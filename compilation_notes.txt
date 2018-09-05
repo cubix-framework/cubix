@@ -1,8 +1,0 @@
-With -O2, compilation takes forever.
-
-We found the following two minimal sets of compilation flags that mitigate this blowup and make compilation manageable:
-
-1: -fno-cse -fno-full-laziness
-2: -fno-specialize -funfolding-creation-threshold=0
-
-If disable everything except CSE and specialise, blow-up still occurs. Remains true with -O1
