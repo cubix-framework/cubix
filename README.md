@@ -150,3 +150,88 @@ Example:
 In C and Java, you will additionally be prompted for the type of the
 parameter to add. Give this type as an AST for `language-c` or
 `language-java` (e.g.: `(PrimType IntT)`, not `int`).
+
+# Running the language test suites
+
+Cubix comes with scripts for running any semantics-preserving
+transformation on language test suites for C, Java, JavaScript, Lua,
+and Python, in the files `scripts/test_java.rb` and similar. To do so:
+
+  1. Follow the below instructions to install the language tests.
+  2. Each .rb file contains a constant at the top like `JAVA_DIR` and
+  `JAVA_TESTS` pointing to the language implementation and tests
+  directory. Modify these appropriately.
+  3. Run `./scripts/test_<lang>.rb <name of transformation>`
+
+These scripts will run the transformation on all tests, run the
+transformed tests, and report the final pass/fail counts.
+
+For all transformations except `id`, they will first run the identity
+transformation, and discard any tests that fail. This rules out tests
+that trigger bugs in the 3rd party parsers/pretty-printers, most (but
+not all) self-referential tests, and tests that the original language
+implementation fails.
+
+They also come with a special `count_loc` parameter that counts the
+total lines of code in all relevant tests.
+
+
+## Installing GCC and GCC torture
+
+
+*Note*: The C instructions are still being updated.
+
+In some directory:
+
+    git clone https://github.com/gcc-mirror/gcc.git
+    cd gcc
+    
+    # If you want the same revision of gcc-torture as in the paper
+    git reset --hard f72de674726c5d054b9d99b0a4db09dfb52bf494
+    
+    cd ..
+    mkdir gcc_build
+    cd gcc_build
+    ../gcc-mirror/configure
+    make -j8
+    make install
+
+## Installing the K-Java test suite
+
+In some directory:
+
+    git clone https://github.com/kframework/java-semantics
+    
+    # If you want the same revision as in the paper
+    cd java-semantics
+    git reset --hard c202266304340a2a4be81fa21ee4fe36b3117ee3
+    
+    
+## Installing test262, the JavaScript spec conformance tests, and the KJS test driver
+
+In some directory:
+
+    git clone https://github.com/kframework/javascript-semantics.git
+    cd javascript-semantics
+    git reset --hard d5aca308d12d3838c645e1f787e2abc9257ce43e # Only if you want the same revision as in the paper
+    make test262
+
+## The Lua tests
+
+As described in the paper, we had to make several modifications to the
+Lua test suite to get them to run with Cubix. In particular, we
+removed several overly self-referential tests, and modified the test
+suite to report the number of passing/total assertions, rather than
+aborting the entire suite on the first failure.
+
+These tests are in the `test/lua/lua-5.3.3-tests` directory.
+
+## Installing the CPython tests
+
+In some directory:
+
+    git clone https://github.com/python/cpython.git
+    cd cpython
+    git reset --hard 7bd4afec86849a57b48f375a9c4e0c32f0539dad # Only if you want the same revision as in the paper
+    ./configure
+    make
