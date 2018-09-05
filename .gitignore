@@ -1,0 +1,7 @@
+.DS_STORE
+.idea
+.stack-work
+out
+a.out
+cubix.cabal
+*.class

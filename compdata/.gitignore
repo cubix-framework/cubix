@@ -1,0 +1,13 @@
+build
+dist
+dummy.cabal
+*~
+*\#
+*.orig
+*.o
+*.hi
+*.tix
+*.mix
+hpcreport
+*.DS_Store
+.stack-work

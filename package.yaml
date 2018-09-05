@@ -1,0 +1,207 @@
+name: cubix
+version: '0.1.0.0'
+synopsis: A framework for multi-language transformation
+description: Please see README.md
+category: language
+author: James Koppel
+maintainer: jkoppel@mit.edu
+copyright: 2016 James Koppel
+license: BSD3
+dependencies:
+- compstrat
+- comptrans
+- containers
+- deepseq
+- mtl
+- transformers
+ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports"
+flags:
+  only-one-language:
+    manual: true
+    default: false
+when:
+    condition: flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+library:
+  source-dirs: src
+  exposed-modules:
+  - Cubix.Analysis.Call.Trivial
+  - Cubix.Language.Info
+  - Cubix.Language.C.Parametric.Common
+  - Cubix.Language.C.Parametric.Full
+  - Cubix.Language.C.Parse
+  - Cubix.Language.Java.Parametric.Common
+  - Cubix.Language.Java.Parametric.Full
+  - Cubix.Language.Java.Parse
+  - Cubix.Language.JavaScript.Parametric.Common
+  - Cubix.Language.JavaScript.Parametric.Full
+  - Cubix.Language.Lua.Parametric.Common
+  - Cubix.Language.Lua.Parametric.Full
+  - Cubix.Language.Parametric.Derive
+  - Cubix.Language.Parametric.InjF
+  - Cubix.Language.Parametric.ProgInfo
+  - Cubix.Language.Parametric.Semantics.Cfg
+  - Cubix.Language.Parametric.Semantics.CfgInserter
+  - Cubix.Language.Parametric.Semantics.SemanticProperties
+  - Cubix.Language.Parametric.Syntax
+  - Cubix.Language.Python.Parametric.Common
+  - Cubix.Language.Python.Parametric.Full
+  - Cubix.ParsePretty
+  - Cubix.Sin.Compdata.Annotation
+  - Cubix.Sin.NFData
+  - Cubix.Transformations.Hoist
+  - Cubix.Transformations.Plumbing.IPT
+  - Cubix.Transformations.TAC
+  - Cubix.Transformations.TestCoverage
+  - Cubix.Transformations.Variation
+  - Language.JavaScript.Pretty.Printer.Extended
+  ghc-options:
+  - -fcontext-stack=200
+  dependencies:
+  - base >=4.7 && <5
+  - cubix-compdata
+  - concurrent-supply >=0.1.7
+  - constraints
+  - data-default
+  - deepseq-generics
+  - fgl
+  - language-c
+  - language-dot
+  - language-java >= 0.2.8.1
+  - language-javascript >= 0.6.0.9
+  - language-lua
+  - language-python
+  - lens
+  - MonadRandom
+  - process
+  - random
+  - template-haskell
+  - temporary
+  - text
+  - th-expand-syns
+  - wl-pprint
+executables:
+  examples-multi:
+    main: Main.hs
+    source-dirs: examples/multi
+    ghc-options:
+     - -threaded
+     - -rtsopts
+     - -with-rtsopts=-N
+     - -fcontext-stack=200
+    dependencies:
+    - base
+    - cubix-compdata
+    - constraints
+    - fgl
+    - language-dot
+    - language-c
+    - language-java >= 0.2.8.1
+    - language-javascript >= 0.6.0.9
+    - language-lua
+    - language-python
+    - cubix
+    - lens
+    - temporary
+    - text
+  # Stack doesn't seem to let you disable building these,
+  # and I'm having trouble guarding these with a flag.
+  # So, commenting out.
+  #examples-basic:
+  #  main: Examples/Multi/Main.hs
+  #  source-dirs: examples/basic
+  #  ghc-options:
+  #  - -threaded
+  #  - -rtsopts
+  #  - -with-rtsopts=-N
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - cubix
+  #examples-c:
+  #  main: Main.hs
+  #  source-dirs: examples/c
+  #  ghc-options:
+  #    - -threaded
+  #    - -rtsopts
+  #    - -with-rtsopts=-N
+  #    - -fcontext-stack=200
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - language-c
+  #  - cubix
+  #examples-java:
+  #  main: Main.hs
+  #  source-dirs: examples/java
+  #  ghc-options:
+  #  - -threaded
+  #  - -rtsopts
+  #  - -with-rtsopts=-N
+  #  - -fcontext-stack=200
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - cubix
+  #  - language-java
+  #examples-javascript:
+  #  main: Main.hs
+  #  source-dirs: examples/javascript
+  #  ghc-options:
+  #  - -threaded
+  #  - -rtsopts
+  #  - -with-rtsopts=-N
+  #  - -fcontext-stack=200
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - language-javascript >= 0.6.0.9
+  #  - cubix
+  #examples-lua:
+  #  main: Main.hs
+  #  source-dirs: examples/lua
+  #  ghc-options:
+  #    - -threaded
+  #    - -rtsopts
+  #    - -with-rtsopts=-N
+  #    - -fcontext-stack=200
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - language-lua
+  #  - cubix
+  #  - lens
+  #  - text
+  #examples-python:
+  #  main: Main.hs
+  #  source-dirs: examples/python
+  #  ghc-options:
+  #    - -threaded
+  #    - -rtsopts
+  #    - -with-rtsopts=-N
+  #    - -fcontext-stack=200
+  #  dependencies:
+  #  - base
+  #  - cubix-compdata
+  #  - language-python
+  #  - cubix
+benchmarks:
+  mainbench:
+    main: Benchmarks.hs
+    source-dirs: benchmarks
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -fcontext-stack=200
+    dependencies:
+     - base
+     - cubix-compdata
+     - criterion
+     - cubix
+     - language-c
+     - language-java >= 0.2.8.1
+     - language-javascript >= 0.6.0.9
+     - language-lua
+     - language-python
+     - lens

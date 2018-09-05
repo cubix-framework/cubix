@@ -1,0 +1,3 @@
+9/22/17
+
+stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'  430.82s user 107.05s system 268% cpu 3:20.65 total

@@ -1,0 +1,175 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
+module Cubix.ParsePretty(
+    ParseFile(..)
+  , Pretty(..)
+
+  , parseLua
+  , prettyLua
+
+#ifndef ONLY_ONE_LANGUAGE
+  , parseC
+  , parseJava
+  , parseJavaScript
+  , parsePython
+
+  , prettyC
+  , prettyJava
+  , prettyJavaScript
+  , prettyPython
+#endif
+  ) where
+
+
+import Control.Monad ( liftM, (>=>) )
+import Control.Monad.Identity ( runIdentity )
+
+import Data.Comp.Multi ( Term, stripA, ann )
+import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
+import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
+
+
+import qualified Language.C as C
+import qualified Language.Java.Pretty as Java
+import qualified Language.JavaScript.Parser as JS
+import qualified Language.JavaScript.Pretty.Printer.Extended as JS
+import qualified Language.Lua.Annotated as Lua
+import qualified Language.Lua.Annotated.Lexer as Lua
+import qualified Language.Lua.PrettyPrinter as Lua
+import qualified Language.Lua.Annotated.Simplify as Lua
+import qualified Language.Python.Common as Python
+import qualified Language.Python.Version3.Parser as Python
+
+import Cubix.Language.Info
+
+import Cubix.Language.C.Parametric.Common as CCommon
+import qualified Cubix.Language.C.Parametric.Full as CFull
+import qualified Cubix.Language.C.Parse as CParse
+import qualified Cubix.Language.Java.Parse as JParse
+import Cubix.Language.Java.Parametric.Common as JCommon
+import qualified Cubix.Language.Java.Parametric.Full as JFull
+import Cubix.Language.JavaScript.Parametric.Common as JSCommon
+import qualified Cubix.Language.JavaScript.Parametric.Full as JSFull
+import Cubix.Language.Lua.Parametric.Common as LCommon
+import qualified Cubix.Language.Lua.Parametric.Full as LFull
+import Cubix.Language.Python.Parametric.Common as PCommon
+import qualified Cubix.Language.Python.Parametric.Full as PFull
+
+
+type family RootSort (f :: (* -> *) -> * -> *)
+
+class ParseFile f where
+  parseFile :: FilePath -> IO (Maybe (Term f (RootSort f)))
+
+class Pretty f where
+  pretty :: Term f (RootSort f) -> String
+
+  -- FIXME: The only reason this is needed is because Project forgets
+  -- what sort its contents are
+  prettyUnsafe :: Term f l -> String
+  default prettyUnsafe :: (DynCase (Term f) (RootSort f)) => Term f l -> String
+  prettyUnsafe = pretty . fromDynProj
+
+-- | NOTE: This reflects the half-finished transition of Lua to annotated terms
+parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
+parseLua path = do
+    res <- Lua.parseFile path
+    case res of
+     Left errors -> print errors >> return Nothing
+     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
+  where
+    toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
+    toSourceSpan x = Just $ mkSourceSpan (Lua.sourcePosName from) (Lua.sourcePosLine from, Lua.sourcePosColumn from)
+                                                                  (Lua.sourcePosLine to,   Lua.sourcePosColumn to)
+      where
+        from = Lua.sourceFrom x
+        to   = Lua.sourceTo   x
+
+prettyLua :: MLuaTerm LBlockL -> String
+prettyLua = show . Lua.pprint . Lua.sBlock . LFull.untranslate . ann Nothing . LCommon.untranslate
+
+type instance RootSort MLuaSig = LBlockL
+instance ParseFile MLuaSig where parseFile = parseLua
+instance Pretty MLuaSig where pretty = prettyLua
+
+#ifndef ONLY_ONE_LANGUAGE
+
+parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
+parseC path = do
+  res <- CParse.parse path
+  case res of
+    Left errors -> print errors >> return Nothing
+    Right tree -> return $ Just $ CCommon.translate $ CFull.translate $ fmap (const ()) tree
+
+
+dummyNodeInfo :: C.NodeInfo
+dummyNodeInfo = C.mkNodeInfoOnlyPos C.nopos
+
+
+prettyC :: MCTerm CTranslationUnitL -> String
+prettyC = show . C.pretty . fmap (const dummyNodeInfo) . CFull.untranslate . CCommon.untranslate
+
+type instance RootSort MCSig = CTranslationUnitL
+instance ParseFile MCSig where parseFile = parseC
+instance Pretty MCSig where pretty = prettyC
+
+parseJava :: FilePath -> IO (Maybe (MJavaTerm CompilationUnitL))
+parseJava path = do
+  res <- JParse.parse path
+  case res of
+    Left  x -> return Nothing
+    Right p -> return $ Just $ JCommon.translate $ JFull.translate p
+
+
+prettyJava :: MJavaTerm CompilationUnitL -> String
+prettyJava = Java.prettyPrint . JFull.untranslate . JCommon.untranslate
+
+
+type instance RootSort MJavaSig = CompilationUnitL
+instance ParseFile MJavaSig where parseFile = parseJava
+instance Pretty MJavaSig where pretty = prettyJava
+
+parseJavaScript :: FilePath -> IO (Maybe (MJSTerm JSASTL))
+parseJavaScript path = liftM (Just . JSCommon.translate . normalizeJS . JSFull.translate) $ JS.parseFile path
+  where
+    normalizeJS :: JSFull.JSTerm JSASTL -> JSFull.JSTerm JSASTL
+    normalizeJS t = runIdentity $ allbuR (promoteR normalizeSemi >=> promoteR normalizeAnno) t
+
+    normalizeSemi :: (Monad m) => RewriteM m JSFull.JSTerm JSSemiL
+    normalizeSemi _ = return (iJSSemi iJSNoAnnot)
+
+    normalizeAnno :: (Monad m) => RewriteM m JSFull.JSTerm JSAnnotL
+    normalizeAnno _ = return iJSNoAnnot
+
+prettyJavaScript :: MJSTerm JSASTL -> String
+prettyJavaScript =  JS.prettyPrint . JSFull.untranslate . JSCommon.untranslate
+
+
+type instance RootSort MJSSig = JSASTL
+instance ParseFile MJSSig where parseFile = parseJavaScript
+instance Pretty MJSSig where pretty = prettyJavaScript
+
+parsePython :: FilePath -> IO (Maybe (MPythonTerm PCommon.ModuleL))
+parsePython path = do
+  contents <- readFile path
+  let res = Python.parseModule contents path
+  case res of
+    Left  e     -> print e >> return Nothing
+    Right (m, _) -> return $ Just $ PCommon.translate $ PFull.translate $ fmap (const ()) m
+
+prettyPython :: MPythonTerm PCommon.ModuleL -> String
+prettyPython = show . Python.pretty . PFull.untranslate . PCommon.untranslate
+
+
+type instance RootSort MPythonSig = PCommon.ModuleL
+instance ParseFile MPythonSig where parseFile = parsePython
+instance Pretty MPythonSig where pretty = prettyPython
+
+#endif

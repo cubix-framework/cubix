@@ -1,0 +1,72 @@
+Name:                   cubix-compdata
+Version:                        1.0
+Synopsis:                       Compositional Data Types for Cubix
+Description: This is forked from Patrick Bahr's compdata library to be more tightly integrated with Cubix
+
+
+Category:               Generics
+License:                BSD3
+License-file:           LICENSE
+Author:                 Patrick Bahr, Tom Hvitved
+Maintainer:             paba@diku.dk
+Build-Type:             Simple
+Cabal-Version:          >=1.9.2
+bug-reports:            https://github.com/pa-ba/compdata/issues
+
+extra-source-files:
+  -- test files
+  testsuite/tests/*.hs
+  testsuite/tests/Data/*.hs
+  testsuite/tests/Data/Comp/Multi/*.hs
+  testsuite/tests/Data/Comp/Examples/*.hs
+  testsuite/tests/Test/Utils.hs
+  -- example files
+  examples/Examples/Multi/*.hs
+
+library
+  Exposed-Modules:      Data.Comp.Derive.Utils
+                        Data.Comp.Ops
+
+                        Data.Comp.Multi
+                        Data.Comp.Multi.Term
+                        Data.Comp.Multi.Sum
+                        Data.Comp.Multi.HFunctor
+                        Data.Comp.Multi.HFoldable
+                        Data.Comp.Multi.HTraversable
+                        Data.Comp.Multi.Algebra
+                        Data.Comp.Multi.Annotation
+                        Data.Comp.Multi.Show
+                        Data.Comp.Multi.Equality
+                        Data.Comp.Multi.Ordering
+                        Data.Comp.Multi.Variables
+                        Data.Comp.Multi.Ops
+                        Data.Comp.Multi.Mapping
+                        Data.Comp.Multi.Derive
+                        Data.Comp.Multi.Generic
+                        Data.Comp.Multi.Projection
+                        Data.Comp.Multi.Mutable
+
+  Other-Modules:        Data.Comp.SubsumeCommon
+
+                        Data.Comp.Multi.Derive.HFunctor
+                        Data.Comp.Multi.Derive.HFoldable
+                        Data.Comp.Multi.Derive.HTraversable
+                        Data.Comp.Multi.Derive.Equality
+                        Data.Comp.Multi.Derive.Ordering
+                        Data.Comp.Multi.Derive.Show
+                        Data.Comp.Multi.Derive.SmartConstructors
+
+  Build-Depends:        base >= 4.7, base < 5, template-haskell, containers, mtl >= 2.2.1, QuickCheck >= 2 && < 2.9, derive,
+                        deepseq, th-expand-syns, transformers
+  Extensions:           FlexibleContexts
+  hs-source-dirs:       src
+  ghc-options:          -W
+
+
+Test-Suite test
+  Type:                 exitcode-stdio-1.0
+  Main-is:                      Data_Test.hs
+  hs-source-dirs:               testsuite/tests examples src
+  Build-Depends:        base >= 4.7, base < 5, template-haskell, containers, mtl >= 2.2.1, QuickCheck >= 2 && < 2.9, 
+                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2 >= 0.3, derive,
+                        th-expand-syns, deepseq, transformers

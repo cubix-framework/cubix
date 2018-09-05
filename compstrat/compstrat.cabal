@@ -1,0 +1,60 @@
+Name:                compstrat
+Version:             0.1.0.2
+Synopsis:            Strategy combinators for compositional data types
+Description:         
+
+    A library for strategic programming on compositional data types. See
+    /The Essence of Strategic Programming/, <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.104.5296&rep=rep1&type=pdf>,
+    by Ralf Laemmel et al.
+    .
+    Strategic programming is a way of allowing traversals to be written in a highly
+    generic and composable fashion.
+    .
+    The names and general interface are modeled on the KURE library,
+    but this library tries to be as composable as the lens library.
+    .
+    The type of a
+    strategy combinator is the same as the /Vertical/ type
+    that ekmett proposed and rejected as an extension to the current
+    lens library. A /Vertical/ is essentially a monadic traversal. This hence
+    could potentially be merged with the lens library.
+License:             BSD3
+License-File:        LICENSE
+Author:              James Koppel
+Maintainer:          jkoppel@mit.edu
+Category:            Language, Generics
+build-type:          Simple
+extra-source-files:  README.md
+Cabal-version:       >=1.9.2
+
+Source-Repository head
+  Type: git
+  Location: https://github.com/jkoppel/compstrat
+
+Library
+
+  Exposed-Modules:     
+                     Data.Comp.Multi.Strategic
+                     Data.Comp.Multi.Strategy.Classification
+                     Data.Comp.Multi.Strategy.Derive
+
+  Build-Depends:
+
+                     base >=4.8
+                   , cubix-compdata
+                   , mtl < 2.3
+                   , parallel >= 3.2
+                   , template-haskell
+                   , th-expand-syns <= 0.4.0.0
+                   , transformers < 0.5
+
+  Ghc-Options:     -O2 -threaded -rtsopts
+
+--Executable examples
+--  Hs-Source-Dirs:  examples
+--  Main-Is:         Examples.Multi.Main
+--  Ghc-Options:     -O2 -threaded -rtsopts -with-rtsopts=-N
+--  Build-Depends:   compdata
+--                 , compstrat
+--                 , comptrans
+                  
