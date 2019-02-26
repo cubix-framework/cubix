@@ -22,8 +22,8 @@ It currently supports C, Java, JavaScript, Lua, and Python.
 The Cubix system itself, and the general incremental parametric syntax
 approach, is described in the OOPSLA 2018 paper:
 
-* *One Tool, Many Languages: Language-Parametric Transformation with
-  Incremental Parametric Syntax*; James Koppel et al
+* [*One Tool, Many Languages: Language-Parametric Transformation with
+  Incremental Parametric Syntax*; James Koppel et al](http://www.jameskoppel.com/files/papers/oopsla18main-p221-p.pdf)
   
 We also recommend reading the following papers to get the necessary
 background in generic programming to understand Cubix:
