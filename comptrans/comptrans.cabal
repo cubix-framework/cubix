@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.20.0.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 30a834f7d6172930dc4cbc23d6bc5eadc17d9be464bae4ee88250ffff540bbc4
+-- hash: 5e640736f5c83c05ca93d56cb441deeb87a5c981c707001110da833f11ef5ec4
 
 name:           comptrans
 version:        0.1.0.5
@@ -25,7 +27,6 @@ maintainer:     James Koppel
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
 
 source-repository head
   type: git
@@ -36,19 +37,19 @@ library
       ./.
   ghc-options: -Wall
   build-depends:
-      base >=4.7
+      base
     , bytestring
-    , containers <=0.6
+    , containers
     , cubix-compdata
-    , deepseq <1.5
-    , deepseq-generics <=0.2.0.0
-    , ghc-prim >=0.2
-    , lens <5
+    , deepseq
+    , deepseq-generics
+    , ghc-prim
+    , lens
     , mtl
     , syb
     , template-haskell
     , text
-    , th-expand-syns <=0.4.0.0
+    , th-expand-syns
     , transformers
   exposed-modules:
       Data.Comp.Derive.Generic
