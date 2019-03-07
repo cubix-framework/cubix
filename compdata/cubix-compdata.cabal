@@ -56,7 +56,7 @@ library
                         Data.Comp.Multi.Derive.Show
                         Data.Comp.Multi.Derive.SmartConstructors
 
-  Build-Depends:        base >= 4.7, base < 5, template-haskell, containers, mtl >= 2.2.1, QuickCheck >= 2 && < 2.9, derive,
+  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, derive,
                         deepseq, th-expand-syns, transformers
   Extensions:           FlexibleContexts
   hs-source-dirs:       src
@@ -67,6 +67,6 @@ Test-Suite test
   Type:                 exitcode-stdio-1.0
   Main-is:                      Data_Test.hs
   hs-source-dirs:               testsuite/tests examples src
-  Build-Depends:        base >= 4.7, base < 5, template-haskell, containers, mtl >= 2.2.1, QuickCheck >= 2 && < 2.9, 
-                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2 >= 0.3, derive,
+  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
+                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2, derive,
                         th-expand-syns, deepseq, transformers

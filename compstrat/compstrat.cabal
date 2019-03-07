@@ -40,13 +40,13 @@ Library
 
   Build-Depends:
 
-                     base >=4.8
+                     base
                    , cubix-compdata
-                   , mtl < 2.3
-                   , parallel >= 3.2
+                   , mtl
+                   , parallel
                    , template-haskell
-                   , th-expand-syns <= 0.4.0.0
-                   , transformers < 0.5
+                   , th-expand-syns
+                   , transformers
 
   Ghc-Options:     -O2 -threaded -rtsopts
 
