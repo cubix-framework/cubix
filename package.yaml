@@ -57,6 +57,7 @@ library:
   - Language.JavaScript.Pretty.Printer.Extended
   ghc-options:
   - -fcontext-stack=200
+  - -O0
   dependencies:
   - base
   - cubix-compdata
