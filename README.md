@@ -22,7 +22,8 @@ It currently supports C, Java, JavaScript, Lua, and Python.
 The Cubix system itself, and the general incremental parametric syntax
 approach, is described in the OOPSLA 2018 paper:
 
-* [*One Tool, Many Languages: Language-Parametric Transformation with
+* 
+*One Tool, Many Languages: Language-Parametric Transformation with
   Incremental Parametric Syntax*; James Koppel et al](http://www.jameskoppel.com/files/papers/oopsla18main-p221-p.pdf)
   
 We also recommend reading the following papers to get the necessary
@@ -84,6 +85,8 @@ third-party frontends.
 You are now ready to run Cubix transformations:
 
     stack exec examples-multi java hoist input-files/java/Foo.java
+    
+Cubix has many dependencies, several of which are not on Hackage/Stackage, including some forks of Hackage libraries whose changes have not been merged upstream. This makes it more difficult to create a new package which depends on Cubix. For an example of how to do this, see https://github.com/jkoppel/using-cubix-example].
 
 # Compilation notes
 
