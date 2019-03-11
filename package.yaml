@@ -14,7 +14,7 @@ dependencies:
 - deepseq
 - mtl
 - transformers
-ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports"
+ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports -O0"
 flags:
   only-one-language:
     manual: true
@@ -57,7 +57,6 @@ library:
   - Language.JavaScript.Pretty.Printer.Extended
   ghc-options:
   - -fcontext-stack=200
-  - -O0
   dependencies:
   - base
   - cubix-compdata
