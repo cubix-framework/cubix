@@ -85,7 +85,7 @@ You are now ready to run Cubix transformations:
 
     stack exec examples-multi java hoist input-files/java/Foo.java
     
-Cubix has many dependencies, several of which are not on Hackage/Stackage, including some forks of Hackage libraries whose changes have not been merged upstream. This makes it more difficult to create a new package which depends on Cubix. For an example of how to do this, see [https://github.com/jkoppel/using-cubix-example].
+Cubix has many dependencies, several of which are not on Hackage/Stackage, including some forks of Hackage libraries whose changes have not been merged upstream. This makes it more difficult to create a new package which depends on Cubix. For an example of how to do this, see https://github.com/jkoppel/using-cubix-example.
 
 # Compilation notes
 
