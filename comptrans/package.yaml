@@ -31,20 +31,19 @@ maintainer: James Koppel
 license: BSD3
 github: jkoppel/comptrans
 dependencies:
-- base <5
-- base >=4.7
+- base
 - bytestring
-- containers <=0.6
+- containers
 - cubix-compdata
-- deepseq <1.5
-- deepseq-generics <=0.2.0.0
-- ghc-prim >=0.2
-- lens <5
+- deepseq
+- deepseq-generics
+- ghc-prim
+- lens
 - mtl
 - syb
 - template-haskell
 - text
-- th-expand-syns <=0.4.0.0
+- th-expand-syns
 - transformers
 library:
   ghc-options: -Wall

@@ -14,7 +14,7 @@ dependencies:
 - deepseq
 - mtl
 - transformers
-ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports"
+ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports -O0"
 flags:
   only-one-language:
     manual: true
@@ -58,7 +58,7 @@ library:
   ghc-options:
   - -fcontext-stack=200
   dependencies:
-  - base >=4.7 && <5
+  - base
   - cubix-compdata
   - concurrent-supply >=0.1.7
   - constraints
