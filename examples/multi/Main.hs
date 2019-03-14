@@ -8,7 +8,7 @@
 
 module Main where
 
-import Control.Monad ( liftM, (<=<), (=<<) )
+import Control.Monad ( when, liftM, (<=<), (=<<) )
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char  ( toLower )
@@ -276,9 +276,9 @@ doTransform language transform file = do
 -- with other transformations
 
 main = do
-  putStrLn description
   args <- getArgs
-  if length args < 3 then
+  if length args < 3 then do
+    when (length args == 0) $ putStrLn description
     putStrLn usage
    else
      let (language, cmd) = (downcase (args !! 0), downcase (args !! 1)) in
