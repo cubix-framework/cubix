@@ -276,10 +276,11 @@ doTransform language transform file = do
 -- with other transformations
 
 main = do
-  putStrLn description
   args <- getArgs
-  if length args < 3 then
-    putStrLn usage
+  if length args == 0 then
+    putStrLn $ description ++ usage
+   else if length args < 3 then
+     putStrLn usage
    else
      let (language, cmd) = (downcase (args !! 0), downcase (args !! 1)) in
      if isTransform cmd then
