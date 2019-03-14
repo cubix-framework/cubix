@@ -276,6 +276,7 @@ doTransform language transform file = do
 -- with other transformations
 
 main = do
+  putStrLn description
   args <- getArgs
   if length args < 3 then
     putStrLn usage
@@ -290,6 +291,12 @@ main = do
      else
        putStrLn usage
 
+
+description :: String
+description = "Cubix 0.1.0.0\n"
+           ++ "Cubix is a framework for language-parametric program "
+           ++ "transformation. It currently supports C, Java, JavaScript, "
+           ++ "Lua, and Python.\n"
 
 usage :: String
 usage =  "Usage:\n"
