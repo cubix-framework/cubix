@@ -76,7 +76,7 @@ First, download the sub-libraries `comptrans` and `compstrat`
     
 Second, build Cubix:
 
-    stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
+    stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'
 
 You may be prompted for your Github credentials to download the
 third-party frontends.
