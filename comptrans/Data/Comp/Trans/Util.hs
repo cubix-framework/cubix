@@ -123,6 +123,7 @@ baseTypes :: [Type]
 baseTypes = [ ConT ''Int
             , ConT ''Bool
             , ConT ''Char
+            , ConT ''Float
             , ConT ''Double
             , ConT ''Integer
             , ConT ''String
