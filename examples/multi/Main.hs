@@ -8,7 +8,7 @@
 
 module Main where
 
-import Control.Monad ( liftM, (<=<), (=<<) )
+import Control.Monad ( when, liftM, (<=<), (=<<) )
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char  ( toLower )
@@ -277,7 +277,8 @@ doTransform language transform file = do
 
 main = do
   args <- getArgs
-  if length args < 3 then
+  if length args < 3 then do
+    when (length args == 0) $ putStrLn description
     putStrLn usage
    else
      let (language, cmd) = (downcase (args !! 0), downcase (args !! 1)) in
@@ -290,6 +291,12 @@ main = do
      else
        putStrLn usage
 
+
+description :: String
+description = "Cubix 0.1.0.0\n"
+           ++ "Cubix is a framework for language-parametric program "
+           ++ "transformation. It currently supports C, Java, JavaScript, "
+           ++ "Lua, and Python.\n"
 
 usage :: String
 usage =  "Usage:\n"
