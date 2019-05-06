@@ -112,14 +112,14 @@ Adding "--flag cubix:only-one-language" to the build command will turn on a comp
 # Directory Overview
 
 Overview of directories (corresponding to the top-level of the zip file, and the /cubix directory on the Docker image):
-/stack.yaml         # High-level build description
-/package.yaml     # Low-level build description 
-/examples           # Example transformations built with Cubix
-/examples/multi # The main driver for the multi-language transformations
-/comptrans         # Source code for the comptrans library
-/compstrat          # Source code for compstrat, our library for Strategic Programming with Compositional Datatypes
-/input-files         # Small test inputs in each of the 5 languages
-/scripts               # Scripts for running the transformations over compiler test suites
+    /stack.yaml         # High-level build description
+    /package.yaml     # Low-level build description 
+    /examples           # Example transformations built with Cubix
+    /examples/multi # The main driver for the multi-language transformations
+    /comptrans         # Source code for the comptrans library
+    /compstrat          # Source code for compstrat, our library for Strategic Programming with Compositional Datatypes
+    /input-files         # Small test inputs in each of the 5 languages
+    /scripts               # Scripts for running the transformations over compiler test suites
 
 # Running the built-in transformations and analyses
 
