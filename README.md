@@ -107,7 +107,9 @@ occurs. Remains true with -O1
 
 Adding "--flag cubix:only-one-language" to the build command will turn on a compile flag that disables building support for all languages except Lua, the smallest language. This greatly speeds compilation times, to the point where we are able to compile with -O2. Some of the performance reports in cubix/benchmarks/reports were compiled with this flag.
 
+# Docker Image
 
+A Docker image containing the version of Cubix submitted to OOPSLA 2018 along with runs of all the experiments, including the human study, is available from https://zenodo.org/record/1413855 .
 
 # Directory Overview
 
