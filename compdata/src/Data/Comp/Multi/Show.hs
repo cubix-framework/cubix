@@ -21,6 +21,7 @@
 
 module Data.Comp.Multi.Show
     ( ShowHF(..)
+    , KShow(..)
     ) where
 
 import Data.Comp.Multi.Algebra
