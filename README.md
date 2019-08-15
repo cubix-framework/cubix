@@ -126,7 +126,7 @@ Overview of directories (corresponding to the top-level of the zip file, and the
 
 # Running the built-in transformations and analyses
 
-Use this command from the "languages" directory (the one that contains "stack.yaml"):
+Use this command from the top-level directory (the one that contains "stack.yaml"):
 
     stack exec examples-multi
     
