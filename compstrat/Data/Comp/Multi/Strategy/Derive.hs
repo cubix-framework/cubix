@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP             #-}
 
 module Data.Comp.Multi.Strategy.Derive (
     makeDynCase
@@ -18,7 +19,8 @@ import Data.Comp.Multi.Strategy.Classification ( KDynCase, kdyncase )
 
 makeDynCase :: Name -> Q [Dec]
 makeDynCase fname = do
-          TyConI (DataD _cxt tname targs constrs _deriving) <- abstractNewtypeQ $ reify fname
+          -- TODO: replace abstractNewtypeQ with generic definitionn from Data.Comp.Derive.Utils
+          TyConI (DataD _cxt tname targs _ constrs _deriving) <- abstractNewtypeQ $ reify fname
           let iVar = tyVarBndrName $ last targs
           let labs = nub $ catMaybes $ map (iTp iVar) constrs
           let cons = map (abstractConType &&& iTp iVar) constrs
@@ -39,7 +41,7 @@ makeDynCase fname = do
            instTp  <- forallT []
                               (return [])
                               (foldl appT (conT ''KDynCase) [conT tname, return tp])
-           return $ InstanceD [] instTp body
+           return $ InstanceD Nothing [] instTp body
   
        mkClause :: Type -> ((Name, Int), Maybe Type) -> Q [Clause]
        mkClause tp (con, Just tp')
@@ -65,8 +67,8 @@ abstractNewtypeQ = liftM abstractNewtype
   @data@ declarations.
 -}
 abstractNewtype :: Info -> Info
-abstractNewtype (TyConI (NewtypeD cxt name args constr derive))
-    = TyConI (DataD cxt name args [constr] derive)
+abstractNewtype (TyConI (NewtypeD cxt name args mk constr derive))
+    = TyConI (DataD cxt name args mk [constr] derive)
 abstractNewtype owise = owise
 
 

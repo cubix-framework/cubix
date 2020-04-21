@@ -225,8 +225,8 @@ prunetdRF :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewrit
 prunetdRF f = f +> anyR (prunetdRF f)
 
 -- | Like prunetdRF, but the outer level always succeeds
-prunetdR :: (Monad m, HTraversable f) => GRewriteM (MaybeT m) (Cxt h f a) -> GRewriteM m (Cxt h f a)
-prunetdR = tryR . prunetdRF
+prunetdR :: forall m f h a.(Monad m, HTraversable f) => GRewriteM (MaybeT m) (Cxt h f a) -> GRewriteM m (Cxt h f a)
+prunetdR f = tryR (prunetdRF f)
 
 -- | Applies a rewrite to the first node where it can succeed in a bottom-up traversal
 onebuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
