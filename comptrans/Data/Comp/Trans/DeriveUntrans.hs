@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP             #-}
 
 module Data.Comp.Trans.DeriveUntrans (
     deriveUntrans
@@ -82,13 +83,24 @@ deriveUntrans names term = do targDec <- mkTarg targNm
 {- type family Targ l -}
 mkTarg :: Name -> CompTrans [Dec]
 mkTarg targNm = do i <- lift $ newName "i"
+#if __GLASGOW_HASKELL__ < 800
                    return [FamilyD TypeFam targNm [PlainTV i] Nothing]
+#else
+                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i] NoSig Nothing)]
+#endif
 
 {- newtype T l = T { t :: Targ l } -}
 mkWrapper :: Name -> Name -> Name -> CompTrans [Dec]
 mkWrapper tpNm fNm targNm = do i <- lift $ newName "i"
-                               let con = RecC tpNm [(fNm, NotStrict, AppT (ConT targNm) (VarT i))]
-                               return [NewtypeD [] tpNm [PlainTV i] con []]
+                               let con = RecC tpNm [(fNm, bang, AppT (ConT targNm) (VarT i))]
+#if __GLASGOW_HASKELL__ < 800
+                                   bang = NotStrict
+                                   nt   = NewtypeD [] tpNm [PlainTV i] con []
+#else
+                                   bang = Bang NoSourceUnpackedness NoSourceStrictness
+                                   nt   = NewtypeD [] tpNm [PlainTV i] Nothing con []
+#endif
+                               return [nt]
 {-
   untranslate :: JavaTerm l -> Targ l
   untranslate = t . cata untrans
@@ -140,9 +152,18 @@ mkInstance classNm funNm wrap unwrap targNm typNm = do inf <- lift $ reify typNm
                                                               , inst clauses instTyp
                                                               ]
   where
-    famInst targTyp = TySynInstD targNm (TySynEqn [ConT $ nameLab typNm] targTyp)
+    famInst targTyp =
+#if __GLASGOW_HASKELL__ < 800
+      TySynInstD targNm (TySynEqn [ConT $ nameLab typNm] targTyp)
+#else
+      TySynInstD (TySynEqn Nothing (AppT (ConT targNm) (ConT $ nameLab typNm)) targTyp)
+#endif
 
-    inst clauses instTyp =  InstanceD []
+    inst clauses instTyp =  InstanceD
+#if __GLASGOW_HASKELL__ >= 800
+                                      Nothing
+#endif
+                                      []
                                       (AppT (ConT classNm) instTyp)
                                       [FunD funNm clauses]
 

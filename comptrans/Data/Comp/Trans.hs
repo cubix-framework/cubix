@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP             #-}
 
 -- |
 -- 
@@ -117,8 +118,13 @@ generateNameLists root = do
 getLabels :: [Name] -> CompTrans [Type]
 getLabels nms = mapM toLabel nms
   where
-    toLabel n = do TyConI (DataD _ n' _ _ _) <- lift $ reify $ nameLab n
-                   return $ ConT n'
+    toLabel n = do
+#if __GLASGOW_HASKELL__ < 800
+      TyConI (DataD _ n' _ _ _) <- lift $ reify $ nameLab n
+#else
+      TyConI (DataD _ n' _ _ _ _) <- lift $ reify $ nameLab n
+#endif
+      return $ ConT n'
 
 getTypeParamVars :: [Name] -> CompTrans [Name]
 getTypeParamVars = liftM concat . mapM getTypeArgs

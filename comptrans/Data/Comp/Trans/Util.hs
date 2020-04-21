@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP             #-}
 
 module Data.Comp.Trans.Util
   (
@@ -165,8 +166,13 @@ modNameBase :: (String -> String) -> Name -> Name
 modNameBase f = mkName . f . nameBase
 
 simplifyDataInf :: Info -> [(Name, [Type])]
+#if __GLASGOW_HASKELL__ < 800
 simplifyDataInf (TyConI (DataD _ _ _ cons _))   = map extractCon cons
 simplifyDataInf (TyConI (NewtypeD _ _ _ con _)) = [extractCon con]
+#else
+simplifyDataInf (TyConI (DataD _ _ _ _ cons _))   = map extractCon cons
+simplifyDataInf (TyConI (NewtypeD _ _ _ _ con _)) = [extractCon con]
+#endif
 simplifyDataInf _                               = error "Attempted to derive multi-sorted compositional data type for non-nullary datatype"
 
 extractCon :: Con -> (Name, [Type])
@@ -179,8 +185,13 @@ getTypeArgs :: Name -> CompTrans [Name]
 getTypeArgs nm = do
   inf <- lift $ reify nm
   case inf of
+#if __GLASGOW_HASKELL__ < 800
     TyConI (DataD _ _ tvs _ _)    -> return $ getNames tvs
     TyConI (NewtypeD _ _ tvs _ _) -> return $ getNames tvs
+#else
+    TyConI (DataD _ _ tvs _ _ _)    -> return $ getNames tvs
+    TyConI (NewtypeD _ _ tvs _ _ _) -> return $ getNames tvs
+#endif
     _                             -> return []
 
 getNames :: [TyVarBndr] -> [Name]
