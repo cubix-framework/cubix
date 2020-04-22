@@ -5,7 +5,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE CPP #-}
 
 -- |
 -- Allows you to derive instances of GHC.Generics for compositional data types.
@@ -62,21 +61,12 @@ data GenericExample
 
 makeInstancesLike :: [Name] -> [Type] -> Q [Dec] -> Q [Dec]
 makeInstancesLike cons labs example = do
-#if __GLASGOW_HASKELL__ < 800
-  [InstanceD [] (AppT (ConT tc) _) b] <- example
-#else
-  [InstanceD _ [] (AppT (ConT tc) _) b] <- example
-#endif
-  return [makeInstanceLike tc c l b | c <- cons, l <- labs]
+  [InstanceD ov [] (AppT (ConT tc) _) b] <- example
+  return [makeInstanceLike ov tc c l b | c <- cons, l <- labs]
 
--- TODO: Should makeInstanceLike take account of original overlap annotation?
-makeInstanceLike :: Name -> Name -> Type -> [Dec] -> Dec
-makeInstanceLike tc c l b =
-#if __GLASGOW_HASKELL__ < 800
-  InstanceD [] (AppT (ConT tc) (AppT (ConT c) l)) b
-#else
-  InstanceD Nothing [] (AppT (ConT tc) (AppT (ConT c) l)) b
-#endif
+makeInstanceLike :: Maybe Overlap -> Name -> Name -> Type -> [Dec] -> Dec
+makeInstanceLike ov tc c l b =
+  InstanceD ov [] (AppT (ConT tc) (AppT (ConT c) l)) b
 
 --------------------------------------------------------------------------------
 -- Deriving Generic
@@ -127,11 +117,7 @@ makeGenericInstance typNm lab = do
                    ]
              where
                one = liftM head
-#if __GLASGOW_HASKELL__ < 800
-               addDecs (InstanceD c t ds) ds' = return $ [InstanceD c t (ds++ds')]
-#else
                addDecs (InstanceD ov c t ds) ds' = return $ [InstanceD ov c t (ds++ds')]
-#endif
                mkClause (pat, expr) = Clause [pat] (NormalB expr) []
 
                getEVar (AppT (VarT n) _) = Just n
@@ -174,11 +160,7 @@ addSumExp (e:es) = [AppE (ConE 'L1) e] ++ map (\f -> AppE (ConE 'R1) f) (addSumE
 
 matchingCon :: Type -> Name -> Q Bool
 matchingCon t nm = do
-#if __GLASGOW_HASKELL__ < 800
-  (DataConI _ tp parentNm _) <- reify nm
-#else
   (DataConI _ tp parentNm) <- reify nm
-#endif
   return $ cxtlessUnifiable (extractLab tp parentNm) t
 
 

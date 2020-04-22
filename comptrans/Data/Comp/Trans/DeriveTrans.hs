@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP             #-}
 
 module Data.Comp.Trans.DeriveTrans
   (
@@ -121,9 +120,7 @@ mkInstance transAlts classNm funNm typNm = do
   clauses <- mapM (uncurry $ mkClause transAlts funNm) nmTyps
   let targNm = nameLab typNm
   return (InstanceD
-#if __GLASGOW_HASKELL__ >= 800
                    Nothing
-#endif
                    []
                    (AppT (AppT (ConT classNm) srcTyp) (ConT targNm))
                    [FunD funNm clauses])
