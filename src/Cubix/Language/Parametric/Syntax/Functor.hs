@@ -517,39 +517,39 @@ liftF f = insertF . f . extractF
 mapF :: (InsertF f h, ExtractF f g, Functor f, Typeable b) => (g a -> h b) -> g (f a) -> h (f b)
 mapF f = liftF (fmap f)
 
-pattern Just' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a (Maybe l)
+pattern Just' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a (Maybe l)
 pattern Just' x <- (project -> (Just (JustF x))) where
   Just' x = inject $ JustF x
 
-pattern Nothing' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a (Maybe l)
+pattern Nothing' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a (Maybe l)
 pattern Nothing' <- (project -> Just NothingF) where
   Nothing' = inject NothingF
 
 
-pattern NilF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a [l]
+pattern NilF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a [l]
 pattern NilF' <- (project -> Just NilF) where
   NilF' = inject NilF
 
-pattern ConsF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
+pattern ConsF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
 pattern ConsF' x xs <- (project -> (Just (ConsF x xs))) where
   ConsF' x xs = inject $ ConsF x xs
 
-pattern SingletonF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l]
+pattern SingletonF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l]
 pattern SingletonF' x = ConsF' x NilF'
 
-pattern PairF' :: () => (PairF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l -> Cxt h f a l' -> Cxt h f a (l, l')
+pattern PairF' :: (PairF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l -> Cxt h f a l' -> Cxt h f a (l, l')
 pattern PairF' x y <- (project -> (Just (PairF x y))) where
   PairF' x y = inject $ PairF x y
 
-pattern TripleF' :: () => (TripleF :<: f, Typeable i, Typeable j, Typeable k, HFunctor f) => Cxt h f a i -> Cxt h f a j -> Cxt h f a k -> Cxt h f a (i,j,k)
+pattern TripleF' :: (TripleF :<: f, Typeable i, Typeable j, Typeable k, HFunctor f) => Cxt h f a i -> Cxt h f a j -> Cxt h f a k -> Cxt h f a (i,j,k)
 pattern TripleF' x y z <- (project -> Just (TripleF x y z)) where
   TripleF' x y z = inject $ TripleF x y z
 
-pattern Left'  :: () => (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l  -> Cxt h f a (Either l l')
+pattern Left'  :: (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l  -> Cxt h f a (Either l l')
 pattern Left'  x <- (project -> (Just (LeftF x))) where
   Left'  x = inject $ LeftF x
 
-pattern Right' :: () => (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l' -> Cxt h f a (Either l l')
+pattern Right' :: (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l' -> Cxt h f a (Either l l')
 pattern Right' x <- (project -> (Just (RightF x))) where
   Right' x = inject $ RightF x
 
@@ -558,14 +558,14 @@ pattern Right' x <- (project -> (Just (RightF x))) where
 -- |
 -- I really don't like having to copy variants for annotated versions, but must with current design
 
-pattern JustA' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a (Maybe l)
+pattern JustA' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a (Maybe l)
 pattern JustA' x <- (project' -> (Just (JustF x)))
 
-pattern NilFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a [l]
+pattern NilFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a [l]
 pattern NilFA' <- (project' -> Just NilF)
 
-pattern ConsFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l] -> Cxt h (f :&: p) a [l]
+pattern ConsFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l] -> Cxt h (f :&: p) a [l]
 pattern ConsFA' x xs <- (project' -> (Just (ConsF x xs)))
 
-pattern SingletonFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l]
+pattern SingletonFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l]
 pattern SingletonFA' x <- (ConsFA' x NilFA')

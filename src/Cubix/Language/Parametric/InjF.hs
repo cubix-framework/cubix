@@ -106,11 +106,16 @@ class AInjF' f l (is :: [*]) where
 instance AInjF' f l '[] where
   ainjF' _ _ = Nothing
 
-instance (HTraversable f, AInjF' f l is, KDynCase f i, InjF f l i) => AInjF' f l (i ': is) where
-  ainjF' _ x = case (dyncase x :: Maybe (_ :~: i)) of
+instance (HTraversable f, AInjF' f l is, InjF f l i, KDynCase f i) => AInjF' f l (i ': is) where
+  -- NOTE: Moved application of dyncase into the where clause (dcase)
+  --       because the constraint KDynCase given in context was getting
+  --       ignored.
+  ainjF' _ x = case dcase x of
       Just p  -> gcastWith p spec x
       Nothing -> ainjF' (Proxy :: Proxy is) x
     where
+      dcase :: forall li. (KDynCase f i) => TermLab f li -> Maybe (li :~: i)
+      dcase a = dyncase a :: Maybe (li :~: i)
       spec :: (MonadAnnotater Label m) => TermLab f i -> Maybe (TermLab f l, TermLab f l -> m (TermLab f i))
       spec t = case projF' t of
         Just t' -> Just (t', labeledInjF)

@@ -61,6 +61,7 @@ import Cubix.Language.Lua.Parametric.Common as LCommon
 import qualified Cubix.Language.Lua.Parametric.Full as LFull
 import Cubix.Language.Python.Parametric.Common as PCommon
 import qualified Cubix.Language.Python.Parametric.Full as PFull
+import qualified Data.Text as T (unpack)
 
 
 type family RootSort (f :: (* -> *) -> * -> *)
@@ -86,8 +87,9 @@ parseLua path = do
      Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
   where
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
-    toSourceSpan x = Just $ mkSourceSpan (Lua.sourcePosName from) (Lua.sourcePosLine from, Lua.sourcePosColumn from)
-                                                                  (Lua.sourcePosLine to,   Lua.sourcePosColumn to)
+    toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))
+                                         (Lua.sourceLine from, Lua.sourceColumn from)
+                                         (Lua.sourceLine to,   Lua.sourceColumn to)
       where
         from = Lua.sourceFrom x
         to   = Lua.sourceTo   x

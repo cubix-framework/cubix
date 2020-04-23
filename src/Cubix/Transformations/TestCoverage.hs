@@ -133,7 +133,7 @@ instance MarkBlockCovered MPythonSig where
 #endif
 
 luaNumber :: Int -> MLuaTerm L.ExpL
-luaNumber n = L.iNumber $ pack $ show n
+luaNumber n = L.iNumber L.iIntNum $ pack $ show n
 
 instance MarkBlockCovered MLuaSig where
   markBlockCovered n = annotateLabel term

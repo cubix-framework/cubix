@@ -67,7 +67,7 @@ data MaybeIdentIsJSIdent e l where
 
 deriveAll [''MaybeIdentIsJSIdent]
 
-pattern JSIdent' :: () => (MaybeIdentIsJSIdent :<: f, Ident :<: f, MaybeF :<: f, HFunctor f) => String -> Cxt h f a JSIdentL
+pattern JSIdent' :: (MaybeIdentIsJSIdent :<: f, Ident :<: f, MaybeF :<: f, HFunctor f) => String -> Cxt h f a JSIdentL
 pattern JSIdent' ident <- (project -> Just (MaybeIdentIsJSIdent (Just' (Ident' ident)))) where
   JSIdent' ident = iMaybeIdentIsJSIdent $ Just' $ Ident' ident
 

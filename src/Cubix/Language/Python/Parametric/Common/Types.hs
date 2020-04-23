@@ -123,15 +123,15 @@ data PyCondExpr e l where
 deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr]
 
 
-pattern PyBlock' :: () => (PyBlock :<: f, HFunctor f) => Cxt h f a (Maybe PyStringLitL) -> Cxt h f a BlockL -> Cxt h f a PyBlockL
+pattern PyBlock' :: (PyBlock :<: f, HFunctor f) => Cxt h f a (Maybe PyStringLitL) -> Cxt h f a BlockL -> Cxt h f a PyBlockL
 pattern PyBlock' docStr body <- (project -> Just (PyBlock docStr body)) where
   PyBlock' docStr body = iPyBlock docStr body
 
-pattern PyChainComp' :: () => (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL -> Cxt h f a PyCompL
+pattern PyChainComp' :: (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL -> Cxt h f a PyCompL
 pattern PyChainComp' op l r <- (project -> Just (PyChainComp op l r)) where
   PyChainComp' op l r = iPyChainComp op l r
 
-pattern PyBaseComp' :: () => (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL
+pattern PyBaseComp' :: (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL
 pattern PyBaseComp' op l r <- (project -> Just (PyBaseComp op l r)) where
   PyBaseComp' op l r = iPyBaseComp op l r
 
@@ -174,11 +174,11 @@ data PythonParam e l where
 
 deriveAll [''PyFunDefAttrs, ''PyParamAttrs, ''PythonParam]
 
-pattern PyFunDefAttrs' :: () => (PyFunDefAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a FunctionDefAttrsL
+pattern PyFunDefAttrs' :: (PyFunDefAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a FunctionDefAttrsL
 pattern PyFunDefAttrs' ann <- (project -> Just (PyFunDefAttrs ann)) where
   PyFunDefAttrs' ann = iPyFunDefAttrs ann
 
-pattern PyParamAttrs' :: () => (PyParamAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a (Maybe Py.ExprL) -> Cxt h f a ParameterAttrsL
+pattern PyParamAttrs' :: (PyParamAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a (Maybe Py.ExprL) -> Cxt h f a ParameterAttrsL
 pattern PyParamAttrs' ann def <- (project -> Just (PyParamAttrs ann def)) where
   PyParamAttrs' ann def = iPyParamAttrs ann def
 
