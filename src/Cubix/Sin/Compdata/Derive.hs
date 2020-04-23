@@ -30,7 +30,7 @@ smartFConstructors fname = do
     liftM concat $ mapM (genSmartConstr (map tyVarBndrName targs) tname) cons
         where iTp iVar (ForallC _ cxt t) =
                   -- Check if the GADT phantom type is constrained
-                  case [y | AppT (AppT (ConT _) x) y <- cxt, x == VarT iVar] of
+                  case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
                     [] -> iTp iVar t
                     tp:_ -> Just tp
               iTp _iVar (GadtC _ _ (AppT _ tp)) =
