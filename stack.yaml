@@ -16,12 +16,11 @@ extra-deps:
 - git: git@github.com:jkoppel/language-javascript.git
   commit: 3b2026cf9c443bc798683c12206de439354283ce
 - language-dot-0.1.1
-- git: git@github.com:jkoppel/language-c.git
-  commit: e5bdaaa8cbf28d09962ccd64a50808d8e5032f85
-- git: git@github.com:jkoppel/language-java.git
-  commit: 68e71843294b233c36b3cbe52d9b1e35a5898997
-- git: git@github.com:bjpop/language-python.git
-  commit: 9269c77ca67c52280314a122cae1b3fa1a044168
+# - git: git@github.com:jkoppel/language-c.git
+#   commit: e5bdaaa8cbf28d09962ccd64a50808d8e5032f85
+# - git: git@github.com:jkoppel/language-java.git
+#   commit: 68e71843294b233c36b3cbe52d9b1e35a5898997
+- language-python-0.5.6
 - git: git@github.com:jkoppel/derive.git
   commit: ef612bb6dd36fe50be9a75806d5c1ec1a8b2e566
 - concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627

@@ -90,8 +90,9 @@ createSortInclusionType fromNm toNm = do
   e <- newName "e"
   i <- newName "i"
   let ctx = [foldl AppT EqualityT [VarT i, ConT toNm]]
-  let con = ForallC [] ctx $ NormalC tName [(NotStrict, AppT (VarT e) (ConT fromNm))]
-  return $ [DataD [] tName [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] [con] []]
+  let notStrict = Bang NoSourceUnpackedness NoSourceStrictness
+  let con = ForallC [] ctx $ NormalC tName [(notStrict, AppT (VarT e) (ConT fromNm))]
+  return $ [DataD [] tName [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] Nothing [con] []]
 
   
 createSortInclusionTypes :: [Name] -> [Name] -> Q [Dec]
@@ -167,5 +168,5 @@ makeDefaultInstances :: [Type] -> Name -> Name -> Exp -> [Dec]
 makeDefaultInstances typs className methName exp =
   flip map typs $ \t -> let instSig = AppT (ConT className) t in
                         let dec = ValD (VarP methName) (NormalB exp) [] in
-                        InstanceD [] instSig [dec]
+                        InstanceD Nothing [] instSig [dec]
 
