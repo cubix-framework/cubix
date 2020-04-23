@@ -112,4 +112,4 @@ doOptionalAppend targ e = do
     dominatingAppendFirstOpts targ e EmptyInsertOkay
 
 
-type MonadTAC f m = (MonadState (TACState f) m, MonadReader (LocalTACState f) m, MonadCfgInsertion m f BlockItemL, MonadRandom m, MonadPlus m)
+type MonadTAC f m = (MonadState (TACState f) m, MonadReader (LocalTACState f) m, MonadCfgInsertion m f BlockItemL, MonadRandom m, MonadPlus m, MonadFail m)

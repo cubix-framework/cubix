@@ -235,9 +235,10 @@ constructCfgBreak t = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
 
-  (l:_) <- use break_stack
-
-  Just n <- nodeForLab l
+  l' <- use break_stack
+  let (l:_) = l'
+  n' <- nodeForLab l
+  let Just n = n'
   cur_cfg %= addEdge enterNode n -- go to end of loop
   -- do not connect enter to exit
 
@@ -247,10 +248,10 @@ constructCfgContinue :: (HasLoopStack s, MonadState s m, CfgComponent g s) => Te
 constructCfgContinue t = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
-
-  (l:_) <- use continue_stack
-
-  Just n <- nodeForLab l
+  l' <- use continue_stack
+  let (l:_) = l'
+  n' <- nodeForLab l
+  let Just n = n'
   cur_cfg %= addEdge enterNode n -- go to beginning of loop
   -- do not connect enter to exit
 

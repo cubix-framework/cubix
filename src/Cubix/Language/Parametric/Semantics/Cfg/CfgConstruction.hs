@@ -151,7 +151,8 @@ extractEEPPair (SubPairs ((proj :: f _ _ -> Maybe (PairF _ _)) -> Just (PairF x 
 -- time to care ATM
 extractEEPMaybe :: (KExtractF' Maybe f, Monad m) => m (EnterExitPair f (Maybe l)) -> m (Maybe (EnterExitPair f l))
 extractEEPMaybe m = do
-  SubPairs p <- m
+  p' <- m
+  let SubPairs p = p'
   return $ kextractF' p
 
 
