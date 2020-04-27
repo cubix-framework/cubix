@@ -65,25 +65,25 @@ data UnitF (e :: * -> *) l where
 deriveAll [''BoolF, ''IntF, ''IntegerF, ''CharF, ''UnitF]
 
 
-pattern BoolF' :: () => (BoolF :<: f, HFunctor f) => Bool -> Cxt h f a BoolL
+pattern BoolF' :: (BoolF :<: f, HFunctor f) => Bool -> Cxt h f a BoolL
 pattern BoolF' b <- (project -> Just (BoolF b)) where
   BoolF' b = iBoolF b
 
 
-pattern IntF' :: () => (IntF :<: f, HFunctor f) => Int -> Cxt h f a IntL
+pattern IntF' :: (IntF :<: f, HFunctor f) => Int -> Cxt h f a IntL
 pattern IntF' x <- (project -> Just (IntF x)) where
   IntF' x = iIntF x
 
 
-pattern IntegerF' :: () => (IntegerF :<: f, HFunctor f) => Integer -> Cxt h f a IntegerL
+pattern IntegerF' :: (IntegerF :<: f, HFunctor f) => Integer -> Cxt h f a IntegerL
 pattern IntegerF' x <- (project -> Just (IntegerF x)) where
   IntegerF' x = iIntegerF x
 
 
-pattern CharF' :: () => (CharF :<: f, HFunctor f) => Char -> Cxt h f a CharL
+pattern CharF' :: (CharF :<: f, HFunctor f) => Char -> Cxt h f a CharL
 pattern CharF' x <- (project -> Just (CharF x)) where
   CharF' x = iCharF x
 
-pattern UnitF' :: () => (UnitF :<: f, HFunctor f) => Cxt h f a ()
+pattern UnitF' :: (UnitF :<: f, HFunctor f) => Cxt h f a ()
 pattern UnitF' <- (project -> Just UnitF) where
   UnitF' = iUnitF

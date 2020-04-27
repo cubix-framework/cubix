@@ -58,7 +58,8 @@ singleton = return
 
 extractForInit :: (HasCurCfg s MCSig) => HState s (EnterExitPair MCSig) (Either (Maybe CExpressionL) CDeclarationL) -> State s (Maybe (EnterExitPair MCSig ()))
 extractForInit m = do
-  SubPairs p1 <- unHState m
+  p1' <- unHState m
+  let SubPairs p1 = p1'
   case kextractF2' p1 of
     Left x  -> mapM collapseEnterExit =<< (extractEEPMaybe $ return x)
     Right x -> Just <$> collapseEnterExit x

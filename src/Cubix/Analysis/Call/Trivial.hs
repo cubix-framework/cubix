@@ -42,12 +42,14 @@ type FunctionId = String
 
 newtype AccumMap k v = AccumMap { runAccumMap :: Map k v }
 
-mergeKey :: (Ord k, Monoid v) => k -> v -> Map k v -> Map k v
-mergeKey = Map.insertWith mappend
+mergeKey :: (Ord k, Semigroup v) => k -> v -> Map k v -> Map k v
+mergeKey = Map.insertWith (<>)
+
+instance (Ord k, Semigroup v) => Semigroup (AccumMap k v) where
+  (AccumMap m1) <> (AccumMap m2) = AccumMap $ Map.foldrWithKey (\k v m -> mergeKey k v m) m2 m1
 
 instance (Ord k, Monoid v) => Monoid (AccumMap k v) where
   mempty = AccumMap $ Map.empty
-  mappend (AccumMap m1) (AccumMap m2) = AccumMap $ Map.foldrWithKey (\k v m -> mergeKey k v m) m2 m1
 
 ----------------------------------------------------------------------------------------------------------------
 

@@ -35,7 +35,7 @@ import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM, Trans
                                    guardedT, guardBoolT, isSortT,
                                    promoteRF, (>+>) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms )
-import Data.Typeable.Internal ( Typeable )
+import Data.Typeable ( Typeable )
 
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax as P

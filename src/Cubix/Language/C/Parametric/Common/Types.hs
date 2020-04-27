@@ -161,7 +161,7 @@ data CVoidArg (e :: * -> *) l where
 -- Try again after upgrading GHC?
 deriveAll [''CVoidArg]
 
-pattern CVoidArg' :: () => (CVoidArg :<: f, HFunctor f) => Cxt h f a CSpecialParamL
+pattern CVoidArg' :: (CVoidArg :<: f, HFunctor f) => Cxt h f a CSpecialParamL
 pattern CVoidArg' <- (project -> Just CVoidArg) where
   CVoidArg' = iCVoidArg
 
@@ -170,7 +170,7 @@ data CVarArgParam (e :: * -> *) l where
 
 deriveAll [''CVarArgParam]
 
-pattern CVarArgParam' :: () => (CVarArgParam :<: f, HFunctor f) => Cxt h f a CSpecialParamL
+pattern CVarArgParam' :: (CVarArgParam :<: f, HFunctor f) => Cxt h f a CSpecialParamL
 pattern CVarArgParam' <- (project -> Just CVarArgParam) where
   CVarArgParam' = iCVarArgParam
 
@@ -181,7 +181,7 @@ data COldStyleParam e l where
 
 deriveAll [''COldStyleParam]
 
-pattern COldStyleParam' :: () => (COldStyleParam :<: f, HFunctor f) => Cxt h f a P.IdentL -> Cxt h f a COldStyleParamL
+pattern COldStyleParam' :: (COldStyleParam :<: f, HFunctor f) => Cxt h f a P.IdentL -> Cxt h f a COldStyleParamL
 pattern COldStyleParam' n <- (project -> Just (COldStyleParam n)) where
   COldStyleParam' n = iCOldStyleParam n
 
@@ -191,8 +191,8 @@ data CFunDeclAttrs e l where
 
 deriveAll [''CFunDeclAttrs]
 
-pattern CFunDeclAttrs' :: () => (CFunDeclAttrs :<: f, HFunctor f) => Cxt h f a [C.CDerivedDeclaratorL] -> Cxt h f a [C.CAttributeL]
-                                                                  -> Cxt h f a (Maybe (C.CStringLiteralL)) -> Cxt h f a [C.CAttributeL] -> Cxt h f a FunctionDeclAttrsL
+pattern CFunDeclAttrs' :: (CFunDeclAttrs :<: f, HFunctor f) => Cxt h f a [C.CDerivedDeclaratorL] -> Cxt h f a [C.CAttributeL]
+                                                            -> Cxt h f a (Maybe (C.CStringLiteralL)) -> Cxt h f a [C.CAttributeL] -> Cxt h f a FunctionDeclAttrsL
 pattern CFunDeclAttrs' dds attrs1 asmNm attrs2 <- (project -> Just (CFunDeclAttrs dds attrs1 asmNm attrs2)) where
   CFunDeclAttrs' dds attrs1 asmNm attrs2 = iCFunDeclAttrs dds attrs1 asmNm attrs2
 
@@ -201,8 +201,8 @@ data CFunDefAttrs e l where
 
 deriveAll [''CFunDefAttrs]
 
-pattern CFunDefAttrs' :: () => (CFunDefAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a FunctionDeclAttrsL
-                                                                -> Cxt h f a [CDeclarationL] -> Cxt h f a FunctionDefAttrsL
+pattern CFunDefAttrs' :: (CFunDefAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a FunctionDeclAttrsL
+                                                          -> Cxt h f a [CDeclarationL] -> Cxt h f a FunctionDefAttrsL
 pattern CFunDefAttrs' dss fda decls <- (project -> Just (CFunDefAttrs dss fda decls)) where
   CFunDefAttrs' dss fda decls = iCFunDefAttrs dss fda decls
 
@@ -214,8 +214,8 @@ data CFunParamAttrs e l where
 
 deriveAll [''CFunParamAttrs]
 
-pattern CFunParamAttrs' :: () => (CFunParamAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a [CDerivedDeclaratorL]
-                              -> Cxt h f a (Maybe CStringLiteralL) -> Cxt h f a [CAttributeL] -> Cxt h f a CFunParamAttrsL
+pattern CFunParamAttrs' :: (CFunParamAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a [CDerivedDeclaratorL]
+                          -> Cxt h f a (Maybe CStringLiteralL) -> Cxt h f a [CAttributeL] -> Cxt h f a CFunParamAttrsL
 pattern CFunParamAttrs' dss dds asmNm attrs <- (project -> Just (CFunParamAttrs dss dds asmNm attrs)) where
   CFunParamAttrs' dss dds asmNm attrs = iCFunParamAttrs dss dds asmNm attrs
 
@@ -232,12 +232,12 @@ createSortInclusionInfers [  ''P.FunctionCallL, ''C.CExpressionL, ''C.CExpressio
 
 
 
-pattern CInteger' :: () => (CInteger :<: f, CIntRepr :<: f, Flags :<: f, HFunctor f) => Integer -> Cxt h f a CIntegerL
+pattern CInteger' :: (CInteger :<: f, CIntRepr :<: f, Flags :<: f, HFunctor f) => Integer -> Cxt h f a CIntegerL
 pattern CInteger' n <- (project -> Just (CInteger n _ _)) where
   CInteger' n = iCInteger n iDecRepr (C.iFlags 0)
 
 -- Not a wide string
-pattern CString' :: () => (CString :<: f, HFunctor f) => String -> Cxt h f a CStringL
+pattern CString' :: (CString :<: f, HFunctor f) => String -> Cxt h f a CStringL
 pattern CString' s <- (project -> Just (CString s False)) where
   CString' s = iCString s False
 

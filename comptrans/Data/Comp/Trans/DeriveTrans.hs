@@ -119,7 +119,9 @@ mkInstance transAlts classNm funNm typNm = do
   let nmTyps = simplifyDataInf inf
   clauses <- mapM (uncurry $ mkClause transAlts funNm) nmTyps
   let targNm = nameLab typNm
-  return (InstanceD []
+  return (InstanceD
+                   Nothing
+                   []
                    (AppT (AppT (ConT classNm) srcTyp) (ConT targNm))
                    [FunD funNm clauses])
 

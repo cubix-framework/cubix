@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Data.Comp.Trans.Collect (
@@ -48,8 +48,8 @@ collectTypes' n = view excludedNames >>= run
     run _                          = do
       inf <- lift $ reify n
       let cons = case inf of
-            TyConI (DataD _ _ _ cns _)    -> cns
-            TyConI (NewtypeD _ _ _ con _) -> [con]
+            TyConI (DataD _ _ _ _ cns _)    -> cns
+            TyConI (NewtypeD _ _ _ _ con _) -> [con]
             _ -> []
       childNames <- liftM concat $ mapM extractNames cons
       return $ (singleton n) `union` (mconcat $ map singleton childNames)

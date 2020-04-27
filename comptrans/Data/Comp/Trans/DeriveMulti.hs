@@ -21,8 +21,8 @@ deriveMulti n = do
 
   if containsAll substs typeArgs then
     case inf of
-      TyConI (DataD _ nm _ cons _)   -> mkGADT nm (applySubsts substs cons)
-      TyConI (NewtypeD _ nm _ con _) -> mkGADT nm [(applySubsts substs con)]
+      TyConI (DataD _ nm _ _ cons _)   -> mkGADT nm (applySubsts substs cons)
+      TyConI (NewtypeD _ nm _ _ con _) -> mkGADT nm [(applySubsts substs con)]
       _                              -> do lift $ reportError $ "Attempted to derive multi-sorted compositional data type for " ++ show n
                                                               ++ ", which is not a nullary datatype (and does not have concrete values supplied for type args)"
                                            return []
@@ -53,10 +53,9 @@ mkGADT n cons = do
     Just annPropInf  -> mapM_ checkUniqueVar cons
     Nothing          -> return ()
   cons' <- mapM (mkCon n' e i) cons
-  return $ [DataD [] n' [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] cons' []
-           ,DataD [] (nameLab n) [] [] []
+  return $ [DataD [] n' [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] Nothing cons' []
+           ,DataD [] (nameLab n) [] Nothing [] []
            ]
-
 
 mkCon :: Name -> Name -> Name -> Con -> CompTrans Con
 mkCon l e i (NormalC n sts) = view annotationProp >>= mkConNormal

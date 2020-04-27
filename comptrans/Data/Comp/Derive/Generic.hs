@@ -61,12 +61,12 @@ data GenericExample
 
 makeInstancesLike :: [Name] -> [Type] -> Q [Dec] -> Q [Dec]
 makeInstancesLike cons labs example = do
-  [InstanceD [] (AppT (ConT tc) _) b] <- example
-  return [makeInstanceLike tc c l b | c <- cons, l <- labs]
+  [InstanceD ov [] (AppT (ConT tc) _) b] <- example
+  return [makeInstanceLike ov tc c l b | c <- cons, l <- labs]
 
-makeInstanceLike :: Name -> Name -> Type -> [Dec] -> Dec
-makeInstanceLike tc c l b = InstanceD [] (AppT (ConT tc) (AppT (ConT c) l)) b 
-
+makeInstanceLike :: Maybe Overlap -> Name -> Name -> Type -> [Dec] -> Dec
+makeInstanceLike ov tc c l b =
+  InstanceD ov [] (AppT (ConT tc) (AppT (ConT c) l)) b
 
 --------------------------------------------------------------------------------
 -- Deriving Generic
@@ -117,8 +117,7 @@ makeGenericInstance typNm lab = do
                    ]
              where
                one = liftM head
-               addDecs (InstanceD c t ds) ds' = return $ [InstanceD c t (ds++ds')]
-
+               addDecs (InstanceD ov c t ds) ds' = return $ [InstanceD ov c t (ds++ds')]
                mkClause (pat, expr) = Clause [pat] (NormalB expr) []
 
                getEVar (AppT (VarT n) _) = Just n
@@ -161,7 +160,7 @@ addSumExp (e:es) = [AppE (ConE 'L1) e] ++ map (\f -> AppE (ConE 'R1) f) (addSumE
 
 matchingCon :: Type -> Name -> Q Bool
 matchingCon t nm = do
-  (DataConI _ tp parentNm _) <- reify nm
+  (DataConI _ tp parentNm) <- reify nm
   return $ cxtlessUnifiable (extractLab tp parentNm) t
 
 

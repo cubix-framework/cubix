@@ -24,15 +24,23 @@ import Cubix.Language.Parametric.InjF ( InjF, injectF )
 
 smartFConstructors :: Name -> Q [Dec]
 smartFConstructors fname = do
-    TyConI (DataD _cxt tname targs constrs _deriving) <- abstractNewtypeQ $ reify fname
+    TyConI (DataD _cxt tname targs _ constrs _deriving) <- abstractNewtypeQ $ reify fname
     let iVar = tyVarBndrName $ last targs
     let cons = map (abstractConType &&& iTp iVar) constrs
     liftM concat $ mapM (genSmartConstr (map tyVarBndrName targs) tname) cons
-        where iTp iVar (ForallC _ cxt _) =
+        where iTp iVar (ForallC _ cxt t) =
                   -- Check if the GADT phantom type is constrained
-                  case [y | AppT (AppT EqualityT x) y <- cxt, x == VarT iVar] of
-                    [] -> Nothing
+                  case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
+                    [] -> iTp iVar t
                     tp:_ -> Just tp
+              iTp _iVar (GadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
+              iTp _iVar (RecGadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
               iTp _ _ = Nothing
               genSmartConstr targs tname ((name, args), miTp) = do
                 let bname = nameBase name
@@ -77,8 +85,8 @@ abstractNewtypeQ = liftM abstractNewtype
   @data@ declarations.
 -}
 abstractNewtype :: Info -> Info
-abstractNewtype (TyConI (NewtypeD cxt name args constr derive))
-    = TyConI (DataD cxt name args [constr] derive)
+abstractNewtype (TyConI (NewtypeD cxt name args mk constr derive))
+    = TyConI (DataD cxt name args mk [constr] derive)
 abstractNewtype owise = owise
 
 
@@ -90,6 +98,8 @@ abstractConType (NormalC constr args) = (constr, length args)
 abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
+abstractConType (GadtC [constr] args _) = (constr, length args)
+abstractConType (RecGadtC [constr] args _) = (constr, length args)
 
 {-|
   This function returns the name of a bound type variable

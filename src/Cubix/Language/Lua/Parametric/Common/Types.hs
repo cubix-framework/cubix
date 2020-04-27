@@ -90,15 +90,15 @@ deriveAll [''LuaVarArgsParam]
 
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
-pattern LuaFunctionDefinedObj' :: () => (LuaFunctionDefinedObj :<: f, HFunctor f) => Cxt h f a [P.IdentL] -> Cxt h f a LuaFunctionDefinedObjL
+pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :<: f, HFunctor f) => Cxt h f a [P.IdentL] -> Cxt h f a LuaFunctionDefinedObjL
 pattern LuaFunctionDefinedObj' nms <- (project -> Just (LuaFunctionDefinedObj nms)) where
   LuaFunctionDefinedObj' nms = iLuaFunctionDefinedObj nms
 
-pattern LuaFunctionAttrs' :: () => (LuaFunctionAttrs :<: f, HFunctor f) => Cxt h f a LuaFunctionDefinedObjL -> Cxt h f a FunctionDefAttrsL
+pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :<: f, HFunctor f) => Cxt h f a LuaFunctionDefinedObjL -> Cxt h f a FunctionDefAttrsL
 pattern LuaFunctionAttrs' o <- (project -> Just (LuaFunctionAttrs o)) where
   LuaFunctionAttrs' o = iLuaFunctionAttrs o
 
-pattern LuaVarArgsParam' :: () => (LuaVarArgsParam :<: f, HFunctor f) => Cxt h f a FunctionParameterL
+pattern LuaVarArgsParam' :: (LuaVarArgsParam :<: f, HFunctor f) => Cxt h f a FunctionParameterL
 pattern LuaVarArgsParam' <- (project -> Just LuaVarArgsParam) where
   LuaVarArgsParam' = iLuaVarArgsParam
 

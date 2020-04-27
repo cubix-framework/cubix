@@ -165,8 +165,8 @@ modNameBase :: (String -> String) -> Name -> Name
 modNameBase f = mkName . f . nameBase
 
 simplifyDataInf :: Info -> [(Name, [Type])]
-simplifyDataInf (TyConI (DataD _ _ _ cons _))   = map extractCon cons
-simplifyDataInf (TyConI (NewtypeD _ _ _ con _)) = [extractCon con]
+simplifyDataInf (TyConI (DataD _ _ _ _ cons _))   = map extractCon cons
+simplifyDataInf (TyConI (NewtypeD _ _ _ _ con _)) = [extractCon con]
 simplifyDataInf _                               = error "Attempted to derive multi-sorted compositional data type for non-nullary datatype"
 
 extractCon :: Con -> (Name, [Type])
@@ -179,8 +179,8 @@ getTypeArgs :: Name -> CompTrans [Name]
 getTypeArgs nm = do
   inf <- lift $ reify nm
   case inf of
-    TyConI (DataD _ _ tvs _ _)    -> return $ getNames tvs
-    TyConI (NewtypeD _ _ tvs _ _) -> return $ getNames tvs
+    TyConI (DataD _ _ tvs _ _ _)    -> return $ getNames tvs
+    TyConI (NewtypeD _ _ tvs _ _ _) -> return $ getNames tvs
     _                             -> return []
 
 getNames :: [TyVarBndr] -> [Name]

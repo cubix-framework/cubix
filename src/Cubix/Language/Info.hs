@@ -140,7 +140,7 @@ instance HasLabelGen LabelGen where
 class (MonadState s m, HasLabelGen s) => MonadLabeler s m | m -> s
 instance (MonadState s m, HasLabelGen s) => MonadLabeler s m
 
-instance (MonadLabeler s m) => MonadAnnotater Label m where
+instance (Monad m, MonadLabeler s m) => MonadAnnotater Label m where
   annM t = (:&:) t <$> nextLabel
 
 -- | Allows embedding a smaller state inside a larger one
