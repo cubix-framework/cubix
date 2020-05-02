@@ -194,14 +194,17 @@ f >+> g = unwrapAnyR (wrapAnyR f >=> wrapAnyR g)
 (+>) f g x = f x <|> g x
 
 -- | Applies a rewrite to all immediate subterms of the current term, succeeding if any succeed
+--   Ignores holes.
 anyR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> RewriteM m (Cxt h f a) l
 anyR f = unwrapAnyR $ allR $ wrapAnyR f -- not point-free because of type inference
 
 -- | Applies a rewrite to the first immediate subterm of the current term where it can succeed
+--   Ignores holes.
 oneR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> RewriteM m (Cxt h f a) l
 oneR f = unwrapOneR $ allR $ wrapOneR f -- not point-free because of type inference
 
 -- | Runs a rewrite in a bottom-up traversal
+--   Ignores holes.
 allbuR :: (Monad m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 allbuR f = allR (allbuR f) >=> f
 
@@ -209,30 +212,37 @@ revAllbuR :: (Monad m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m
 revAllbuR f = revAllR (revAllbuR f) >=> f
 
 -- | Runs a rewrite in a top-down traversal
+--   Ignores holes.
 alltdR :: (Monad m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 alltdR f = f >=> allR (alltdR f)
 
 -- | Runs a rewrite in a bottom-up traversal, succeeding if any succeed
+--   Ignores holes.
 anybuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 anybuR f = anyR (anybuR f) >+> f
 
 -- | Runs a rewrite in a top-down traversal, succeeding if any succeed
+--   Ignores holes.
 anytdR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 anytdR f = f >+> anyR (anytdR f)
 
 -- | Runs a rewrite in a top-down traversal, succeeding if any succeed, and pruning below successes
+--   Ignores holes.
 prunetdRF :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 prunetdRF f = f +> anyR (prunetdRF f)
 
 -- | Like prunetdRF, but the outer level always succeeds
+--   Ignores holes.
 prunetdR :: (Monad m, HTraversable f) => GRewriteM (MaybeT m) (Cxt h f a) -> GRewriteM m (Cxt h f a)
 prunetdR = tryR . prunetdRF
 
 -- | Applies a rewrite to the first node where it can succeed in a bottom-up traversal
+--   Ignores holes.
 onebuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 onebuR f = oneR (onebuR f) +> f
 
 -- | Applies a rewrite to the first node where it can succeed in a top-down traversal
+--   Ignores holes.
 onetdR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 onetdR f = f +> oneR (onetdR f)
 
