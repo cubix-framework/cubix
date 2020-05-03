@@ -7,6 +7,10 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeApplications      #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Annotation
@@ -46,7 +50,10 @@ import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
+import Data.Comp.Multi.Alt
 import qualified Data.Comp.Ops as O
+import Data.Comp.Elem
+import Data.Comp.Dict
 
 type AnnTerm a f = Term (f :&: a)
 
@@ -97,6 +104,13 @@ inject' = Term . inj'
 injectOpt :: (f :<: g) => f (AnnTerm (Maybe p) g) l -> AnnTerm (Maybe p) g l
 injectOpt t = inject' (t :&: Nothing)
 
-caseH' :: ((f :&: a) e l -> t) -> ((g :&: a) e l -> t) -> ((f :+: g) :&: a) e l -> t
-caseH' f g (Inl x :&: a) = f (x :&: a)
-caseH' f g (Inr x :&: a) = g (x :&: a)
+caseH' :: forall fs a e l t. Alts (DistAnn fs a) e l t -> (Sum fs :&: a) e l -> t
+caseH' alts = caseH alts . distAnn
+
+type family DistAnn (fs :: [(* -> *) -> * -> *]) (a :: *) :: [(* -> *) -> * -> *] where
+  DistAnn (f ': fs) a = f :&: a ': DistAnn fs a
+  DistAnn '[]       _ = '[]
+
+distAnn :: (Sum fs :&: a) e :-> Sum (DistAnn fs a) e
+distAnn (Sum wit v :&: a) =
+  unsafeMapSum wit v (:&: a)

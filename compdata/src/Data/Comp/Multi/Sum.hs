@@ -27,7 +27,7 @@
 module Data.Comp.Multi.Sum
     (
      (:<:),
-     (:+:),
+     Sum,
      caseH,
 
      -- * Projections for Signatures and Terms
@@ -40,7 +40,7 @@ module Data.Comp.Multi.Sum
      inject,
      deepInject,
 
-     split,
+     -- split,
 
      -- * Injections and Projections for Constants
      injectConst,
@@ -92,9 +92,9 @@ deepInject :: (HFunctor g, g :<: f) => CxtFun g f
 {-# INLINE deepInject #-}
 deepInject = appSigFun inj
 
-
-split :: (f :=: f1 :+: f2) => (f1 (Term f) :-> a) -> (f2 (Term f) :-> a) -> Term f :-> a
-split f1 f2 (Term t) = spl f1 f2 t
+-- TODO: split
+-- split :: (f :=: f1 :+: f2) => (f1 (Term f) :-> a) -> (f2 (Term f) :-> a) -> Term f :-> a
+-- split f1 f2 (Term t) = spl f1 f2 t
 
 
 -- | This function injects a whole context into another context.
@@ -122,8 +122,8 @@ projectConst = fmap (hfmap (const (K ()))) . project
 -- Used to prevent typechecker from applying the default cases when it shouldn't,
 -- i.e.: it can't use the default case when it only has a type variable for the signature
 type family IsSum (f :: (* -> *) -> * -> *) :: Bool where
-  IsSum (f :+: g) = True
-  IsSum f         = False
+  IsSum (Sum fs) = True
+  IsSum f        = False
 
 type NotSum f = (IsSum f ~ False)
 

@@ -1,0 +1,55 @@
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE PolyKinds              #-}
+
+module Data.Comp.Elem
+       ( Elem (..)
+       , type (∈)
+       , type (∋)
+       , witness
+       , elemEq
+       , comparePos
+       ) where
+
+import Data.Proxy
+import GHC.TypeLits
+import Data.Type.Equality
+import qualified Unsafe.Coerce as U
+
+data Elem (f :: k) (fs :: [k]) where
+  Elem :: Int -> Elem f fs
+
+type family Position (f :: k) (fs :: [k]) where
+  Position (f :: k) ((f :: k) ': fs) = 0
+  Position f (g ': fs) = 1 + Position f fs
+
+class (KnownNat (Position f fs)) => (f :: k) ∈ (fs :: [k])
+instance (KnownNat (Position f fs)) => f ∈ fs
+
+class (KnownNat (Position f fs)) => (fs :: [k]) ∋ (f :: k)
+instance (KnownNat (Position f fs)) => fs ∋ f
+
+{-# INLINE witness #-}
+witness :: forall f fs. (f ∈ fs) => Elem f fs
+witness = Elem pos
+  where pos = fromInteger (natVal (Proxy :: Proxy (Position f fs)))
+
+{-# INLINE elemEq #-}
+elemEq :: forall f g fs. Elem f fs -> Elem g fs -> Maybe (f :~: g)
+elemEq (Elem v1) (Elem v2) = case v1 == v2 of
+  True -> Just (U.unsafeCoerce Refl)
+  False -> Nothing
+
+{-# INLINE comparePos #-}
+comparePos :: Elem f fs -> Elem g fs -> Ordering
+comparePos (Elem v1) (Elem v2) = compare v1 v2
+

@@ -36,12 +36,12 @@ import Data.Comp.Trans.Util
 --------------------------------------------------------------------------------
 -- Generic instances for general CDTs
 --------------------------------------------------------------------------------
-
-instance (Generic (f e l), Generic (g e l)) => Generic ((f M.:+: g) e l) where
-  type Rep ((f M.:+: g) e l) = (Rep (f e l)) :+: (Rep (g e l))
-  from = M.caseH (L1 . from) (R1 . from)
-  to (L1 x) = M.Inl $ to x
-  to (R1 x) = M.Inr $ to x
+-- TODO: Generic
+-- instance (Generic (f e l), Generic (g e l)) => Generic ((f M.:+: g) e l) where
+--   type Rep ((f M.:+: g) e l) = (Rep (f e l)) :+: (Rep (g e l))
+--   from = M.caseH (L1 . from) (R1 . from)
+--   to (L1 x) = M.Inl $ to x
+--   to (R1 x) = M.Inr $ to x
 
 instance (Generic (f (M.Term f) l)) => Generic (M.Term f l) where
   type Rep (M.Term f l) = Rep (f (M.Term f) l)

@@ -76,10 +76,10 @@ module Data.Comp.Multi.Algebra (
       paraM,
 
       -- * R-Coalgebras & Apomorphisms
-      RCoalg,
-      apo,
-      RCoalgM,
-      apoM,
+      -- RCoalg,
+      -- apo,
+      -- RCoalgM,
+      -- apoM,
 
 
       -- * CV-Coalgebras & Futumorphisms
@@ -382,39 +382,39 @@ paraM f = liftM fsnd . cataM run
 --------------------------------
 -- R-Coalgebras & Apomorphisms --
 --------------------------------
+-- TODO: R-Coalgebra
+-- -- | This type represents r-coalgebras over functor @f@ and with
+-- -- domain @a@.
+-- type RCoalg f a = a :-> f (Term f :+: a)
 
--- | This type represents r-coalgebras over functor @f@ and with
--- domain @a@.
-type RCoalg f a = a :-> f (Term f :+: a)
+-- -- | This function constructs an apomorphism from the given
+-- -- r-coalgebra.
+-- apo :: forall f a . (HFunctor f) => RCoalg f a -> a :-> Term f
+-- apo f = run
+--     where run :: a :-> Term f
+--           run = Term . hfmap run' . f
+--           run' :: Term f :+: a :-> Term f
+--           run' (Inl t) = t
+--           run' (Inr a) = run a
 
--- | This function constructs an apomorphism from the given
--- r-coalgebra.
-apo :: forall f a . (HFunctor f) => RCoalg f a -> a :-> Term f
-apo f = run
-    where run :: a :-> Term f
-          run = Term . hfmap run' . f
-          run' :: Term f :+: a :-> Term f
-          run' (Inl t) = t
-          run' (Inr a) = run a
+-- -- | This type represents monadic r-coalgebras over monad @m@ and
+-- -- functor @f@ with domain @a@.
 
--- | This type represents monadic r-coalgebras over monad @m@ and
--- functor @f@ with domain @a@.
+-- type RCoalgM m f a = NatM m a (f (Term f :+: a))
 
-type RCoalgM m f a = NatM m a (f (Term f :+: a))
-
--- | This function constructs a monadic apomorphism from the given
--- monadic r-coalgebra.
-apoM :: forall f m a . (HTraversable f, Monad m) =>
-        RCoalgM m f a -> NatM m a (Term f)
-apoM f = run
-    where run :: NatM m a (Term f)
-          run a = do
-            t <- f a
-            t' <- hmapM run' t
-            return $ Term t'
-          run' :: NatM m (Term f :+: a)  (Term f)
-          run' (Inl t) = return t
-          run' (Inr a) = run a
+-- -- | This function constructs a monadic apomorphism from the given
+-- -- monadic r-coalgebra.
+-- apoM :: forall f m a . (HTraversable f, Monad m) =>
+--         RCoalgM m f a -> NatM m a (Term f)
+-- apoM f = run
+--     where run :: NatM m a (Term f)
+--           run a = do
+--             t <- f a
+--             t' <- hmapM run' t
+--             return $ Term t'
+--           run' :: NatM m (Term f :+: a)  (Term f)
+--           run' (Inl t) = return t
+--           run' (Inr a) = run a
 
 -----------------------------------
 -- CV-Coalgebras & Futumorphisms --

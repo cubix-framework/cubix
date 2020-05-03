@@ -31,11 +31,11 @@ module Data.Comp.Multi.Strategy.Classification
 
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 import Data.Maybe ( fromJust )
-import Data.Proxy ( Proxy )
+import Data.Proxy
 
 import GHC.Exts ( Constraint )
 
-import Data.Comp.Multi ( Term, (:+:), E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum )
+import Data.Comp.Multi ( Term, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
 import Data.Comp.Multi.HFoldable ( HFoldable )
 
 --------------------------------------------------------------------------------
@@ -59,8 +59,11 @@ class KDynCase (f :: (* -> *) -> * -> *) a where
 instance {-# OVERLAPPABLE #-} (NotSum f) => KDynCase f a where
   kdyncase = const Nothing
 
-instance {-# OVERLAPPING #-} (KDynCase f l, KDynCase g l) => KDynCase (f :+: g) l where
-  kdyncase = caseH kdyncase kdyncase
+class (KDynCase f l ) => KDynCaseFlip l f
+instance (KDynCase f l) => KDynCaseFlip l f
+
+instance {-# OVERLAPPING #-} (All (KDynCaseFlip l) fs) => KDynCase (Sum fs) l where
+  kdyncase = caseCxt (Proxy :: Proxy (KDynCaseFlip l)) kdyncase
 
 instance {-# OVERLAPPING #-} (KDynCase f l) => KDynCase (f :&: a) l where
   kdyncase = kdyncase . remA

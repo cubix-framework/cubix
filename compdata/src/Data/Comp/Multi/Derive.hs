@@ -46,13 +46,14 @@ import Data.Comp.Multi.Derive.HTraversable
 import Data.Comp.Multi.Derive.Ordering
 import Data.Comp.Multi.Derive.Show
 import Data.Comp.Multi.Derive.SmartConstructors
-import Data.Comp.Multi.Ops ((:+:), caseH)
+-- import Data.Comp.Multi.Ops ((:+:), caseH)
 
 import Language.Haskell.TH
 
+-- TODO: liftSum
 {-| Given the name of a type class, where the first parameter is a higher-order
   functor, lift it to sums of higher-order. Example: @class HShowF f where ...@
   is lifted as @instance (HShowF f, HShowF g) => HShowF (f :+: g) where ... @.
  -}
 liftSum :: Name -> Q [Dec]
-liftSum = liftSumGen 'caseH ''(:+:)
+liftSum _ = pure [] -- liftSumGen 'caseH ''(:+:)

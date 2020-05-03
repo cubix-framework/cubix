@@ -27,6 +27,7 @@ module Data.Comp.Multi (
   , module Data.Comp.Multi.Show
   , module Data.Comp.Multi.Sum
   , module Data.Comp.Multi.Term
+  , module Data.Comp.Dict
     ) where
 
 import Data.Comp.Multi.Algebra
@@ -41,6 +42,7 @@ import Data.Comp.Multi.Ordering
 import Data.Comp.Multi.Show
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
+import Data.Comp.Dict
 
 {- $ex1
 The example illustrates how to use generalised compositional data types
