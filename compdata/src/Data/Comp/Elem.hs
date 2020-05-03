@@ -18,6 +18,8 @@ module Data.Comp.Elem
        , witness
        , elemEq
        , comparePos
+       , extend
+       , contract
        ) where
 
 import Data.Proxy
@@ -53,3 +55,12 @@ elemEq (Elem v1) (Elem v2) = case v1 == v2 of
 comparePos :: Elem f fs -> Elem g fs -> Ordering
 comparePos (Elem v1) (Elem v2) = compare v1 v2
 
+{-# INLINE extend #-}
+extend :: Elem f fs -> Elem f (g ': fs)
+extend (Elem i) = Elem (i + 1)
+
+{-# INLINE contract #-}
+contract :: Elem f (g ': fs) -> Either (f :~: g) (Elem f fs)
+contract (Elem i)
+  | i > 0     = Right (Elem (i - 1))
+  | otherwise = Left (U.unsafeCoerce Refl)

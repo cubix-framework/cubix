@@ -53,6 +53,12 @@ module Data.Comp.Multi.Ops
     , (<|)
     , cons
     , nil
+    , Elem (..)
+    , type (∈)
+    , type (∋)
+    , witness
+    , extend
+    , contract
     ) where
 
 import Control.Monad

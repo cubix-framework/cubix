@@ -29,7 +29,7 @@
 module Data.Comp.Multi.Projection (pr, (:<), (:*:)(..), ffst, fsnd) where
 
 import Data.Comp.SubsumeCommon
-import Data.Comp.Multi.Ops hiding (Sum)
+import Data.Comp.Multi.Ops hiding (Sum, Elem)
 
 type family Elem (f :: * -> *)
                  (g :: * -> *) :: Emb where
