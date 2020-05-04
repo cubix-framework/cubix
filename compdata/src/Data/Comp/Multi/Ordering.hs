@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE TypeApplications     #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -52,7 +52,7 @@ instance ( All OrdHF fs
          ) => OrdHF (Sum fs) where
     compareHF (Sum wit1 x) (Sum wit2 y) =
       case elemEq wit1 wit2 of
-        Just Refl -> withDict (dictFor @OrdHF wit1) $ compareHF x y
+        Just Refl -> compareHF x y \\ dictFor @OrdHF wit1
         Nothing   -> comparePos wit1 wit2
 
 {-| From an 'OrdHF' difunctor an 'Ord' instance of the corresponding term type

@@ -35,7 +35,7 @@ import Data.Proxy
 
 import GHC.Exts ( Constraint )
 
-import Data.Comp.Multi ( Term, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
+import Data.Comp.Multi ( HFix, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
 import Data.Comp.Multi.HFoldable ( HFoldable )
 
 --------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class DynCase f a where
   -- | Determine whether a node has sort @a@
   dyncase :: f b -> Maybe (b :~: a)
 
--- | An instance @KDynCase f a@ defines an instance @DynCase (Term f) a@
+-- | An instance @KDynCase f a@ defines an instance @DynCase (HFix f) a@
 class KDynCase (f :: (* -> *) -> * -> *) a where
   kdyncase :: f e b -> Maybe (b :~: a)
 
@@ -93,7 +93,7 @@ caseDyn :: (DynCase f a) => (f a -> r) -> f l -> r -> r
 caseDyn f t r = maybe r f (dynProj t)
 
 -- | Gives all subterms of any given sort of a term
-subterms :: (DynCase (Term f) l, HFoldable f) => Term f l' -> [Term f l]
+subterms :: (DynCase (HFix f) l, HFoldable f) => HFix f l' -> [HFix f l]
 subterms x = [ y | Just y <- map caseE $ subs x]
 
 isSort :: forall e l. (DynCase e l) => Proxy l -> forall i. e i -> Bool

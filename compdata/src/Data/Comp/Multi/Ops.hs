@@ -1,22 +1,22 @@
-{-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE KindSignatures         #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE PolyKinds              #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
-{-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE UndecidableSuperClasses#-}
-{-# LANGUAGE PartialTypeSignatures  #-}
-{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE ConstraintKinds         #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE FunctionalDependencies  #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE KindSignatures          #-}
+{-# LANGUAGE MagicHash               #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE PartialTypeSignatures   #-}
+{-# LANGUAGE PolyKinds               #-}
+{-# LANGUAGE RankNTypes              #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE TypeSynonymInstances    #-}
+{-# LANGUAGE UndecidableInstances    #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -47,6 +47,8 @@ module Data.Comp.Multi.Ops
     , O.fsnd
     , unsafeMapSum
     , caseCxt
+    , caseSumF
+    , caseSum
     , Alts
     , Alt
     , alt
@@ -64,6 +66,7 @@ module Data.Comp.Multi.Ops
 import Control.Monad
 import Data.Type.Equality
 import Data.Proxy
+import Data.Functor.Identity
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
@@ -92,32 +95,31 @@ caseH alts (Sum wit v) = extractAt wit alts v
 caseCxt :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a e -> b) -> Sum fs a e -> b
 caseCxt _ f (Sum wit v) = f v \\ dictFor @cxt wit
 
-instance (All HFunctor fs) => HFunctor (Sum fs) where
-    hfmap f (Sum wit v) =
-      Sum wit $
-      hfmap f v \\
-      dictFor @HFunctor wit
+{-# INLINE caseSumF #-}
+caseSumF :: forall cxt f fs a e b. (All cxt fs, Functor f) => Proxy cxt -> (forall g. (cxt g) => g a e -> f (g b e)) -> Sum fs a e -> f (Sum fs b e)
+caseSumF _ f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
 
+{-# INLINE caseSum #-}
+caseSum :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall g. (cxt g) => g a e -> g b e) -> Sum fs a e -> Sum fs b e
+caseSum p f = runIdentity . caseSumF p (Identity . f) 
+
+instance (All HFunctor fs) => HFunctor (Sum fs) where
+    hfmap f = caseSum (Proxy @HFunctor) (hfmap f)
+      
 instance ( HFunctor (Sum fs)
          , All HFoldable fs
          ) => HFoldable (Sum fs) where
-    hfold (Sum wit e) = hfold e \\ dictFor @HFoldable wit
-    hfoldMap f (Sum wit e) = hfoldMap f e \\ dictFor @HFoldable wit
-    hfoldr f b (Sum wit e) = hfoldr f b e \\ dictFor @HFoldable wit
-    hfoldl f b (Sum wit e) = hfoldl f b e \\ dictFor @HFoldable wit
-    hfoldr1 f (Sum wit e) = hfoldr1 f e \\ dictFor @HFoldable wit
+    hfold      = caseCxt (Proxy @HFoldable) hfold
+    hfoldMap f = caseCxt (Proxy @HFoldable) (hfoldMap f)
+    hfoldr f b = caseCxt (Proxy @HFoldable) (hfoldr f b)
+    hfoldl f b = caseCxt (Proxy @HFoldable) (hfoldl f b)
+    hfoldr1 f  = caseCxt (Proxy @HFoldable) (hfoldr1 f)
 
 instance ( HFoldable (Sum fs)
          , All HTraversable fs
          ) => HTraversable (Sum fs) where
-    htraverse f (Sum wit e) =
-      Sum wit <$>
-      htraverse f e \\
-      dictFor @HTraversable wit
-    hmapM f (Sum wit e) =
-      Sum wit `liftM`
-      hmapM f e \\
-      dictFor @HTraversable wit
+    htraverse f = caseSumF (Proxy @HTraversable) (htraverse f)
+    hmapM f     = caseSumF (Proxy @HTraversable) (hmapM f)
 
 -- The subsumption relation.
 
@@ -177,15 +179,18 @@ instance (HTraversable f) => HTraversable (f :&: a) where
 class RemA (s :: (* -> *) -> * -> *) s' | s -> s'  where
     remA :: s a :-> s' a
 
--- TODO: remA
--- instance ( -- fs ~ RemAnn gs
---            fs ~ '[f :&: a]
---          , gs ~ '[f]
---          ) => RemA (Sum fs) (Sum gs) where
---     remA (Sum fsWit a) =
---       let gsWit = witness
---       in (Sum gsWit (remA a) :: Sum gs _ _) \\\
---          dictForNat @RemA fsWit (Proxy :: Proxy gs)
+-- NOTE: This is linear
+--       Is there a way to make this constant time?
+instance ( RemA f g
+         , RemA (Sum fs) (Sum gs)
+         ) => RemA (Sum (f ': fs)) (Sum (g ': gs)) where
+  remA (Sum w a) = case contract w of
+    Left Refl -> Sum witness (remA a)
+    Right w0  -> case go (Sum w0 a) of
+      Sum w1 a -> Sum (extend w1) a
+
+    where go :: (RemA (Sum fs) (Sum gs)) => Sum fs a :-> Sum gs a
+          go = remA
 
 instance RemA (f :&: p) f where
     remA (v :&: _) = v

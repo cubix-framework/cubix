@@ -1,15 +1,15 @@
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Sum
@@ -40,7 +40,7 @@ module Data.Comp.Multi.Sum
      inject,
      deepInject,
 
-     -- split,
+     split,
 
      -- * Injections and Projections for Constants
      injectConst,
@@ -92,9 +92,8 @@ deepInject :: (HFunctor g, g :<: f) => CxtFun g f
 {-# INLINE deepInject #-}
 deepInject = appSigFun inj
 
--- TODO: split
--- split :: (f :=: f1 :+: f2) => (f1 (Term f) :-> a) -> (f2 (Term f) :-> a) -> Term f :-> a
--- split f1 f2 (Term t) = spl f1 f2 t
+split :: (f :=: Sum fs) => (forall e l. Alts fs (HFix f) e (a l)) -> HFix f :-> a
+split alts = spl alts . unTerm
 
 
 -- | This function injects a whole context into another context.

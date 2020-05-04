@@ -7,7 +7,10 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Variables
@@ -50,6 +53,8 @@ import Data.Comp.Multi.Mapping
 import Data.Comp.Multi.Ops
 
 import Data.Comp.Multi.Term
+import Data.Comp.Dict
+import Data.Proxy
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -105,6 +110,13 @@ class HasVars (f  :: (* -> *) -> * -> *) v where
 
 $(derive [liftSum] [''HasVars])
 
+class (HasVars f v) => HasVarsFlip v f
+instance (HasVars f v) => HasVarsFlip v f
+
+instance (All (HasVarsFlip v) fs) => HasVars (Sum fs) v where
+  isVar = caseCxt (Proxy @(HasVarsFlip v)) isVar
+  bindsVars = caseCxt (Proxy @(HasVarsFlip v)) bindsVars
+
 -- | Same as 'isVar' but it returns Nothing@ instead of @Just v@ if
 -- @v@ is contained in the given set of variables.
 
@@ -151,7 +163,7 @@ hfoldlBoundVars f e t = let n :: f (Numbered a) i
 newtype C a b i = C{ unC :: a -> b i }
 
 varsToHoles :: forall f v. (HTraversable f, HasVars f v, Ord v) =>
-                Term f :-> Context f (K v)
+                HFix f :-> Context f (K v)
 varsToHoles t = unC (cata alg t) Set.empty
     where alg :: (HTraversable f, HasVars f v, Ord v) => Alg f (C (Set v) (Context f (K v)))
           alg t = C $ \vars -> case isVar t of

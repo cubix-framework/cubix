@@ -69,7 +69,7 @@ import Control.Parallel.Strategies ( withStrategy, rparWith, rpar, Eval, runEval
 
 import Debug.Trace ( traceM )
 
-import Data.Comp.Multi ( Cxt(..), Term, unTerm, (:->), (:=>) )
+import Data.Comp.Multi ( Cxt(..), HFix, unTerm, (:->), (:=>) )
 import Data.Comp.Multi.Generic ( query )
 import Data.Comp.Multi.HFoldable ( HFoldable(..) )
 import Data.Comp.Multi.HTraversable ( HTraversable(..) )
@@ -297,23 +297,23 @@ mtryM = liftM (maybe mempty id) . runMaybeT
 
 -- | Runs a translation in a top-down manner, combining its
 --   When run using MaybeT, returns its result for the last node where it succeded
-onetdT :: (MonadPlus m, HFoldable f) => GTranslateM m (Term f) t -> GTranslateM m (Term f) t
+onetdT :: (MonadPlus m, HFoldable f) => GTranslateM m (HFix f) t -> GTranslateM m (HFix f) t
 onetdT t = query t mplus
 
-parQuery :: forall r f. HFoldable f => (Term f :=>  r) -> (r -> r -> r) -> Term f :=> r
+parQuery :: forall r f. HFoldable f => (HFix f :=>  r) -> (r -> r -> r) -> HFix f :=> r
 parQuery q c tree = runEval $ rec 8 tree
   where
-    rec :: Int -> Term f :=> Eval r
+    rec :: Int -> HFix f :=> Eval r
     rec 0 i = rpar $ query q c i
     rec depth i@(Term t) = hfoldl (\s x -> liftM2 c s (rec (depth-1) x)) (rpar $ q i) t
 
-foldT :: (HFoldable f, Monoid t, Applicative m) => GTranslateM m (Term f) t -> TranslateM m (Term f) l t
+foldT :: (HFoldable f, Monoid t, Applicative m) => GTranslateM m (HFix f) t -> TranslateM m (HFix f) l t
 foldT t (Term tree) = hfoldl (\s x -> liftA2 mappend s (t x)) (pure mempty) tree
 
 -- | Fold a tree in a top-down manner
-foldtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM m (Term f) t -> GTranslateM m (Term f) t
+foldtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM m (HFix f) t -> GTranslateM m (HFix f) t
 foldtdT t = parQuery t (liftM2 mappend)
 
 -- | An always successful top-down fold, replacing failures with mempty.
-crushtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM (MaybeT m) (Term f) t -> GTranslateM m (Term f) t
+crushtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM (MaybeT m) (HFix f) t -> GTranslateM m (HFix f) t
 crushtdT f = foldtdT $ mtryM . f

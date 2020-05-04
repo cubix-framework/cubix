@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE TypeOperators          #-}
 
 module Data.Comp.Alt
        ( Alts

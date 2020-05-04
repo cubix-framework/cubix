@@ -1,16 +1,16 @@
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE PolyKinds              #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE MagicHash              #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
 
 module Data.Comp.Dict
        ( Dict (..)
@@ -27,9 +27,13 @@ import qualified Unsafe.Coerce as U
 
 import Data.Comp.Elem
 
+-- NOTE: `E` exists in `Data.Comp.Multi.HFunctor` but it is not PolyKinded.
+--       See dictFor function for a usage.
 data E (f :: k1 -> *) where
   E :: f e -> E f
 
+-- NOTE: ekmett's constraints also define a `Dict`
+--       unfortunately it has a kind of `Constraint -> *`
 data Dict (c :: k -> Constraint) (a :: k) where
   Dict :: c a => Dict c a
 

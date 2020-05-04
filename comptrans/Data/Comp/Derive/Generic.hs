@@ -53,8 +53,8 @@ instance (Generic (f e l), Generic (M.Sum fs e l)) => Generic (M.Sum (f ': fs) e
   to (R1 x) = case to x :: M.Sum fs e l of
     M.Sum w a -> M.Sum (M.extend w) a
 
-instance (Generic (f (M.Term f) l)) => Generic (M.Term f l) where
-  type Rep (M.Term f l) = Rep (f (M.Term f) l)
+instance (Generic (f (M.HFix f) l)) => Generic (M.HFix f l) where
+  type Rep (M.HFix f l) = Rep (f (M.HFix f) l)
   from (M.Term x) = from x
   to x = M.Term $ to x
 

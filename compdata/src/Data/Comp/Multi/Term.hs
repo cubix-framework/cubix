@@ -24,6 +24,7 @@ module Data.Comp.Multi.Term
      Hole,
      NoHole,
      Context,
+     HFix,
      Term,
      Const,
      constTerm,
@@ -35,7 +36,8 @@ module Data.Comp.Multi.Term
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
-import Data.Monoid
+import Data.Comp.Multi.Ops
+import Data.Monoid hiding (Sum)
 
 import Control.Applicative hiding (Const)
 import Control.Monad
@@ -48,7 +50,7 @@ type Const (f :: (* -> *) -> * -> *) = f (K ())
 -- the argument is indeed a constant, i.e. does not have a value for
 -- the argument type of the functor f.
 
-constTerm :: (HFunctor f) => Const f :-> Term f
+constTerm :: (HFunctor f) => Const f :-> HFix f
 constTerm = Term . hfmap (const undefined)
 
 -- | This data type represents contexts over a signature. Contexts are
@@ -71,10 +73,12 @@ data NoHole
 type Context = Cxt Hole
 
 -- | A (higher-order) term is a context with no holes.
-type Term f = Cxt NoHole f (K ())
+type HFix f = Cxt NoHole f (K ())
+
+type Term f = HFix (Sum f)
 
 -- | This function unravels the given term at the topmost layer.
-unTerm :: Term f t -> f (Term f) t
+unTerm :: HFix f t -> f (HFix f) t
 unTerm (Term t) = t
 
 instance (HFunctor f) => HFunctor (Cxt h f) where
@@ -120,7 +124,7 @@ simpCxt :: (HFunctor f) => f a i -> Context f a i
 simpCxt = Term . hfmap Hole
 
 {-| Cast a term over a signature to a context over the same signature. -}
-toCxt :: (HFunctor f) => Term f :-> Context f a
+toCxt :: (HFunctor f) => HFix f :-> Context f a
 {-# INLINE toCxt #-}
 toCxt = unsafeCoerce
 -- equivalentto @Term . (hfmap toCxt) . unTerm@

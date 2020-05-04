@@ -6,13 +6,13 @@
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE RankNTypes             #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -39,6 +39,8 @@ module Data.Comp.Ops
 
 import Data.Foldable
 import Data.Traversable
+import Data.Proxy
+import Data.Functor.Identity
 
 import Control.Applicative
 import Control.Monad hiding (mapM, sequence)
@@ -66,42 +68,39 @@ at e (Sum wit a) =
 caseF :: Alts fs a b -> Sum fs a -> b
 caseF alts (Sum wit v) = extractAt wit alts v
 
+{-# INLINE caseCxt #-}
+caseCxt :: forall cxt fs a b. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a -> b) -> Sum fs a -> b
+caseCxt _ f (Sum wit v) = f v \\ dictFor @cxt wit
+
+{-# INLINE caseSumF #-}
+caseSumF :: forall cxt f fs a b. (All cxt fs, Functor f) => Proxy cxt -> (forall g. (cxt g) => g a -> f (g b)) -> Sum fs a -> f (Sum fs b)
+caseSumF _ f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
+
+{-# INLINE caseSum #-}
+caseSum :: forall cxt fs a b. (All cxt fs) => Proxy cxt -> (forall g. (cxt g) => g a -> g b) -> Sum fs a -> Sum fs b
+caseSum p f = runIdentity . caseSumF p (Identity . f)
+
 instance (All Functor fs) => Functor (Sum fs) where
-    fmap f (Sum wit v) =
-      Sum wit $
-      fmap f v \\
-      dictFor @Functor wit
+    fmap f = caseSum (Proxy @Functor) (fmap f)
 
 instance ( All Foldable fs
          , Functor (Sum fs)
          ) => Foldable (Sum fs) where
-    fold (Sum wit e) = withDict (dictFor @Foldable wit) $ fold e
-    foldMap f (Sum wit e) = foldMap f e \\ dictFor @Foldable wit
-    foldr f b (Sum wit e) = foldr f b e \\ dictFor @Foldable wit
-    foldl f b (Sum wit e) = foldl f b e \\ dictFor @Foldable wit
-    foldr1 f (Sum wit e) = foldr1 f e \\ dictFor @Foldable wit
-    foldl1 f (Sum wit e) = foldl1 f e \\ dictFor @Foldable wit
+    fold      = caseCxt (Proxy @Foldable) fold
+    foldMap f = caseCxt (Proxy @Foldable) (foldMap f)
+    foldr f b = caseCxt (Proxy @Foldable) (foldr f b)
+    foldl f b = caseCxt (Proxy @Foldable) (foldl f b)
+    foldr1 f  = caseCxt (Proxy @Foldable) (foldr1 f)
+    foldl1 f  = caseCxt (Proxy @Foldable) (foldl1 f)
 
 instance ( All Traversable fs
          , Functor (Sum fs)
          , Foldable (Sum fs)
          ) => Traversable (Sum fs) where
-    traverse f (Sum wit e) =
-      Sum wit <$>
-      traverse f e \\
-      dictFor @Traversable wit
-    sequenceA (Sum wit e) =
-      Sum wit <$>
-      sequenceA e \\
-      dictFor @Traversable wit
-    mapM f (Sum wit e) =
-      Sum wit `liftM`
-      mapM f e \\
-      dictFor @Traversable wit
-    sequence (Sum wit e) =
-      Sum wit `liftM`
-      sequence e \\
-      dictFor @Traversable wit
+    traverse f = caseSumF (Proxy @Traversable) (traverse f)
+    sequenceA  = caseSumF (Proxy @Traversable) sequenceA
+    mapM f     = caseSumF (Proxy @Traversable) (mapM f)
+    sequence   = caseSumF (Proxy @Traversable) sequence
 
 infixl 5 :<:
 infixl 5 :=:

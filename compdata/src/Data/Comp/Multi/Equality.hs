@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 --------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ instance KEq a => Eq (E a) where
 instance (All EqHF fs) => EqHF (Sum fs) where
     eqHF (Sum wit1 x) (Sum wit2 y) =
       case elemEq wit1 wit2 of
-              Just Refl -> withDict (dictFor @EqHF wit1) $ eqHF x y
+              Just Refl -> eqHF x y \\ dictFor @EqHF wit1
               Nothing   -> False
 
 instance EqHF f => EqHF (Cxt h f) where

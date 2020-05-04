@@ -1,16 +1,16 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeApplications      #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Annotation
@@ -50,12 +50,8 @@ import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
-import Data.Comp.Multi.Alt
-import qualified Data.Comp.Ops as O
-import Data.Comp.Elem
-import Data.Comp.Dict
 
-type AnnTerm a f = Term (f :&: a)
+type AnnTerm a f = HFix (f :&: a)
 
 -- | This function transforms a function with a domain constructed
 -- from a functor to a function with a domain constructed with the
