@@ -13,8 +13,8 @@
 
 module Data.Comp.Elem
        ( Elem (..)
-       , type (∈)
-       , type (∋)
+       , Mem
+       , RMem
        , witness
        , elemEq
        , comparePos
@@ -34,14 +34,14 @@ type family Position (f :: k) (fs :: [k]) where
   Position (f :: k) ((f :: k) ': fs) = 0
   Position f (g ': fs) = 1 + Position f fs
 
-class (KnownNat (Position f fs)) => (f :: k) ∈ (fs :: [k])
-instance (KnownNat (Position f fs)) => f ∈ fs
+class (KnownNat (Position f fs)) => Mem (f :: k) (fs :: [k])
+instance (KnownNat (Position f fs)) => Mem f fs
 
-class (KnownNat (Position f fs)) => (fs :: [k]) ∋ (f :: k)
-instance (KnownNat (Position f fs)) => fs ∋ f
+class (KnownNat (Position f fs)) => RMem (fs :: [k]) (f :: k)
+instance (KnownNat (Position f fs)) => RMem fs f
 
 {-# INLINE witness #-}
-witness :: forall f fs. (f ∈ fs) => Elem f fs
+witness :: forall f fs. (Mem f fs) => Elem f fs
 witness = Elem pos
   where pos = fromInteger (natVal (Proxy :: Proxy (Position f fs)))
 

@@ -110,7 +110,7 @@ class (f :: * -> *) :<: (g :: * -> *) where
   prj  :: g a -> Maybe (f a)
 
 instance ( Functor f
-         , f ∈ fs
+         , Mem f fs
          ) => f :<: (Sum fs) where
   inj = Sum witness
   prj = at witness

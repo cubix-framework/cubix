@@ -56,8 +56,8 @@ module Data.Comp.Multi.Ops
     , cons
     , nil
     , Elem (..)
-    , type (∈)
-    , type (∋)
+    , Mem
+    , RMem
     , witness
     , extend
     , contract
@@ -130,7 +130,7 @@ class (f :: (* -> *) -> * -> *) :<: (g :: (* -> *) -> * -> *) where
   inj :: f a :-> g a
   proj :: NatM Maybe (g a) (f a)
 
-instance ( f ∈ fs
+instance ( Mem f fs
          ) => f :<: (Sum fs) where
   inj = Sum witness
   proj = at witness
