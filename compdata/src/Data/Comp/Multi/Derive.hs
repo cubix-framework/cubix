@@ -38,7 +38,8 @@ module Data.Comp.Multi.Derive
      liftSum
     ) where
 
-import Data.Comp.Derive.Utils (derive, liftSumGen)
+import Data.Comp.Derive.Utils (derive, liftSumGen')
+import Data.Comp.Dict (All)
 import Data.Comp.Multi.Derive.Equality
 import Data.Comp.Multi.Derive.HFoldable
 import Data.Comp.Multi.Derive.HFunctor
@@ -46,7 +47,7 @@ import Data.Comp.Multi.Derive.HTraversable
 import Data.Comp.Multi.Derive.Ordering
 import Data.Comp.Multi.Derive.Show
 import Data.Comp.Multi.Derive.SmartConstructors
--- import Data.Comp.Multi.Ops ((:+:), caseH)
+import Data.Comp.Multi.Ops (Sum, caseCxt)
 
 import Language.Haskell.TH
 
@@ -56,4 +57,4 @@ import Language.Haskell.TH
   is lifted as @instance (HShowF f, HShowF g) => HShowF (f :+: g) where ... @.
  -}
 liftSum :: Name -> Q [Dec]
-liftSum _ = pure [] -- liftSumGen 'caseH ''(:+:)
+liftSum = liftSumGen' 'caseCxt ''Sum ''All

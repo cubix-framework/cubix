@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE TemplateHaskell #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Derive.Utils
@@ -16,6 +17,7 @@ module Data.Comp.Derive.Utils where
 
 
 import Control.Monad
+import Data.Proxy
 import Language.Haskell.TH
 import Language.Haskell.TH.ExpandSyns
 import Language.Haskell.TH.Syntax
@@ -207,6 +209,51 @@ mkInstanceD cxt ty decs = InstanceD cxt ty decs
 mkInstanceD cxt ty decs = InstanceD Nothing cxt ty decs
 #endif
 
+
+-- | This function lifts type class instances over sums
+-- of signatures. To this end it assumes that it contains only methods
+-- with types of the form @f t1 .. tn -> t@ where @f@ is the signature
+-- that is used to construct sums. Since this function is generic it
+-- assumes as its first argument the name of the function that is
+-- used to lift methods over sums i.e. a function of type
+--
+-- @
+-- (forall f. f t1 .. tn -> t) -> (Sum fs t1 .. tn -> t)
+-- @
+--
+-- where @Sum@ is the sum type constructor. The second argument to
+-- this function is expected to be the name of that constructor. The
+-- last argument is the name of the class whose instances should be
+-- lifted over sums. The class should be such that the last parameter
+-- is that of the signature.
+
+liftSumGen' :: Name -> Name -> Name -> Name -> Q [Dec]
+liftSumGen' caseName sumName allName fname = do
+  ClassI (ClassD _ name targs_ _ decs) _ <- reify fname
+  let targs = map tyVarBndrName targs_
+      ts = map VarT (init targs)
+  fs <- newName "fs"
+  case null targs of
+    True -> do
+      reportError $ "Class " ++ show name ++ " cannot be lifted to sums!"
+      return []
+    False -> do
+      allCxt <- conT allName `appT` clsType `appT` varT fs
+      let cxt = [ allCxt ]
+      let tp = ConT sumName `AppT` VarT fs
+      let complType = foldl AppT (ConT name) ts `AppT` tp
+      decs' <- sequence $ concatMap decl decs
+      return [mkInstanceD cxt complType decs']
+        where decl :: Dec -> [DecQ]
+              decl (SigD f _) = [funD f [clause f]]
+              decl _ = []
+              clause :: Name -> ClauseQ
+              clause f = do x <- newName "x"
+                            pclsName <- pclsNameM
+                            let b = NormalB (VarE caseName `AppE` pclsName `AppE` VarE f `AppE` VarE x)
+                            return $ Clause [VarP x] b []
+              pclsNameM = [e| Proxy :: Proxy $clsType |]
+              clsType = foldl (\acc a -> acc `appT` pure a) (conT name) ts
 
 
 -- | This function lifts type class instances over sums

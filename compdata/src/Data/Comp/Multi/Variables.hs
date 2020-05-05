@@ -108,7 +108,7 @@ class HasVars (f  :: (* -> *) -> * -> *) v where
     bindsVars :: Mapping m a => f a :=> m (Set v)
     bindsVars _ = empty
 
-$(derive [liftSum] [''HasVars])
+-- $(derive [liftSum] [''HasVars'])
 
 class (HasVars f v) => HasVarsFlip v f
 instance (HasVars f v) => HasVarsFlip v f

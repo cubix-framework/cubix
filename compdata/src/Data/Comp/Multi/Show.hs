@@ -31,9 +31,6 @@ import Data.Comp.Multi.Annotation
 import Data.Comp.Multi.Derive
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Term
-import Data.Comp.Multi.Ops (Sum, caseCxt)
-import Data.Comp.Dict
-import Data.Proxy
 
 instance KShow (K String) where
     kshow = id
@@ -55,6 +52,3 @@ instance (ShowHF f, Show p) => ShowHF (f :&: p) where
     showHF (v :&: p) =  K $ unK (showHF v) ++ " :&: " ++ show p
 
 $(derive [liftSum] [''ShowHF])
-
-instance (All ShowHF fs) => ShowHF (Sum fs) where
-  showHF = caseCxt (Proxy @ShowHF) showHF
