@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -33,7 +34,7 @@ import Data.Typeable ( Typeable )
 
 import GHC.Generics ( Generic )
 
-import Data.Comp.Multi ( Term, unTerm, (:<:), (:&:)(..), caseH, caseH', HFunctor, (:+:)(..), HFoldable, htoList, AnnTerm, inject' )
+import Data.Comp.Multi ( unTerm, (:<:), (:&:)(..), caseCxt, HFunctor, HFoldable, htoList, inject', All, Sum, HFix, AnnHFix, caseCxt' )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..), kIsSort )
 
 import Cubix.Language.Parametric.Syntax.Functor
@@ -53,7 +54,7 @@ data Kleene = KTrue | KUnknown | KFalse
 
 
 class GetStrictness' g f where
-  getStrictness' :: f (Term g) l -> [Strictness]
+  getStrictness' :: f (HFix g) l -> [Strictness]
 
 defaultGetStrictness :: (HFoldable f) => f e l -> [Strictness]
 defaultGetStrictness t = take (length (htoList t)) (repeat Strict)
@@ -61,11 +62,11 @@ defaultGetStrictness t = take (length (htoList t)) (repeat Strict)
 instance {-# OVERLAPPABLE #-} (HFoldable f) => GetStrictness' g f where
   getStrictness' = defaultGetStrictness
 
-instance {-# OVERLAPPING #-} (GetStrictness' g f1, GetStrictness' g f2) => GetStrictness' g (f1 :+: f2) where
-  getStrictness' = caseH getStrictness' getStrictness'
+instance {-# OVERLAPPING #-} (All (GetStrictness' g) fs) => GetStrictness' g (Sum fs) where
+  getStrictness' = caseCxt (Proxy @(GetStrictness' g)) getStrictness'
 
 class GetStrictness f where
-  getStrictness :: Term f l -> [Strictness]
+  getStrictness :: HFix f l -> [Strictness]
 
 instance (GetStrictness' f f) => GetStrictness f where
   getStrictness = getStrictness' . unTerm
@@ -73,16 +74,16 @@ instance (GetStrictness' f f) => GetStrictness f where
 --------------------------------------------------------------------------------------
 
 class HasSideEffects' g f where
-  hasSideEffects' :: f (Term g) l -> Kleene
+  hasSideEffects' :: f (HFix g) l -> Kleene
 
 instance {-# OVERLAPPABLE #-} HasSideEffects' g f where
   hasSideEffects' = const KUnknown
 
-instance {-# OVERLAPPING #-} (HasSideEffects' g f1, HasSideEffects' g f2) => HasSideEffects' g (f1 :+: f2) where
-  hasSideEffects' = caseH hasSideEffects' hasSideEffects'
+instance {-# OVERLAPPING #-} (All (HasSideEffects' g) fs) => HasSideEffects' g (Sum fs) where
+  hasSideEffects' = caseCxt (Proxy @(HasSideEffects' g)) hasSideEffects'
 
 class HasSideEffects f where
-  hasSideEffects :: Term f l -> Kleene
+  hasSideEffects :: HFix f l -> Kleene
 
 instance (HasSideEffects' f f) => HasSideEffects f where
   hasSideEffects = hasSideEffects' . unTerm
@@ -100,15 +101,15 @@ data NodeEvaluationPoint = EnterEvalPoint
   deriving ( Eq, Ord, Show, Generic, NFData )
 
 -- We have to expand the type-synonym AnnTerm in a couple places because no partial application
-class (DynCase (Term g) l) => InsertAt' f g l where
-  insertAt'    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a g l -> (f :&: a) (AnnTerm a g) i -> m (AnnTerm a g i)
-  canInsertAt' :: NodeEvaluationPoint -> Proxy l -> (f :&: a) (AnnTerm a g) i -> Bool
+class (DynCase (HFix g) l) => InsertAt' g l f where
+  insertAt'    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnHFix a g l -> (f :&: a) (AnnHFix a g) i -> m (AnnHFix a g i)
+  canInsertAt' :: NodeEvaluationPoint -> Proxy l -> (f :&: a) (AnnHFix a g) i -> Bool
 
-instance {-# OVERLAPPABLE #-} (f :<: g, DynCase (Term g) l) => InsertAt' f g l where
+instance {-# OVERLAPPABLE #-} (f :<: g, DynCase (HFix g) l) => InsertAt' g l f where
   insertAt'    _ _ t = return $ inject' t
   canInsertAt' _ _ _ = False
 
-instance {-# OVERLAPPING #-} (ListF :<: g, HFunctor g, KDynCase g l, KDynCase g [l], Typeable l) => InsertAt' ListF g l where
+instance {-# OVERLAPPING #-} (ListF :<: g, HFunctor g, KDynCase g l, KDynCase g [l], Typeable l) => InsertAt' g l ListF where
   insertAt' EnterEvalPoint e t = case kdyncase t :: Maybe (_ :~: [l]) of
                                    Nothing -> return $ inject' t
                                    Just p  -> gcastWith p $ liftM inject' $ annM $ ConsF e (inject' t)
@@ -117,24 +118,22 @@ instance {-# OVERLAPPING #-} (ListF :<: g, HFunctor g, KDynCase g l, KDynCase g 
   canInsertAt' EnterEvalPoint _ = kIsSort (Proxy :: Proxy [l])
   canInsertAt' _              _ = const False
 
-instance {-# OVERLAPPING #-} (InsertAt' f1 g l, InsertAt' f2 g l) => InsertAt' (f1 :+: f2) g l where
-  insertAt' p e = caseH' (insertAt' p e) (insertAt' p e)
-
-  canInsertAt' p _ = caseH' (canInsertAt' p (Proxy :: Proxy l)) (canInsertAt' p (Proxy :: Proxy l))
+instance {-# OVERLAPPING #-} (All (InsertAt' g l) fs, DynCase (HFix g) l) => InsertAt' g l (Sum fs) where
+  insertAt' p e = caseCxt' (Proxy @(InsertAt' g l)) (insertAt' p e)
+  canInsertAt' p e = caseCxt' (Proxy @(InsertAt' g l)) (canInsertAt' p e)
 
 class InsertAt g l where
-  insertAt    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a g l -> AnnTerm a g i -> m (AnnTerm a g i)
-  canInsertAt :: NodeEvaluationPoint -> Proxy l -> AnnTerm a g i -> Bool
+  insertAt    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnHFix a g l -> AnnHFix a g i -> m (AnnHFix a g i)
+  canInsertAt :: NodeEvaluationPoint -> Proxy l -> AnnHFix a g i -> Bool
 
 
-
-
-instance (InsertAt' g g l) => InsertAt g l where
+instance (InsertAt' g l g) => InsertAt g l where
  insertAt p e t       = insertAt' p e (unTerm t)
  canInsertAt p prox t = canInsertAt' p prox (unTerm t)
 
-insertBefore :: (InsertAt g l, MonadAnnotater a m) => AnnTerm a g l -> AnnTerm a g i -> m (AnnTerm a g i)
+
+insertBefore :: (InsertAt g l, MonadAnnotater a m) => AnnHFix a g l -> AnnHFix a g i -> m (AnnHFix a g i)
 insertBefore = insertAt EnterEvalPoint
 
-canInsertBefore :: (InsertAt g l) => Proxy l -> AnnTerm a g i -> Bool
+canInsertBefore :: (InsertAt g l) => Proxy l -> AnnHFix a g i -> Bool
 canInsertBefore = canInsertAt EnterEvalPoint

@@ -32,7 +32,7 @@ data ProgInfo f = ProgInfo { _proginf_cfg :: Cfg f
 
 makeClassy ''ProgInfo
 
-makeProgInfo :: (CfgBuilder f) => TermLab f l -> ProgInfo f
+makeProgInfo :: (CfgBuilder f) => HFixLab f l -> ProgInfo f
 makeProgInfo t = ProgInfo (makeCfg t) (getPaths t)
 
 cfgNodePath :: ProgInfo f -> CfgNode f -> Maybe Path

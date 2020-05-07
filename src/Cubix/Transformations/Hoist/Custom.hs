@@ -31,7 +31,7 @@ import qualified Data.Set as Set
 
 import Control.Lens ( makeLenses, (^.), (%=) )
 
-import Data.Comp.Multi ( project, Term )
+import Data.Comp.Multi ( project, HFix, Sum )
 import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, allbuR, alltdR, promoteR, addFail )
 import Data.Comp.Multi.Strategy.Classification ( subterms )
 
@@ -56,7 +56,7 @@ data HoistState f = HoistState {
 
 makeLenses ''HoistState
 
-type instance SpecialHoistState MLuaSig = ()
+type instance SpecialHoistState (Sum MLuaSig) = ()
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance SpecialHoistState MCSig = ()
@@ -73,7 +73,7 @@ type instance SpecialHoistState MJavaSig = JavaSpecialHoistState
 
 class HoistStateConstraints f where
   emptyHoistState :: HoistState f
-  updateSpecialState :: (MonadState (HoistState f) m) => Term f l -> m ()
+  updateSpecialState :: (MonadState (HoistState f) m) => HFix f l -> m ()
 
 instance {-# OVERLAPPABLE #-} (SpecialHoistState f ~ ()) => HoistStateConstraints f where
   emptyHoistState = HoistState Set.empty ()
@@ -154,11 +154,11 @@ class SpecialHoist f where
   --specialHoistSingle :: HoistState f -> Term f SingleLocalVarDeclL -> Maybe (Term f [BlockItemL], Term f [StatSort f])
 
   specialHoistMulti  :: HoistState f
-                     -> Term f MultiLocalVarDeclCommonAttrsL
-                     -> Term f LocalVarDeclAttrsL
-                     -> Term f VarDeclBinderL
-                     -> Term f OptLocalVarInitL
-                     -> Maybe ([Term f BlockItemL], [Term f (StatSort f)])
+                     -> HFix f MultiLocalVarDeclCommonAttrsL
+                     -> HFix f LocalVarDeclAttrsL
+                     -> HFix f VarDeclBinderL
+                     -> HFix f OptLocalVarInitL
+                     -> Maybe ([HFix f BlockItemL], [HFix f (StatSort f)])
 
 instance {-# OVERLAPPABLE #-} SpecialHoist f where
   --specialHoistSingle _ _ = Nothing
@@ -262,14 +262,14 @@ class BuiltinSpecialIdents (f :: (* -> *) -> * -> *) where
 instance {-# OVERLAPPABLE #-} BuiltinSpecialIdents f where
   builtinReferencedIdents _ = Set.empty
 
-instance {-# OVERLAPPING #-} BuiltinSpecialIdents MLuaSig where
+instance {-# OVERLAPPING #-} BuiltinSpecialIdents (Sum MLuaSig) where
   builtinReferencedIdents _ = Set.fromList ["_ENV"]
 
 
 -- The identifier set should probably be generalized to a language-specific hoist state
 class BlockHoisting f where
-  blockHoistSingle :: HoistState f -> Term f SingleLocalVarDeclL -> Bool
-  blockHoistMulti  :: HoistState f -> Term f MultiLocalVarDeclL  -> Bool
+  blockHoistSingle :: HoistState f -> HFix f SingleLocalVarDeclL -> Bool
+  blockHoistMulti  :: HoistState f -> HFix f MultiLocalVarDeclL  -> Bool
 
 instance {-# OVERLAPPABLE #-} BlockHoisting f where
   blockHoistSingle _ _ = False

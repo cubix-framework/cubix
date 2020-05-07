@@ -59,16 +59,16 @@ class CallAnalysis f where
 
 type TrivialCallAnalysisConstraints f = ( FunctionCall :<: f, Ident :<: f
                                         , InjF f IdentL FunctionExpL, HTraversable f
-                                        , DynCase (TermLab f) FunctionCallL)
+                                        , DynCase (HFixLab f) FunctionCallL)
 type TCAC f = TrivialCallAnalysisConstraints f
 
 
-getCalls' :: (TCAC f, Monad m) => TranslateM m (TermLab f) FunctionCallL (AccumMap FunctionId [Label])
+getCalls' :: (TCAC f, Monad m) => TranslateM m (HFixLab f) FunctionCallL (AccumMap FunctionId [Label])
 getCalls' t@(stripA -> FunctionCall' _ f _) = return $ case projF f of
                                                          Just (Ident' n) -> AccumMap $ Map.singleton n [getAnn t]
                                                          Nothing         -> mempty
 
-getCalls :: (TCAC f) => GTranslateM Identity (TermLab f) (AccumMap FunctionId [Label])
+getCalls :: (TCAC f) => GTranslateM Identity (HFixLab f) (AccumMap FunctionId [Label])
 getCalls = crushtdT (promoteTF $ addFail getCalls')
 
 instance (TCAC f) => CallAnalysis f where
@@ -77,7 +77,7 @@ instance (TCAC f) => CallAnalysis f where
       -- After a lot of painful debugging, I've determined that let-statements are evil
       -- (within a let statement, the typeclass-resolver will run wild and try to infer stuff
       --   while ignoring the things provided by the context)
-      getCallsAnnSource :: forall f. (TCAC f) => (FilePath, E (TermLab f)) -> AccumMap FunctionId [NodeIdx]
+      getCallsAnnSource :: forall f. (TCAC f) => (FilePath, E (HFixLab f)) -> AccumMap FunctionId [NodeIdx]
       getCallsAnnSource (fil, E t) = case runIdentity $ getCalls t of
                                        AccumMap m -> AccumMap $ Map.map (map (NodeIdx fil)) m
 
@@ -87,7 +87,7 @@ instance (TCAC f) => CallAnalysis f where
 
 type TrivialFunctionAnalysisConstraints f = ( FunctionDef :<: f, Ident :<: f
                                             , HTraversable f
-                                            , DynCase (TermLab f) FunctionDefL)
+                                            , DynCase (HFixLab f) FunctionDefL)
 
 type TFAC f = TrivialFunctionAnalysisConstraints f
 
@@ -95,15 +95,15 @@ class FunctionAnalysis f where
   functionAnalysis :: Project f -> Map FunctionId [NodeIdx]
 
 
-getFuncs' :: (TFAC f, Monad m) => TranslateM m (TermLab f) FunctionDefL (AccumMap FunctionId [Label])
+getFuncs' :: (TFAC f, Monad m) => TranslateM m (HFixLab f) FunctionDefL (AccumMap FunctionId [Label])
 getFuncs' t@(stripA -> FunctionDef' _ (Ident' n) _ _) = return $ AccumMap $ Map.singleton n [getAnn t]
 
-getFuncs :: (TFAC f) => GTranslateM Identity (TermLab f) (AccumMap FunctionId [Label])
+getFuncs :: (TFAC f) => GTranslateM Identity (HFixLab f) (AccumMap FunctionId [Label])
 getFuncs = crushtdT (promoteTF $ addFail getFuncs')
 
 instance (TFAC f) => FunctionAnalysis f where
   functionAnalysis prj = runAccumMap $ fold $ map getFuncsAnnSource $ Map.toList prj
     where
-      getFuncsAnnSource :: forall f. (TFAC f) => (FilePath, E (TermLab f)) -> AccumMap FunctionId [NodeIdx]
+      getFuncsAnnSource :: forall f. (TFAC f) => (FilePath, E (HFixLab f)) -> AccumMap FunctionId [NodeIdx]
       getFuncsAnnSource (fil, E t) = case runIdentity $ getFuncs t of
                                        AccumMap m -> AccumMap $ Map.map (map (NodeIdx fil)) m

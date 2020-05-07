@@ -45,7 +45,7 @@ data TACState f = TACState { _tac_gen          :: LabelGen
                            , _tac_gensym_state :: GensymState
 
                            , _is_accumulating_prepends :: Bool
-                           , _to_prepend       :: [TermLab f BlockItemL]
+                           , _to_prepend       :: [HFixLab f BlockItemL]
                            }
 
 makeLenses ''TACState
@@ -65,7 +65,7 @@ makeLocalTACState = LocalTACState
 
 -- Simulating a sub runWriterT; we needed to switch from Writer to State
 -- to allow using the CfgInsertert
-withSubPrepends :: (MonadState (TACState f) m) => m x -> m (x, [TermLab f BlockItemL])
+withSubPrepends :: (MonadState (TACState f) m) => m x -> m (x, [HFixLab f BlockItemL])
 withSubPrepends sub = do
   old_is_acc <- use is_accumulating_prepends
   old <- use to_prepend
@@ -77,7 +77,7 @@ withSubPrepends sub = do
   is_accumulating_prepends .= old_is_acc
   return (x, p)
 
-doPrepend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l -> TermLab f BlockItemL -> m ()
+doPrepend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => HFixLab f l -> HFixLab f BlockItemL -> m ()
 doPrepend targ t = do
   is_acc <- use is_accumulating_prepends
   if is_acc then
@@ -86,11 +86,11 @@ doPrepend targ t = do
     dominatingPrependLast targ t
 
 
-data PrependPair f l = PrependPair { prepend_first :: TermLab f l
-                                   , prepend_rest  :: Maybe (TermLab f l)
+data PrependPair f l = PrependPair { prepend_first :: HFixLab f l
+                                   , prepend_rest  :: Maybe (HFixLab f l)
                                    }
 
-doPrependSplit  :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l
+doPrependSplit  :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => HFixLab f l
                                                                                  -> PrependPair f BlockItemL
                                                                                  -> m ()
 doPrependSplit targ p = do
@@ -101,8 +101,8 @@ doPrependSplit targ p = do
     firstPredPrependLast targ (prepend_first p)
     maybe (return ()) (restPredPrependLast targ) (prepend_rest p)
 
-doOptionalAppend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l
-                                                                                     -> TermLab f BlockItemL
+doOptionalAppend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => HFixLab f l
+                                                                                     -> HFixLab f BlockItemL
                                                                                      -> m ()
 doOptionalAppend targ e = do
   is_acc <- use is_accumulating_prepends

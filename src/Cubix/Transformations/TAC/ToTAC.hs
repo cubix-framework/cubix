@@ -61,7 +61,7 @@ import Cubix.Transformations.Variation
 
 data HoistExpState f = HoistExpState { _hes_sns   :: [Strictness]
                                      , _hes_hcs   :: [ShouldHoist]
-                                     , _hes_prevs :: [E (TermLab f)]
+                                     , _hes_prevs :: [E (HFixLab f)]
                                      }
 
 makeLenses ''HoistExpState
@@ -71,7 +71,7 @@ makeLenses ''HoistExpState
 -- | I could make a general mechanism for declaring evaluation order, but I'm not going to.
 --   I've overdue on time spent polishing
 class TACSpecial f where
-  tacSpecial :: (MonadTAC f m) => GRewriteM m (TermLab f)
+  tacSpecial :: (MonadTAC f m) => GRewriteM m (HFixLab f)
 
 instance {-# OVERLAPPABLE #-} TACSpecial f where
   tacSpecial = failR
@@ -120,7 +120,7 @@ instance {-# OVERLAPPING #-} TACSpecial MJSSig where
 -- me bring this transformation to 100%.
 
 class SpecialTmpHoistAction f where
-  specialTmpHoistAction :: (MonadTAC f m) => TermLab f IdentL -> TermLab f l -> m ()
+  specialTmpHoistAction :: (MonadTAC f m) => HFixLab f IdentL -> HFixLab f l -> m ()
 
 instance {-# OVERLAPPABLE #-} SpecialTmpHoistAction f where
   specialTmpHoistAction _ _ = return ()
@@ -129,7 +129,7 @@ instance {-# OVERLAPPABLE #-} SpecialTmpHoistAction f where
 instance {-# OVERLAPPING #-} SpecialTmpHoistAction MPythonSig where
   specialTmpHoistAction n targ = do
     let cxt = PyCommon.iDelete (SingletonF' $ injF (Hole n)) iUnitF
-    (e :: TermLab MPythonSig BlockItemL) <- annotateLabelOuter cxt
+    (e :: HFixLab MPythonSig BlockItemL) <- annotateLabelOuter cxt
     doOptionalAppend targ e
 
 #endif
@@ -152,10 +152,10 @@ class    (DefaultLocalVarDeclAttrs f, InjF f (ExpressionSort f) LocalVarInitL, I
 instance (DefaultLocalVarDeclAttrs f, InjF f (ExpressionSort f) LocalVarInitL, InjF f IdentL VarDeclBinderL) => ExtraSingleVarDeclConstraints f
 
 type CanTransTAC (f :: (* -> *) -> * -> *) =
-      ( DynCase (TermLab f) (ExpressionSort f)
-      , DynCase (TermLab f) (StatSort f)
-      , DynCase (TermLab f) AssignL
-      , DynCase (TermLab f) IdentL
+      ( DynCase (HFixLab f) (ExpressionSort f)
+      , DynCase (HFixLab f) (StatSort f)
+      , DynCase (HFixLab f) AssignL
+      , DynCase (HFixLab f) IdentL
       , InjF f IdentL (ExpressionSort f)
       , InjF f IdentL LhsL
       , InjF f (ExpressionSort f) RhsL
@@ -173,7 +173,7 @@ type CanTransTAC (f :: (* -> *) -> * -> *) =
       , DecFragment f
       , HTraversable f
       , EqHF f
-      , ExtractF [] (TermLab f)
+      , ExtractF [] (HFixLab f)
       , ExplicitDeclsVariation f ExtraMultiVarDeclConstraints ExtraSingleVarDeclConstraints ExtraAssignConstraints
 
       , CfgBuilder f
@@ -203,7 +203,7 @@ randomlySkipHoist = return False
 -- FIXME: I'd like to refactor out the args as a HoistExpState, but it doesn't quite match
 -- I think I'd need a bigger hoist state refactor to do this properly
 extractNonValue :: forall f m. (CanTransTAC f, MonadTAC f m) =>
-                    Strictness -> ShouldHoist -> [E (TermLab f)] -> RewriteM m (TermLab f) (ExpressionSort f)
+                    Strictness -> ShouldHoist -> [E (HFixLab f)] -> RewriteM m (HFixLab f) (ExpressionSort f)
 extractNonValue sn hc prevs e = view ltac_mod_set >>= \modSet  ->
     if isValue modSet e then
       return e
@@ -237,7 +237,7 @@ extractNonValue sn hc prevs e = view ltac_mod_set >>= \modSet  ->
           (e', ps) <- withSubPrepends doHoistChildren
           tmp <- gensym
 
-          (finalAssn :: TermLab f BlockItemL) <- annotateLabelOuter $ injF $ Assign' (injF $ Hole tmp) AssignOpEquals' (injF $ Hole e')
+          (finalAssn :: HFixLab f BlockItemL) <- annotateLabelOuter $ injF $ Assign' (injF $ Hole tmp) AssignOpEquals' (injF $ Hole e')
 
           let inside = ps ++ [finalAssn]
 
@@ -253,7 +253,7 @@ extractNonValue sn hc prevs e = view ltac_mod_set >>= \modSet  ->
     subhcs = shouldHoistChild hc $ stripA e
     doHoistChildren = allStateR hoistChild (HoistExpState subsns subhcs []) e
 
-hoistChild :: (CanTransTAC f, MonadTAC f m) => HoistExpState f -> TermLab f l -> m (TermLab f l, HoistExpState f)
+hoistChild :: (CanTransTAC f, MonadTAC f m) => HoistExpState f -> HFixLab f l -> m (HFixLab f l, HoistExpState f)
 hoistChild hes t = do t' <- (guardedT barrierCheck idR (subexpToTmp (head sns) (head hcs) ps)) t
                       return $ (t', hes & hes_sns   .~ tail sns
                                         & hes_hcs   .~ tail hcs
@@ -263,7 +263,7 @@ hoistChild hes t = do t' <- (guardedT barrierCheck idR (subexpToTmp (head sns) (
     hcs = hes ^. hes_hcs
     ps  = hes ^. hes_prevs
 
-subexpToTmp :: (CanTransTAC f, MonadTAC f m) => Strictness -> ShouldHoist -> [E (TermLab f)] -> GRewriteM m (TermLab f)
+subexpToTmp :: (CanTransTAC f, MonadTAC f m) => Strictness -> ShouldHoist -> [E (HFixLab f)] -> GRewriteM m (HFixLab f)
 subexpToTmp sn hc prevs t = if hc == StopHoisting then
                               return t
                             else
@@ -277,7 +277,7 @@ subexpToTmp sn hc prevs t = if hc == StopHoisting then
 
 
 makeVarDecSingle :: (CanTransTAC f, MonadTAC f m, ContainsSingleDec f, ExtraSingleVarDeclConstraints f) =>
-                      TermLab f IdentL -> Maybe (TermLab f (ExpressionSort f)) -> m (TermLab f SingleLocalVarDeclL)
+                      HFixLab f IdentL -> Maybe (HFixLab f (ExpressionSort f)) -> m (HFixLab f SingleLocalVarDeclL)
 makeVarDecSingle ident mExp = annotateLabelOuter $ SingleLocalVarDecl' defaultLocalVarDeclAttrs (injF (Hole ident)) init
   where 
     init = case mExp of
@@ -285,25 +285,25 @@ makeVarDecSingle ident mExp = annotateLabelOuter $ SingleLocalVarDecl' defaultLo
       Just exp -> JustLocalVarInit' (injF (Hole exp))
 
 makeVarDecMulti :: (CanTransTAC f, MonadTAC f m, MultiLocalVarDecl :<: f, ContainsSingleDec f, ExtraMultiVarDeclConstraints f) =>
-                      TermLab f IdentL -> Maybe (TermLab f (ExpressionSort f)) -> m (TermLab f MultiLocalVarDeclL)
+                      HFixLab f IdentL -> Maybe (HFixLab f (ExpressionSort f)) -> m (HFixLab f MultiLocalVarDeclL)
 makeVarDecMulti ident exp = do
   innerDec <- makeVarDecSingle ident exp
   annotateLabelOuter $ MultiLocalVarDecl' defaultMultiLocalVarDeclCommonAttrs
                                           (insertFHole [innerDec])
 
 makeAssignment :: (CanTransTAC f, AssignmentInsertion f ExtraAssignConstraints, MonadTAC f m) =>
-                      TermLab f IdentL -> Maybe (TermLab f (ExpressionSort f)) -> m (Maybe (TermLab f AssignL))
+                      HFixLab f IdentL -> Maybe (HFixLab f (ExpressionSort f)) -> m (Maybe (HFixLab f AssignL))
 makeAssignment ident exp = case exp of
   Nothing -> return Nothing
   Just e  -> liftM Just $ annotateLabelOuter $ Assign' (injF $ Hole ident) AssignOpEquals' (injF $ Hole e)
 
-makeVarDec :: forall f m. (CanTransTAC f, MonadTAC f m) => TermLab f IdentL -> Maybe (TermLab f (ExpressionSort f)) -> m (Maybe (TermLab f BlockItemL))
+makeVarDec :: forall f m. (CanTransTAC f, MonadTAC f m) => HFixLab f IdentL -> Maybe (HFixLab f (ExpressionSort f)) -> m (Maybe (HFixLab f BlockItemL))
 makeVarDec ident x = case tacDeclsVariation (Proxy :: Proxy f) of
   HasExplicitDeclsVariation (MultiDecInsertionVariation  Dict) -> Just <$> (labeledInjF =<< makeVarDecMulti  ident x)
   HasExplicitDeclsVariation (SingleDecInsertionVariation Dict) -> Just <$> (labeledInjF =<< makeVarDecSingle ident x)
   NoExplicitDeclsVariation  Dict                               -> mapM labeledInjF =<< makeAssignment ident x
 
-makeVarDecPair :: (CanTransTAC f, MonadTAC f m) => TermLab f IdentL -> Maybe (TermLab f (ExpressionSort f)) -> m (Maybe (PrependPair f BlockItemL))
+makeVarDecPair :: (CanTransTAC f, MonadTAC f m) => HFixLab f IdentL -> Maybe (HFixLab f (ExpressionSort f)) -> m (Maybe (PrependPair f BlockItemL))
 makeVarDecPair ident x = do
   mDec <- makeVarDec ident x
   case mDec of
@@ -313,11 +313,11 @@ makeVarDecPair ident x = do
        lassn <- mapM labeledInjF assn
        return $ Just $ PrependPair dec lassn
 
-trackModSet :: (CanTransTAC f, Monad m) => GRewriteM (ReaderT (LocalTACState f) m) (TermLab f)
-                                       -> GRewriteM m (TermLab f)
+trackModSet :: (CanTransTAC f, Monad m) => GRewriteM (ReaderT (LocalTACState f) m) (HFixLab f)
+                                       -> GRewriteM m (HFixLab f)
 trackModSet f t = runReaderT (f t) (makeLocalTACState (modifiedVariables t))
 
-toTAC :: forall f m l. (CanTransTAC f) => TermLab f l -> IO (TermLab f l)
+toTAC :: forall f m l. (CanTransTAC f) => HFixLab f l -> IO (HFixLab f l)
 toTAC t = do
    gen <- mkCSLabelGen
    let progInf = makeProgInfo t
@@ -328,7 +328,7 @@ toTAC t = do
    return $ evalState (finalizeGensymNames evalled) (GensymState 0 allIds Map.empty)
   where
     allIds :: Set String
-    allIds = Set.fromList $ [s | Ident' s <- (map stripA $ (subterms t :: [TermLab f IdentL]))]
+    allIds = Set.fromList $ [s | Ident' s <- (map stripA $ (subterms t :: [HFixLab f IdentL]))]
 
-    trans :: GRewriteM (CfgInserterT f BlockItemL (RandT StdGen (State (TACState f)))) (TermLab f)
+    trans :: GRewriteM (CfgInserterT f BlockItemL (RandT StdGen (State (TACState f)))) (HFixLab f)
     trans = allbuR (tryR (barrierCheck >=> (trackModSet $ subexpToTmp Strict ShouldHoist [])))

@@ -1,7 +1,9 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -23,11 +25,12 @@ module Cubix.Sin.Compdata.Annotation (
 
 import Control.Monad.Identity ( Identity(..) )
 import Data.Default ( Default(..) )
-import Data.Comp.Multi ( AnnTerm, Cxt(..), Term, (:=>), CxtFunM, SigFun, appSigFunM )
+import Data.Comp.Multi ( AnnTerm, Cxt(..), Term, (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
-import Data.Comp.Multi.Ops ((:&:)(..), (:+:)(..), caseH )
+import Data.Comp.Multi.Ops ((:&:)(..), Sum (..), contract)
 
 import Cubix.Sin.Compdata.Instances ()
+import Data.Type.Equality
 
 ---- This exists so you can constrain a functor to be annotated without also
 ---- naming the unannotated functor. This makes it more convenient for inclusion
@@ -38,10 +41,18 @@ class Annotated (f :: (* -> *) -> * -> *) a | f -> a where
 instance Annotated (f :&: a) a where
   getAnn' (_ :&: x) = x
 
-instance (Annotated f a, Annotated g a) => Annotated (f :+: g) a where
-  getAnn' = caseH getAnn' getAnn'
+instance ( Annotated f a
+         , Annotated (Sum fs) a
+         ) => Annotated (Sum (f ': fs)) a where
+  getAnn' (Sum w a) = case contract w of
+    Left Refl -> getAnn' a
+    Right w0  -> go (Sum w0 a)
 
-getAnn :: (Annotated f a) => Term f :=> a
+    where go :: (Annotated (Sum fs) a) => Sum fs e l -> a
+          go = getAnn'
+
+
+getAnn :: (Annotated f a) => HFix f :=> a
 getAnn (Term x) = getAnn' x
 
 class (Monad m) => MonadAnnotater a m where
@@ -53,7 +64,7 @@ newtype AnnotateDefault a x = AnnotateDefault' { runAnnotateDefault' :: Identity
 pattern AnnotateDefault :: x -> AnnotateDefault a x
 pattern AnnotateDefault x = AnnotateDefault' (Identity x)
 
-runAnnotateDefault :: AnnotateDefault a (AnnTerm a f l) -> AnnTerm a f l
+runAnnotateDefault :: AnnotateDefault a (AnnHFix a f l) -> AnnHFix a f l
 runAnnotateDefault = runIdentity . runAnnotateDefault'
 
 -- | Specializing annotation to Maybe a to aid instance selection

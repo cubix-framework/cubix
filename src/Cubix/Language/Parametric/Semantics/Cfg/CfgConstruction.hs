@@ -7,6 +7,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -48,7 +49,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (^.), (%=)  )
 
-import Data.Comp.Multi ( Cxt(..), Term, (:->), K(..), inj, proj, project, para, stripA, inj, (:+:), (:<:), HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), AnnTerm, inj', caseH' )
+import Data.Comp.Multi ( Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, (:<:), HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnHFix )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import Cubix.Language.Info
@@ -60,10 +61,10 @@ import Cubix.Language.Parametric.Syntax.Functor
 type family ComputationSorts (f :: (* -> *) -> * -> *) :: [*]
 
 class IsComputationSort' f (l :: [*]) where
-  isComputationSort' :: Proxy l -> Term f i -> Bool
+  isComputationSort' :: Proxy l -> HFix f i -> Bool
 
 class IsComputationSort f where
-  isComputationSort :: Term f l -> Bool
+  isComputationSort :: HFix f i -> Bool
 
 instance (IsComputationSort' f (ComputationSorts f)) => IsComputationSort f where
   isComputationSort = isComputationSort' (Proxy :: Proxy (ComputationSorts f))
@@ -71,19 +72,19 @@ instance (IsComputationSort' f (ComputationSorts f)) => IsComputationSort f wher
 instance IsComputationSort' f '[] where
   isComputationSort' _ = const False
 
-instance (IsComputationSort' f ls, DynCase (Term f) l) => IsComputationSort' f (l ': ls) where
+instance (IsComputationSort' f ls, DynCase (HFix f) l) => IsComputationSort' f (l ': ls) where
   isComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsComputationSort :: forall f f' l. (IsComputationSort f, HFunctor f) => TermLab f l -> Bool
+labeledIsComputationSort :: forall f f' l. (IsComputationSort f, HFunctor f) => HFixLab f l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
 type family SuspendedComputationSorts (f :: (* -> *) -> * -> *) :: [*]
 
 class IsSuspendedComputationSort' f (l :: [*]) where
-  isSuspendedComputationSort' :: Proxy l -> Term f i -> Bool
+  isSuspendedComputationSort' :: Proxy l -> HFix f i -> Bool
 
 class IsSuspendedComputationSort f where
-  isSuspendedComputationSort :: Term f l -> Bool
+  isSuspendedComputationSort :: HFix f i -> Bool
 
 instance (IsSuspendedComputationSort' f (SuspendedComputationSorts f)) => IsSuspendedComputationSort f where
   isSuspendedComputationSort = isSuspendedComputationSort' (Proxy :: Proxy (SuspendedComputationSorts f))
@@ -91,19 +92,19 @@ instance (IsSuspendedComputationSort' f (SuspendedComputationSorts f)) => IsSusp
 instance IsSuspendedComputationSort' f '[] where
   isSuspendedComputationSort' _ = const False
 
-instance (IsSuspendedComputationSort' f ls, DynCase (Term f) l) => IsSuspendedComputationSort' f (l ': ls) where
+instance (IsSuspendedComputationSort' f ls, DynCase (HFix f) l) => IsSuspendedComputationSort' f (l ': ls) where
   isSuspendedComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isSuspendedComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort f, HFunctor f) => AnnTerm a f l -> Bool
+labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort f, HFunctor f) => AnnHFix a f l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
 
 type family ContainerFunctors (f :: (* -> *) -> * -> *) :: [(* -> *) -> * -> *]
 
 class IsContainer' f (l :: [(* -> *) -> * -> *])where
-  isContainer' :: Proxy l -> Term f i -> Bool
+  isContainer' :: Proxy l -> HFix f i -> Bool
 
 class IsContainer f where
-  isContainer :: Term f i -> Bool
+  isContainer :: HFix f i -> Bool
 
 instance (IsContainer' f (ContainerFunctors f)) => IsContainer f where
   isContainer = isContainer' (Proxy :: Proxy (ContainerFunctors f))
@@ -116,7 +117,7 @@ instance (IsContainer' f ls, l :<: f) => IsContainer' f (l ': ls) where
                        Just _  -> True
                        Nothing -> isContainer' (Proxy :: Proxy ls) t
 
-labeledIsContainer :: (IsContainer f, HFunctor f) => AnnTerm a f l -> Bool
+labeledIsContainer :: (IsContainer f, HFunctor f) => AnnHFix a f l -> Bool
 labeledIsContainer = isContainer . stripA
 
 
@@ -177,14 +178,16 @@ combineEnterExit p1 p2 = do
           cur_cfg %= addEdge x1 n2
           return $ EnterExitPair n1 x2
 
+collapseFProdG :: (HFunctor f, f :<: g) => f (HFix g :*: t) :-> HFix g :*: f t
+collapseFProdG t = (Term $ inj $ hfmap ffst t) :*: (hfmap fsnd t)
 
-collapseFProd :: (HFunctor f, f :<: g) => f (Term g :*: t) :-> Term g :*: f t
-collapseFProd t = (Term $ inj $ hfmap ffst t) :*: (hfmap fsnd t)
+collapseFProd :: (HFunctor f, f :<: g) => f (HFix g :*: t) :-> HFix g :*: f t
+collapseFProd = collapseFProdG
 
-collapseFProd' :: (HFunctor f, f :<: g) => (f :&: a) (AnnTerm a g :*: t) :-> AnnTerm a g :*: f t
+collapseFProd' :: (HFunctor f, f :<: g) => (f :&: a) (AnnHFix a g :*: t) :-> AnnHFix a g :*: f t
 collapseFProd' t@(x :&: _) = (Term $ inj' $ hfmap ffst t) :*: (hfmap fsnd x)
 
-fprodFst' :: (HFunctor f, f :<: g) => (f :&: a) (AnnTerm a g :*: t) :-> AnnTerm a g
+fprodFst' :: (HFunctor f, f :<: g) => (f :&: a) (AnnHFix a g :*: t) :-> AnnHFix a g
 fprodFst' (collapseFProd' -> t :*: _) = t
 
 -- | PreRAlg's are things that can be modularly composed
@@ -203,13 +206,12 @@ fprodFst' (collapseFProd' -> t :*: _) = t
 -- In @PreRAlg f g a@, @f@ is the signature functor of
 -- the outer layer, while @g@ is the recursive signature
 -- functor, and @a@ is the carrier of the R-algebra.
-type PreRAlg f g a = f (Term g :*: a) :-> a
+type PreRAlg f g a = f (HFix g :*: a) :-> a
 
 data HState s f l = HState { unHState :: State s (f l) }
 
-class ConstructCfg f g s where
+class ConstructCfg g s f where
   constructCfg :: PreRAlg (f :&: Label) (g :&: Label) (HState s (EnterExitPair g))
-
 
 type CfgComponent g s = (HasLabelGen s, HasCurCfg s g, HTraversable g)
 type SortChecks g = (IsComputationSort g, IsSuspendedComputationSort g, IsContainer g)
@@ -243,13 +245,11 @@ constructCfgDefault p@(collapseFProd' -> (t :*: subCfgs)) =
   else
     HState $ runSubCfgs subCfgs
 
-
-
-instance {-# OVERLAPPABLE #-} (f :<: g, HTraversable f, CfgComponent g s, SortChecks g) => ConstructCfg f g s where
+instance {-# OVERLAPPABLE #-} (f :<: g, HTraversable f, CfgComponent g s, SortChecks g) => ConstructCfg g s f where
   constructCfg = constructCfgDefault
 
-instance {-# OVERLAPPING #-} (ConstructCfg f1 g s, ConstructCfg f2 g s) => ConstructCfg (f1 :+: f2) g s where
-  constructCfg = caseH' constructCfg constructCfg
+instance {-# OVERLAPPING #-} (All (ConstructCfg g s) fs) => ConstructCfg g s (Sum fs) where
+  constructCfg = caseCxt' (Proxy @(ConstructCfg g s)) constructCfg
 
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -259,10 +259,10 @@ type family CfgState (f :: (* -> *) -> * -> *) :: *
 class CfgInitState f where
    cfgInitState :: Proxy f -> CfgState f
 
-class    (CfgComponent f (CfgState f), ConstructCfg f f (CfgState f), CfgInitState f, HFunctor f) => CfgBuilder f
-instance (CfgComponent f (CfgState f), ConstructCfg f f (CfgState f), CfgInitState f, HFunctor f) => CfgBuilder f
+class    (CfgComponent f (CfgState f), ConstructCfg f (CfgState f) f, CfgInitState f, HFunctor f) => CfgBuilder f
+instance (CfgComponent f (CfgState f), ConstructCfg f (CfgState f) f, CfgInitState f, HFunctor f) => CfgBuilder f
 
-makeCfg :: forall f l. (CfgBuilder f) => TermLab f l -> Cfg f
+makeCfg :: forall f l. (CfgBuilder f) => HFixLab f l -> Cfg f
 makeCfg t = (execState (unHState $ para constructCfg t) initState) ^. cur_cfg
   where
     initState = cfgInitState (Proxy :: Proxy f)

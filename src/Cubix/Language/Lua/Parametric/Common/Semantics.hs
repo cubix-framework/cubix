@@ -12,7 +12,7 @@ module Cubix.Language.Lua.Parametric.Common.Semantics () where
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 import Data.Proxy ( Proxy(..) )
 
-import Data.Comp.Multi ( (:<:), project, inject' )
+import Data.Comp.Multi ( (:<:), project, inject', Sum )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
 
 import Cubix.Language.Lua.Parametric.Common.Types
@@ -30,7 +30,7 @@ instance {-# OVERLAPPING #-} (Binop :<: g) => GetStrictness' g Exp where
   getStrictness' x                  = defaultGetStrictness x
 
 -- Special casing functions so we don't put stuff at top level b/c looks weird even though correct
-instance {-# OVERLAPPING #-} InsertAt' ListF MLuaSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' (Sum MLuaSig) BlockItemL ListF where
   insertAt' EnterEvalPoint e t = case kdyncase t :: Maybe (_ :~: [BlockItemL]) of
                                      Nothing -> return $ inject' t
                                      Just p  -> gcastWith p $ inject' <$> annM (ConsF e (inject' t))

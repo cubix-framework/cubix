@@ -17,7 +17,7 @@ import Data.Typeable ( Typeable )
 import Control.Lens ( (%=), makeLenses )
 
 import Data.Comp.Multi ( (:<:), project, project', stripA, remA )
-import Data.Comp.Multi.Ops ( (:*:)(..), ffst )
+import Data.Comp.Multi.Ops ( Sum, (:*:)(..), ffst )
 
 import Cubix.Language.Info
 
@@ -27,7 +27,7 @@ import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
 
 data LuaCfgState = LuaCfgState {
-                   _lcs_cfg       :: Cfg MLuaSig
+                   _lcs_cfg       :: Cfg (Sum MLuaSig)
                  , _lcs_labeler   :: LabelGen
                  , _lcs_stack     :: LoopStack
                  , _lcs_goto_labs :: LabelMap
@@ -35,15 +35,15 @@ data LuaCfgState = LuaCfgState {
 
 makeLenses ''LuaCfgState
 
-instance HasCurCfg LuaCfgState MLuaSig where cur_cfg = lcs_cfg
+instance HasCurCfg LuaCfgState (Sum MLuaSig) where cur_cfg = lcs_cfg
 instance HasLabelGen LuaCfgState where labelGen = lcs_labeler
 instance HasLoopStack LuaCfgState where loopStack = lcs_stack
 instance HasLabelMap LuaCfgState where labelMap = lcs_goto_labs
 
-type instance ComputationSorts MLuaSig = '[StatL, ExpL, PrefixExpL, VarL, TableFieldL, FunCallL, [BlockItemL], AssignL]
-type instance SuspendedComputationSorts MLuaSig = '[P.FunctionDefL]
-type instance ContainerFunctors MLuaSig = '[PairF, ListF, MaybeF]
-type instance CfgState MLuaSig = LuaCfgState
+type instance ComputationSorts (Sum MLuaSig) = '[StatL, ExpL, PrefixExpL, VarL, TableFieldL, FunCallL, [BlockItemL], AssignL]
+type instance SuspendedComputationSorts (Sum MLuaSig) = '[P.FunctionDefL]
+type instance ContainerFunctors (Sum MLuaSig) = '[PairF, ListF, MaybeF]
+type instance CfgState (Sum MLuaSig) = LuaCfgState
 
 nameString :: MLuaTermLab NameL -> String
 nameString (stripA -> project -> Just (IdentIsName (Ident' s))) = s
@@ -59,11 +59,11 @@ extractClauses hs = do
     extractClause (SubPairs p) = kextractF2' p
 
 -- Lua's for loop is weird
-constructCfgLuaForRange :: MLuaTermLab h -> State LuaCfgState (EnterExitPair MLuaSig i)
-                                         -> State LuaCfgState (EnterExitPair MLuaSig j)
-                                         -> State LuaCfgState (EnterExitPair MLuaSig k)
-                                         -> State LuaCfgState (EnterExitPair MLuaSig l)
-                                         -> State LuaCfgState (EnterExitPair MLuaSig m)
+constructCfgLuaForRange :: MLuaTermLab h -> State LuaCfgState (EnterExitPair (Sum MLuaSig) i)
+                                         -> State LuaCfgState (EnterExitPair (Sum MLuaSig) j)
+                                         -> State LuaCfgState (EnterExitPair (Sum MLuaSig) k)
+                                         -> State LuaCfgState (EnterExitPair (Sum MLuaSig) l)
+                                         -> State LuaCfgState (EnterExitPair (Sum MLuaSig) m)
 constructCfgLuaForRange t mInit mFinal mOptStep mBody = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -91,7 +91,7 @@ constructCfgLuaForRange t mInit mFinal mOptStep mBody = do
   return $ EnterExitPair enterNode exitNode
 
 
-instance ConstructCfg Stat MLuaSig LuaCfgState where
+instance ConstructCfg (Sum MLuaSig) LuaCfgState Stat where
   constructCfg (collapseFProd' -> (t :*: Break))        = HState $ constructCfgBreak t
   constructCfg (collapseFProd' -> (t :*: (While e b)))  = HState $ constructCfgWhile t (unHState e) (unHState b)
   constructCfg (collapseFProd' -> (t :*: (Repeat b e))) = HState $ constructCfgDoWhile t (unHState e) (unHState b)
@@ -105,11 +105,11 @@ instance ConstructCfg Stat MLuaSig LuaCfgState where
   constructCfg (collapseFProd' -> (t :*: (If clauses optElse)))                 = HState $ constructCfgIfElseIfElse t (extractClauses clauses) (extractEEPMaybe $ unHState optElse)
   constructCfg t = constructCfgDefault t
 
-instance ConstructCfg P.Block MLuaSig LuaCfgState where
+instance ConstructCfg (Sum MLuaSig) LuaCfgState P.Block where
   constructCfg p@(collapseFProd' -> (t :*: _)) = case project' t of
     Just (P.Block xs r) -> case (extractF xs, project' r) of
       ([], Just (LuaBlockEnd e)) -> constructCfgGeneric p -- FIXME: Doesn't properly handle returns, but I think the TACer won't notice
       _  -> constructCfgDefault p
 
-instance CfgInitState MLuaSig where
+instance CfgInitState (Sum MLuaSig) where
   cfgInitState _ = LuaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap

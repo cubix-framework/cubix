@@ -54,6 +54,8 @@ module Cubix.Language.Info
   , rewriteProjectM
   , rewriteProjectWithFilM
   , putProject
+
+  , HFixLab
   ) where
 
 import Control.Concurrent.Supply ( Supply, newSupply, freshId, splitSupply )
@@ -78,7 +80,7 @@ import GHC.Generics ( Generic )
 
 import System.IO.Unsafe ( unsafePerformIO )
 
-import Data.Comp.Multi ( AnnTerm, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM )
+import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM )
 
@@ -121,6 +123,9 @@ makeClassy ''Attrs
 
 type TermLab f   = AnnTerm Label f
 type TermAttrs f = AnnTerm Attrs f
+
+type HFixLab f   = AnnHFix Label f
+type HFixAttrs f = AnnHFix Attrs f
 
 ppLabel :: Label -> String
 ppLabel (Label n) = show n
@@ -202,35 +207,37 @@ labelToAttrs (x :&: l) = x :&: Attrs l Nothing
 annotateLabel :: (HTraversable f, MonadAnnotater Label m) => CxtFunM m f (f :&: Label)
 annotateLabel = annotateM
 
-annotateOuter :: (HTraversable f, MonadAnnotater a m) => Context f (AnnTerm a f) l -> m (AnnTerm a f l)
+annotateOuter :: (HTraversable f, MonadAnnotater a m) => Context f (AnnHFix a f) l -> m (AnnHFix a f l)
 annotateOuter = liftM appCxt . annotateM
 
-annotateLabelOuter :: (HTraversable f, MonadAnnotater Label m) => Context f (TermLab f) l -> m (TermLab f l)
+annotateLabelOuter :: (HTraversable f, MonadAnnotater Label m) => Context f (HFixLab f) l -> m (HFixLab f l)
 annotateLabelOuter = annotateOuter
 
-labelProg' :: (HTraversable f) => LabelGen -> Term f l -> (TermLab f l, LabelGen)
+labelProg' :: (HTraversable f) => LabelGen -> HFix f l -> (HFixLab f l, LabelGen)
 labelProg' gen t = runState (annotateLabel t) gen
 
-labelProg :: (HTraversable f) => LabelGen -> Term f l -> TermLab f l
+labelProg :: (HTraversable f) => LabelGen -> HFix f l -> HFixLab f l
 labelProg gen t = fst $ labelProg' gen t
 
-annotateTop :: (MonadAnnotater Label m) => f (TermLab f) l -> m (TermLab f l)
+annotateTop :: (MonadAnnotater Label m) => f (HFixLab f) l -> m (HFixLab f l)
 annotateTop = liftM Term . annM
 
-annotateTop' :: (f :<: g, MonadAnnotater Label m) => f (TermLab g) l -> m (TermLab g l)
+annotateTop' :: (f :<: g, MonadAnnotater Label m) => f (HFixLab g) l -> m (HFixLab g l)
 annotateTop' = annotateTop . inj
 
-annotateTopAttrs :: (MonadAnnotater Label m) => f (TermAttrs f) l -> m (TermAttrs f l)
+annotateTopAttrs :: (MonadAnnotater Label m) => f (HFixAttrs f) l -> m (HFixAttrs f l)
 annotateTopAttrs = liftM Term . liftM labelToAttrs . annM
 
-annotateTopAttrs' :: (f :<: g, MonadAnnotater Label m) => f (TermAttrs g) l -> m (TermAttrs g l)
+annotateTopAttrs' :: (f :<: g, MonadAnnotater Label m) => f (HFixAttrs g) l -> m (HFixAttrs g l)
 annotateTopAttrs' = annotateTopAttrs . inj
 
 --------------------------------------------------------------------------------
 
-type Project f = Map FilePath (E (TermLab f))
+type Project f = Map FilePath (E (HFixLab f))
 
-parseProject :: forall f l. (HTraversable f) => LabelGen -> (FilePath -> IO (Maybe (Term f l))) -> [FilePath] -> IO (Maybe (Project f))
+parseProject :: forall f l.
+               ( HTraversable f
+               ) => LabelGen -> (FilePath -> IO (Maybe (HFix f l))) -> [FilePath] -> IO (Maybe (Project f))
 parseProject gen parse fils = runMaybeT (go gen fils)
   where
     go :: LabelGen -> [FilePath] -> MaybeT IO (Project f)
@@ -240,11 +247,11 @@ parseProject gen parse fils = runMaybeT (go gen fils)
                            prj <- go gen' fils
                            return $ Map.insert fil (E tLab) prj
 
-rewriteProjectM :: (Applicative m) => (forall l. TermLab f l -> m (TermLab f l)) -> Project f -> m (Project f)
+rewriteProjectM :: (Applicative m) => (forall l. HFixLab f l -> m (HFixLab f l)) -> Project f -> m (Project f)
 rewriteProjectM f = traverse (rewriteEM f)
 
-rewriteProjectWithFilM :: (Applicative m) => (forall l. FilePath -> TermLab f l -> m (TermLab f l)) -> Project f -> m (Project f)
+rewriteProjectWithFilM :: (Applicative m) => (forall l. FilePath -> HFixLab f l -> m (HFixLab f l)) -> Project f -> m (Project f)
 rewriteProjectWithFilM f = Map.traverseWithKey (\k t -> rewriteEM (f k) t)
 
-putProject :: (forall l. TermLab f l -> String) -> Project f -> IO ()
+putProject :: (forall l. HFixLab f l -> String) -> Project f -> IO ()
 putProject pp prj = forM_ (Map.toList prj) (\(fil, E t) -> writeFile fil (pp t))

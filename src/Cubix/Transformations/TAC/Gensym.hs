@@ -53,7 +53,7 @@ gensymPrefix = "i_am_a_temp_replace_me"
 tmpVarPrefix :: String
 tmpVarPrefix = "t"
 
-gensym :: (MonadState s m, HasGensymState s, MonadAnnotater Label m, Ident :<: f) => m (TermLab f IdentL)
+gensym :: (MonadState s m, HasGensymState s, MonadAnnotater Label m, Ident :<: f) => m (HFixLab f IdentL)
 gensym = do
   gensymCounter += 1
   n <- use gensymCounter
@@ -64,7 +64,7 @@ gensym = do
    else
     annotateTop' (Ident id)
 
-finalizeGensymName :: (MonadState s m, HasGensymState s, HTraversable f, Ident :<: f) => RewriteM m (TermLab f) IdentL
+finalizeGensymName :: (MonadState s m, HasGensymState s, HTraversable f, Ident :<: f) => RewriteM m (HFixLab f) IdentL
 finalizeGensymName t@(project' -> Just (Ident s)) =
                                   let lab = getAnn t in
                                   if isPrefixOf gensymPrefix s then do
@@ -85,5 +85,5 @@ finalizeGensymName t@(project' -> Just (Ident s)) =
                                   else
                                     return t
 
-finalizeGensymNames :: (MonadState s m, HasGensymState s, HTraversable f, DynCase (TermLab f) IdentL, Ident :<: f) => GRewriteM m (TermLab f)
+finalizeGensymNames :: (MonadState s m, HasGensymState s, HTraversable f, DynCase (HFixLab f) IdentL, Ident :<: f) => GRewriteM m (HFixLab f)
 finalizeGensymNames = tryR $ anytdR $ promoteRF finalizeGensymName

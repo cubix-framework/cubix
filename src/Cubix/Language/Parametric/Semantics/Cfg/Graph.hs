@@ -1,12 +1,15 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Cubix.Language.Parametric.Semantics.Cfg.Graph (
     Cfg
@@ -74,7 +77,7 @@ import GHC.Generics ( Generic )
 
 import Control.Lens ( (^.), (%~), (%=), (&), (?=), (&), (%~), at, ix, use, makeClassy, makeClassyFor )
 
-import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE )
+import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, AnnHFix, HFix )
 import Data.Comp.Multi.Derive ( KShow(..) )
 
 import Cubix.Language.Info
@@ -115,16 +118,15 @@ data CfgNode f = CfgNode { _cfg_node_prevs :: Set Label
                          , _cfg_node_succs :: Set Label
                          , _cfg_node_lab   :: Label
                          , _cfg_node_type  :: CfgNodeType
-                         , _cfg_node_term  :: E (TermLab f)
+                         , _cfg_node_term  :: E (HFixLab f)
                          }
-  deriving ( Eq, Ord, Show, Generic )
-
+  deriving ( Show, Eq, Ord, Generic )
 
 data Cfg f = Cfg {
                    _cfg_nodes     :: Map Label (CfgNode f)
                  , _cfg_ast_nodes :: Map Label (Map CfgNodeType Label)
                  }
-  deriving ( Eq, Ord, Show, Generic )
+  deriving ( Show, Eq, Ord, Generic )
 
 makeClassyFor "HasCurCfg" "cur_cfg" [("_cfg_nodes", "cfg_nodes"), ("_cfg_ast_nodes", "cfg_ast_nodes")] ''Cfg
 
@@ -144,7 +146,7 @@ emptyCfg = Cfg Map.empty Map.empty
 cfgNodes :: Cfg f -> [CfgNode f]
 cfgNodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
 
-addCfgNodeWithLabel :: (HasCurCfg s f, MonadState s m) => TermLab f l -> Label -> CfgNodeType -> m (CfgNode f)
+addCfgNodeWithLabel :: (HasCurCfg s f, MonadState s m) => HFixLab f l -> Label -> CfgNodeType -> m (CfgNode f)
 addCfgNodeWithLabel t l typ = do
   let node = CfgNode { _cfg_node_prevs = Set.empty
                      , _cfg_node_succs = Set.empty
@@ -165,7 +167,7 @@ addCfgNodeWithLabel t l typ = do
 
   return node
 
-addCfgNode :: (HasCurCfg s f, HasLabelGen s, MonadState s m) => TermLab f l -> CfgNodeType -> m (CfgNode f)
+addCfgNode :: (HasCurCfg s f, HasLabelGen s, MonadState s m) => HFixLab f l -> CfgNodeType -> m (CfgNode f)
 addCfgNode t typ = do
   l <- nextLabel
   addCfgNodeWithLabel t l typ
@@ -205,7 +207,7 @@ lookupCfg cfg l = case safeLookupCfg cfg l of
   Just n  -> n
   Nothing -> error $ "Label not found in CFG: " ++ show l
 
-cfgNodeForTerm :: Cfg f -> CfgNodeType -> TermLab f l -> Maybe (CfgNode f)
+cfgNodeForTerm :: Cfg f -> CfgNodeType -> HFixLab f l -> Maybe (CfgNode f)
 cfgNodeForTerm cfg typ t = do
   nodeMap <- Map.lookup (getAnn t) (cfg ^. cfg_ast_nodes)
   cfgLab <- Map.lookup typ nodeMap
@@ -291,14 +293,14 @@ prettyCfg cfg = concatMap nodeEdges nodes
     pInterestingDegree _ = ""
 
 
-getCfgLab :: forall f l. Cfg f -> TermLab f l -> [Label]
+getCfgLab :: forall f l. Cfg f -> HFixLab f l -> [Label]
 getCfgLab cfg t = case Map.lookup astLab (cfg ^. cfg_ast_nodes) of
                     Nothing -> []
                     Just m -> map snd $ Map.toList m
   where
     astLab = getAnn t
 
-putSubtree :: (ShowHF f, HFoldable f) => TermLab f l -> Cfg f ->  IO ()
+putSubtree :: (ShowHF f, HFoldable f) => HFixLab f l -> Cfg f ->  IO ()
 putSubtree t cfg = do
  let cfgLab = getCfgLab cfg t
  if length cfgLab > 0 then do
@@ -308,7 +310,7 @@ putSubtree t cfg = do
   else
    return ()
 
-debugCfg :: (ShowHF f, HFoldable f) => TermLab f l -> Cfg f -> IO ()
+debugCfg :: (ShowHF f, HFoldable f) => HFixLab f l -> Cfg f -> IO ()
 debugCfg t cfg = do
   putStrLn $ prettyCfg cfg
   mapM (\(E t) -> putSubtree t cfg) $ subterms t

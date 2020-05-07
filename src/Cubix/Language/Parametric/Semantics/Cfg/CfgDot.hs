@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -19,7 +20,7 @@ import Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
 import Cubix.Language.Parametric.Semantics.Cfg.Graph
 
 
-renderCfgDot :: forall f l. (CfgBuilder f) => TermLab f l -> Dot.Graph
+renderCfgDot :: forall f l. (CfgBuilder f) => HFixLab f l -> Dot.Graph
 renderCfgDot t = Dot.Graph Dot.StrictGraph Dot.DirectedGraph Nothing (nodeStmts ++ edgeStmts)
   where
     cfg = simplify $ cfgToFgl $ makeCfg t

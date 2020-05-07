@@ -33,7 +33,7 @@ import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
-import Data.Comp.Multi ( Cxt(..), (:<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm )
+import Data.Comp.Multi ( Cxt(..), (:<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, AnnHFix )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewriteM )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
@@ -79,16 +79,16 @@ fromProjF x = case projF x of
   Just y  -> y
   Nothing -> error "InjF.fromProjF"
 
-labeledInjF :: (MonadAnnotater Label m, InjF f l l', HTraversable f) => TermLab f l -> m (TermLab f l')
+labeledInjF :: (MonadAnnotater Label m, InjF f l l', HTraversable f) => HFixLab f l -> m (HFixLab f l')
 labeledInjF t = annotateLabelOuter $ injF $ Hole t
 
 -- This MonadAnnotater instance leaks because it's technically possible to define a MonadLabeller
 -- instance for AnnotateDefault. Gah!
 -- FIXME: Anything that can be done about this?
-injFAnnDef :: (InjF f l l', HTraversable f, MonadAnnotater a (AnnotateDefault a)) => AnnTerm a f l -> AnnTerm a f l'
+injFAnnDef :: (InjF f l l', HTraversable f, MonadAnnotater a (AnnotateDefault a)) => AnnHFix a f l -> AnnHFix a f l'
 injFAnnDef t = runAnnotateDefault $ annotateOuter $ injF $ Hole t
 
-injectFAnnDef :: (InjF f l l', HTraversable f, MonadAnnotater a (AnnotateDefault a)) => (f :&: a) (AnnTerm a f) l -> AnnTerm a f l'
+injectFAnnDef :: (InjF f l l', HTraversable f, MonadAnnotater a (AnnotateDefault a)) => (f :&: a) (AnnHFix a f) l -> AnnHFix a f l'
 injectFAnnDef =  injFAnnDef . inject
 
 --------------------------------------------------------------------------------
@@ -98,10 +98,10 @@ type family InjectableSorts (sig :: (* -> *) -> * -> *) (sort :: *) :: [*]
 
 -- NOTE: There should be some way to express this in terms of the Lens library
 class AInjF f l where
-  ainjF :: (MonadAnnotater Label m) => TermLab f l' -> Maybe (TermLab f l, TermLab f l -> m (TermLab f l'))
+  ainjF :: (MonadAnnotater Label m) => HFixLab f l' -> Maybe (HFixLab f l, HFixLab f l -> m (HFixLab f l'))
 
 class AInjF' f l (is :: [*]) where
-  ainjF' :: (MonadAnnotater Label m) => Proxy is -> TermLab f l' -> Maybe (TermLab f l, TermLab f l -> m (TermLab f l'))
+  ainjF' :: (MonadAnnotater Label m) => Proxy is -> HFixLab f l' -> Maybe (HFixLab f l, HFixLab f l -> m (HFixLab f l'))
 
 instance AInjF' f l '[] where
   ainjF' _ _ = Nothing
@@ -114,9 +114,9 @@ instance (HTraversable f, AInjF' f l is, InjF f l i, KDynCase f i) => AInjF' f l
       Just p  -> gcastWith p spec x
       Nothing -> ainjF' (Proxy :: Proxy is) x
     where
-      dcase :: forall li. (KDynCase f i) => TermLab f li -> Maybe (li :~: i)
+      dcase :: forall li. (KDynCase f i) => HFixLab f li -> Maybe (li :~: i)
       dcase a = dyncase a :: Maybe (li :~: i)
-      spec :: (MonadAnnotater Label m) => TermLab f i -> Maybe (TermLab f l, TermLab f l -> m (TermLab f i))
+      spec :: (MonadAnnotater Label m) => HFixLab f i -> Maybe (HFixLab f l, HFixLab f l -> m (HFixLab f i))
       spec t = case projF' t of
         Just t' -> Just (t', labeledInjF)
         Nothing -> Nothing
@@ -125,7 +125,7 @@ instance {-# OVERLAPPABLE #-} (AInjF' f l (InjectableSorts f l)) => AInjF f l wh
   ainjF = ainjF' (Proxy :: Proxy (InjectableSorts f l))
 
 
-promoteInjRF :: (AInjF f l, MonadPlus m, MonadAnnotater Label m) => RewriteM m (TermLab f) l -> GRewriteM m (TermLab f)
+promoteInjRF :: (AInjF f l, MonadPlus m, MonadAnnotater Label m) => RewriteM m (HFixLab f) l -> GRewriteM m (HFixLab f)
 promoteInjRF f t = case ainjF t of
   Nothing        -> mzero
   Just (t', ins) -> ins =<< f t'

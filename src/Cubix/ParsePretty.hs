@@ -31,7 +31,7 @@ module Cubix.ParsePretty(
 import Control.Monad ( liftM, (>=>) )
 import Control.Monad.Identity ( runIdentity )
 
-import Data.Comp.Multi ( Term, stripA, ann )
+import Data.Comp.Multi ( Sum, HFix, stripA, ann )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 
@@ -67,15 +67,15 @@ import qualified Data.Text as T (unpack)
 type family RootSort (f :: (* -> *) -> * -> *)
 
 class ParseFile f where
-  parseFile :: FilePath -> IO (Maybe (Term f (RootSort f)))
+  parseFile :: FilePath -> IO (Maybe (HFix f (RootSort f)))
 
 class Pretty f where
-  pretty :: Term f (RootSort f) -> String
+  pretty :: HFix f (RootSort f) -> String
 
   -- FIXME: The only reason this is needed is because Project forgets
   -- what sort its contents are
-  prettyUnsafe :: Term f l -> String
-  default prettyUnsafe :: (DynCase (Term f) (RootSort f)) => Term f l -> String
+  prettyUnsafe :: HFix f l -> String
+  default prettyUnsafe :: (DynCase (HFix f) (RootSort f)) => HFix f l -> String
   prettyUnsafe = pretty . fromDynProj
 
 -- | NOTE: This reflects the half-finished transition of Lua to annotated terms
@@ -97,9 +97,9 @@ parseLua path = do
 prettyLua :: MLuaTerm LBlockL -> String
 prettyLua = show . Lua.pprint . Lua.sBlock . LFull.untranslate . ann Nothing . LCommon.untranslate
 
-type instance RootSort MLuaSig = LBlockL
-instance ParseFile MLuaSig where parseFile = parseLua
-instance Pretty MLuaSig where pretty = prettyLua
+type instance RootSort (Sum MLuaSig) = LBlockL
+instance ParseFile (Sum MLuaSig) where parseFile = parseLua
+instance Pretty (Sum MLuaSig) where pretty = prettyLua
 
 #ifndef ONLY_ONE_LANGUAGE
 

@@ -1,13 +1,15 @@
 --{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -- This is a separate file due to GHC's phase restriction.
 
@@ -20,9 +22,10 @@ module Cubix.Language.Lua.Parametric.Full.Trans (
 import Prelude hiding ( EQ, GT, LT )
 
 import Data.Maybe ( isJust )
+import Data.Proxy
 import Data.Typeable ( Typeable )
 
-import Data.Comp.Multi ( inject', caseH', (:+:), (:&:)(..), injectOpt )
+import Data.Comp.Multi ( inject', caseCxt'', Sum, All, (:&:)(..), injectOpt, DistAnn )
 
 import qualified Language.Haskell.TH as TH
 import qualified Language.Lua.Annotated as Lua
@@ -88,9 +91,8 @@ type instance Targ (l, l') = (Targ l, Targ l')
 instance Untrans (PairF :&: a) where
   untrans (PairF x y :&: _) = T (t x, t y)
 
-
-instance (Untrans (f :&: a), Untrans (g :&: a)) => Untrans ((f :+: g) :&: a) where
-  untrans = caseH' untrans untrans
+instance (All Untrans (DistAnn fs a)) => Untrans (Sum fs :&: a) where
+  untrans = caseCxt'' (Proxy @Untrans) untrans
 
 type instance Targ () = ()
 instance Untrans (UnitF :&: a) where

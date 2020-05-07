@@ -39,7 +39,7 @@ import System.IO ( hFlush, stdout )
 
 import Control.Lens ( (&), (^.), makeClassy, use, at, (%%~), (%=) )
 
-import Data.Comp.Multi ( Cxt(..), Term, (:<:), isNode', project', HTraversable, ShowHF, EqHF, stripA, toCxt, E(..), runE )
+import Data.Comp.Multi ( Cxt(..), HFix, (:<:), isNode', project', HTraversable, ShowHF, EqHF, stripA, toCxt, E(..), runE )
 import Data.Comp.Multi.Derive ( liftSum )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, dynProj )
@@ -89,12 +89,12 @@ data IPTState f = IPTState { _ipt_gen       :: LabelGen
 
 makeClassy ''IPTState
 
-type CanIPT f = ( ListF :<: f, ExtractF [] (TermLab f)
+type CanIPT f = ( ListF :<: f, ExtractF [] (HFixLab f)
                 , Ident :<: f
                 , FunctionDef :<: f, PositionalParameter :<: f
                 , FunctionCall :<: f, FunctionArgumentList :<: f, PositionalArgument :<: f
 
-                , DynCase (TermLab f) FunctionDefL
+                , DynCase (HFixLab f) FunctionDefL
                 , InjF f IdentL PositionalArgExpL
 --                , IsNode ReceiverArg f
 
@@ -144,7 +144,7 @@ lookupUnsafe :: (Ord k) => k -> Map k v -> v
 lookupUnsafe k m = fromJust $ Map.lookup k m
 
 class PromptParamAttrs f where
-  promptParamAttrs :: (MonadIO m) => m (Term f ParameterAttrsL)
+  promptParamAttrs :: (MonadIO m) => m (HFix f ParameterAttrsL)
 
 instance {-# OVERLAPPABLE #-} (EmptyParameterAttrs :<: f, HTraversable f) => PromptParamAttrs f where
   promptParamAttrs = return EmptyParameterAttrs'
@@ -163,7 +163,7 @@ instance PromptParamAttrs MJavaSig where
 
 #endif
 
---isReceiverArg :: (CanIPT f) => Term f l -> Bool
+--isReceiverArg :: (CanIPT f) => HFix f l -> Bool
 --isReceiverArg = isNode (Proxy :: Proxy ReceiverArg)
 
 data Relation = Relation String [Int]
@@ -172,7 +172,7 @@ data Relation = Relation String [Int]
 data AddParamAction f = AddParamAction { _apa_fnName     :: String
                                        , _apa_rel        :: Relation
                                        , _apa_paramName  :: String
-                                       , _apa_paramAttrs :: Term f ParameterAttrsL
+                                       , _apa_paramAttrs :: HFix f ParameterAttrsL
                                        , _apa_funcPath   :: NodeIdx
                                        }
   deriving ( Eq, Ord, Show )
@@ -182,12 +182,12 @@ makeClassy ''AddParamAction
 data CorrectCallsAction f = CorrectCallsAction { cca_fnName     :: String
                                                , cca_rel        :: Relation
                                                , cca_paramName  :: String
-                                               , cca_paramAttrs :: Term f ParameterAttrsL
+                                               , cca_paramAttrs :: HFix f ParameterAttrsL
                                                , cca_callPaths  :: [NodeIdx]
                                                }
   deriving ( Eq, Ord, Show )
 
-getName :: (HTraversable f, Ident :<: f) => TermLab f IdentL -> String
+getName :: (HTraversable f, Ident :<: f) => HFixLab f IdentL -> String
 getName (stripA -> Ident' n) = n
 
 getRange :: (Int, Int) -> [a] -> [a]
@@ -205,7 +205,7 @@ strDiff context before after =
   let extract = (\l -> intercalate "\n" $ getRange (max 0 (firstDiff - context), max 0 (lastDiff - context)) l) in
   (extract lines1, extract lines2)
 
-promptChange :: (HTraversable f, Pretty f, MonadIO m) => FilePath -> TermLab f i -> TermLab f j -> m Bool
+promptChange :: (HTraversable f, Pretty f, MonadIO m) => FilePath -> HFixLab f i -> HFixLab f j -> m Bool
 promptChange fil before after = do
   liftIO $ putStrLn $ "Proposing change to " ++ fil
   let str1 = prettyUnsafe $ stripA before
@@ -225,7 +225,7 @@ promptChangePrj fil before after = case (lookupUnsafe fil before, lookupUnsafe f
                                      (E x, E y) -> promptChange fil x y
 
 
-addParam' :: (CanIPT f, MonadIPT f m) => AddParamAction f -> RewriteM m (TermLab f) FunctionDefL
+addParam' :: (CanIPT f, MonadIPT f m) => AddParamAction f -> RewriteM m (HFixLab f) FunctionDefL
 addParam' apa t@(project' -> Just (FunctionDef a n pars b)) =
     if (apa ^. apa_fnName) /= getName n then
       return t
@@ -245,11 +245,11 @@ addParam apa@(AddParamAction fn rel paramNm attrs ni@(NodeIdx fil lab)) prj = do
       ccas <- getCCAs
       if shouldDo then return (prj', ccas) else return (prj, [])
   where
-    addParamToFile :: (Maybe (E (TermLab f))) -> m (Maybe (E (TermLab f)))
+    addParamToFile :: (Maybe (E (HFixLab f))) -> m (Maybe (E (HFixLab f)))
     addParamToFile Nothing = error "Expected file fil not found in Project map (apa)"
     addParamToFile (Just (E t)) = do path <- labToPath lab <$> lookupUnsafe fil <$> use ipt_proginf
                                      -- I have no clue why this type annotation is needed and I'm on a deadline
-                                     (Just <$> E <$> rewriteAtPathM (promoteR $ addParam' apa) t path) :: (m (Maybe (E (TermLab f))))
+                                     (Just <$> E <$> rewriteAtPathM (promoteR $ addParam' apa) t path) :: (m (Maybe (E (HFixLab f))))
 
     getCCAs :: m [CorrectCallsAction f]
     getCCAs = do
@@ -257,12 +257,12 @@ addParam apa@(AddParamAction fn rel paramNm attrs ni@(NodeIdx fil lab)) prj = do
       let calls = Map.findWithDefault [] fn callMap
       return $ coalesce $ map (CorrectCallsAction fn rel paramNm attrs) (map (\x -> [x]) calls)
 
-getFnFromFunDef :: (CanIPT f) => TermLab f l -> Maybe String
+getFnFromFunDef :: (CanIPT f) => HFixLab f l -> Maybe String
 getFnFromFunDef (dynProj -> Just (stripA -> FunctionDef' _ (Ident' n) _ _)) = Just n
 getFnFromFunDef _                                                           = Nothing
 
 -- Left off: This is failing
-getParentFn :: forall f l. (CanIPT f) => Path -> TermLab f l -> Maybe String
+getParentFn :: forall f l. (CanIPT f) => Path -> HFixLab f l -> Maybe String
 getParentFn path t = do (E x) <- searchParent (isNode' (Proxy :: Proxy FunctionDef)) t path
                         getFnFromFunDef x
 
@@ -291,14 +291,14 @@ correctCalls cca@(CorrectCallsAction nm rel parNm attrs [ni@(NodeIdx fil lab)]) 
                      return $ map (AddParamAction newFnName rel parNm attrs) funcs
         return (prj', fromMaybe [] apa)
   where
-    addArgToFile :: Maybe (E (TermLab f)) -> m (Maybe (E (TermLab f)))
+    addArgToFile :: Maybe (E (HFixLab f)) -> m (Maybe (E (HFixLab f)))
     addArgToFile Nothing = error "Expected file fil not found in Project map"
     addArgToFile (Just (E t)) = do path <- labToPath lab <$> lookupUnsafe fil <$> use ipt_proginf
                                    Just <$> E <$> rewriteAtPathM addArg t path
 
     -- TODO: Check for non-positional arguments
     -- FIXME: What to do about clobbered labels? This is where mutable terms would help so much.
-    addArg :: TermLab f l -> m (TermLab f l)
+    addArg :: HFixLab f l -> m (HFixLab f l)
     addArg t@(project' -> Just (FunctionCall a f (project' -> Just (FunctionArgumentList args)))) = do
         newArg <- annotateLabel $ (PositionalArgument' (injF $ Ident' parNm))
         annotateLabelOuter $ FunctionCall' (Hole a) (Hole f) (FunctionArgumentList' $ insertFHole $ extractF args ++ [newArg])
