@@ -20,6 +20,7 @@ module Data.Comp.Elem
        , comparePos
        , extend
        , contract
+       , unsafeElem
        ) where
 
 import Data.Proxy
@@ -64,3 +65,8 @@ contract :: Elem f (g ': fs) -> Either (f :~: g) (Elem f fs)
 contract (Elem i)
   | i > 0     = Right (Elem (i - 1))
   | otherwise = Left (U.unsafeCoerce Refl)
+
+-- NOTE: Completely unsafe. USE WITH CARE.
+{-# INLINE unsafeElem #-}
+unsafeElem :: Elem f fs -> Elem g gs
+unsafeElem (Elem e) = Elem e

@@ -46,6 +46,7 @@ module Data.Comp.Multi.Ops
     , O.ffst
     , O.fsnd
     , unsafeMapSum
+    , unsafeElem
     , caseCxt
     , caseSumF
     , caseSum

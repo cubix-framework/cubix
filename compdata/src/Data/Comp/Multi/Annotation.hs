@@ -28,6 +28,7 @@
 module Data.Comp.Multi.Annotation
     (
      AnnTerm,
+     AnnHFix,
      (:&:) (..),
      RemA (..),
      liftA,
@@ -40,18 +41,23 @@ module Data.Comp.Multi.Annotation
      inj',
      inject',
      injectOpt,
-     caseH'
+     caseH',
+     caseCxt',
+     caseCxt'',
+     DistAnn
     ) where
 
 import Data.Proxy ( Proxy )
-
+import Data.Comp.Dict
+import Data.Comp.Elem
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
 
-type AnnTerm a f = HFix (f :&: a)
+type AnnHFix a f = HFix (f :&: a)
+type AnnTerm a f = HFix (Sum f :&: a)
 
 -- | This function transforms a function with a domain constructed
 -- from a functor to a function with a domain constructed with the
@@ -97,11 +103,23 @@ inj' (x :&: p) = (inj x) :&: p
 inject' :: (f :<: g) => (f :&: p) (Cxt h (g :&: p) a) :-> Cxt h (g :&: p) a
 inject' = Term . inj'
 
-injectOpt :: (f :<: g) => f (AnnTerm (Maybe p) g) l -> AnnTerm (Maybe p) g l
+injectOpt :: (f :<: g) => f (AnnHFix (Maybe p) g) l -> AnnHFix (Maybe p) g l
 injectOpt t = inject' (t :&: Nothing)
 
 caseH' :: forall fs a e l t. Alts (DistAnn fs a) e l t -> (Sum fs :&: a) e l -> t
 caseH' alts = caseH alts . distAnn
+
+caseCxt' :: forall cxt fs a e l t. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt' _ f (Sum wit v :&: a) =
+  f (v :&: a) \\ dictFor @cxt wit
+
+caseCxt'' :: forall cxt fs a e l t. (All cxt (DistAnn fs a)) => Proxy cxt -> (forall f. (cxt (f :&: a)) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt'' _ f (Sum wit v :&: a) =
+  f (v :&: a) \\ dictFor @cxt (annWit wit)
+
+  where annWit :: Elem f fs -> Elem (f :&: a) (DistAnn fs a)
+        annWit = unsafeElem
+
 
 type family DistAnn (fs :: [(* -> *) -> * -> *]) (a :: *) :: [(* -> *) -> * -> *] where
   DistAnn (f ': fs) a = f :&: a ': DistAnn fs a
