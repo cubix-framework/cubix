@@ -35,8 +35,8 @@ import Cubix.Language.Python.Parametric.Common as PCommon
 
 --------------------------------------------------------------------------------------
 
-type family ExpressionSort (f :: (* -> *) -> * -> *) :: *
-type family BarrierSorts  (f :: (* -> *) -> * -> *) :: [*]
+type family ExpressionSort (f :: [(* -> *) -> * -> *]) :: *
+type family BarrierSorts  (f :: [(* -> *) -> * -> *]) :: [*]
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance ExpressionSort MCSig = CCommon.CExpressionL
@@ -52,29 +52,29 @@ type instance ExpressionSort MPythonSig = PCommon.ExprL
 type instance BarrierSorts   MPythonSig = '[PCommon.StatementL]
 #endif
 
-type instance ExpressionSort (Sum MLuaSig) = LCommon.ExpL
-type instance BarrierSorts   (Sum MLuaSig) = '[LCommon.StatL, LCommon.FunBodyL]
+type instance ExpressionSort MLuaSig = LCommon.ExpL
+type instance BarrierSorts   MLuaSig = '[LCommon.StatL, LCommon.FunBodyL]
 
 --------------------------------------------------------------------------------------
 
 -- Subexp-to-tmp transform will run on all subexps of some "barrier sort" which are not contained in a sub barrier sort
 -- E.g.: Run all all exps in a statement which are not contained in a child statement
-class BarrierCheck' f (l :: [*]) where
-  barrierCheck' :: (MonadPlus m) => Proxy l -> GRewriteM m (HFixLab f)
+class BarrierCheck' fs (l :: [*]) where
+  barrierCheck' :: (MonadPlus m) => Proxy l -> GRewriteM m (TermLab fs)
 
-class BarrierCheck f where
-  barrierCheck :: (MonadPlus m) => GRewriteM m (HFixLab f)
+class BarrierCheck fs where
+  barrierCheck :: (MonadPlus m) => GRewriteM m (TermLab fs)
 
-instance (BarrierCheck' f (BarrierSorts f)) => BarrierCheck f where
-  barrierCheck = barrierCheck' (Proxy :: Proxy (BarrierSorts f))
+instance (BarrierCheck' fs (BarrierSorts fs)) => BarrierCheck fs where
+  barrierCheck = barrierCheck' (Proxy :: Proxy (BarrierSorts fs))
 
-instance BarrierCheck' f '[] where
+instance BarrierCheck' fs '[] where
   barrierCheck' _ = failR
 
-instance (BarrierCheck' f ls, DynCase (HFixLab f) l) => BarrierCheck' f (l ': ls) where
+instance (BarrierCheck' fs ls, DynCase (TermLab fs) l) => BarrierCheck' fs (l ': ls) where
   barrierCheck' _ = guardedT (guardBoolT $ isSortT (Proxy :: Proxy l)) idR (barrierCheck' (Proxy :: Proxy ls))
 
 --------------------------------------------------------------------------------------
 
-isExpression :: forall m f. (MonadPlus m, DynCase (HFixLab f) (ExpressionSort f)) => GRewriteM m (HFixLab f)
-isExpression = isSortR (Proxy :: Proxy (ExpressionSort f))
+isExpression :: forall m fs. (MonadPlus m, DynCase (TermLab fs) (ExpressionSort fs)) => GRewriteM m (TermLab fs)
+isExpression = isSortR (Proxy :: Proxy (ExpressionSort fs))

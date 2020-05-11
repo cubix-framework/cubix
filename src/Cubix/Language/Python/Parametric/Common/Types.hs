@@ -1,19 +1,19 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE EmptyDataDecls        #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternGuards         #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Cubix.Language.Python.Parametric.Common.Types where
 
@@ -21,7 +21,7 @@ module Cubix.Language.Python.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', project, HFunctor, (:<:) )
+import Data.Comp.Multi ( Cxt, Term, project', project, HFunctor, (:<:), Sum )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -220,24 +220,24 @@ do let pythonSortInjections = [ ''IdentIsIdent, ''AssignIsStatement, ''ExprIsRhs
    sumDec <- runCompTrans $ makeSumType "MPythonSig" names
    return sumDec
 
-type instance InjectableSorts MPythonSig AssignL = '[StatementL]
+type instance InjectableSorts (Sum MPythonSig) AssignL = '[StatementL]
 
 type MPythonTerm    = Term MPythonSig
 type MPythonTermLab = TermLab MPythonSig
 
-type MPythonCxt h a = Cxt h MPythonSig a
+type MPythonCxt h a = Cxt h (Sum MPythonSig) a
 
 -----------------------------------------------------------------------------------
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
 
-instance InjF MPythonSig [PyLValueL] LhsL where
+instance InjF (Sum MPythonSig) [PyLValueL] LhsL where
   injF = iPyLhs
   projF' x = do
     PyLhs ls <- project' x
     return ls
 
-instance InjF MPythonSig P.IdentL Py.ExprL where
+instance InjF (Sum MPythonSig) P.IdentL Py.ExprL where
   injF x = Py.iVar (injF x) iUnitF
   projF' x
     | Just (Py.Var v _) <- project' x
@@ -245,7 +245,7 @@ instance InjF MPythonSig P.IdentL Py.ExprL where
     = return i
   projF' _ = Nothing
 
-instance InjF MPythonSig P.IdentL LhsL where
+instance InjF (Sum MPythonSig) P.IdentL LhsL where
   injF n = iPyLhs $ insertF [injF n]
   projF' t
     | Just (PyLhs es) <- project' t
@@ -254,7 +254,7 @@ instance InjF MPythonSig P.IdentL LhsL where
     = projF' e
   projF' _ = Nothing
 
-instance InjF MPythonSig AssignL BlockItemL where
+instance InjF (Sum MPythonSig) AssignL BlockItemL where
   injF = iAssignIsStatement
   projF' t
     | Just (StatementIsBlockItem s) <- project' t
@@ -262,7 +262,7 @@ instance InjF MPythonSig AssignL BlockItemL where
     = return a
   projF' _ = Nothing
 
-instance InjF MPythonSig P.IdentL FunctionExpL where
+instance InjF (Sum MPythonSig) P.IdentL FunctionExpL where
   injF x = iVar (injF x) iUnitF
 
   projF' (project' -> Just (FunctionIdent n)) = Just n
@@ -271,7 +271,7 @@ instance InjF MPythonSig P.IdentL FunctionExpL where
     , Just (Var v _) <- project' e = projF' v
   projF' _                                    = Nothing
 
-instance InjF MPythonSig P.IdentL PositionalArgExpL where
+instance InjF (Sum MPythonSig) P.IdentL PositionalArgExpL where
   injF = iExprIsPositionalArgExp . injF
   projF' t
    | Just (ExprIsPositionalArgExp e) <- project' t = projF' e

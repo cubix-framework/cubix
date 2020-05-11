@@ -18,7 +18,7 @@ import Data.Maybe ( fromJust )
 import System.Environment ( getArgs )
 import System.IO ( hClose )
 
-import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Sum, HFix )
+import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Sum, Term, All )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import qualified Language.Dot.Pretty as Dot
@@ -57,7 +57,7 @@ data LangProg = CProg      (MCTerm CTranslationUnitL)
   deriving ( Eq, Ord, Show )
 #endif
 
-data LangProj = LuaProj    (Project (Sum MLuaSig))
+data LangProj = LuaProj    (Project MLuaSig)
 #ifndef ONLY_ONE_LANGUAGE
               | CProj      (Project MCSig)
               | JavaProj   (Project MJavaSig)
@@ -107,7 +107,7 @@ putProj (PythonProj p) = putProject (prettyPython     . fromJust . dynProj . str
 putProj (LuaProj    p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
 
 
-debugTree' :: (ShowHF f, HFoldable f, CfgBuilder f) => HFix f l -> IO ()
+debugTree' :: (All ShowHF fs, All HFoldable fs, CfgBuilder fs) => Term fs l -> IO ()
 debugTree' t = do
   gen <- mkCSLabelGen
   let tLab = labelProg gen t

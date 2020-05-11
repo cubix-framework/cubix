@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE FunctionalDependencies   #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE TemplateHaskell          #-}
 
 module Cubix.Language.Parametric.ProgInfo (
     ProgInfo
@@ -17,7 +18,7 @@ import Control.Lens ( makeClassy, (^.), use )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 
-import Data.Comp.Multi ( runE)
+import Data.Comp.Multi ( runE, All, HFoldable)
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Path
@@ -26,13 +27,13 @@ import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Sin.Compdata.Annotation ( getAnn )
 
 
-data ProgInfo f = ProgInfo { _proginf_cfg :: Cfg f
+data ProgInfo fs = ProgInfo { _proginf_cfg :: Cfg fs
                            , _proginf_paths :: Map Label Path
                            }
 
 makeClassy ''ProgInfo
 
-makeProgInfo :: (CfgBuilder f) => HFixLab f l -> ProgInfo f
+makeProgInfo :: (CfgBuilder fs, All HFoldable fs) => TermLab fs l -> ProgInfo fs
 makeProgInfo t = ProgInfo (makeCfg t) (getPaths t)
 
 cfgNodePath :: ProgInfo f -> CfgNode f -> Maybe Path

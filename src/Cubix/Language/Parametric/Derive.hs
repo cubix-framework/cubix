@@ -30,7 +30,7 @@ import Language.Haskell.TH.ExpandSyns ( expandSyns )
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax hiding ( Cxt )
 
-import Data.Comp.Multi ( (:&:), (:<:), project', HFunctor )
+import Data.Comp.Multi ( (:&:), (:-<:), project', HFunctor, All )
 import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 import Data.Comp.Multi.Strategy.Derive ( makeDynCase )
 
@@ -118,7 +118,7 @@ createSortInclusionInfer fromNm toNm = do
       let p = conP tName [varP x]
       let xe = varE x
 
-      [d| instance ($t :<: f, HFunctor f) => InjF f $fromT $toT where
+      [d| instance ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
             injF = $smartCon
 
             projF' (project' -> Just $p) = Just $xe

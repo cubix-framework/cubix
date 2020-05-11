@@ -22,7 +22,7 @@ module Cubix.Language.Parametric.Path
 
 import Control.Monad ( (=<<) )
 
-import Data.Comp.Multi ( Cxt(..), Term, Alg, cata, K(..), E(..), runE, (:&:), hfoldMap, HTraversable(..), Sum, HFix )
+import Data.Comp.Multi ( Cxt(..), Alg, cata, K(..), E(..), runE, (:&:), hfoldMap, HTraversable(..), HFix )
 import Data.Comp.Multi.Mapping ( Numbered(..), number )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, caseE )
 

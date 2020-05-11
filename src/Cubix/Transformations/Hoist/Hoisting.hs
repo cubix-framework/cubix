@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -28,7 +29,7 @@ import Data.Traversable ( for )
 import Control.Lens ( (&), (.~), (%=), (.=), (^.), use, Lens' )
 
 import Data.Constraint ( Dict(..) )
-import Data.Comp.Multi ( (:<:), HFix, HTraversable, HFunctor )
+import Data.Comp.Multi ( (:<:), HFix, HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
 
 import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM, TranslateM,
                                    promoteR, addFail, tryR, idR, allR, alltdR,
@@ -42,76 +43,81 @@ import Cubix.Language.Parametric.Syntax as P
 import Cubix.Transformations.Hoist.Custom
 import Cubix.Transformations.Variation
 
-class NoConstraint (f :: (* -> *) -> * -> *) where
-instance NoConstraint f where
+class NoConstraint (fs :: [(* -> *) -> * -> *]) where
+instance NoConstraint fs where
 
-type VarDeclFragment f = ( SingleLocalVarDecl :<: f
-                         , OptLocalVarInit :<: f, Ident :<: f )
-type AssignFragment f = ( Assign :<: f, AssignOpEquals :<: f )
-type HasFunctors f = (ListF :<: f, ExtractF [] (HFix f))
+type VarDeclFragment fs = ( SingleLocalVarDecl :-<: fs
+                         , OptLocalVarInit :-<: fs, Ident :-<: fs )
+type AssignFragment fs = ( Assign :-<: fs, AssignOpEquals :-<: fs )
+type HasFunctors fs = (ListF :-<: fs, ExtractF [] (Term fs))
 
 -- Assume one-to-one mapping between (StatSort f) and BlockItemL
-type CanHoist f = ( VariableInsertionVariation f NoConstraint NoConstraint
-                  , VarDeclFragment f, AssignFragment f, Block :<: f
-                  , VarInitToRhs (HFix f), VarDeclBinderToLhs (HFix f)
-                  , HoistStateConstraints f
-                  , SpecialHoist f
-                  , BuiltinSpecialIdents f
-                  , BlockHoisting f
-                  , InjF f AssignL (StatSort f)
-                  , InjF f (StatSort f) BlockItemL
-                  , HTraversable f, HasFunctors f
-                  , DynCase (HFix f) BlockL
-                  , DynCase (HFix f) IdentL
-                  , DynCase (HFix f) SingleLocalVarDeclL
-                  , DynCase (HFix f) [(StatSort f)]
-                  , DynCase (HFix f) [BlockItemL]
-                  , Typeable (StatSort f)
+type CanHoist fs = ( VariableInsertionVariation fs NoConstraint NoConstraint
+                   , VarDeclFragment fs, AssignFragment fs, Block :-<: fs
+                   , VarInitToRhs (Term fs), VarDeclBinderToLhs (Term fs)
+                   , HoistStateConstraints fs
+                   , SpecialHoist fs
+                   , BuiltinSpecialIdents fs
+                   , BlockHoisting fs
+                   , InjF fs AssignL (StatSort fs)
+                   , InjF fs (StatSort fs) BlockItemL
+                   , All HTraversable fs, HasFunctors fs
+                   , DynCase (Term fs) BlockL
+                   , DynCase (Term fs) IdentL
+                   , DynCase (Term fs) SingleLocalVarDeclL
+                   , DynCase (Term fs) [(StatSort fs)]
+                   , DynCase (Term fs) [BlockItemL]
+                   , Typeable (StatSort fs)
                   )
 
-type HoistMonad f = WriterT [HFix f BlockItemL] (State (HoistState f))
-type MonadHoist f m = (MonadWriter [HFix f BlockItemL] m, MonadState (HoistState f) m)
+type HoistMonad fs = WriterT [Term fs BlockItemL] (State (HoistState fs))
+type MonadHoist fs m = (MonadWriter [Term fs BlockItemL] m, MonadState (HoistState fs) m)
 
 -- FIXME FIXME FIXME: This breaks if a hoisted declaration shadows a declaration in an
 -- outer scope, and the shadowed variable is referred to earlier in the block
 --
 -- 4/15/2018: Not sure if the above is still true; deserves some thinking
-declToAssign :: (CanHoist f) => HFix f MultiLocalVarDeclCommonAttrsL -> HFix f SingleLocalVarDeclL -> [HFix f (StatSort f)]
+declToAssign :: (CanHoist fs) => Term fs MultiLocalVarDeclCommonAttrsL -> Term fs SingleLocalVarDeclL -> [Term fs (StatSort fs)]
 declToAssign mattrs (SingleLocalVarDecl' lattrs b optInit) = case optInit of
   NoLocalVarInit'        -> []
   JustLocalVarInit' init -> [P.iAssign (varDeclBinderToLhs b)
                                         AssignOpEquals'
                                        (varInitToRhs mattrs b lattrs init)]
 
-removeInit :: (CanHoist f) => HFix f SingleLocalVarDeclL -> HFix f SingleLocalVarDeclL
+removeInit :: (CanHoist fs) => Term fs SingleLocalVarDeclL -> Term fs SingleLocalVarDeclL
 removeInit (SingleLocalVarDecl' a n _) = SingleLocalVarDecl' a n NoLocalVarInit'
 
-refCheck :: (CanHoist f) => Set String -> HFix f SingleLocalVarDeclL -> Bool
+refCheck :: (CanHoist fs, All HFoldable fs) => Set String -> Term fs SingleLocalVarDeclL -> Bool
 refCheck prevRef (SingleLocalVarDecl' _ binder init) = Set.null $ Set.intersection boundIdents refs
   where
     refs = prevRef `Set.union` (referencedIdents init)
     boundIdents = referencedIdents binder
 
-refCheckMulti :: (CanHoist f) => Set String -> [HFix f SingleLocalVarDeclL] -> Bool
+refCheckMulti :: (CanHoist fs, All HFoldable fs) => Set String -> [Term fs SingleLocalVarDeclL] -> Bool
 refCheckMulti prevRefs decls = all (uncurry refCheck) $ zip cumPrevDecl decls
   where
     cumPrevDecl = map (Set.union prevRefs) $ cumulativeReferencedIdents decls
 
-referencedIdents :: (CanHoist f) => HFix f l -> Set String
+referencedIdents :: (CanHoist fs, All HFoldable fs) => Term fs l -> Set String
 referencedIdents t = Set.fromList $ map (\(Ident' s) -> s) $ subterms t
 
 -- This is stupid and conservative. For example, in the case of Java, if you
 -- refer to a package "x.y.z", it will list "x", "y", and "z" as referred symbols
-cumulativeReferencedIdents :: forall f l. (CanHoist f) => [HFix f l] -> [Set String]
+cumulativeReferencedIdents :: forall fs l. (CanHoist fs, All HFoldable fs) => [Term fs l] -> [Set String]
 cumulativeReferencedIdents = init . scanl addIdents Set.empty
   where
-    addIdents :: Set String -> HFix f l -> Set String
+    addIdents :: Set String -> Term fs l -> Set String
     addIdents start t = Set.union start $ referencedIdents t
 
 getThenModify :: MonadState s m => Lens' s a -> (a -> a) -> m a
 getThenModify l f = use l >>= \x -> (l .= f x) >>= const (return x)
   
-transformSingle :: (CanHoist f, SingleDecInsertion f NoConstraint, MonadHoist f m) => HFix f (StatSort f) -> MaybeT m [HFix f (StatSort f)]
+transformSingle ::
+  ( CanHoist fs
+  , SingleDecInsertion fs NoConstraint
+  , MonadHoist fs m
+  , All HFoldable fs
+  ) => Term fs (StatSort fs) -> MaybeT m [Term fs (StatSort fs)]
 transformSingle (projF -> Just t@(SingleLocalVarDecl' attr binder init)) = do
   seenIdents %= (Set.union $ referencedIdents init)
   hoistState <- get
@@ -127,7 +133,12 @@ transformSingle _ = mzero
 
 -- If blocking one part of a multi-hoist, we could still hoist the other parts,
 -- but that sounds like work to code.
-transformMulti :: (CanHoist f, MultiDecInsertion f NoConstraint, MonadHoist f m) => HFix f (StatSort f) -> MaybeT m [HFix f (StatSort f)]
+transformMulti ::
+  ( CanHoist fs
+  , MultiDecInsertion fs NoConstraint
+  , MonadHoist fs m
+  , All HFoldable fs
+  ) => Term fs (StatSort fs) -> MaybeT m [Term fs (StatSort fs)]
 transformMulti (projF -> Just t@(MultiLocalVarDecl' attrs sdecls)) = do
   hoistState <- get
   seenIdents %= Set.union (referencedIdents sdecls)
@@ -152,39 +163,43 @@ transformMulti (projF -> Just t@(MultiLocalVarDecl' attrs sdecls)) = do
       mzero
 transformMulti _ = mzero
 
-transformListHead :: (MonadPlus m, Typeable l, HFunctor f, ListF :<: f) => (HFix f l -> m [HFix f l]) -> RewriteM m (HFix f) [l]
+transformListHead :: (MonadPlus m, Typeable l, All HFunctor fs, ListF :-<: fs) => (Term fs l -> m [Term fs l]) -> RewriteM m (Term fs) [l]
 transformListHead f (ConsF' t ts) = f t >>= return . (foldr (ConsF' . injF) ts)
 transformListHead _ NilF' = mzero
 
-transformStatSorts :: forall f m. (CanHoist f, MonadHoist f m) => RewriteM (MaybeT m) (HFix f) [(StatSort f)]
-transformStatSorts = case variableInsertionVariation (Proxy :: Proxy f) (Proxy :: Proxy NoConstraint) (Proxy :: Proxy NoConstraint) of
+transformStatSorts :: forall fs m. (CanHoist fs, MonadHoist fs m, All HFoldable fs) => RewriteM (MaybeT m) (Term fs) [(StatSort fs)]
+transformStatSorts = case variableInsertionVariation (Proxy :: Proxy fs) (Proxy :: Proxy NoConstraint) (Proxy :: Proxy NoConstraint) of
   MultiDecInsertionVariation  Dict -> transformListHead transformMulti
   SingleDecInsertionVariation Dict -> transformListHead transformSingle
 
-transformBlockItems :: forall f m. (CanHoist f, MonadHoist f m) => RewriteM (MaybeT m) (HFix f) [BlockItemL]
+transformBlockItems :: forall fs m. (CanHoist fs, MonadHoist fs m, All HFoldable fs) => RewriteM (MaybeT m) (Term fs) [BlockItemL]
 transformBlockItems t = mapF injF <$> (transformStatSorts $ mapF fromProjF t)
 
-addIdents :: (CanHoist f, MonadHoist f m) => RewriteM (MaybeT m) (HFix f) IdentL
+addIdents :: (CanHoist fs, MonadHoist fs m) => RewriteM (MaybeT m) (Term fs) IdentL
 addIdents (Ident' s) = (seenIdents %= Set.insert s) *> mzero
 
-updateState :: (CanHoist f, MonadHoist f m) => GRewriteM (MaybeT m) (HFix f)
+updateState :: (CanHoist fs, MonadHoist fs m) => GRewriteM (MaybeT m) (Term fs)
 updateState = promoteRF addIdents >+> (\t -> updateSpecialState t *> mzero)
 
-tillFailure :: (Monad m, HTraversable f) => GRewriteM (MaybeT m) (HFix f) -> GRewriteM m (HFix f)
+tillFailure :: (Monad m, All HTraversable fs) => GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
 tillFailure f t = liftM (maybe t id) $ runMaybeT $ f t >>= lift . (tillFailure f)
 
 -- Run non-transformation f top-down on block subtrees, and apply transformation g top-down on non-block nodes
-transformOuterScope :: (MonadHoist f m, CanHoist f) => GRewriteM m (HFix f) -> GRewriteM (MaybeT m) (HFix f) -> GRewriteM m (HFix f)
+transformOuterScope ::
+  ( MonadHoist fs m
+  , CanHoist fs
+  , All HFoldable fs
+  ) => GRewriteM m (Term fs) -> GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
 transformOuterScope f g = tryR $ guardedT (guardBoolT (isSortT (Proxy :: Proxy BlockL)))
                                           (addFail $ alltdR f) (addFail $ (tillFailure g) >=> allR (transformOuterScope f g))
 
-hoistBlock :: forall f. (CanHoist f) => Rewrite (HFix f) BlockL
+hoistBlock :: forall fs. (CanHoist fs, All HFoldable fs) => Rewrite (Term fs) BlockL
 hoistBlock (Block' items end) = return $ Block' (insertF $ decls ++ extractF items') end
   where
-    hoist :: HoistMonad f (HFix f [BlockItemL])
+    hoist :: HoistMonad fs (Term fs [BlockItemL])
     hoist = transformOuterScope (promoteR addIdents) (updateState >+> (promoteRF transformBlockItems) >+> (promoteRF transformStatSorts)) items
-    startState = emptyHoistState & seenIdents .~ (builtinReferencedIdents (Proxy :: Proxy f))
+    startState = emptyHoistState & seenIdents .~ (builtinReferencedIdents (Proxy :: Proxy fs))
     (items', decls) = evalState (runWriterT hoist) startState
 
-hoistDeclarations :: (CanHoist f) => GRewrite (HFix f)
+hoistDeclarations :: (CanHoist fs, All HFoldable fs) => GRewrite (Term fs)
 hoistDeclarations = alltdR $ promoteR $ addFail hoistBlock

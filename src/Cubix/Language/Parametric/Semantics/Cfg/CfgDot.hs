@@ -19,12 +19,16 @@ import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
 import Cubix.Language.Parametric.Semantics.Cfg.Graph
 
-
-renderCfgDot :: forall f l. (CfgBuilder f) => HFixLab f l -> Dot.Graph
+renderCfgDot :: forall fs l. (CfgBuilder fs) => TermLab fs l -> Dot.Graph
 renderCfgDot t = Dot.Graph Dot.StrictGraph Dot.DirectedGraph Nothing (nodeStmts ++ edgeStmts)
   where
-    cfg = simplify $ cfgToFgl $ makeCfg t
+    cfg :: (CfgBuilder fs) => Fgl.Gr Label ()
+    cfg = simplify $ cfgToFgl $ (makeCfg t)
+
+    nodeStmts :: [Dot.Statement]
     nodeStmts = map renderNode $ Fgl.labNodes cfg
+
+    edgeStmts :: [Dot.Statement]
     edgeStmts = map renderEdge $ Fgl.labEdges cfg
 
 renderNode :: Fgl.LNode Label -> Dot.Statement
@@ -40,7 +44,7 @@ renderEdge (a, b, _) =
 renderId :: Int -> Dot.NodeId
 renderId nId = Dot.NodeId (Dot.NameId $ show nId) Nothing
 
-cfgToFgl :: Cfg f -> Fgl.Gr Label ()
+cfgToFgl :: Cfg fs -> Fgl.Gr Label ()
 cfgToFgl cfg = Fgl.mkGraph nodes edges
   where
     (nodeLabs, cfgNodes) = unzip $ Map.toList (cfg ^. cfg_nodes)

@@ -233,25 +233,28 @@ annotateTopAttrs' = annotateTopAttrs . inj
 
 --------------------------------------------------------------------------------
 
-type Project f = Map FilePath (E (HFixLab f))
+type Project fs = Map FilePath (E (TermLab fs))
 
-parseProject :: forall f l.
-               ( HTraversable f
-               ) => LabelGen -> (FilePath -> IO (Maybe (HFix f l))) -> [FilePath] -> IO (Maybe (Project f))
+parseProject ::
+  forall fs l.
+  ( All HFoldable fs
+  , All HFunctor fs
+  , All HTraversable fs
+  ) => LabelGen -> (FilePath -> IO (Maybe (Term fs l))) -> [FilePath] -> IO (Maybe (Project fs))
 parseProject gen parse fils = runMaybeT (go gen fils)
   where
-    go :: LabelGen -> [FilePath] -> MaybeT IO (Project f)
+    go :: (All HFoldable fs, All HFunctor fs, All HTraversable fs) => LabelGen -> [FilePath] -> MaybeT IO (Project fs)
     go gen []         = return Map.empty
     go gen (fil:fils) = do t <- MaybeT $ parse fil
                            let (tLab, gen') = labelProg' gen t
                            prj <- go gen' fils
                            return $ Map.insert fil (E tLab) prj
 
-rewriteProjectM :: (Applicative m) => (forall l. HFixLab f l -> m (HFixLab f l)) -> Project f -> m (Project f)
+rewriteProjectM :: (Applicative m) => (forall l. TermLab fs l -> m (TermLab fs l)) -> Project fs -> m (Project fs)
 rewriteProjectM f = traverse (rewriteEM f)
 
-rewriteProjectWithFilM :: (Applicative m) => (forall l. FilePath -> HFixLab f l -> m (HFixLab f l)) -> Project f -> m (Project f)
+rewriteProjectWithFilM :: (Applicative m) => (forall l. FilePath -> TermLab fs l -> m (TermLab fs l)) -> Project fs -> m (Project fs)
 rewriteProjectWithFilM f = Map.traverseWithKey (\k t -> rewriteEM (f k) t)
 
-putProject :: (forall l. HFixLab f l -> String) -> Project f -> IO ()
+putProject :: (forall l. TermLab fs l -> String) -> Project fs -> IO ()
 putProject pp prj = forM_ (Map.toList prj) (\(fil, E t) -> writeFile fil (pp t))

@@ -23,7 +23,7 @@ import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 import Data.Proxy
 import Data.Text ( pack, unpack )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), Sum, All, caseCxt
+import Data.Comp.Multi ( project, inject, unTerm, (:-<:), Sum, All, caseCxt
                        , HFunctor(..), (:&:) )
 
 import Cubix.Language.Info
@@ -42,10 +42,10 @@ class Trans f where
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
   trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: Sum MLuaSig, f :<: Sum F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
+transDefault :: (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: Sum MLuaSig, f :<: Sum F.LuaSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => Trans f where
   trans = transDefault
 
 transIdent :: F.LuaTerm F.NameL -> MLuaTerm IdentL
@@ -125,10 +125,10 @@ class Untrans f where
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: Sum F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
+untransDefault :: (HFunctor f, f :-<: F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: Sum F.LuaSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.LuaSig) => Untrans f where
   untrans = untransDefault
 
 untransIdent :: MLuaTerm IdentL -> F.LuaTerm F.NameL
@@ -234,7 +234,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStat where
                    | otherwise = l
 
 
-untransError :: (HFunctor f, f :<: Sum MLuaSig) => f MLuaTerm l -> F.LuaTerm l
+untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))
 
 do ipsNames <- sumToNames ''MLuaSig

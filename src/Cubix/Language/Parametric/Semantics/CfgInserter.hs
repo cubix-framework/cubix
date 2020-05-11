@@ -31,7 +31,7 @@ import Data.Proxy ( Proxy(..) )
 
 import Control.Lens ( makeLenses, use, (%=), (%%~), (^.) )
 
-import Data.Comp.Multi ( E(..), runE, HFunctor, HTraversable )
+import Data.Comp.Multi ( E(..), runE, HFunctor, HTraversable, HFoldable, All )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, allbuR )
 
 import Cubix.Language.Info
@@ -49,43 +49,48 @@ import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, getAnn )
 -- switched to MonadWriter
 
 -- Nothing to control what order these are applied in. Ideally, want operational transform maybe?
-data InsertionOp f l = InsertionOp { _insert_op_eval_point :: NodeEvaluationPoint
-                                   , _insert_op_node       :: HFixLab f l
-                                   }
+data InsertionOp fs l = InsertionOp { _insert_op_eval_point :: NodeEvaluationPoint
+                                    , _insert_op_node       :: TermLab fs l
+                                    }
 makeLenses ''InsertionOp
 
-data CfgInsertState f l = CfgInsertState {
-                            _pendingInsertions :: Map Label [InsertionOp f l]
-                          , _cis_proginf       :: ProgInfo f
+data CfgInsertState fs l = CfgInsertState {
+                            _pendingInsertions :: Map Label [InsertionOp fs l]
+                          , _cis_proginf       :: ProgInfo fs
                           }
 
 makeLenses ''CfgInsertState
 
-instance HasProgInfo (CfgInsertState f l) f where progInfo = cis_proginf
-instance HasCurCfg (CfgInsertState f l) f where cur_cfg = cis_proginf.proginf_cfg
+instance HasProgInfo (CfgInsertState fs l) fs where progInfo = cis_proginf
+instance HasCurCfg (CfgInsertState fs l) fs where cur_cfg = cis_proginf.proginf_cfg
 
-type CfgInserterT f l m = WriterT [Action f l] m
+type CfgInserterT fs l m = WriterT [Action fs l] m
 
 data EmptyInsertOkay = EmptyInsertOkay | EmptyInsertNotOkay
 
-data Action f l = DominatingPrependFirst (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
-                | DominatingPrependLast  (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
-                | DominatingAppendFirst  (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
-                | DominatingAppendLast   (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
-                | FirstPredPrependLast   (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
-                | RestPredPrependLast    (E (HFixLab f)) (HFixLab f l) EmptyInsertOkay
+data Action fs l = DominatingPrependFirst (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
+                 | DominatingPrependLast  (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
+                 | DominatingAppendFirst  (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
+                 | DominatingAppendLast   (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
+                 | FirstPredPrependLast   (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
+                 | RestPredPrependLast    (E (TermLab fs)) (TermLab fs l) EmptyInsertOkay
 
 
 collapseMaybeList :: Maybe [a] -> [a]
 collapseMaybeList = concat
 
-dominatingInsert :: forall f l m i. (Monad m, HFunctor f, InsertAt f l) => Bool
-                                                                        -> (forall a. a -> [a] -> [a])
-                                                                        -> ([CfgNode f] -> StateT (CfgInsertState f l) m [CfgNode f])
-                                                                        -> E (HFixLab f)
-                                                                        -> HFixLab f l
-                                                                        -> EmptyInsertOkay
-                                                                        -> StateT (CfgInsertState f l) m ()
+dominatingInsert ::
+  forall fs l m.
+  ( Monad m
+  , All HFunctor fs
+  , InsertAt fs l
+  ) => Bool
+  -> (forall a. a -> [a] -> [a])
+  -> ([CfgNode fs] -> StateT (CfgInsertState fs l) m [CfgNode fs])
+  -> E (TermLab fs)
+  -> TermLab fs l
+  -> EmptyInsertOkay
+  -> StateT (CfgInsertState fs l) m ()
 dominatingInsert isPrepend op filt t toInsert empOk = do
     cfg <- use cur_cfg
     let (Just tNode) = runE (cfgNodeForTerm cfg EnterNode) t
@@ -102,7 +107,7 @@ dominatingInsert isPrepend op filt t toInsert empOk = do
           let insertions' = op (InsertionOp (nodeTypeToEvalPoint (p ^. cfg_node_type)) toInsert) (collapseMaybeList insertions)
           pendingInsertions %= Map.insert lab insertions'
   where
-    canInsert :: CfgNode f -> Bool
+    canInsert :: CfgNode fs -> Bool
     canInsert n =  (runE (canInsertAt (nodeTypeToEvalPoint (n ^. cfg_node_type)) (Proxy :: Proxy l)) (n ^. cfg_node_term))
 
 
@@ -127,7 +132,7 @@ getPath inf node = case cfgNodePath inf node of
   Just p  -> p
   Nothing -> emptyPath
 
-runAction :: (Monad m, InsertAt f l, HFunctor f) => Action f l -> StateT (CfgInsertState f l) m ()
+runAction :: (Monad m, InsertAt fs l, All HFunctor fs) => Action fs l -> StateT (CfgInsertState fs l) m ()
 runAction (DominatingPrependFirst l t emp) = dominatingInsert True  (:)    trivFilt     l t emp
 runAction (DominatingPrependLast  l t emp) = dominatingInsert True  append trivFilt     l t emp
 runAction (DominatingAppendFirst  l t emp) = dominatingInsert False (:)    trivFilt     l t emp
@@ -138,34 +143,34 @@ runAction (RestPredPrependLast    l t emp) = dominatingInsert True  append butFi
 
 -- NOTE: I think this should be refactored so that there's just one kind of
 -- append/prepend action, with many options
-class (Monad m) => MonadCfgInsertion m f l where
-  dominatingPrependFirstOpts :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
-  dominatingPrependLastOpts  :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
-  dominatingAppendFirstOpts  :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
-  dominatingAppendLastOpts   :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
-  firstPredPrependLastOpts   :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
-  restPredPrependLastOpts    :: HFixLab f i -> HFixLab f l -> EmptyInsertOkay -> m ()
+class (Monad m) => MonadCfgInsertion m fs l where
+  dominatingPrependFirstOpts :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
+  dominatingPrependLastOpts  :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
+  dominatingAppendFirstOpts  :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
+  dominatingAppendLastOpts   :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
+  firstPredPrependLastOpts   :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
+  restPredPrependLastOpts    :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
 
-  dominatingPrependFirst :: HFixLab f i -> HFixLab f l -> m ()
+  dominatingPrependFirst :: TermLab fs i -> TermLab fs l -> m ()
   dominatingPrependFirst t x = dominatingPrependFirstOpts t x EmptyInsertNotOkay
 
-  dominatingPrependLast :: HFixLab f i -> HFixLab f l -> m ()
+  dominatingPrependLast :: TermLab fs i -> TermLab fs l -> m ()
   dominatingPrependLast t x = dominatingPrependLastOpts t x EmptyInsertNotOkay
 
-  dominatingAppendFirst :: HFixLab f i -> HFixLab f l -> m ()
+  dominatingAppendFirst :: TermLab fs i -> TermLab fs l -> m ()
   dominatingAppendFirst t x = dominatingAppendFirstOpts t x EmptyInsertNotOkay
 
-  dominatingAppendLast :: HFixLab f i -> HFixLab f l -> m ()
+  dominatingAppendLast :: TermLab fs i -> TermLab fs l -> m ()
   dominatingAppendLast t x = dominatingAppendLastOpts t x EmptyInsertNotOkay
 
-  firstPredPrependLast :: HFixLab f i -> HFixLab f l -> m ()
+  firstPredPrependLast :: TermLab fs i -> TermLab fs l -> m ()
   firstPredPrependLast t x = firstPredPrependLastOpts t x EmptyInsertNotOkay
 
-  restPredPrependLast :: HFixLab f i -> HFixLab f l -> m ()
+  restPredPrependLast :: TermLab fs i -> TermLab fs l -> m ()
   restPredPrependLast t x = restPredPrependLastOpts t x EmptyInsertNotOkay
 
 
-instance (Monad m) => MonadCfgInsertion (CfgInserterT f l m) f l where
+instance (Monad m) => MonadCfgInsertion (CfgInserterT fs l m) fs l where
   dominatingPrependFirstOpts t x emp = tell [DominatingPrependFirst (E t) x emp]
   dominatingPrependLastOpts  t x emp = tell [DominatingPrependLast  (E t) x emp]
   dominatingAppendFirstOpts  t x emp = tell [DominatingAppendFirst  (E t) x emp]
@@ -173,7 +178,7 @@ instance (Monad m) => MonadCfgInsertion (CfgInserterT f l m) f l where
   firstPredPrependLastOpts   t x emp = tell [FirstPredPrependLast   (E t) x emp]
   restPredPrependLastOpts    t x emp = tell [RestPredPrependLast    (E t) x emp]
 
-instance (MonadCfgInsertion m f l) => MonadCfgInsertion (MaybeT m) f l where
+instance (MonadCfgInsertion m fs l) => MonadCfgInsertion (MaybeT m) fs l where
   dominatingPrependFirstOpts t x emp = lift $ dominatingPrependFirstOpts t x emp
   dominatingPrependLastOpts  t x emp = lift $ dominatingPrependLastOpts  t x emp
   dominatingAppendFirstOpts  t x emp = lift $ dominatingAppendFirstOpts  t x emp
@@ -181,7 +186,7 @@ instance (MonadCfgInsertion m f l) => MonadCfgInsertion (MaybeT m) f l where
   firstPredPrependLastOpts   t x emp = lift $ firstPredPrependLastOpts   t x emp
   restPredPrependLastOpts    t x emp = lift $ restPredPrependLastOpts    t x emp
 
-instance (MonadCfgInsertion m f l) => MonadCfgInsertion (ReaderT s m) f l where
+instance (MonadCfgInsertion m fs l) => MonadCfgInsertion (ReaderT s m) fs l where
   dominatingPrependFirstOpts t x emp = lift $ dominatingPrependFirstOpts t x emp
   dominatingPrependLastOpts  t x emp = lift $ dominatingPrependLastOpts  t x emp
   dominatingAppendFirstOpts  t x emp = lift $ dominatingAppendFirstOpts  t x emp
@@ -189,10 +194,17 @@ instance (MonadCfgInsertion m f l) => MonadCfgInsertion (ReaderT s m) f l where
   firstPredPrependLastOpts   t x emp = lift $ firstPredPrependLastOpts   t x emp
   restPredPrependLastOpts    t x emp = lift $ restPredPrependLastOpts    t x emp
 
-finalizeInsertions :: forall f m l. (InsertAt f l, MonadAnnotater Label m, HTraversable f) => Map Label [InsertionOp f l] -> GRewriteM m (HFixLab f)
+finalizeInsertions ::
+  forall fs m l.
+  ( InsertAt fs l
+  , MonadAnnotater Label m
+  , All HTraversable fs
+  , All HFoldable fs
+  , All HFunctor fs
+  ) => Map Label [InsertionOp fs l] -> GRewriteM m (TermLab fs)
 finalizeInsertions insertMap t = foldr (\(InsertionOp p x) r -> r >>= insertAt p x) (return t) =<< insertions
   where
-    insertions :: m [InsertionOp f l]
+    insertions :: m [InsertionOp fs l]
     insertions = do
       let raw_list = collapseMaybeList $ Map.lookup (getAnn t) insertMap
 
@@ -214,7 +226,13 @@ finalizeInsertions insertMap t = foldr (\(InsertionOp p x) r -> r >>= insertAt p
       return sorted
 
 
-performCfgInsertions :: (MonadAnnotater Label m, InsertAt f l, HTraversable f) => Proxy l -> ProgInfo f -> RewriteM (CfgInserterT f l m) (HFixLab f) i -> RewriteM m (HFixLab f) i
+performCfgInsertions ::
+  ( MonadAnnotater Label m
+  , InsertAt fs l
+  , All HTraversable fs
+  , All HFunctor fs
+  , All HFoldable fs
+  ) => Proxy l -> ProgInfo fs -> RewriteM (CfgInserterT fs l m) (TermLab fs) i -> RewriteM m (TermLab fs) i
 performCfgInsertions _ proginf f t = do
    (t', actions) <- runWriterT (f t)
    s <- execStateT (mapM_ runAction actions) (CfgInsertState Map.empty proginf)

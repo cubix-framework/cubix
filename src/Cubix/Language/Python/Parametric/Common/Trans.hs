@@ -1,16 +1,16 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PartialTypeSignatures  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE ViewPatterns           #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Python.Parametric.Common.Trans () where
@@ -24,7 +24,7 @@ module Cubix.Language.Python.Parametric.Common.Trans
 import Data.List( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), (:+:), caseH, HFunctor(..) )
+import Data.Comp.Multi ( project, inject, unTerm, (:<:), caseH, HFunctor(..) )
 
 import Cubix.Language.Python.Parametric.Common.Types
 import qualified Cubix.Language.Python.Parametric.Full as F
@@ -37,14 +37,14 @@ import Cubix.Language.Parametric.Syntax
 translate :: F.PythonTerm l -> MPythonTerm l
 translate = trans . unTerm
 
-translate' :: (InjF MPythonSig l l') => F.PythonTerm l -> MPythonTerm l'
+translate' :: (InjF (Sum MPythonSig) l l') => F.PythonTerm l -> MPythonTerm l'
 translate' = injF . translate
 
 class Trans f where
   trans :: f F.PythonTerm l -> MPythonTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
 transDefault :: (HFunctor f, f :<: MPythonSig, f :<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
 transDefault = inject . hfmap translate

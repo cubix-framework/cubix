@@ -1,13 +1,16 @@
 --{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -- This is a separate file due to GHC's phase restriction.
 
@@ -18,10 +21,10 @@ module Cubix.Language.Python.Parametric.Full.Trans (
     translate
   , untranslate
   ) where
-
+import Data.Proxy
 import Data.Typeable (Typeable )
 
-import Data.Comp.Multi ( caseH, (:+:) )
+import Data.Comp.Multi ( caseCxt, Sum, All )
 
 
 import qualified Language.Python.Common.AST as P
@@ -83,6 +86,6 @@ type instance Targ () = ()
 instance Untrans UnitF where
   untrans UnitF = T ()
 
-instance (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 #endif

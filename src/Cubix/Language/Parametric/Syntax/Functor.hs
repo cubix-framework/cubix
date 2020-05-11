@@ -71,7 +71,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   , mapF
   ) where
 
-import Data.Comp.Multi ( HFunctor, (:<:), Sum, (:&:), Cxt(..), Context, K(..), unK, inject, project, project', RemA(..), NotSum, HFix, caseCxt, All )
+import Data.Comp.Multi ( HFunctor, (:<:), Sum, (:&:), Cxt(..), Context, K(..), unK, inject, project, project', RemA(..), NotSum, HFix, caseCxt, All, CxtS, (:-<:) )
 import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 
 import Data.Comp.Multi.Strategy.Classification
@@ -313,15 +313,21 @@ instance (Typeable l, Typeable l') => KDynCase EitherF (Either l l') where
 riNothingF :: forall h f a l. (MaybeF :<: f, Typeable l) => Cxt h f a (Maybe l)
 riNothingF = inject NothingF
 
-iJustF :: (MaybeF :<: f, InjF f (Maybe l) l', Typeable l) => Cxt h f a l -> Cxt h f a l'
-iJustF = injectF . JustF
+iJustF :: (MaybeF :-<: fs, InjF fs (Maybe l) l', Typeable l) => CxtS h fs a l -> CxtS h fs a l'
+iJustF = injF . iJust
+
+iJust :: (MaybeF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a (Maybe l)
+iJust = inject . JustF
 
 -- | Smart constructor for NilF. Restricted; cannot be lifted through a sort injection
 riNilF :: forall h f a l. (ListF :<: f, Typeable l) => Cxt h f a [l]
 riNilF = inject NilF
 
-iConsF :: (ListF :<: f, InjF f [l] l', Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a l'
-iConsF x y = injectF (ConsF x y)
+iConsF :: (ListF :-<: fs, InjF fs [l] l', Typeable l) => CxtS h fs a l -> CxtS h fs a [l] -> CxtS h fs a l'
+iConsF x y = injF (iCons x y)
+
+iCons :: (ListF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
+iCons x y = inject (ConsF x y)
 
 -- | Smart constructor for PairF. Restricted; cannot be lifted through a sort injection
 riPairF :: (PairF :<: f, Typeable i, Typeable j) => Cxt h f a i -> Cxt h f a j -> Cxt h f a (i, j)
@@ -506,11 +512,11 @@ insertFHole = insertF . fmap Hole
 
 instance (ListF :<: e, HFunctor e) => InsertF [] (Cxt h e a) where
   insertF [] = riNilF
-  insertF (x : xs) = x `iConsF` (insertF xs)
+  insertF (x : xs) = x `iCons` (insertF xs)
 
 instance (MaybeF :<: e, HFunctor e) => InsertF Maybe (Cxt h e a) where
   insertF Nothing = riNothingF
-  insertF (Just x) = iJustF x
+  insertF (Just x) = iJust x
 
 
 liftF :: (InsertF f h, ExtractF f g, Functor f, Typeable b) => (f (g a) -> f (h b)) -> g (f a) -> h (f b)

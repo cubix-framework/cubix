@@ -22,7 +22,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:<:), HFunctor, project, Sum )
+import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:-<:), All, HFunctor, project, Sum, CxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -90,15 +90,15 @@ deriveAll [''LuaVarArgsParam]
 
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
-pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :<: f, HFunctor f) => Cxt h f a [P.IdentL] -> Cxt h f a LuaFunctionDefinedObjL
+pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :-<: fs, All HFunctor fs) => CxtS h fs a [P.IdentL] -> CxtS h fs a LuaFunctionDefinedObjL
 pattern LuaFunctionDefinedObj' nms <- (project -> Just (LuaFunctionDefinedObj nms)) where
   LuaFunctionDefinedObj' nms = iLuaFunctionDefinedObj nms
 
-pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :<: f, HFunctor f) => Cxt h f a LuaFunctionDefinedObjL -> Cxt h f a FunctionDefAttrsL
+pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :-<: fs, All HFunctor fs) => CxtS h fs a LuaFunctionDefinedObjL -> CxtS h fs a FunctionDefAttrsL
 pattern LuaFunctionAttrs' o <- (project -> Just (LuaFunctionAttrs o)) where
   LuaFunctionAttrs' o = iLuaFunctionAttrs o
 
-pattern LuaVarArgsParam' :: (LuaVarArgsParam :<: f, HFunctor f) => Cxt h f a FunctionParameterL
+pattern LuaVarArgsParam' :: (LuaVarArgsParam :-<: fs, All HFunctor fs) => CxtS h fs a FunctionParameterL
 pattern LuaVarArgsParam' <- (project -> Just LuaVarArgsParam) where
   LuaVarArgsParam' = iLuaVarArgsParam
 
@@ -134,8 +134,8 @@ do let newLuaNodes       = [ ''LuaLocalVarInit, ''LuaLhs, ''LuaRhs, ''LuaBlockEn
    sumDec <- runCompTrans $ makeSumType "MLuaSig" names
    return sumDec
 
-type instance InjectableSorts (Sum MLuaSig) AssignL = '[StatL]
-type instance InjectableSorts (Sum MLuaSig) SingleLocalVarDeclL = '[StatL]
+type instance InjectableSorts MLuaSig AssignL = '[StatL]
+type instance InjectableSorts MLuaSig SingleLocalVarDeclL = '[StatL]
 
 type MLuaTerm = Term MLuaSig
 type MLuaTermLab = TermLab MLuaSig
@@ -149,31 +149,31 @@ type MLuaTermOptAnn a = AnnTerm (Maybe a) MLuaSig
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
 
-instance InjF (Sum MLuaSig) [ExpL] LocalVarInitL where
+instance InjF MLuaSig [ExpL] LocalVarInitL where
   injF = iLuaLocalVarInit
 
   projF' (project' -> (Just (LuaLocalVarInit x))) = Just x
   projF' _ = Nothing
 
-instance InjF (Sum MLuaSig) [L.VarL] LhsL where
+instance InjF MLuaSig [L.VarL] LhsL where
   injF = iLuaLhs
 
   projF' (project' -> (Just (LuaLhs x))) = Just x
   projF' _ = Nothing
 
-instance InjF (Sum MLuaSig) [ExpL] RhsL where
+instance InjF MLuaSig [ExpL] RhsL where
   injF = iLuaRhs
 
   projF' (project' -> (Just (LuaRhs x))) = Just x
   projF' _ = Nothing
 
-instance InjF (Sum MLuaSig) (Maybe [ExpL]) BlockEndL where
+instance InjF MLuaSig (Maybe [ExpL]) BlockEndL where
   injF = iLuaBlockEnd
 
   projF' (project' -> (Just (LuaBlockEnd x))) = Just x
   projF' _ = Nothing
 
-instance InjF (Sum MLuaSig) AssignL BlockItemL where
+instance InjF MLuaSig AssignL BlockItemL where
   injF = iAssignIsStat
 
   projF' t = do
@@ -181,13 +181,13 @@ instance InjF (Sum MLuaSig) AssignL BlockItemL where
     projF' a
 
 
-instance InjF (Sum MLuaSig) SingleLocalVarDeclL BlockItemL where
+instance InjF MLuaSig SingleLocalVarDeclL BlockItemL where
   injF = iSingleLocalVarDeclIsStat
   projF' t = do
     (a :: MLuaCxtA h a p StatL) <- projF' t
     projF' a
 
-instance InjF (Sum MLuaSig) IdentL ExpL where
+instance InjF MLuaSig IdentL ExpL where
   injF = iPrefixExp . iPEVar . iVarName . injF
   projF' t = do
     PrefixExp a <- project' t
@@ -195,7 +195,7 @@ instance InjF (Sum MLuaSig) IdentL ExpL where
     VarName c <- project' b
     projF' c
 
-instance InjF (Sum MLuaSig) ExpL LocalVarInitL where
+instance InjF MLuaSig ExpL LocalVarInitL where
   injF x = injF $ insertF [x]
   projF' t = do
     LuaLocalVarInit x <- project' t
@@ -203,7 +203,7 @@ instance InjF (Sum MLuaSig) ExpL LocalVarInitL where
     NilF <- project' rest
     return e
 
-instance {-# OVERLAPPING #-} InjF (Sum MLuaSig) IdentL VarDeclBinderL where
+instance {-# OVERLAPPING #-} InjF MLuaSig IdentL VarDeclBinderL where
   injF x = iTupleBinder $ insertF [x]
 
   projF' t = do
@@ -212,7 +212,7 @@ instance {-# OVERLAPPING #-} InjF (Sum MLuaSig) IdentL VarDeclBinderL where
     NilF <- project' rest
     return n
 
-instance InjF (Sum MLuaSig) IdentL LhsL where
+instance InjF MLuaSig IdentL LhsL where
   injF x = iLuaLhs $ ConsF' (iVarName $ injF x) riNilF
   projF' t = do
     LuaLhs vs <- project' t
@@ -221,7 +221,7 @@ instance InjF (Sum MLuaSig) IdentL LhsL where
     VarName n <- project' v
     projF' n
 
-instance InjF (Sum MLuaSig) ExpL RhsL where
+instance InjF MLuaSig ExpL RhsL where
   injF x = iLuaRhs $ ConsF' x riNilF
   projF' t = do
     LuaRhs es <- project' t
@@ -229,7 +229,7 @@ instance InjF (Sum MLuaSig) ExpL RhsL where
     NilF <- project' rest
     return e
 
-instance InjF (Sum MLuaSig) IdentL PositionalArgExpL where
+instance InjF MLuaSig IdentL PositionalArgExpL where
   injF = iPrefixExp . iPEVar . iVarName . injF
 
   projF' x
@@ -240,7 +240,7 @@ instance InjF (Sum MLuaSig) IdentL PositionalArgExpL where
   projF' _ = Nothing
 
 -- FIXME: Replace with real thing that handles normal function call syntax
-instance InjF (Sum MLuaSig) IdentL FunctionExpL where
+instance InjF MLuaSig IdentL FunctionExpL where
   injF = iFunctionIdent
 
   projF' (project' -> Just (FunctionIdent n)) = Just n

@@ -77,7 +77,7 @@ import GHC.Generics ( Generic )
 
 import Control.Lens ( (^.), (%~), (%=), (&), (?=), (&), (%~), at, ix, use, makeClassy, makeClassyFor )
 
-import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, AnnHFix, HFix )
+import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, AnnHFix, HFix, All )
 import Data.Comp.Multi.Derive ( KShow(..) )
 
 import Cubix.Language.Info
@@ -114,25 +114,33 @@ evalPointToNodeType = CfgNodeType
 nodeTypeToEvalPoint :: CfgNodeType -> NodeEvaluationPoint
 nodeTypeToEvalPoint (CfgNodeType p) = p
 
-data CfgNode f = CfgNode { _cfg_node_prevs :: Set Label
-                         , _cfg_node_succs :: Set Label
-                         , _cfg_node_lab   :: Label
-                         , _cfg_node_type  :: CfgNodeType
-                         , _cfg_node_term  :: E (HFixLab f)
-                         }
-  deriving ( Show, Eq, Ord, Generic )
+data CfgNode fs = CfgNode { _cfg_node_prevs :: Set Label
+                          , _cfg_node_succs :: Set Label
+                          , _cfg_node_lab   :: Label
+                          , _cfg_node_type  :: CfgNodeType
+                          , _cfg_node_term  :: E (TermLab fs)
+                          }
+  deriving ( Generic )
 
-data Cfg f = Cfg {
-                   _cfg_nodes     :: Map Label (CfgNode f)
+deriving instance (All ShowHF fs, All HFunctor fs) => Show (CfgNode fs)
+deriving instance (All HFunctor fs, All OrdHF fs, All EqHF fs) => Ord (CfgNode fs)
+deriving instance (All EqHF fs) => Eq (CfgNode fs)
+
+data Cfg fs = Cfg {
+                   _cfg_nodes     :: Map Label (CfgNode fs)
                  , _cfg_ast_nodes :: Map Label (Map CfgNodeType Label)
                  }
-  deriving ( Show, Eq, Ord, Generic )
+  deriving ( Generic )
+
+deriving instance (All ShowHF fs, All HFunctor fs) => Show (Cfg fs)
+deriving instance (All HFunctor fs, All OrdHF fs, All EqHF fs) => Ord (Cfg fs)
+deriving instance (All EqHF fs) => Eq (Cfg fs)
 
 makeClassyFor "HasCurCfg" "cur_cfg" [("_cfg_nodes", "cfg_nodes"), ("_cfg_ast_nodes", "cfg_ast_nodes")] ''Cfg
 
 makeClassy ''CfgNode
 
-mapCfgNode :: (HFunctor f) => (forall e i. f e i -> g e i) -> (CfgNode f -> CfgNode g)
+mapCfgNode :: (All HFunctor fs) => (forall e i. Sum fs e i -> Sum gs e i) -> (CfgNode fs -> CfgNode gs)
 mapCfgNode f n = CfgNode { _cfg_node_prevs = n ^. cfg_node_prevs
                          , _cfg_node_succs = n ^. cfg_node_succs
                          , _cfg_node_lab   = n ^. cfg_node_lab
@@ -140,13 +148,13 @@ mapCfgNode f n = CfgNode { _cfg_node_prevs = n ^. cfg_node_prevs
                          , _cfg_node_term  = (n ^. cfg_node_term) & (\(E x) -> E (appSigFun (propAnnSigFun f) x))
                          }
 
-emptyCfg :: Cfg f
+emptyCfg :: Cfg fs
 emptyCfg = Cfg Map.empty Map.empty
 
-cfgNodes :: Cfg f -> [CfgNode f]
+cfgNodes :: Cfg fs -> [CfgNode fs]
 cfgNodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
 
-addCfgNodeWithLabel :: (HasCurCfg s f, MonadState s m) => HFixLab f l -> Label -> CfgNodeType -> m (CfgNode f)
+addCfgNodeWithLabel :: (HasCurCfg s fs, MonadState s m) => TermLab fs l -> Label -> CfgNodeType -> m (CfgNode fs)
 addCfgNodeWithLabel t l typ = do
   let node = CfgNode { _cfg_node_prevs = Set.empty
                      , _cfg_node_succs = Set.empty
@@ -167,15 +175,15 @@ addCfgNodeWithLabel t l typ = do
 
   return node
 
-addCfgNode :: (HasCurCfg s f, HasLabelGen s, MonadState s m) => HFixLab f l -> CfgNodeType -> m (CfgNode f)
+addCfgNode :: (HasCurCfg s fs, HasLabelGen s, MonadState s m) => TermLab fs l -> CfgNodeType -> m (CfgNode fs)
 addCfgNode t typ = do
   l <- nextLabel
   addCfgNodeWithLabel t l typ
 
-nodeForLab :: (HasCurCfg s f, MonadState s m) => Label -> m (Maybe (CfgNode f))
+nodeForLab :: (HasCurCfg s fs, MonadState s m) => Label -> m (Maybe (CfgNode fs))
 nodeForLab l = Map.lookup l <$> use (cur_cfg.cfg_nodes)
 
-addEdge :: CfgNode f -> CfgNode f -> Cfg f -> Cfg f
+addEdge :: CfgNode fs -> CfgNode fs -> Cfg fs -> Cfg fs
 addEdge from to cfg = cfg''
   where
     fl = from ^. cfg_node_lab
@@ -184,36 +192,36 @@ addEdge from to cfg = cfg''
     cfg'  = cfg  & (cfg_nodes.(at fl).traverse.cfg_node_succs) %~ (Set.insert tl)
     cfg'' = cfg' & (cfg_nodes.(at tl).traverse.cfg_node_prevs) %~ (Set.insert fl)
 
-addEdgeLab :: forall f. Proxy f -> Label -> Label -> Cfg f -> Cfg f
+addEdgeLab :: forall fs. Proxy fs -> Label -> Label -> Cfg fs -> Cfg fs
 addEdgeLab _ l1 l2 cfg = fromMaybe cfg cfg'
   where
-    cfg' :: Maybe (Cfg f)
+    cfg' :: Maybe (Cfg fs)
     cfg' = do
       n1 <- safeLookupCfg cfg l1
       n2 <- safeLookupCfg cfg l2
       return $ addEdge n1 n2 cfg
 
-removeEdgeLab :: Label -> Label -> Cfg f -> Cfg f
+removeEdgeLab :: Label -> Label -> Cfg fs -> Cfg fs
 removeEdgeLab l1 l2 cfg = cfg''
   where
     cfg'  = cfg  & (cfg_nodes.(at l1).traverse.cfg_node_succs) %~ (Set.delete l2)
     cfg'' = cfg' & (cfg_nodes.(at l2).traverse.cfg_node_prevs) %~ (Set.delete l1)
 
-safeLookupCfg :: Cfg f -> Label -> Maybe (CfgNode f)
+safeLookupCfg :: Cfg fs -> Label -> Maybe (CfgNode fs)
 safeLookupCfg cfg l = Map.lookup l (cfg ^. cfg_nodes)
 
-lookupCfg :: Cfg f -> Label -> CfgNode f
+lookupCfg :: Cfg fs -> Label -> CfgNode fs
 lookupCfg cfg l = case safeLookupCfg cfg l of
   Just n  -> n
   Nothing -> error $ "Label not found in CFG: " ++ show l
 
-cfgNodeForTerm :: Cfg f -> CfgNodeType -> HFixLab f l -> Maybe (CfgNode f)
+cfgNodeForTerm :: Cfg fs -> CfgNodeType -> TermLab fs l -> Maybe (CfgNode fs)
 cfgNodeForTerm cfg typ t = do
   nodeMap <- Map.lookup (getAnn t) (cfg ^. cfg_ast_nodes)
   cfgLab <- Map.lookup typ nodeMap
   safeLookupCfg cfg cfgLab
 
-removeNode :: CfgNode f -> Cfg f -> Cfg f
+removeNode :: CfgNode fs -> Cfg fs -> Cfg fs
 removeNode n g = g & removePredEdges
                    & removeSuccEdges
                    & (cfg_nodes     %~ Map.delete lab)
@@ -227,7 +235,7 @@ removeNode n g = g & removePredEdges
     removeSuccEdges gr = foldr (\s -> removeEdgeLab lab s) gr (Set.toList (n ^. cfg_node_succs))
 
 -- TODO: Find out what this is actually called; "vertex contraction" is something else
-contractNode :: Label -> Cfg f -> Cfg f
+contractNode :: Label -> Cfg fs -> Cfg fs
 contractNode l g = removeNode n $
                    foldr add g [(x, y) | x <- (Set.toList (n ^. cfg_node_prevs))
                                        , y <- (Set.toList (n ^. cfg_node_succs))]
@@ -235,7 +243,7 @@ contractNode l g = removeNode n $
     n = lookupCfg g l
     add (x, y) gr = addEdge (lookupCfg gr x) (lookupCfg gr y) gr
 
-satisfyingBoundary :: Set Label -> (CfgNode f -> Set Label) -> (CfgNode f -> Bool) -> Cfg f -> CfgNode f -> ListT Maybe (CfgNode f)
+satisfyingBoundary :: Set Label -> (CfgNode fs -> Set Label) -> (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> ListT Maybe (CfgNode fs)
 satisfyingBoundary seen succ pred cfg node =
   if Set.member (node ^. cfg_node_lab) seen then
     mzero
@@ -250,31 +258,31 @@ satisfyingBoundary seen succ pred cfg node =
       satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
 
 
-satisfyingPredBoundary :: (CfgNode f -> Bool) -> Cfg f -> CfgNode f -> Maybe [CfgNode f]
+satisfyingPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node
 
-satisfyingSuccBoundary :: (CfgNode f -> Bool) -> Cfg f -> CfgNode f -> Maybe [CfgNode f]
+satisfyingSuccBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingSuccBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_succs) pred cfg node
 
-satisfyingStrictPredBoundary :: (CfgNode f -> Bool) -> Cfg f -> CfgNode f -> Maybe [CfgNode f]
+satisfyingStrictPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingStrictPredBoundary pred cfg node = satisfyingPredBoundary pred' cfg node
   where
     pred' n = ((n ^. cfg_node_lab) /= (node ^. cfg_node_lab)) && pred n
 
-satisfyingStrictSuccBoundary :: (CfgNode f -> Bool) -> Cfg f -> CfgNode f -> Maybe [CfgNode f]
+satisfyingStrictSuccBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingStrictSuccBoundary pred cfg node = satisfyingSuccBoundary pred' cfg node
   where
     pred' n = ((n ^. cfg_node_lab) /= (node ^. cfg_node_lab)) && pred n
 
-enterNodePreds :: Cfg f -> CfgNode f -> Maybe [CfgNode f]
+enterNodePreds :: Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 enterNodePreds cfg n = satisfyingStrictPredBoundary (isEnterNode . (^. cfg_node_type)) cfg n
 
-enterNodeSuccs :: Cfg f -> CfgNode f -> Maybe [CfgNode f]
+enterNodeSuccs :: Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 enterNodeSuccs cfg n = satisfyingStrictSuccBoundary (isEnterNode . (^. cfg_node_type)) cfg n
 
 --------------------------------------------------------------------------------------
 
-prettyCfg :: Cfg f -> String
+prettyCfg :: Cfg fs -> String
 prettyCfg cfg = concatMap nodeEdges nodes
   where
     nodes = map snd $ Map.toList (cfg ^. cfg_nodes)
@@ -293,14 +301,14 @@ prettyCfg cfg = concatMap nodeEdges nodes
     pInterestingDegree _ = ""
 
 
-getCfgLab :: forall f l. Cfg f -> HFixLab f l -> [Label]
+getCfgLab :: forall fs l. Cfg fs -> TermLab fs l -> [Label]
 getCfgLab cfg t = case Map.lookup astLab (cfg ^. cfg_ast_nodes) of
                     Nothing -> []
                     Just m -> map snd $ Map.toList m
   where
     astLab = getAnn t
 
-putSubtree :: (ShowHF f, HFoldable f) => HFixLab f l -> Cfg f ->  IO ()
+putSubtree :: (All ShowHF fs, All HFoldable fs, All HFunctor fs) => TermLab fs l -> Cfg fs ->  IO ()
 putSubtree t cfg = do
  let cfgLab = getCfgLab cfg t
  if length cfgLab > 0 then do
@@ -310,7 +318,7 @@ putSubtree t cfg = do
   else
    return ()
 
-debugCfg :: (ShowHF f, HFoldable f) => HFixLab f l -> Cfg f -> IO ()
+debugCfg :: (All ShowHF fs, All HFoldable fs, All HFunctor fs) => TermLab fs l -> Cfg fs -> IO ()
 debugCfg t cfg = do
   putStrLn $ prettyCfg cfg
   mapM (\(E t) -> putSubtree t cfg) $ subterms t
@@ -319,14 +327,14 @@ debugCfg t cfg = do
 
 --------------------------------------------------------------------------------------
 
-isStartNode :: Cfg f -> CfgNode f -> Bool
+isStartNode :: Cfg fs -> CfgNode fs -> Bool
 isStartNode cfg n = isNothing maybePrecs || numPrecs == 0
   where
     maybePrecs = enterNodePreds cfg n
     numPrecs = length $ fromJust maybePrecs
 
 
-startsBasicBlock :: Cfg f -> CfgNode f -> Bool
+startsBasicBlock :: Cfg fs -> CfgNode fs -> Bool
 startsBasicBlock cfg n = (isEnterNode (n ^. cfg_node_type)) && (isStartNode cfg n || isJoinNode || predIsFork)
   where
     maybePrecs = enterNodePreds cfg n

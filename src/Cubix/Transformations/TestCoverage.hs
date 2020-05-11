@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
@@ -26,7 +27,7 @@ import qualified Data.Set as Set
 
 import Data.Text ( pack )
 
-import Data.Comp.Multi ( project', (:<:), ShowHF, Sum )
+import Data.Comp.Multi ( project', (:<:), ShowHF, Sum, (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, revAllbuR )
 import Data.Comp.Multi.Strategy.Classification ( caseDyn )
 
@@ -67,18 +68,18 @@ nextBlockId = do
   bb_counter -= 1
   return id
 
-class BlockCounterStart (f :: (* -> *) -> * -> *) where
-  blockCounterStart :: Proxy f -> Int
+class BlockCounterStart (fs :: [(* -> *) -> * -> *]) where
+  blockCounterStart :: Proxy fs -> Int
 
 -- Every language but Lua
-instance {-# OVERLAPPABLE #-} BlockCounterStart f where
+instance {-# OVERLAPPABLE #-} BlockCounterStart fs where
   blockCounterStart _ = 0
 
-instance {-# OVERLAPPING #-} BlockCounterStart (Sum MLuaSig) where
+instance {-# OVERLAPPING #-} BlockCounterStart MLuaSig where
   blockCounterStart _ = 1
 
-class MarkBlockCovered f where
-  markBlockCovered :: (MonadAnnotater Label m) => Int -> m (HFixLab f (StatSort f))
+class MarkBlockCovered fs where
+  markBlockCovered :: (MonadAnnotater Label m) => Int -> m (TermLab fs (StatSort fs))
 
 #ifndef ONLY_ONE_LANGUAGE
 cInt :: Int -> MCTerm CExpressionL
@@ -135,7 +136,7 @@ instance MarkBlockCovered MPythonSig where
 luaNumber :: Int -> MLuaTerm L.ExpL
 luaNumber n = L.iNumber L.iIntNum $ pack $ show n
 
-instance MarkBlockCovered (Sum MLuaSig) where
+instance MarkBlockCovered MLuaSig where
   markBlockCovered n = annotateLabel term
     where
       term :: MLuaTerm BlockItemL
@@ -144,15 +145,15 @@ instance MarkBlockCovered (Sum MLuaSig) where
       covArr :: MLuaTerm L.PrefixExpL
       covArr = iPEVar $ L.iSelectName (iPEVar $ iVarName $ iIdent "TestCoverage") (iIdent "coverage")
 
-class ExcludeBasicBlock f where
-  excludeBasicBlock :: HFixLab f l -> Bool
+class ExcludeBasicBlock fs where
+  excludeBasicBlock :: TermLab fs l -> Bool
 
 -- |
 -- There's no good reason why you shouldn't consider each loop to be its own basic block
 -- (because the condition gets executed some number of times independently), but it looks weird
 -- to try to instrument it, and humans wouldn't do that
 
-instance {-#OVERLAPPABLE #-} ExcludeBasicBlock f where
+instance {-#OVERLAPPABLE #-} ExcludeBasicBlock fs where
   excludeBasicBlock = const False
 
 #ifndef ONLY_ONE_LANGUAGE
@@ -181,10 +182,10 @@ instance {-# OVERLAPPING #-} ExcludeBasicBlock MJavaSig where
       excludeWhile _                                = False
 #endif
 
-class TrustReachability (f :: (* -> *) -> * -> *) where
-  trustReachability :: Proxy f -> Bool
+class TrustReachability (fs :: [(* -> *) -> * -> *]) where
+  trustReachability :: Proxy fs -> Bool
 
-instance {-# OVERLAPPABLE #-} TrustReachability f where
+instance {-# OVERLAPPABLE #-} TrustReachability fs where
   trustReachability _ = False
 
 #ifndef ONLY_ONE_LANGUAGE
@@ -192,22 +193,22 @@ instance {-# OVERLAPPING #-} TrustReachability MJavaSig where
   trustReachability _ = True
 #endif
 
-type CanInstrument f = ( ListF :<: f
-                       , MarkBlockCovered f
-                       , BlockCounterStart f
-                       , ExcludeBasicBlock f
-                       , TrustReachability f
-                       , CfgBuilder f
-                       , InsertAt f (StatSort f)
+type CanInstrument fs = ( ListF :-<: fs
+                        , MarkBlockCovered fs
+                        , BlockCounterStart fs
+                        , ExcludeBasicBlock fs
+                        , TrustReachability fs
+                        , CfgBuilder fs
+                        , InsertAt fs (StatSort fs)
+                        , All ShowHF fs
+                        , All HFoldable fs
+                        )
 
-                       , ShowHF f
-                       )
-
-type MonadTestCov f m = (MonadState TestCovState m, MonadCfgInsertion m f (StatSort f))
+type MonadTestCov fs m = (MonadState TestCovState m, MonadCfgInsertion m fs (StatSort fs))
 
 -- This prevents marking the space after return's, but does have the effect of not marking empty catch blocks because of the ways our CFGs currently work.
 -- Pick your poison.
-isUnreachableAndEmpty :: (ListF :<: f) => Cfg f -> HFixLab f l -> Bool
+isUnreachableAndEmpty :: (ListF :-<: fs) => Cfg fs -> TermLab fs l -> Bool
 isUnreachableAndEmpty cfg t = isEmpty t && isUnreachable t
   where
     isUnreachable t = case cfgNodeForTerm cfg EnterNode t of
@@ -219,8 +220,8 @@ isUnreachableAndEmpty cfg t = isEmpty t && isUnreachable t
 
 -- Quick-and-dirty for rebuttal. Need to check for unreachable nodes, so we trace back the graph and look for an entry point.
 -- We don't currently have a notion of entry point, but we know that exit nodes are not entry points
-unreachableTest :: forall f l. (CanInstrument f) => Cfg f -> HFixLab f l -> Bool
-unreachableTest cfg t = if not (trustReachability (Proxy :: Proxy f)) then
+unreachableTest :: forall fs l. (CanInstrument fs) => Cfg fs -> TermLab fs l -> Bool
+unreachableTest cfg t = if not (trustReachability (Proxy :: Proxy fs)) then
                           False
                         else
                           case cfgNodeForTerm cfg EnterNode t of
@@ -231,7 +232,7 @@ unreachableTest cfg t = if not (trustReachability (Proxy :: Proxy f)) then
 
 
 
-addCoverageStatement :: (CanInstrument f, MonadTestCov f m) => Cfg f -> GRewriteM m (HFixLab f)
+addCoverageStatement :: (CanInstrument fs, MonadTestCov fs m) => Cfg fs -> GRewriteM m (TermLab fs)
 addCoverageStatement cfg t = case cfgNodeForTerm cfg EnterNode t of
                                Nothing       -> return t
                                Just cfgNode  -> do
@@ -242,13 +243,13 @@ addCoverageStatement cfg t = case cfgNodeForTerm cfg EnterNode t of
 
                                  return t
 
-instrumentTestCoverage :: forall f l. (CanInstrument f) => HFixLab f l -> IO (HFixLab f l)
+instrumentTestCoverage :: forall fs l. (CanInstrument fs) => TermLab fs l -> IO (TermLab fs l)
 instrumentTestCoverage t = do
     gen <- mkCSLabelGen
     let progInfo = makeProgInfo t
 
     let labelsNeeded = (^. bb_counter) $ execState (trans progInfo t) (TestCovState 0 gen)
-    let counterStart = (-labelsNeeded) - 1 + (blockCounterStart (Proxy :: Proxy f))
+    let counterStart = (-labelsNeeded) - 1 + (blockCounterStart (Proxy :: Proxy fs))
     return $ evalState (trans progInfo t) (TestCovState counterStart gen)
   where
-    trans progInfo = performCfgInsertions (Proxy :: Proxy (StatSort f)) progInfo $ (revAllbuR $ addCoverageStatement (progInfo ^. proginf_cfg))
+    trans progInfo = performCfgInsertions (Proxy :: Proxy (StatSort fs)) progInfo $ (revAllbuR $ addCoverageStatement (progInfo ^. proginf_cfg))
