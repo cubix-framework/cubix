@@ -30,7 +30,9 @@ import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.Annotation
 import Data.Comp.Multi.Derive
 import Data.Comp.Multi.HFunctor
+import Data.Comp.Multi.Ops (Sum, caseCxt)
 import Data.Comp.Multi.Term
+import Data.Proxy
 
 instance KShow (K String) where
     kshow = id

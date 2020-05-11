@@ -36,6 +36,7 @@ module Data.Comp.Multi.Ops
     ( Sum (..)
     , caseH
     , (:<:)
+    , (:-<:)
     , inj
     , proj
     , (:=:)
@@ -59,6 +60,7 @@ module Data.Comp.Multi.Ops
     , Elem (..)
     , Mem
     , RMem
+    , at
     , witness
     , extend
     , contract
@@ -107,8 +109,8 @@ caseSum p f = runIdentity . caseSumF p (Identity . f)
 instance (All HFunctor fs) => HFunctor (Sum fs) where
     hfmap f = caseSum (Proxy @HFunctor) (hfmap f)
       
-instance ( HFunctor (Sum fs)
-         , All HFoldable fs
+instance ( All HFoldable fs
+         , All HFunctor fs
          ) => HFoldable (Sum fs) where
     hfold      = caseCxt (Proxy @HFoldable) hfold
     hfoldMap f = caseCxt (Proxy @HFoldable) (hfoldMap f)
@@ -116,8 +118,9 @@ instance ( HFunctor (Sum fs)
     hfoldl f b = caseCxt (Proxy @HFoldable) (hfoldl f b)
     hfoldr1 f  = caseCxt (Proxy @HFoldable) (hfoldr1 f)
 
-instance ( HFoldable (Sum fs)
-         , All HTraversable fs
+instance ( All HTraversable fs
+         , All HFoldable fs
+         , All HFunctor fs
          ) => HTraversable (Sum fs) where
     htraverse f = caseSumF (Proxy @HTraversable) (htraverse f)
     hmapM f     = caseSumF (Proxy @HTraversable) (hmapM f)
@@ -200,3 +203,6 @@ instance RemA (f :&: p) f where
 -- TODO: write gs as a function of fs.    
 unsafeMapSum :: Elem f fs -> f a e -> (f a :-> g a) -> Sum gs a e
 unsafeMapSum (Elem wit) v f = Sum (Elem wit) (f v)
+
+class (f :<: Sum fs) => f :-<: fs
+instance (f :<: Sum fs) => f :-<: fs

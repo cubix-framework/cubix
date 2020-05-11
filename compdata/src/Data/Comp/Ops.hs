@@ -84,7 +84,6 @@ instance (All Functor fs) => Functor (Sum fs) where
     fmap f = caseSum (Proxy @Functor) (fmap f)
 
 instance ( All Foldable fs
-         , Functor (Sum fs)
          ) => Foldable (Sum fs) where
     fold      = caseCxt (Proxy @Foldable) fold
     foldMap f = caseCxt (Proxy @Foldable) (foldMap f)
@@ -94,8 +93,8 @@ instance ( All Foldable fs
     foldl1 f  = caseCxt (Proxy @Foldable) (foldl1 f)
 
 instance ( All Traversable fs
-         , Functor (Sum fs)
-         , Foldable (Sum fs)
+         , All Functor fs
+         , All Foldable fs
          ) => Traversable (Sum fs) where
     traverse f = caseSumF (Proxy @Traversable) (traverse f)
     sequenceA  = caseSumF (Proxy @Traversable) sequenceA
@@ -103,7 +102,7 @@ instance ( All Traversable fs
     sequence   = caseSumF (Proxy @Traversable) sequence
 
 infixl 5 :<:
-infixl 5 :=:
+-- infixl 5 :=:
 
 class (f :: * -> *) :<: (g :: * -> *) where
   inj  :: f a -> g a

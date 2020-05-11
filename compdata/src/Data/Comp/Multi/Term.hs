@@ -26,6 +26,7 @@ module Data.Comp.Multi.Term
      Context,
      HFix,
      Term,
+     CxtS,
      Const,
      constTerm,
      unTerm,
@@ -69,13 +70,15 @@ data Hole
 -- | Phantom type that signals that a 'Cxt' does not contain holes.
 data NoHole
 
+type CxtS h fs a = Cxt h (Sum fs) a
+
 -- | A context might contain holes.
 type Context = Cxt Hole
 
 -- | A (higher-order) term is a context with no holes.
 type HFix f = Cxt NoHole f (K ())
 
-type Term f = HFix (Sum f)
+type Term fs = HFix (Sum fs)
 
 -- | This function unravels the given term at the topmost layer.
 unTerm :: HFix f t -> f (HFix f) t
