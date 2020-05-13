@@ -24,6 +24,7 @@ module Data.Comp.Multi.Term
      Hole,
      NoHole,
      Context,
+     ContextS,
      HFix,
      Term,
      CxtS,
@@ -74,6 +75,8 @@ type CxtS h fs a = Cxt h (Sum fs) a
 
 -- | A context might contain holes.
 type Context = Cxt Hole
+
+type ContextS fs a = CxtS Hole fs a
 
 -- | A (higher-order) term is a context with no holes.
 type HFix f = Cxt NoHole f (K ())

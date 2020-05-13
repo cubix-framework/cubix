@@ -44,7 +44,9 @@ module Data.Comp.Multi.Annotation
      caseH',
      caseCxt',
      caseCxt'',
-     DistAnn
+     DistAnn,
+     AnnCxt,
+     AnnCxtS
     ) where
 
 import Data.Proxy ( Proxy )
@@ -57,7 +59,13 @@ import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
 
 type AnnHFix a f = HFix (f :&: a)
-type AnnTerm a f = HFix (Sum f :&: a)
+type AnnTerm a fs = HFix (Sum fs :&: a)
+
+type AnnCxt p h f a = Cxt h (f :&: p) a
+-- type AnnContext p f a = AnnCxt p Hole f a
+
+type AnnCxtS p h fs a = AnnCxt p h (Sum fs) a
+-- type AnnContextS p fs a = AnnContext p (Sum fs) a
 
 -- | This function transforms a function with a domain constructed
 -- from a functor to a function with a domain constructed with the
