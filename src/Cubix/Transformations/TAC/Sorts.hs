@@ -21,7 +21,6 @@ module Cubix.Transformations.TAC.Sorts (
 import Control.Monad ( MonadPlus )
 import Data.Proxy ( Proxy(..) )
 
-import Data.Comp.Multi (Sum)
 import Data.Comp.Multi.Strategic ( GRewriteM, guardedT, guardBoolT, isSortT, isSortR, idR, failR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 

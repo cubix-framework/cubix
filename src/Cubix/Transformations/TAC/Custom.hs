@@ -28,7 +28,7 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.Proxy
 
-import Data.Comp.Multi ( Cxt(..), Term, Sum, All, unTerm, Context, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
+import Data.Comp.Multi ( Cxt(..), Term, Sum, All, unTerm, ContextS, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
 import Data.Comp.Multi.Strategic ( Translate, crushtdT, addFail, promoteTF )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms )
 
@@ -146,7 +146,7 @@ instance RenderGuard MPythonSig where
 instance RenderGuard MLuaSig where -- handle the insertF
   renderGuard sign cond body = annotateLabelOuter $ LCommon.iIf (insertF [riPairF signedCond block]) Nothing'
     where
-      signedCond :: Context (Sum MLuaSig) MLuaTermLab LCommon.ExpL
+      signedCond :: ContextS MLuaSig MLuaTermLab LCommon.ExpL
       signedCond = if sign then
                      Hole cond
                    else
@@ -201,7 +201,7 @@ instance {-# OVERLAPPING #-} ShouldHoistSelf' MLuaSig LCommon.Exp where
 
   shouldHoistSelf' t = Nothing
 
-shouldHoistSelf :: (ShouldHoistSelf' fs (Sum fs)) => Term fs l -> Maybe ShouldHoist
+shouldHoistSelf :: (All (ShouldHoistSelf' fs) fs) => Term fs l -> Maybe ShouldHoist
 shouldHoistSelf = shouldHoistSelf' . unTerm
 
 class ShouldHoistChild' gs f where
@@ -217,14 +217,14 @@ shouldHoistAllChildren = defaultShouldHoistChild ShouldHoist
 instance {-# OVERLAPPABLE #-} (HFoldable f) => ShouldHoistChild' gs f where
   shouldHoistChild' = defaultShouldHoistChild
 
-instance {-# OVERLAPPING #-} (All (ShouldHoistChild' g) fs) => ShouldHoistChild' g (Sum fs) where
-  shouldHoistChild' h = caseCxt (Proxy @(ShouldHoistChild' g)) (shouldHoistChild' h)
+instance {-# OVERLAPPING #-} (All (ShouldHoistChild' gs) fs) => ShouldHoistChild' gs (Sum fs) where
+  shouldHoistChild' h = caseCxt (Proxy @(ShouldHoistChild' gs)) (shouldHoistChild' h)
 
 class ShouldHoistChild fs where
   shouldHoistChild :: ShouldHoist -> Term fs l -> [ShouldHoist]
 
-instance ( ShouldHoistChild' fs (Sum fs)
-         , ShouldHoistSelf' fs (Sum fs)
+instance ( All (ShouldHoistChild' fs) fs
+         , All (ShouldHoistSelf' fs) fs
          , All HFoldable fs
          , All HFunctor fs
          ) => ShouldHoistChild fs where

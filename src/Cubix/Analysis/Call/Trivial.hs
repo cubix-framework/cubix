@@ -25,7 +25,7 @@ import qualified Data.Map as Map
 
 import Data.Foldable ( fold )
 
-import Data.Comp.Multi ( E(..), HTraversable, stripA, (:<:), (:-<:), All, Sum, HFoldable, HFunctor )
+import Data.Comp.Multi ( E(..), HTraversable, stripA, (:-<:), All, HFoldable, HFunctor )
 import Data.Comp.Multi.Strategic ( TranslateM, GTranslateM, crushtdT, promoteTF, addFail )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 

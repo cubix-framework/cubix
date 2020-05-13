@@ -12,7 +12,7 @@ module Cubix.Transformations.Hoist.Elementary (
     elementaryHoist
   ) where
 
-import Data.Comp.Multi ( (:<:), HFix, project, transform, HTraversable, Term, (:-<:), All )
+import Data.Comp.Multi ( project, transform, HTraversable, Term, (:-<:), All )
 
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax

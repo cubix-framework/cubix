@@ -27,7 +27,7 @@ import qualified Data.Set as Set
 
 import Data.Text ( pack )
 
-import Data.Comp.Multi ( project', (:<:), ShowHF, Sum, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( project', (:<:), ShowHF, (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, revAllbuR )
 import Data.Comp.Multi.Strategy.Classification ( caseDyn )
 

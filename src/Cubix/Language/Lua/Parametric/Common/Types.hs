@@ -22,7 +22,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:-<:), All, HFunctor, project, Sum, CxtS )
+import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:-<:), All, HFunctor, project, Sum, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -140,8 +140,8 @@ type instance InjectableSorts MLuaSig SingleLocalVarDeclL = '[StatL]
 type MLuaTerm = Term MLuaSig
 type MLuaTermLab = TermLab MLuaSig
 
-type MLuaCxt h a = Cxt h (Sum MLuaSig) a
-type MLuaCxtA h a p = Cxt h (Sum MLuaSig :&: p) a
+type MLuaCxt h a = CxtS h MLuaSig a
+type MLuaCxtA h a p = AnnCxtS p h MLuaSig a
 
 type MLuaTermOptAnn a = AnnTerm (Maybe a) MLuaSig
 

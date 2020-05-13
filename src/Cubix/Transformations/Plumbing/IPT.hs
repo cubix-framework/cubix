@@ -40,7 +40,7 @@ import System.IO ( hFlush, stdout )
 
 import Control.Lens ( (&), (^.), makeClassy, use, at, (%%~), (%=) )
 
-import Data.Comp.Multi ( Cxt(..), HFix, (:<:), isNode', project', HTraversable, ShowHF, EqHF, stripA, toCxt, E(..), runE, All, (:-<:), Term, HFunctor, OrdHF, HFoldable, Sum )
+import Data.Comp.Multi ( Cxt(..), isNode', project', HTraversable, ShowHF, EqHF, stripA, toCxt, E(..), runE, All, (:-<:), Term, HFunctor, OrdHF, HFoldable )
 import Data.Comp.Multi.Derive ( liftSum )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, dynProj )
@@ -104,7 +104,7 @@ type CanIPT fs = ( ListF :-<: fs, ExtractF [] (TermLab fs)
                  , All EqHF fs
 
                  , CfgBuilder fs
-                 , Pretty (Sum fs)
+                 , Pretty fs
                  , TrivialCallAnalysisConstraints fs
                  , TrivialFunctionAnalysisConstraints fs
 
@@ -215,7 +215,7 @@ promptChange ::
   ( All HTraversable fs
   , All HFoldable fs
   , All HFunctor fs
-  , Pretty (Sum fs)
+  , Pretty fs
   , MonadIO m
   ) => FilePath -> TermLab fs i -> TermLab fs j -> m Bool
 promptChange fil before after = do
@@ -236,7 +236,7 @@ promptChangePrj ::
   ( All HTraversable fs
   , All HFoldable fs
   , All HFunctor fs
-  , Pretty (Sum fs)
+  , Pretty fs
   , MonadIO m
   ) => FilePath -> Project fs -> Project fs -> m Bool
 promptChangePrj fil before after = case (lookupUnsafe fil before, lookupUnsafe fil after) of

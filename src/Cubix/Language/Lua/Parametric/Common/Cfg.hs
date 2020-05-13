@@ -16,7 +16,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (%=), makeLenses )
 
-import Data.Comp.Multi ( (:<:), project, project', stripA, remA, (:-<:) )
+import Data.Comp.Multi ( project, project', stripA, remA, (:-<:) )
 import Data.Comp.Multi.Ops ( Sum, (:*:)(..), ffst )
 
 import Cubix.Language.Info

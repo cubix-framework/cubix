@@ -29,7 +29,7 @@ import Data.Traversable ( for )
 import Control.Lens ( (&), (.~), (%=), (.=), (^.), use, Lens' )
 
 import Data.Constraint ( Dict(..) )
-import Data.Comp.Multi ( (:<:), HFix, HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
 
 import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM, TranslateM,
                                    promoteR, addFail, tryR, idR, allR, alltdR,

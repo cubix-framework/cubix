@@ -130,7 +130,7 @@ instance {-# OVERLAPPABLE #-} SpecialTmpHoistAction fs where
 instance {-# OVERLAPPING #-} SpecialTmpHoistAction MPythonSig where
   specialTmpHoistAction n targ = do
     let cxt = PyCommon.iDelete (SingletonF' $ injF (Hole n)) iUnitF
-    (e :: HFixLab MPythonSig BlockItemL) <- annotateLabelOuter cxt
+    (e :: TermLab MPythonSig BlockItemL) <- annotateLabelOuter cxt
     doOptionalAppend targ e
 
 #endif
@@ -239,7 +239,7 @@ extractNonValue sn hc prevs e = view ltac_mod_set >>= \modSet  ->
           (e', ps) <- withSubPrepends doHoistChildren
           tmp <- gensym
 
-          (finalAssn :: HFixLab f BlockItemL) <- annotateLabelOuter $ injF $ Assign' (injF $ Hole tmp) AssignOpEquals' (injF $ Hole e')
+          (finalAssn :: TermLab fs BlockItemL) <- annotateLabelOuter $ injF $ Assign' (injF $ Hole tmp) AssignOpEquals' (injF $ Hole e')
 
           let inside = ps ++ [finalAssn]
 
