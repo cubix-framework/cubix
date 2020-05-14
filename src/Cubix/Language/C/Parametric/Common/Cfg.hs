@@ -66,7 +66,7 @@ extractForInit m = do
 
 
 -- TODO: test this for Duff's device (once we have switches working)
-instance ConstructCfg CStatement MCSig CCfgState where
+instance ConstructCfg MCSig CCfgState CStatement where
   constructCfg t@(remA -> CLabel (nam :*: _) (_ :*: mStatEE) _ _) = HState $ do
     -- It's easiest to model it as if the label and the ensuing statement are separate
    labEE <- constructCfgLabel (ffst $ collapseFProd' t) (nameString nam)
@@ -108,7 +108,7 @@ instance ConstructCfg CStatement MCSig CCfgState where
 
 
 -- CLabelBlock's getting nodes is messing everything up
-instance ConstructCfg CLabeledBlock MCSig CCfgState where
+instance ConstructCfg MCSig CCfgState CLabeledBlock where
   constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ runSubCfgs subCfgs
 
 instance CfgInitState MCSig where

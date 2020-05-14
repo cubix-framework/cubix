@@ -42,7 +42,7 @@ import Cubix.Language.Python.Parametric.Common as P
 
 import Cubix.Language.Parametric.InjF
 
-type family StatSort (f :: [(* -> *) -> * -> *]) :: *
+type family StatSort (fs :: [(* -> *) -> * -> *]) :: *
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance StatSort MCSig      = BlockItemL

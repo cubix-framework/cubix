@@ -1,14 +1,13 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverlappingInstances   #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ViewPatterns           #-}
 
 module Cubix.Analysis.Call.Trivial (
     NodeIdx(..)
@@ -60,7 +59,7 @@ class CallAnalysis fs where
 type TrivialCallAnalysisConstraints fs = ( FunctionCall :-<: fs, Ident :-<: fs
                                         , InjF fs IdentL FunctionExpL, All HTraversable fs
                                         , DynCase (TermLab fs) FunctionCallL)
-type TCAC f = TrivialCallAnalysisConstraints f
+type TCAC fs = TrivialCallAnalysisConstraints fs
 
 
 getCalls' :: (TCAC fs, Monad m) => TranslateM m (TermLab fs) FunctionCallL (AccumMap FunctionId [Label])

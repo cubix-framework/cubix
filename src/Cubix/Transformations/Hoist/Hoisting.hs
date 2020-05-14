@@ -1,13 +1,13 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Cubix.Transformations.Hoist.Hoisting (
     hoistDeclarations
@@ -62,6 +62,7 @@ type CanHoist fs = ( VariableInsertionVariation fs NoConstraint NoConstraint
                    , InjF fs AssignL (StatSort fs)
                    , InjF fs (StatSort fs) BlockItemL
                    , All HTraversable fs, HasFunctors fs
+                   , All HFoldable fs
                    , DynCase (Term fs) BlockL
                    , DynCase (Term fs) IdentL
                    , DynCase (Term fs) SingleLocalVarDeclL
@@ -87,23 +88,23 @@ declToAssign mattrs (SingleLocalVarDecl' lattrs b optInit) = case optInit of
 removeInit :: (CanHoist fs) => Term fs SingleLocalVarDeclL -> Term fs SingleLocalVarDeclL
 removeInit (SingleLocalVarDecl' a n _) = SingleLocalVarDecl' a n NoLocalVarInit'
 
-refCheck :: (CanHoist fs, All HFoldable fs) => Set String -> Term fs SingleLocalVarDeclL -> Bool
+refCheck :: (CanHoist fs) => Set String -> Term fs SingleLocalVarDeclL -> Bool
 refCheck prevRef (SingleLocalVarDecl' _ binder init) = Set.null $ Set.intersection boundIdents refs
   where
     refs = prevRef `Set.union` (referencedIdents init)
     boundIdents = referencedIdents binder
 
-refCheckMulti :: (CanHoist fs, All HFoldable fs) => Set String -> [Term fs SingleLocalVarDeclL] -> Bool
+refCheckMulti :: (CanHoist fs) => Set String -> [Term fs SingleLocalVarDeclL] -> Bool
 refCheckMulti prevRefs decls = all (uncurry refCheck) $ zip cumPrevDecl decls
   where
     cumPrevDecl = map (Set.union prevRefs) $ cumulativeReferencedIdents decls
 
-referencedIdents :: (CanHoist fs, All HFoldable fs) => Term fs l -> Set String
+referencedIdents :: (CanHoist fs) => Term fs l -> Set String
 referencedIdents t = Set.fromList $ map (\(Ident' s) -> s) $ subterms t
 
 -- This is stupid and conservative. For example, in the case of Java, if you
 -- refer to a package "x.y.z", it will list "x", "y", and "z" as referred symbols
-cumulativeReferencedIdents :: forall fs l. (CanHoist fs, All HFoldable fs) => [Term fs l] -> [Set String]
+cumulativeReferencedIdents :: forall fs l. (CanHoist fs) => [Term fs l] -> [Set String]
 cumulativeReferencedIdents = init . scanl addIdents Set.empty
   where
     addIdents :: Set String -> Term fs l -> Set String
@@ -116,7 +117,6 @@ transformSingle ::
   ( CanHoist fs
   , SingleDecInsertion fs NoConstraint
   , MonadHoist fs m
-  , All HFoldable fs
   ) => Term fs (StatSort fs) -> MaybeT m [Term fs (StatSort fs)]
 transformSingle (projF -> Just t@(SingleLocalVarDecl' attr binder init)) = do
   seenIdents %= (Set.union $ referencedIdents init)
@@ -137,7 +137,6 @@ transformMulti ::
   ( CanHoist fs
   , MultiDecInsertion fs NoConstraint
   , MonadHoist fs m
-  , All HFoldable fs
   ) => Term fs (StatSort fs) -> MaybeT m [Term fs (StatSort fs)]
 transformMulti (projF -> Just t@(MultiLocalVarDecl' attrs sdecls)) = do
   hoistState <- get
@@ -167,12 +166,12 @@ transformListHead :: (MonadPlus m, Typeable l, All HFunctor fs, ListF :-<: fs) =
 transformListHead f (ConsF' t ts) = f t >>= return . (foldr (ConsF' . injF) ts)
 transformListHead _ NilF' = mzero
 
-transformStatSorts :: forall fs m. (CanHoist fs, MonadHoist fs m, All HFoldable fs) => RewriteM (MaybeT m) (Term fs) [(StatSort fs)]
+transformStatSorts :: forall fs m. (CanHoist fs, MonadHoist fs m) => RewriteM (MaybeT m) (Term fs) [(StatSort fs)]
 transformStatSorts = case variableInsertionVariation (Proxy :: Proxy fs) (Proxy :: Proxy NoConstraint) (Proxy :: Proxy NoConstraint) of
   MultiDecInsertionVariation  Dict -> transformListHead transformMulti
   SingleDecInsertionVariation Dict -> transformListHead transformSingle
 
-transformBlockItems :: forall fs m. (CanHoist fs, MonadHoist fs m, All HFoldable fs) => RewriteM (MaybeT m) (Term fs) [BlockItemL]
+transformBlockItems :: forall fs m. (CanHoist fs, MonadHoist fs m) => RewriteM (MaybeT m) (Term fs) [BlockItemL]
 transformBlockItems t = mapF injF <$> (transformStatSorts $ mapF fromProjF t)
 
 addIdents :: (CanHoist fs, MonadHoist fs m) => RewriteM (MaybeT m) (Term fs) IdentL
@@ -188,12 +187,11 @@ tillFailure f t = liftM (maybe t id) $ runMaybeT $ f t >>= lift . (tillFailure f
 transformOuterScope ::
   ( MonadHoist fs m
   , CanHoist fs
-  , All HFoldable fs
   ) => GRewriteM m (Term fs) -> GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
 transformOuterScope f g = tryR $ guardedT (guardBoolT (isSortT (Proxy :: Proxy BlockL)))
                                           (addFail $ alltdR f) (addFail $ (tillFailure g) >=> allR (transformOuterScope f g))
 
-hoistBlock :: forall fs. (CanHoist fs, All HFoldable fs) => Rewrite (Term fs) BlockL
+hoistBlock :: forall fs. (CanHoist fs) => Rewrite (Term fs) BlockL
 hoistBlock (Block' items end) = return $ Block' (insertF $ decls ++ extractF items') end
   where
     hoist :: HoistMonad fs (Term fs [BlockItemL])
@@ -201,5 +199,5 @@ hoistBlock (Block' items end) = return $ Block' (insertF $ decls ++ extractF ite
     startState = emptyHoistState & seenIdents .~ (builtinReferencedIdents (Proxy :: Proxy fs))
     (items', decls) = evalState (runWriterT hoist) startState
 
-hoistDeclarations :: (CanHoist fs, All HFoldable fs) => GRewrite (Term fs)
+hoistDeclarations :: (CanHoist fs) => GRewrite (Term fs)
 hoistDeclarations = alltdR $ promoteR $ addFail hoistBlock

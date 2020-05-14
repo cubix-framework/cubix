@@ -54,7 +54,7 @@ singleton :: a -> [a]
 singleton = return
 
 
-instance ConstructCfg JSStatement MJSSig JSCfgState where
+instance ConstructCfg MJSSig JSCfgState JSStatement where
   constructCfg p@(remA -> JSStatementBlock _ (body :*: _) _ _) =
        case extractF body of
            [] -> constructCfgGeneric p
@@ -143,14 +143,14 @@ instance ConstructCfg JSStatement MJSSig JSCfgState where
 
   constructCfg t = constructCfgDefault t
 
-instance ConstructCfg FunctionDef MJSSig JSCfgState where
+instance ConstructCfg MJSSig JSCfgState FunctionDef where
   constructCfg (collapseFProd' -> (t :*: (FunctionDef _ _ _ body))) = HState $ (unHState body >> constructCfgEmpty t)
 
-instance ConstructCfg JSExpression MJSSig JSCfgState where
+instance ConstructCfg MJSSig JSCfgState JSExpression where
   constructCfg (collapseFProd' -> (t :*: (JSFunctionExpression _ _ _ _ _ body))) = HState (unHState body >> constructCfgEmpty t)
   constructCfg t = constructCfgDefault t
 
-instance ConstructCfg C.JSFor MJSSig JSCfgState where
+instance ConstructCfg MJSSig JSCfgState C.JSFor where
   constructCfg (collapseFProd' -> (t :*: C.JSFor init cond step body)) = HState $ constructCfgFor t (liftM Just $ unHState init) (liftM Just $ unHState cond) (liftM Just $ unHState step) (unHState body)
   constructCfg (collapseFProd' -> (t :*: C.JSForIn _ _ exp body)) = HState $ constructCfgWhile t (unHState exp) (unHState body)
   constructCfg (collapseFProd' -> (t :*: C.JSForVar init cond step body)) = HState $ constructCfgFor t (liftM Just $ unHState init) (liftM Just $ unHState cond) (liftM Just $ unHState step) (unHState body)

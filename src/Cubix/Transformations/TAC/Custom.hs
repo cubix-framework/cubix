@@ -116,7 +116,7 @@ class RenderGuard fs where
 instance RenderGuard MJSSig where
   renderGuard sign cond body = annotateLabelOuter $ iJSIf noAnn noAnn signedCond noAnn jsBlock
     where
-      noAnn :: Context MJSSig a JSAnnotL
+      noAnn :: ContextS MJSSig a JSAnnotL
       noAnn = iJSNoAnnot
 
       signedCond = if sign then
@@ -170,11 +170,11 @@ instance {-# OVERLAPPING #-} (All (ShouldHoistSelf' gs) fs) => ShouldHoistSelf' 
   shouldHoistSelf' = caseCxt (Proxy @(ShouldHoistSelf' gs)) shouldHoistSelf'
 
 #ifndef ONLY_ONE_LANGUAGE
-instance {-# OVERLAPPING #-} ShouldHoistSelf' JSExpression MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistSelf' MJSSig JSExpression where
   shouldHoistSelf' (JSCallExpressionDot _ _ _) = Just ShouldntHoist
   shouldHoistSelf' _                           = Nothing
 
-instance {-# OVERLAPPING #-} ShouldHoistSelf' PCommon.Expr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistSelf' MPythonSig PCommon.Expr where
   shouldHoistSelf' (PCommon.Starred _ _) = Just ShouldntHoist
   shouldHoistSelf' _                     = Nothing
 #endif
@@ -244,24 +244,24 @@ instance {-# OVERLAP #-} ShouldHoistChild' g P.Assign where
 -- Because Python has more complicated LHSs, but we've taken care of them by changing the representation
 
 #ifndef ONLY_ONE_LANGUAGE
-instance {-# OVERLAPPING #-} ShouldHoistChild' P.Assign MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig P.Assign where
   shouldHoistChild' _ (P.Assign _ _ _) = [ShouldHoist, StopHoisting, ShouldntHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' P.SingleLocalVarDecl g where
+instance {-# OVERLAPPING #-} ShouldHoistChild' gs P.SingleLocalVarDecl where
   shouldHoistChild' _ (P.SingleLocalVarDecl _ _ _) = [StopHoisting, ShouldntHoist, ShouldntHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSStatement MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSStatement where
   shouldHoistChild' _ (JSExpressionStatement _ _) = [ShouldntHoist, StopHoisting]
   shouldHoistChild' h t = defaultShouldHoistChild h t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSTryCatch MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSTryCatch where
   shouldHoistChild' _ (JSCatch _ _ arg _ body) = [StopHoisting, StopHoisting, ShouldntHoist, StopHoisting, ShouldHoist]
   shouldHoistChild' h t = defaultShouldHoistChild h t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' FunctionCall MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig FunctionCall where
   shouldHoistChild' _ (P.FunctionCall _ _ _) = [StopHoisting, ShouldntHoist, ShouldHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSExpression MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSExpression where
   -- Quick but coarse -- only most unary operators (delete, ++, --) should result in non-hoisting
   shouldHoistChild' _ (JSUnaryExpression _ _)      = [StopHoisting, ShouldntHoist]
   shouldHoistChild' _ (JSExpressionPostfix _ _)    = [ShouldntHoist, StopHoisting]
@@ -272,7 +272,7 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' JSExpression MJSSig where
       hoistUnlessDot _                                     = ShouldHoist
 
 --  TODO: I can improve this by making augmented assign, delete, for all use our new lvalue system
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Statement MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Statement where
   shouldHoistChild' _ (PCommon.StmtExpr _ _) = [ShouldntHoist, StopHoisting]
   shouldHoistChild' _ (PCommon.AugmentedAssign _ _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist, StopHoisting]
   shouldHoistChild' _ (PCommon.Delete _ _) = [ShouldntHoist, StopHoisting]
@@ -284,7 +284,7 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Statement MPythonSig wher
   shouldHoistChild' _ (PCommon.Class _ _ _ _) = [StopHoisting, StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t = shouldHoistAllChildren t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyClass MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyClass where
   -- See the above comment for PCommon.Class. When we replaced the original Python Class constructor
   -- with PyClass when doing the docstring change, this didn't get updated. We got burned
   -- by not removing the old constructors from the representation
@@ -292,18 +292,18 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyClass MPythonSig where
   -- I am going to go ahead and say "ShouldHoist" for the class body though....we'll see what happens
   shouldHoistChild' _ (PCommon.PyClass _ _ _) = [StopHoisting, StopHoisting, ShouldHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyWithBinder MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyWithBinder where
   shouldHoistChild' _ (PyWithBinder _ _) = [ShouldHoist, ShouldHoist]
 
 -- In something like "@a.b(foo())", the lookup "a.b" can have an effect, and
 -- "a.b(x)" is different from "t = a.b; t(x)". I just plain don't see any way to hoist
 -- this, period.
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Decorator MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Decorator where
   shouldHoistChild' _ _ = [StopHoisting, StopHoisting, StopHoisting]
 
 -- | We don't support TAC in comprehensions or lambdas;
 --   must avoid hoisting outside of binders
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Expr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Expr where
   shouldHoistChild' h (PCommon.Paren     _ _) = [h, h]
   shouldHoistChild' h (PCommon.ListComp  _ _) = [StopHoisting, StopHoisting]
   shouldHoistChild' h (PCommon.DictComp  _ _) = [StopHoisting, StopHoisting]
@@ -312,15 +312,15 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Expr MPythonSig where
   shouldHoistChild' h (PCommon.Lambda _ _ _)  = [StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t                       = shouldHoistAllChildren t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyCondExpr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyCondExpr where
   shouldHoistChild' h t = shouldHoistAllChildren t
 
 -- Do not support expressions in default parameter values
-instance {-# OVERLAPPING #-} ShouldHoistChild' FunctionDef MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig FunctionDef where
   shouldHoistChild' h (FunctionDef _ _ _ _) = [StopHoisting, StopHoisting, StopHoisting, StopHoisting]
 
 -- Don't hoist the iterator
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Handler MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Handler where
   shouldHoistChild' h (PCommon.Handler _ _ _) = [StopHoisting, ShouldntHoist, StopHoisting]
 #endif
 

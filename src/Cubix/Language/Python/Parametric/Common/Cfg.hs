@@ -55,7 +55,11 @@ type instance CfgState MPythonSig = PythonCfgState
 singleton :: a -> [a]
 singleton = return
 
-constructCfgWhileElse :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g h) -> m (EnterExitPair g i) -> m (EnterExitPair g j) -> m (EnterExitPair g k)
+constructCfgWhileElse ::
+  ( HasLoopStack s
+  , MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l -> m (EnterExitPair gs h) -> m (EnterExitPair gs i) -> m (EnterExitPair gs j) -> m (EnterExitPair gs k)
 constructCfgWhileElse t mExp mBody mElse = do
   enterNode     <- addCfgNode t EnterNode
   loopEntryNode <- addCfgNode t LoopEntryNode
@@ -82,7 +86,7 @@ constructCfgWhileElse t mExp mBody mElse = do
 -- When developing this, I ran afoul of a GHC bug that resulted in my program segfaulting (and changed when
 -- I swapped the order of my instance declarations). Luckily, a "stack clean" fixed the problem
 
-instance {-# OVERLAPPING #-} ConstructCfg Statement MPythonSig PythonCfgState where
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement where
   constructCfg (collapseFProd' -> (t :*: While cond body els _)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
   constructCfg (collapseFProd' -> (t :*: For _ cond body els _)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
 
@@ -110,7 +114,7 @@ instance {-# OVERLAPPING #-} ConstructCfg Statement MPythonSig PythonCfgState wh
   constructCfg t = constructCfgDefault t
 
 -- Excludes evaluating default arguments from the CFG. I don't remember why I did this.
-instance {-# OVERLAPPING #-} ConstructCfg FunctionDef MPythonSig PythonCfgState where
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState FunctionDef where
   constructCfg a@(collapseFProd' -> t :*: FunctionDef _ _ _ body) = HState (unHState body >> (constructCfgEmpty t))
 
 -- | Control flow actually does flow through for classes; it's not a suspended computation.
@@ -120,7 +124,7 @@ instance {-# OVERLAPPING #-} ConstructCfg FunctionDef MPythonSig PythonCfgState 
 -- smarter architecture for building program transformations, but, in this case, we could do this
 -- better by integrating the boundary condition of the CFG inserter with some name machinery
 
-instance {-# OVERLAPPING #-} ConstructCfg PyClass MPythonSig PythonCfgState where
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyClass where
   constructCfg (collapseFProd' -> t :*: PyClass _ args body) = HState $ do
     unHState body
     a <- collapseEnterExit =<< unHState args
@@ -130,7 +134,7 @@ instance {-# OVERLAPPING #-} ConstructCfg PyClass MPythonSig PythonCfgState wher
     p <- combineEnterExit (identEnterExit enterNode) a
     combineEnterExit p (identEnterExit exitNode)
 
-instance {-# OVERLAPPING #-} ConstructCfg PyWith MPythonSig PythonCfgState where
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyWith where
   constructCfg (collapseFProd' -> t :*: PyWith hBinders hBody) = HState $ do
     enterNode <- addCfgNode t EnterNode
 

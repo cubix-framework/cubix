@@ -83,8 +83,6 @@ mCombineEnterExit p1 p2 = p1 >>= (\r -> combineEnterExit r p2)
 constructCfgReturn ::
   ( MonadState s m
   , CfgComponent gs s
-  , All HFunctor gs
-  , All HFoldable gs
   ) => TermLab gs l -> m (Maybe (EnterExitPair gs i)) -> m (EnterExitPair gs l)
 constructCfgReturn t exp = do
   enterNode <- addCfgNode t EnterNode
@@ -104,8 +102,6 @@ constructCfgEmpty t = do
 constructCfgIfElseIfElse ::
   ( MonadState s m
   , CfgComponent gs s
-  , All HFoldable gs
-  , All HFunctor gs
   ) => TermLab gs l -> m [(EnterExitPair gs i, EnterExitPair gs j)] -> m (Maybe (EnterExitPair gs k)) -> m (EnterExitPair gs l)
 constructCfgIfElseIfElse t clauses optElse = do
   enterNode <- addCfgNode t EnterNode
@@ -177,8 +173,6 @@ constructCfgWhile ::
   ( HasLoopStack s
   , MonadState s m
   , CfgComponent gs s
-  , All HFoldable gs
-  , All HFunctor gs
   ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs j) -> m (EnterExitPair gs k)
 constructCfgWhile t mExp mBody = do
   enterNode     <- addCfgNode t EnterNode
@@ -202,8 +196,6 @@ constructCfgDoWhile ::
   ( HasLoopStack s
   , MonadState s m
   , CfgComponent gs s
-  , All HFoldable gs
-  , All HFunctor gs
   ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs j) -> m (EnterExitPair gs k)
 constructCfgDoWhile t mExp mBody = do
   enterNode     <- addCfgNode t EnterNode
@@ -227,8 +219,6 @@ constructCfgFor ::
   ( HasLoopStack s
   , MonadState s m
   , CfgComponent gs s
-  , All HFoldable gs
-  , All HFunctor gs
   ) => TermLab gs l
   -> m (Maybe (EnterExitPair gs h))
   -> m (Maybe (EnterExitPair gs i))

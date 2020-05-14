@@ -78,7 +78,7 @@ instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' f
 labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
-type family SuspendedComputationSorts (f :: [(* -> *) -> * -> *]) :: [*]
+type family SuspendedComputationSorts (fs :: [(* -> *) -> * -> *]) :: [*]
 
 class IsSuspendedComputationSort' fs (l :: [*]) where
   isSuspendedComputationSort' :: Proxy l -> Term fs i -> Bool
@@ -140,7 +140,7 @@ mapEnterExitPair f EmptyEnterExit = EmptyEnterExit
 mapEnterExitPair f (EnterExitPair n x) = EnterExitPair (mapCfgNode f n) (mapCfgNode f x)
 mapEnterExitPair f (SubPairs t) = SubPairs $ f $ hfmap (mapEnterExitPair f) t
 
-iSubPairs ::  (f' :-<: f) => f' (EnterExitPair f) l -> EnterExitPair f l
+iSubPairs ::  (f' :-<: fs) => f' (EnterExitPair fs) l -> EnterExitPair fs l
 iSubPairs x = SubPairs (inj x)
 
 -- Had such confusing type errors with this
@@ -170,7 +170,7 @@ extractEEPMaybe m = do
   return $ kextractF' p
 
 
-identEnterExit :: CfgNode f -> EnterExitPair f l
+identEnterExit :: CfgNode fs -> EnterExitPair fs l
 identEnterExit n = EnterExitPair n n
 
 collapseEnterExit ::
@@ -238,15 +238,13 @@ data HState s f l = HState { unHState :: State s (f l) }
 class ConstructCfg gs s f where
   constructCfg :: PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 
-type CfgComponent gs s = (HasLabelGen s, HasCurCfg s gs, All HTraversable gs)
+type CfgComponent gs s = (HasLabelGen s, HasCurCfg s gs, All HTraversable gs, All HFoldable gs, All HFunctor gs)
 type SortChecks gs = (IsComputationSort gs, IsSuspendedComputationSort gs, IsContainer gs)
 
 runSubCfgs ::
   ( f :-<: gs
   , HTraversable f
   , CfgComponent gs s
-  , All HFunctor gs
-  , All HFoldable gs
   ) => f (HState s (EnterExitPair gs)) i -> State s (EnterExitPair gs j)
 runSubCfgs subCfgs = do
   x <- hmapM unHState subCfgs
@@ -257,8 +255,6 @@ constructCfgGeneric ::
   ( f :-<: gs
   , HTraversable f
   , CfgComponent gs s
-  , All HFunctor gs
-  , All HFoldable gs
   ) => PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 constructCfgGeneric (collapseFProd' -> (t :*: subCfgs)) = HState $ do
   enterNode <- addCfgNode t EnterNode
@@ -275,8 +271,6 @@ constructCfgDefault ::
   , HTraversable f
   , CfgComponent gs s
   , SortChecks gs
-  , All HFunctor gs
-  , All HFoldable gs
   ) => PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 constructCfgDefault p@(collapseFProd' -> (t :*: subCfgs)) =
   if labeledIsComputationSort t then
@@ -296,8 +290,6 @@ instance {-# OVERLAPPABLE #-}
   , HTraversable f
   , CfgComponent gs s
   , SortChecks gs
-  , All HFunctor gs
-  , All HFoldable gs
   ) => ConstructCfg gs s f where
   constructCfg = constructCfgDefault
 
@@ -312,8 +304,8 @@ type family CfgState (f :: [(* -> *) -> * -> *]) :: *
 class CfgInitState fs where
    cfgInitState :: Proxy fs -> CfgState fs
 
-class    (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs, All HFunctor fs) => CfgBuilder fs
-instance (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs, All HFunctor fs) => CfgBuilder fs
+class    (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
+instance (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
 
 makeCfg :: forall fs l. (CfgBuilder fs) => TermLab fs l -> Cfg fs
 makeCfg t = (execState (unHState $ para constructCfg t) initState) ^. cur_cfg

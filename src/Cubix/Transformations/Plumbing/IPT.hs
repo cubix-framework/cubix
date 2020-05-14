@@ -100,6 +100,7 @@ type CanIPT fs = ( ListF :-<: fs, ExtractF [] (TermLab fs)
 --                , IsNode ReceiverArg f
 
                  , All HTraversable fs
+                 , All HFoldable fs
                  , All ShowHF fs
                  , All EqHF fs
 
@@ -251,7 +252,7 @@ addParam' apa t@(project' -> Just (FunctionDef a n pars b)) =
       newPar <- annotateLabel $ PositionalParameter' (apa ^. apa_paramAttrs) (Ident' $ apa ^. apa_paramName)
       annotateLabelOuter $ FunctionDef' (Hole a) (Hole n) (insertFHole $ extractF pars ++ [newPar]) (Hole b)
 
-addParam :: forall fs m. (CanIPT fs, MonadIPTIO fs m, All HFoldable fs) => AddParamAction fs -> Project fs -> m (Project fs, [CorrectCallsAction fs])
+addParam :: forall fs m. (CanIPT fs, MonadIPTIO fs m) => AddParamAction fs -> Project fs -> m (Project fs, [CorrectCallsAction fs])
 addParam apa@(AddParamAction fn rel paramNm attrs ni@(NodeIdx fil lab)) prj = do
     alreadyAdded <- use ipt_addedFunc
     if Set.member ni alreadyAdded then
@@ -280,7 +281,7 @@ getFnFromFunDef (dynProj -> Just (stripA -> FunctionDef' _ (Ident' n) _ _)) = Ju
 getFnFromFunDef _                                                           = Nothing
 
 -- Left off: This is failing
-getParentFn :: forall fs l. (CanIPT fs, All HFoldable fs) => Path -> TermLab fs l -> Maybe String
+getParentFn :: forall fs l. (CanIPT fs) => Path -> TermLab fs l -> Maybe String
 getParentFn path t = do (E x) <- searchParent (isNode' (Proxy :: Proxy FunctionDef)) t path
                         getFnFromFunDef x
 
@@ -289,7 +290,7 @@ getParentFn path t = do (E x) <- searchParent (isNode' (Proxy :: Proxy FunctionD
 -- TODO: Check input relation
 -- FIXME: I've let some local code ugliness creep in. Much duplication between the cca and apa functions;
 -- justified because they're hacks anyway
-correctCalls :: forall fs m. (CanIPT fs, MonadIPTIO fs m, All HFoldable fs) => CorrectCallsAction fs -> Project fs -> m (Project fs, [AddParamAction fs])
+correctCalls :: forall fs m. (CanIPT fs, MonadIPTIO fs m) => CorrectCallsAction fs -> Project fs -> m (Project fs, [AddParamAction fs])
 correctCalls cca@(CorrectCallsAction nm rel parNm attrs [ni@(NodeIdx fil lab)]) prj = do
     alreadyAdded <- use ipt_addedCall
     if Set.member ni alreadyAdded then
@@ -333,7 +334,7 @@ printQueueSize :: (MonadIO m) => [AddParamAction fs] -> [CorrectCallsAction fs] 
 printQueueSize apas ccas = do liftIO $ putStrLn ("APA queue has size " ++ show (length apas))
                               liftIO $ putStrLn ("CCA queue has size " ++ show (length ccas))
 
-mainLoop :: (CanIPT fs, MonadIPTIO fs m, All HFoldable fs) => [AddParamAction fs] -> [CorrectCallsAction fs] -> Project fs -> m (Project fs)
+mainLoop :: (CanIPT fs, MonadIPTIO fs m) => [AddParamAction fs] -> [CorrectCallsAction fs] -> Project fs -> m (Project fs)
 mainLoop []       []       prj = return prj
 mainLoop apas     (c:ccas) prj = do (prj', apas') <- correctCalls c prj
                                     printQueueSize (apas++apas') ccas
@@ -343,7 +344,7 @@ mainLoop (a:apas) []       prj = do (prj', ccas) <- addParam a prj
                                     printQueueSize apasReduced ccas
                                     mainLoop apasReduced ccas prj'
 
-interproceduralPlumbingTransform :: (CanIPT fs, MonadIO m, All HFoldable fs) => LabelGen -> Project fs -> m (Project fs)
+interproceduralPlumbingTransform :: (CanIPT fs, MonadIO m) => LabelGen -> Project fs -> m (Project fs)
 interproceduralPlumbingTransform gen prj = do
     liftIO $ putStr "Give a starting function: "
     flush

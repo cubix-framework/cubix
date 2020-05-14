@@ -98,15 +98,9 @@ data Ident (e :: * -> *) l where
 
 deriveAll [''Ident]
 
-iIdent' :: ( Ident :-<: fs
-          , All HFunctor fs
-          , InjF fs IdentL j
-          ) => String -> CxtS h fs a j
-iIdent' x_anG3 = injectF (Ident x_anG3)
-
 pattern Ident' :: (Ident :-<: fs, All HFunctor fs) => String -> CxtS h fs a IdentL
 pattern Ident' s <- (project -> (Just (Ident s))) where
-  Ident' s = iIdent' s
+  Ident' s = iIdent s
 
 data MultiLocalVarDeclCommonAttrsL
 data LocalVarInitL

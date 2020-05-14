@@ -13,7 +13,7 @@ module Cubix.Language.Java.Parametric.Common.Semantics () where
 import Control.Monad ( liftM )
 import Data.Maybe ( fromJust )
 
-import Data.Comp.Multi ( (:<:), (:&:)(..), project, appCxt, Context, Cxt(..), AnnTerm, inject' )
+import Data.Comp.Multi ( (:<:), (:&:)(..), project, appCxt, Context, Cxt(..), AnnTerm, inject', (:-<:), ContextS )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import Cubix.Language.Java.Parametric.Common.Types
@@ -27,7 +27,7 @@ import Cubix.Sin.Compdata.Annotation ( annotateM )
 
 import Unsafe.Coerce ( unsafeCoerce )
 
-instance {-# OVERLAPPING #-} (Op :<: g) => GetStrictness' g Exp where
+instance {-# OVERLAPPING #-} (Op :-<: gs) => GetStrictness' gs Exp where
   getStrictness'   (Cond _ _ _)   = [Strict, GuardedBy (Place 0), GuardedBy (NegPlace 0)]
   getStrictness' t@(BinOp _ op _) = case project op of
     Just CAnd -> [Strict, NoEval, GuardedBy (Place 0)]
@@ -35,12 +35,12 @@ instance {-# OVERLAPPING #-} (Op :<: g) => GetStrictness' g Exp where
     _           -> defaultGetStrictness t
   getStrictness' x              = defaultGetStrictness x
 
-instance {-# OVERLAPPING #-} InsertAt' Stmt MJavaSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MJavaSig BlockItemL Stmt where
   -- I swear I remember writing something that could safely e.g.:
   -- cast a (CStatement e i) to (CStatement e CStatementL)
   insertAt' EnterEvalPoint t s =  liftM convertTerm $ liftM appCxt $ annotateM e
     where
-      e :: Context MJavaSig (AnnTerm _ MJavaSig) StmtL
+      e :: ContextS MJavaSig (AnnTerm _ MJavaSig) StmtL
       e = V.iBlock (insertF [Hole t, injF ((Hole $ fromJust $ dynProj $ inject' s) :: Context _ _ StmtL)]) EmptyBlockEnd'
 
       convertTerm :: AnnTerm a MJavaSig i -> AnnTerm a MJavaSig j

@@ -103,7 +103,7 @@ extractAndRunSwitchBlocks switchBlocks = mapM collapseEnterExit =<< (map extract
     extractBlock :: EnterExitPair MJavaSig SwitchBlockL -> EnterExitPair MJavaSig [BlockStmtL]
     extractBlock (SubPairs (proj -> Just (SwitchBlock _ body))) = body
 
-instance ConstructCfg Stmt MJavaSig JavaCfgState where
+instance ConstructCfg MJavaSig JavaCfgState Stmt where
   constructCfg (collapseFProd' -> (_ :*: subCfgs@(StmtBlock _))) = HState $ runSubCfgs subCfgs
 
   constructCfg (collapseFProd' -> (t :*: (IfThen cond thn))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState thn)) (return Nothing)

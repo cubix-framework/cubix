@@ -23,7 +23,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:)(..), (:<:), project, HFunctor )
+import Data.Comp.Multi ( Cxt, Term, project', (:&:)(..), (:<:), project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -92,15 +92,33 @@ data JavaVarargsParam e l where
 
 deriveAll [''JavaReceiver, ''JavaTypeArgs, ''JavaMethodDeclAttrs, ''JavaParamAttrs, ''JavaVarargsParam]
 
-pattern JavaMethodDeclAttrs' :: (JavaMethodDeclAttrs :<: f, HFunctor f) => Cxt h f a [J.ModifierL] -> Cxt h f a [J.TypeParamL] -> Cxt h f a (Maybe J.TypeL) -> Cxt h f a [J.RefTypeL] -> Cxt h f a JavaMethodDeclAttrsL
+pattern JavaMethodDeclAttrs' ::
+  ( JavaMethodDeclAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [J.ModifierL]
+  -> CxtS h fs a [J.TypeParamL]
+  -> CxtS h fs a (Maybe J.TypeL)
+  -> CxtS h fs a [J.RefTypeL]
+  -> CxtS h fs a JavaMethodDeclAttrsL
 pattern JavaMethodDeclAttrs' mods tparams retTp exns <- (project -> Just (JavaMethodDeclAttrs mods tparams retTp exns)) where
   JavaMethodDeclAttrs' mods tparams retTp exns = iJavaMethodDeclAttrs mods tparams retTp exns
 
-pattern JavaParamAttrs' :: (JavaParamAttrs :<: f, HFunctor f) => Cxt h f a [J.ModifierL] -> Cxt h f a J.TypeL -> Int -> Cxt h f a JavaParamAttrsL
+pattern JavaParamAttrs' ::
+  ( JavaParamAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [J.ModifierL]
+  -> CxtS h fs a J.TypeL
+  -> Int
+  -> CxtS h fs a JavaParamAttrsL
 pattern JavaParamAttrs' mods tp dim <- (project -> Just (JavaParamAttrs mods tp dim)) where
   JavaParamAttrs' mods tp dim = iJavaParamAttrs mods tp dim
 
-pattern JavaVarargsParam' :: (JavaVarargsParam :<: f, HFunctor f) => Cxt h f a JavaParamAttrsL -> Cxt h f a P.IdentL -> Cxt h f a JavaVarargsParamL
+pattern JavaVarargsParam' ::
+  ( JavaVarargsParam :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a JavaParamAttrsL
+  -> CxtS h fs a P.IdentL
+  -> CxtS h fs a JavaVarargsParamL
 pattern JavaVarargsParam' attrs n <- (project -> Just (JavaVarargsParam attrs n)) where
   JavaVarargsParam' attrs n = iJavaVarargsParam attrs n
 
@@ -153,8 +171,8 @@ type instance InjectableSorts MJavaSig MultiLocalVarDeclL = '[]
 type MJavaTerm = Term MJavaSig
 type MJavaTermLab = TermLab MJavaSig
 
-type MJavaCxt h a = Cxt h MJavaSig a
-type MJavaCxtA h a p = Cxt h (MJavaSig :&: p) a
+type MJavaCxt h a = CxtS h MJavaSig a
+type MJavaCxtA h a p = AnnCxtS p h MJavaSig a
 
 
 

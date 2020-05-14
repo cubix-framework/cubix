@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE ViewPatterns           #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
@@ -22,9 +23,10 @@ module Cubix.Language.Python.Parametric.Common.Trans
   ) where
 
 import Data.List( (\\) )
+import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), caseH, HFunctor(..) )
+import Data.Comp.Multi ( project, inject, unTerm, (:<:), caseCxt, HFunctor(..), All, Sum, (:-<:) )
 
 import Cubix.Language.Python.Parametric.Common.Types
 import qualified Cubix.Language.Python.Parametric.Full as F
@@ -37,7 +39,7 @@ import Cubix.Language.Parametric.Syntax
 translate :: F.PythonTerm l -> MPythonTerm l
 translate = trans . unTerm
 
-translate' :: (InjF (Sum MPythonSig) l l') => F.PythonTerm l -> MPythonTerm l'
+translate' :: (InjF MPythonSig l l') => F.PythonTerm l -> MPythonTerm l'
 translate' = injF . translate
 
 class Trans f where
@@ -46,10 +48,10 @@ class Trans f where
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
   trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MPythonSig, f :<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
+transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MPythonSig, f :<: F.PythonSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => Trans f where
   trans = transDefault
 
 
@@ -172,13 +174,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MPythonTerm l -> F.PythonTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.PythonSig) => f MPythonTerm l -> F.PythonTerm l
+untransDefault :: (HFunctor f, f :-<: F.PythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.PythonSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.PythonSig) => Untrans f where
   untrans = untransDefault
 
 untransIdent :: MPythonTerm IdentL -> F.PythonTerm F.IdentL
@@ -268,7 +270,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStatement where
 instance {-# OVERLAPPING #-} Untrans PyCondExpr where
   untrans (PyCondExpr c t e) = F.iCondExpr (untranslate t) (untranslate c) (untranslate e) iUnitF
 
-untransError :: (HFunctor f, f :<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
+untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))
 
 

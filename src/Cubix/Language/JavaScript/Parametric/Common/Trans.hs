@@ -1,16 +1,17 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP                     #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE KindSignatures          #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE PartialTypeSignatures   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE ViewPatterns            #-}
+{-# LANGUAGE TemplateHaskell         #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE UndecidableInstances    #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.JavaScript.Parametric.Common.Trans () where
@@ -22,11 +23,12 @@ module Cubix.Language.JavaScript.Parametric.Common.Trans
   ) where
 
 import Data.List ( (\\) )
+import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Control.Lens ( (&), (%~), _1 )
 
-import Data.Comp.Multi ( HFunctor, Term, project, inject, unTerm, (:<:), (:+:), caseH, HFunctor(..) )
+import Data.Comp.Multi ( Term, project, inject, unTerm, (:<:), caseCxt, HFunctor(..), (:-<:), All, Sum )
 import Data.Comp.Multi.Show ()
 
 import Cubix.Language.JavaScript.Parametric.Common.Types
@@ -37,10 +39,10 @@ import Cubix.Language.Parametric.Syntax
 
 -------------------------------------------------------------------------------
 
-noAnn :: (F.JSAnnot :<: f, HFunctor f) => Term f F.JSAnnotL
+noAnn :: (F.JSAnnot :-<: fs, All HFunctor fs) => Term fs F.JSAnnotL
 noAnn = F.iJSNoAnnot
 
-semi :: (F.JSSemi :<: f, F.JSAnnot :<: f, HFunctor f) => Term f F.JSSemiL
+semi :: (F.JSSemi :-<: fs, F.JSAnnot :-<: fs, All HFunctor fs) => Term fs F.JSSemiL
 semi = F.iJSSemi F.iJSNoAnnot
 
 jsCommaListToList :: F.JSTerm (F.JSCommaList l) -> [F.JSTerm l]
@@ -67,13 +69,13 @@ translate' = injF . translate
 class Trans f where
   trans :: f F.JSTerm l -> MJSTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MJSSig, f :<: F.JSSig) => f F.JSTerm l -> MJSTerm l
+transDefault :: (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => f F.JSTerm l -> MJSTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MJSSig, f :<: F.JSSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => Trans f where
   trans = transDefault
 
 
@@ -176,13 +178,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MJSTerm l -> F.JSTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.JSSig) => f MJSTerm l -> F.JSTerm l
+untransDefault :: (HFunctor f, f :-<: F.JSSig) => f MJSTerm l -> F.JSTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.JSSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.JSSig) => Untrans f where
   untrans = untransDefault
 
 instance {-# OVERLAPPING #-} Untrans IdentIsJSExpression where
@@ -266,7 +268,7 @@ untransParams params = listToCommaList $ map (untransIdent.paramToIdent) $ extra
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsJSStatement where
   untrans (FunctionDefIsJSStatement (FunctionDef' EmptyFunctionDefAttrs' n params block)) = F.iJSFunction noAnn (untransIdent n) noAnn (untransParams params) noAnn (untranslate $ fromProjF block) semi
 
-untransError :: (HFunctor f, f :<: MJSSig) => f MJSTerm l -> F.JSTerm l
+untransError :: (HFunctor f, f :-<: MJSSig) => f MJSTerm l -> F.JSTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJSTerm _))
 
 do ipsNames <- sumToNames ''MJSSig

@@ -1,15 +1,15 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PartialTypeSignatures  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Cubix.Language.Parametric.Semantics.SemanticProperties (
     Place(..)
@@ -73,19 +73,19 @@ instance (GetStrictness' fs (Sum fs)) => GetStrictness fs where
 
 --------------------------------------------------------------------------------------
 
-class HasSideEffects' g f where
-  hasSideEffects' :: f (HFix g) l -> Kleene
+class HasSideEffects' gs f where
+  hasSideEffects' :: f (Term gs) l -> Kleene
 
-instance {-# OVERLAPPABLE #-} HasSideEffects' g f where
+instance {-# OVERLAPPABLE #-} HasSideEffects' gs f where
   hasSideEffects' = const KUnknown
 
-instance {-# OVERLAPPING #-} (All (HasSideEffects' g) fs) => HasSideEffects' g (Sum fs) where
-  hasSideEffects' = caseCxt (Proxy @(HasSideEffects' g)) hasSideEffects'
+instance {-# OVERLAPPING #-} (All (HasSideEffects' gs) fs) => HasSideEffects' gs (Sum fs) where
+  hasSideEffects' = caseCxt (Proxy @(HasSideEffects' gs)) hasSideEffects'
 
-class HasSideEffects f where
-  hasSideEffects :: HFix f l -> Kleene
+class HasSideEffects fs where
+  hasSideEffects :: Term fs l -> Kleene
 
-instance (HasSideEffects' f f) => HasSideEffects f where
+instance (HasSideEffects' fs (Sum fs)) => HasSideEffects fs where
   hasSideEffects = hasSideEffects' . unTerm
 
 

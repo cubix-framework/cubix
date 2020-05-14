@@ -34,8 +34,8 @@ import Cubix.Language.Python.Parametric.Common as PCommon
 
 --------------------------------------------------------------------------------------
 
-type family ExpressionSort (f :: [(* -> *) -> * -> *]) :: *
-type family BarrierSorts  (f :: [(* -> *) -> * -> *]) :: [*]
+type family ExpressionSort (fs :: [(* -> *) -> * -> *]) :: *
+type family BarrierSorts  (fs :: [(* -> *) -> * -> *]) :: [*]
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance ExpressionSort MCSig = CCommon.CExpressionL

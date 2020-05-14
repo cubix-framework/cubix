@@ -1,12 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Cubix.Language.Parametric.Semantics.CfgInserter (
     EmptyInsertOkay(..)
@@ -117,17 +117,17 @@ append x l = l ++ [x]
 trivFilt :: (Monad m) => [a] -> m [a]
 trivFilt = return
 
-firstNode :: (MonadState (CfgInsertState f l) m) => [CfgNode f] -> m [CfgNode f]
+firstNode :: (MonadState (CfgInsertState fs l) m) => [CfgNode fs] -> m [CfgNode fs]
 firstNode nodes = do
     progInfo <- use progInfo
     return $ [minimumBy (compare `on` (getPath progInfo)) nodes]
 
-butFirstNode :: (MonadState (CfgInsertState f l) m) => [CfgNode f] -> m [CfgNode f]
+butFirstNode :: (MonadState (CfgInsertState fs l) m) => [CfgNode fs] -> m [CfgNode fs]
 butFirstNode nodes = do
     progInfo <- use progInfo
     return $ tail $ sortOn (getPath progInfo) nodes
 
-getPath :: ProgInfo f -> CfgNode f -> Path
+getPath :: ProgInfo fs -> CfgNode fs -> Path
 getPath inf node = case cfgNodePath inf node of
   Just p  -> p
   Nothing -> emptyPath
