@@ -78,6 +78,7 @@ import qualified Data.Comp.Ops as O
 import Data.Comp.Elem
 import Data.Comp.Dict
 
+
 -- |Data type defining a coproduct family.
 data Sum (fs :: [(* -> *) -> * -> *]) h e where
   Sum :: Elem f fs -> f h e -> Sum fs h e

@@ -213,7 +213,9 @@ mkInstanceD cxt ty decs = InstanceD Nothing cxt ty decs
 -- | This function lifts type class instances over sums
 -- of signatures. To this end it assumes that it contains only methods
 -- with types of the form @f t1 .. tn -> t@ where @f@ is the signature
--- that is used to construct sums. Since this function is generic it
+-- that is used to construct sums. It also assumes that the sum of signatures
+-- occur in the last position in class head. Eg: HasVars v f
+-- Since this function is generic it
 -- assumes as its first argument the name of the function that is
 -- used to lift methods over sums i.e. a function of type
 --
@@ -227,8 +229,8 @@ mkInstanceD cxt ty decs = InstanceD Nothing cxt ty decs
 -- lifted over sums. The class should be such that the last parameter
 -- is that of the signature.
 
-liftSumGen' :: Name -> Name -> Name -> Name -> Q [Dec]
-liftSumGen' caseName sumName allName fname = do
+liftSumGen :: Name -> Name -> Name -> Name -> Q [Dec]
+liftSumGen caseName sumName allName fname = do
   ClassI (ClassD _ name targs_ _ decs) _ <- reify fname
   let targs = map tyVarBndrName targs_
       ts = map VarT (init targs)
@@ -254,50 +256,6 @@ liftSumGen' caseName sumName allName fname = do
                             return $ Clause [VarP x] b []
               pclsNameM = [e| Proxy :: Proxy $clsType |]
               clsType = foldl (\acc a -> acc `appT` pure a) (conT name) ts
-
-
--- | This function lifts type class instances over sums
--- ofsignatures. To this end it assumes that it contains only methods
--- with types of the form @f t1 .. tn -> t@ where @f@ is the signature
--- that is used to construct sums. Since this function is generic it
--- assumes as its first argument the name of the function that is
--- used to lift methods over sums i.e. a function of type
---
--- @
--- (f t1 .. tn -> t) -> (g t1 .. tn -> t) -> ((f :+: g) t1 .. tn -> t)
--- @
---
--- where @:+:@ is the sum type constructor. The second argument to
--- this function is expected to be the name of that constructor. The
--- last argument is the name of the class whose instances should be
--- lifted over sums.
-
-liftSumGen :: Name -> Name -> Name -> Q [Dec]
-liftSumGen caseName sumName fname = do
-  ClassI (ClassD _ name targs_ _ decs) _ <- reify fname
-  let targs = map tyVarBndrName targs_
-  splitM <- findSig targs decs
-  case splitM of
-    Nothing -> do reportError $ "Class " ++ show name ++ " cannot be lifted to sums!"
-                  return []
-    Just (ts1_, ts2_) -> do
-      let f = VarT $ mkName "f"
-      let g = VarT $ mkName "g"
-      let ts1 = map VarT ts1_
-      let ts2 = map VarT ts2_
-      let cxt = [mkClassP name (ts1 ++ f : ts2),
-                 mkClassP name (ts1 ++ g : ts2)]
-      let tp = ((ConT sumName `AppT` f) `AppT` g)
-      let complType = foldl AppT (foldl AppT (ConT name) ts1 `AppT` tp) ts2
-      decs' <- sequence $ concatMap decl decs
-      return [mkInstanceD cxt complType decs']
-        where decl :: Dec -> [DecQ]
-              decl (SigD f _) = [funD f [clause f]]
-              decl _ = []
-              clause :: Name -> ClauseQ
-              clause f = do x <- newName "x"
-                            let b = NormalB (VarE caseName `AppE` VarE f `AppE` VarE f `AppE` VarE x)
-                            return $ Clause [VarP x] b []
 
 
 findSig :: [Name] -> [Dec] -> Q (Maybe ([Name],[Name]))

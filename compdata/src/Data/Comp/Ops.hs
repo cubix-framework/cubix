@@ -51,6 +51,12 @@ import Data.Comp.Alt
 
 import Prelude hiding (foldl, foldl1, foldr, foldr1, mapM, sequence)
 
+infixr 6 :+:
+
+-- |Data type defining coproducts.
+data (f :+: g) (a :: *) = Inl (f a)
+                       | Inr (g a)
+
 
 -- |Formal sum of signatures (functors).
 data Sum (fs :: [* -> *]) e where
