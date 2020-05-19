@@ -22,12 +22,11 @@ import Control.Monad.State ( MonadState, evalState, execState )
 import Control.Lens ( makeClassy, use, (-=), (^.))
 
 import Data.Proxy ( Proxy(..) )
-import Data.Set ( Set )
 import qualified Data.Set as Set
 
 import Data.Text ( pack )
 
-import Data.Comp.Multi ( project', (:<:), ShowHF, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( project', ShowHF, (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, revAllbuR )
 import Data.Comp.Multi.Strategy.Classification ( caseDyn )
 

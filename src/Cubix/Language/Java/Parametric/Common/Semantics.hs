@@ -13,7 +13,7 @@ module Cubix.Language.Java.Parametric.Common.Semantics () where
 import Control.Monad ( liftM )
 import Data.Maybe ( fromJust )
 
-import Data.Comp.Multi ( (:<:), (:&:)(..), project, appCxt, Context, Cxt(..), AnnTerm, inject', (:-<:), ContextS )
+import Data.Comp.Multi ( project, appCxt, Context, Cxt(..), AnnTerm, inject', (:-<:), ContextS )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import Cubix.Language.Java.Parametric.Common.Types

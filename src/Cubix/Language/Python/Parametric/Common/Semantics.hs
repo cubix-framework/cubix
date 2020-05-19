@@ -17,7 +17,7 @@ import Control.Monad ( liftM )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
-import Data.Comp.Multi ( Cxt(..), (:<:), project, project', inject', (:&:)(..), (:-<:) )
+import Data.Comp.Multi ( Cxt(..), project, project', inject', (:&:)(..), (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
 
 import Cubix.Language.Info

@@ -12,7 +12,7 @@ module Cubix.Language.Lua.Parametric.Common.Semantics () where
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 import Data.Proxy ( Proxy(..) )
 
-import Data.Comp.Multi ( (:-<:), project, inject', Sum )
+import Data.Comp.Multi ( (:-<:), project, inject')
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
 
 import Cubix.Language.Lua.Parametric.Common.Types

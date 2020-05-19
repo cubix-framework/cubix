@@ -26,7 +26,7 @@ import Data.List( (\\) )
 import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), caseCxt, HFunctor(..), All, Sum, (:-<:) )
+import Data.Comp.Multi ( project, inject, unTerm, caseCxt, HFunctor(..), All, Sum, (:-<:) )
 
 import Cubix.Language.Python.Parametric.Common.Types
 import qualified Cubix.Language.Python.Parametric.Full as F

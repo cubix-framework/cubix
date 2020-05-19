@@ -13,7 +13,7 @@ module Cubix.Language.C.Parametric.Common.Semantics () where
 import Control.Monad ( liftM )
 import Data.Maybe ( fromJust )
 
-import Data.Comp.Multi ( AnnTerm, ContextS, Cxt(..), (:<:), project, appCxt,  inject', (:-<:) )
+import Data.Comp.Multi ( AnnTerm, ContextS, Cxt(..), project, appCxt,  inject', (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import Cubix.Language.C.Parametric.Common.Types

@@ -77,7 +77,7 @@ import GHC.Generics ( Generic )
 
 import Control.Lens ( (^.), (%~), (%=), (&), (?=), (&), (%~), at, ix, use, makeClassy, makeClassyFor )
 
-import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, AnnHFix, HFix, All )
+import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, All )
 import Data.Comp.Multi.Derive ( KShow(..) )
 
 import Cubix.Language.Info

@@ -87,8 +87,7 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   ,        iEmptyBlockItem
   ) where
 
-import Data.Comp.Multi ( Cxt, project, project', (:<:), HFunctor, (:-<:), All, CxtS, Sum )
-
+import Data.Comp.Multi ( project, project', HFunctor, (:-<:), All, CxtS)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 

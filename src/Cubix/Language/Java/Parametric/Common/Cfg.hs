@@ -15,7 +15,6 @@ module Cubix.Language.Java.Parametric.Common.Cfg () where
 #ifndef ONLY_ONE_LANGUAGE
 import Control.Monad ( liftM, liftM2, forM_ )
 import Control.Monad.State ( MonadState )
-import Data.Maybe ( fromJust )
 
 import Control.Lens ( makeLenses, (%=) )
 

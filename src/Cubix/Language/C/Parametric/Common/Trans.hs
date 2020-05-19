@@ -28,7 +28,7 @@ import Data.Proxy
 import Data.List( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), caseCxt, Sum, All, HFunctor(..), (:-<:) )
+import Data.Comp.Multi ( project, inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 import Data.Comp.Multi.Strategic ( crushtdT, addFail, promoteTF )
 
 import qualified Language.C as COrig

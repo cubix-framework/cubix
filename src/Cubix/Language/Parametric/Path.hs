@@ -20,11 +20,9 @@ module Cubix.Language.Parametric.Path
   , searchParent
   ) where
 
-import Control.Monad ( (=<<) )
 
 import Data.Comp.Multi ( Cxt(..), Alg, cata, K(..), E(..), runE, (:&:), hfoldMap, HTraversable(..), HFix )
 import Data.Comp.Multi.Mapping ( Numbered(..), number )
-import Data.Comp.Multi.Strategy.Classification ( DynCase, caseE )
 
 import Data.List ( find )
 import Data.Map ( Map )

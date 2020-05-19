@@ -24,9 +24,8 @@ import Data.Proxy
 import Data.Text ( pack, unpack )
 
 import Data.Comp.Multi ( project, inject, unTerm, (:-<:), Sum, All, caseCxt
-                       , HFunctor(..), (:&:) )
+                       , HFunctor(..) )
 
-import Cubix.Language.Info
 import Cubix.Language.Lua.Parametric.Common.Types
 import qualified Cubix.Language.Lua.Parametric.Full as F
 import Cubix.Language.Parametric.Derive

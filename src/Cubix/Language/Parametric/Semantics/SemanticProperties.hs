@@ -34,7 +34,7 @@ import Data.Typeable ( Typeable )
 
 import GHC.Generics ( Generic )
 
-import Data.Comp.Multi ( unTerm, (:<:), (:&:)(..), caseCxt, HFunctor, HFoldable, htoList, inject', All, Sum, HFix, AnnHFix, caseCxt', AnnTerm, Term, (:-<:) )
+import Data.Comp.Multi ( unTerm, (:&:)(..), caseCxt, HFunctor, HFoldable, htoList, inject', All, Sum, caseCxt', AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..), kIsSort )
 
 import Cubix.Language.Parametric.Syntax.Functor

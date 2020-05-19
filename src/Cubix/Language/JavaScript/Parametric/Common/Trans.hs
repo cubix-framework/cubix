@@ -28,7 +28,7 @@ import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Control.Lens ( (&), (%~), _1 )
 
-import Data.Comp.Multi ( Term, project, inject, unTerm, (:<:), caseCxt, HFunctor(..), (:-<:), All, Sum )
+import Data.Comp.Multi ( Term, project, inject, unTerm, caseCxt, HFunctor(..), (:-<:), All, Sum )
 import Data.Comp.Multi.Show ()
 
 import Cubix.Language.JavaScript.Parametric.Common.Types

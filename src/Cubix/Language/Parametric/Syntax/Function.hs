@@ -92,10 +92,9 @@ module Cubix.Language.Parametric.Syntax.Function (
 
   ) where
 
-import Data.Comp.Multi ( Cxt, CxtS, project, project', (:-<:), HFunctor, All )
+import Data.Comp.Multi (CxtS,project, (:-<:), HFunctor, All )
 
 import Cubix.Language.Parametric.Derive
-import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax.VarDecl
 
 ---------------------------------------------------------------------------------

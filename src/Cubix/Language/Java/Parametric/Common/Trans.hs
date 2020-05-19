@@ -1,18 +1,18 @@
-{-# OPTIONS_GHC -fcontext-stack=200  #-}
-{-# LANGUAGE CPP                     #-}
-{-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE GADTs                   #-}
-{-# LANGUAGE KindSignatures          #-}
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE PartialTypeSignatures   #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
-{-# LANGUAGE TemplateHaskell         #-}
-{-# LANGUAGE TypeApplications        #-}
-{-# LANGUAGE TypeOperators           #-}
-{-# LANGUAGE UndecidableInstances    #-}
-{-# LANGUAGE ViewPatterns            #-}
+{-# OPTIONS_GHC -freduction-depth=200 #-}
+{-# LANGUAGE CPP                      #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE KindSignatures           #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE PartialTypeSignatures    #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Java.Parametric.Common.Trans () where
@@ -28,7 +28,7 @@ import Data.Proxy
 import Data.Typeable ( Typeable )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( unTerm, (:<:), caseH, inject, project, HFunctor, hfmap, (:-<:), All, Sum, caseCxt )
+import Data.Comp.Multi ( unTerm , inject, project, HFunctor, hfmap, (:-<:), All, Sum, caseCxt )
 
 import Cubix.Language.Java.Parametric.Common.Types
 import qualified Cubix.Language.Java.Parametric.Full as F

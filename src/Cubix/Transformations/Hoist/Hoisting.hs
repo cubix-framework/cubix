@@ -16,7 +16,7 @@ module Cubix.Transformations.Hoist.Hoisting (
 
 import Control.Monad ( (>=>), liftM, mzero )
 import Control.Monad ( MonadPlus )
-import Control.Monad.State ( State, MonadState, get, put, evalState )
+import Control.Monad.State ( State, MonadState, get, evalState )
 import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.Maybe ( MaybeT, runMaybeT )
 import Control.Monad.Writer.Lazy ( WriterT, MonadWriter, tell, runWriterT )
@@ -31,8 +31,8 @@ import Control.Lens ( (&), (.~), (%=), (.=), (^.), use, Lens' )
 import Data.Constraint ( Dict(..) )
 import Data.Comp.Multi ( HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
 
-import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM, TranslateM,
-                                   promoteR, addFail, tryR, idR, allR, alltdR,
+import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM,
+                                   promoteR, addFail, tryR, allR, alltdR,
                                    guardedT, guardBoolT, isSortT,
                                    promoteRF, (>+>) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms )

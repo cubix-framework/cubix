@@ -156,7 +156,7 @@ instance Pretty JSStatement where
         pretty (JSVariable annot xs s)                      = text "var" <+> pretty xs <> pretty s
         pretty (JSWhile annot alp x1 arp x2)                = text "while" <+> parens (pretty x1) <+> pretty x2
         pretty (JSWith annot alp x1 arp x s)                = text "with" <+> parens (pretty x1) <+> pretty x <> pretty s
-        pretty s             = error "TODO JSStatement"
+        pretty _s             = error "TODO JSStatement"
 --
 --
 -- instance Pretty [JSStatement] where

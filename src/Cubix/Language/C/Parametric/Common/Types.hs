@@ -24,7 +24,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( HFunctor, Cxt, Term, (:<:), project', project, (:&:), (:-<:), CxtS, All, AnnCxtS )
+import Data.Comp.Multi ( HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.C.Parametric.Full.Names
