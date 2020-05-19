@@ -69,7 +69,7 @@ normalCon (RecC constr args) = (constr, map (\(_,s,t) -> (s,t)) args, Nothing)
 normalCon (InfixC a constr b) = (constr, [a,b], Nothing)
 normalCon (ForallC _ _ constr) = normalCon constr
 #if __GLASGOW_HASKELL__ >= 800
-normalCon (GadtC (constr:constrs) args typ) = (constr,args,Just typ)
+normalCon (GadtC (constr:_constrs) args typ) = (constr,args,Just typ)
 #endif
 
 normalCon' :: Con -> (Name,[Type], Maybe Type)
@@ -127,7 +127,7 @@ abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
 #if __GLASGOW_HASKELL__ >= 800
-abstractConType (GadtC (constr:_) args typ) = (constr,length args) -- Only first Name
+abstractConType (GadtC (constr:_) args _typ) = (constr,length args) -- Only first Name
 #endif
 
 {-|

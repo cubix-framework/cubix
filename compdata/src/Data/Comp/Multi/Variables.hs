@@ -53,8 +53,6 @@ import Data.Comp.Multi.Mapping
 import Data.Comp.Multi.Ops
 
 import Data.Comp.Multi.Term
-import Data.Comp.Dict
-import Data.Proxy
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)

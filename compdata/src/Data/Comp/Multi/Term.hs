@@ -39,9 +39,7 @@ import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
 import Data.Comp.Multi.Ops
-import Data.Monoid hiding (Sum)
 
-import Control.Applicative hiding (Const)
 import Control.Monad
 
 import Unsafe.Coerce
