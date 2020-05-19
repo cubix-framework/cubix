@@ -79,44 +79,44 @@ instance NFData (Cfg f) where
 #ifndef ONLY_ONE_LANGUAGE
 getC :: FilePath -> IO ( CLib.CTranslUnit, CFull.CTerm CTranslationUnitL
                        , MCTerm CTranslationUnitL, MCTermLab CTranslationUnitL
-                       {-, Cfg MCSig-})
+                       , Cfg MCSig)
 getC path = do
   raw <- fromRight <$> CParse.parse path
   gen <- mkCSLabelGen -- OriginSynthetic
   let fullTree = CFull.translate $ fmap (const ()) raw
   let commTree = CCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree{-, makeCfg labTree-})
+  return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
 
 
 getJava :: FilePath -> IO ( JLib.CompilationUnit, JFull.JavaTerm CompilationUnitL
                          , MJavaTerm CompilationUnitL, MJavaTermLab CompilationUnitL
-                         {-, Cfg MJavaSig-})
+                         , Cfg MJavaSig)
 getJava path = do
   raw <- fromRight <$> JParse.parse path
   gen <- mkCSLabelGen -- OriginSynthetic
   let fullTree = JFull.translate raw
   let commTree = JCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree{-, makeCfg labTree-})
+  return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
 
 getJS :: FilePath -> IO ( JSLib.JSAST, JSFull.JSTerm JSASTL
                         , MJSTerm JSASTL, MJSTermLab JSASTL
-                        {-, Cfg MJSSig-})
+                        , Cfg MJSSig)
 getJS path = do
   raw <- JSLib.parseFile path
   gen <- mkCSLabelGen -- OriginSynthetic
   let fullTree = JSFull.translate raw
   let commTree = JSCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree{-, makeCfg labTree-})
+  return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
 
 getPython :: FilePath -> IO (PLib.Module (), PFull.PythonTerm ModuleL
                          , MPythonTerm ModuleL, MPythonTermLab ModuleL
-                         {-, Cfg MPythonSig-})
+                         , Cfg MPythonSig)
 getPython path = do
   contents <- readFile path
   let rawAnnot = fst $ fromRight $ PLib.parseModule contents path
@@ -125,19 +125,19 @@ getPython path = do
   let fullTree = PFull.translate raw
   let commTree = PCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree{-, makeCfg labTree-})
+  return (raw, fullTree, commTree, labTree, makeCfg labTree)
 #endif
 
 getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTerm LBlockL
                          , MLuaTerm LBlockL, MLuaTermLab LBlockL
-                         {-, Cfg MLuaSig-})
+                         , Cfg MLuaSig)
 getLua path = do
   raw <- fromRight <$> LuaLib.parseFile path
   gen <- mkCSLabelGen -- OriginSynthetic
   let fullTree = LFull.translate (fmap toSourceSpan raw)
   let commTree = LCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree {-, makeCfg labTree-})
+  return (raw, fullTree, commTree, labTree , makeCfg labTree)
 
 -- NOTE: duplicated from Cubix.ParsePretty. Find a common home.
 toSourceSpan :: LuaLib.SourceRange -> Maybe SourceSpan
@@ -166,95 +166,94 @@ main = do
   defaultMain [
 #ifndef ONLY_ONE_LANGUAGE
       env (getC "input-files/c/Foo.c") $
-            \ ~(lib, full, ips, lab{-, cfg-}) -> bgroup "c" [
+            \ ~(lib, full, ips, lab, cfg) -> bgroup "c" [
                       bench "showOverheadLib" $ nf id lib
                     , bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
-                    -- , bench "showOverheadCfg" $ nf id cfg
+                    , bench "showOverheadCfg" $ nf id cfg
                     , bench "removeAnnot"     $ nf (fmap (const ())) lib
                     , bench "pretty"          $ nf (show . CLib.pretty) lib
 
                     , bench "transMod"        $ nf (CFull.translate . fmap (const ())) lib
                     , bench "transIps"        $ nf CCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
-                    -- , bench "cfg"             $ nf makeCfg lab
+                    , bench "cfg"             $ nf makeCfg lab
                     , bench "hoist"           $ nf hoistDeclarations ips
-                    -- , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
+                    , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf CCommon.untranslate ips
                     , bench "untransMod"      $ nf CFull.untranslate full
                     ]
 
      , env (getJava "input-files/java/Foo.java") $
-            \ ~(lib, full, ips, lab{-, cfg-}) -> bgroup "java" [
+            \ ~(lib, full, ips, lab, cfg) -> bgroup "java" [
                       bench "showOverheadLib" $ nf id lib
                     , bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
-                    -- , bench "showOverheadCfg" $ nf id cfg
+                    , bench "showOverheadCfg" $ nf id cfg
                     , bench "pretty"          $ nf (show . JLib.prettyPrint) lib
 
                     , bench "transMod"        $ nf JFull.translate lib
                     , bench "transIps"        $ nf JCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
-                    -- , bench "cfg"             $ nf makeCfg lab
+                    , bench "cfg"             $ nf makeCfg lab
                     , bench "hoist"           $ nf hoistDeclarations ips
-                    -- , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
+                    , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf JCommon.untranslate ips
                     , bench "untransMod"      $ nf JFull.untranslate full
                     ]
 
     , env (getJS "input-files/javascript/Foo.js") $
-            \ ~(lib, full, ips, lab {-, cfg-}) -> bgroup "js" [
+            \ ~(lib, full, ips, lab, cfg) -> bgroup "js" [
                       bench "showOverheadLib" $ nf id lib
                     , bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
-                    -- , bench "showOverheadCfg" $ nf id cfg
+                    , bench "showOverheadCfg" $ nf id cfg
                     , bench "pretty"          $ nf (show . JSLib.prettyPrint) lib
 
                     , bench "transMod"        $ nf JSFull.translate lib
                     , bench "transIps"        $ nf JSCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
-                    -- , bench "cfg"             $ nf makeCfg lab
+                    , bench "cfg"             $ nf makeCfg lab
                     , bench "hoist"           $ nf hoistDeclarations ips
                     , bench "tac"             $ nfIO $ toTAC lab
-                    -- , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
+                    , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf JSCommon.untranslate ips
                     , bench "untransMod"      $ nf JSFull.untranslate full
                     ]
 
     , env (getPython "input-files/python/Foo.py") $
-            \ ~(lib, full, ips, lab{-, cfg-}) -> bgroup "python" [
+            \ ~(lib, full, ips, lab, cfg) -> bgroup "python" [
                       bench "showOverheadLib" $ nf id lib
                     , bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
-                    -- , bench "showOverheadCfg" $ nf id cfg
+                    , bench "showOverheadCfg" $ nf id cfg
                     , bench "pretty"          $ nf (show . PLib.pretty) lib
 
                     , bench "transMod"        $ nf PFull.translate lib
                     , bench "transIps"        $ nf PCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
-                    -- , bench "cfg"             $ nf makeCfg lab
+                    , bench "cfg"             $ nf makeCfg lab
                     , bench "tac"             $ nfIO $ toTAC lab
-                    -- , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
+                    , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf PCommon.untranslate ips
                     , bench "untransMod"      $ nf PFull.untranslate full
                     ]
-
-    ,
+    ,                                            
 #endif
       env (getLua "input-files/lua/Foo.lua") $
-            \ ~(lib, full, ips, lab{-, cfg-}) -> bgroup "lua" [
-                      bench "showOverheadMod" $ nf id full
+            \ ~(lib, full, ips, lab, cfg) -> bgroup "lua" [
+                     bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
-                    -- , bench "showOverheadCfg" $ nf id cfg
+                    , bench "showOverheadCfg" $ nf id cfg
                     -- , bench "pretty"          $ nf (show . LuaLib.pprint) lib
-
+                    
                     , bench "transMod"        $ nf LFull.translate (fmap toSourceSpan lib)
                     , bench "transIps"        $ nf LCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
-                    -- , bench "cfg"             $ nf makeCfg lab
+                    , bench "cfg"             $ nf makeCfg lab
                     , bench "hoist"           $ nf hoistDeclarations ips
                     , bench "tac"             $ nfIO $ toTAC lab
-                    -- , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
+                    , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf LCommon.untranslate ips
                     , bench "untransMod"      $ nf LFull.untranslate (ann Nothing full)
                     ]

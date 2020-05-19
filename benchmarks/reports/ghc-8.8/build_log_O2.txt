@@ -2,3 +2,8 @@
 
 stack build cubix --flag cubix:only-one-language   154.05s user 5.86s system 179% cpu 1:29.05 total
 
+05/19/2020
+
+stack build cubix --flag cubix:only-one-language   282.50s user 10.45s system 168% cpu 2:53.89 total
+
+actual command : ( stack build cubix --flag cubix:only-one-language --ghc-options='-O2 -j +RTS -A256m -n2m -RTS' )

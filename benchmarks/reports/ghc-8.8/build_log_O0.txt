@@ -1,3 +1,7 @@
 04/29/2020
 
 stack build cubix --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'  733.98s user 21.16s system 279% cpu 4:29.96 total
+
+05/19/2020
+
+stack build cubix --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'  768.49s user 24.11s system 267% cpu 4:56.28 total
