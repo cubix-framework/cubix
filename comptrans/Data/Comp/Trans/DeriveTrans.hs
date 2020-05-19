@@ -7,7 +7,6 @@ module Data.Comp.Trans.DeriveTrans
 
 import Control.Monad.Trans ( lift )
 import Data.Map ( Map )
-import qualified Data.Map as Map
 
 import Control.Lens ( (^.), _1, _2, (%~), view )
 import Language.Haskell.TH

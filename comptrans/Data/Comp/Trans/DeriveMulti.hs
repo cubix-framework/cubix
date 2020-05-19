@@ -3,10 +3,9 @@ module Data.Comp.Trans.DeriveMulti (
   ) where
 
 import Control.Lens ( _1, _2, _3, (&), (%~), (%%~), (^.), view )
-import Control.Monad ( liftM, (=<<) )
+import Control.Monad ( liftM )
 import Control.Monad.Trans ( MonadTrans(lift) )
 
-import Data.Maybe ( isJust )
 
 import Language.Haskell.TH.Syntax hiding ( lift )
 import Language.Haskell.TH.ExpandSyns ( expandSyns )
@@ -50,7 +49,7 @@ mkGADT n cons = do
   let n' = transName n
   annProp <- view annotationProp
   case annProp of
-    Just annPropInf  -> mapM_ checkUniqueVar cons
+    Just _annPropInf  -> mapM_ checkUniqueVar cons
     Nothing          -> return ()
   cons' <- mapM (mkCon n' e i) cons
   return $ [DataD [] n' [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] Nothing cons' []
