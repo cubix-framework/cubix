@@ -84,7 +84,7 @@ parseLua path = do
     res <- Lua.parseFile path
     case res of
      Left errors -> print errors >> return Nothing
-     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
+     Right tree  -> return $ Just $ LCommon.translate $ {-stripA $-} LFull.translate $ fmap toSourceSpan tree
   where
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
     toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))

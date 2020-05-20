@@ -30,11 +30,19 @@ makeDynCase fname = do
           mapM (genDyn tname cons) labs
      where
        iTp :: Name -> Con -> Maybe Type
-       iTp iVar (ForallC _ cxt _) =
-         -- Check if the GADT phantom type is constrained
-         case [y | AppT (AppT EqualityT x) y <- cxt, x == VarT iVar] of
-           [] -> Nothing
-           tp:_ -> Just tp
+       iTp iVar (ForallC _ cxt t) =
+                  -- Check if the GADT phantom type is constrained
+                  case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
+                    [] -> iTp iVar t
+                    tp:_ -> Just tp
+       iTp _iVar (GadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
+       iTp _iVar (RecGadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
        iTp _ _ = Nothing
   
        genDyn :: Name -> [((Name, Int), Maybe Type)] -> Type -> Q Dec
@@ -88,6 +96,9 @@ abstractConType (NormalC constr args) = (constr, length args)
 abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
+abstractConType (GadtC [constr] args _) = (constr, length args)
+abstractConType (RecGadtC [constr] args _) = (constr, length args)
+
 
 {-|
   This function returns the name of a bound type variable

@@ -104,7 +104,7 @@ instance NFData SourcePos where rnf = genericRnf
 
 makeClassy ''SourcePos
 
-data SourceSpan = SourceSpan { _sourceStart :: !SourcePos, _sourceEnd :: !SourcePos }
+data SourceSpan = SourceSpan { _sourceStart :: !SourcePos, _sourceEnd :: !SourcePos } deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 makeClassy ''SourceSpan
 
