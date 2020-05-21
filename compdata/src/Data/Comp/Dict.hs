@@ -46,15 +46,15 @@ infixl 1 \\
 (\\) x Dict = x
 
 class All (c :: k -> Constraint) (fs :: [k]) where
-  dicts :: Proxy# fs -> Vector (E (Dict c))
+  dicts :: Proxy# fs -> [E (Dict c)]
 
 instance All c '[] where
   {-# INLINE dicts #-}
-  dicts _ = V.empty
+  dicts _ = []
 
 instance (All c fs, c f) => All c (f ': fs) where
   {-# INLINE dicts #-}
-  dicts p = E (Dict :: Dict c f) `V.cons` (dicts (reproxy @fs p))
+  dicts p = E (Dict :: Dict c f) : (dicts (reproxy @fs p))
 
 reproxy :: forall b a. Proxy# a -> Proxy# b
 reproxy _ = proxy#
@@ -62,7 +62,7 @@ reproxy _ = proxy#
 {-# INLINE dictFor #-}
 dictFor :: forall c f fs. (All c fs) => Elem f fs -> Dict c f
 dictFor (Elem v) =
-  let ds = dicts (proxy# :: Proxy# fs) :: Vector (E (Dict c))
+  let ds = V.fromList (dicts (proxy# :: Proxy# fs)) :: Vector (E (Dict c))
   in case ds V.! v of
        E d -> U.unsafeCoerce d
 
