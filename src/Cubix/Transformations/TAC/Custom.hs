@@ -241,14 +241,14 @@ instance ( All (ShouldHoistChild' fs) fs
 instance {-# OVERLAP #-} ShouldHoistChild' g P.Assign where
   shouldHoistChild' _ (P.Assign _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist]
 
--- Because Python has more complicated LHSs, but we've taken care of them by changing the representation
-
-#ifndef ONLY_ONE_LANGUAGE
-instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig P.Assign where
-  shouldHoistChild' _ (P.Assign _ _ _) = [ShouldHoist, StopHoisting, ShouldntHoist]
-
 instance {-# OVERLAPPING #-} ShouldHoistChild' gs P.SingleLocalVarDecl where
   shouldHoistChild' _ (P.SingleLocalVarDecl _ _ _) = [StopHoisting, ShouldntHoist, ShouldntHoist]
+
+#ifndef ONLY_ONE_LANGUAGE
+-- Because Python has more complicated LHSs, but we've taken care of them by changing the representation
+
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig P.Assign where
+  shouldHoistChild' _ (P.Assign _ _ _) = [ShouldHoist, StopHoisting, ShouldntHoist]
 
 instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSStatement where
   shouldHoistChild' _ (JSExpressionStatement _ _) = [ShouldntHoist, StopHoisting]

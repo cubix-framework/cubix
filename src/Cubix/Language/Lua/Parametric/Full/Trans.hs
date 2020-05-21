@@ -25,7 +25,7 @@ import Data.Maybe ( isJust )
 import Data.Proxy
 import Data.Typeable ( Typeable )
 
-import Data.Comp.Multi ( inject', caseCxt'', Sum, All, (:&:)(..), injectOpt, DistAnn )
+import Data.Comp.Multi ( inject', caseCxt'', Sum, All, (:&:)(..), injectOpt, DistAnn, stripA )
 
 import qualified Language.Haskell.TH as TH
 import qualified Language.Lua.Annotated as Lua
@@ -45,8 +45,8 @@ do substs <- makeSubsts
                 $ withExcludedNames excludedNamesSet
                 $ deriveTrans origASTTypes annotatedTargType
 
-translate :: Lua.Block (Maybe SourceSpan) -> LuaTermOptAnn SourceSpan BlockL
-translate = trans
+translate :: Lua.Block (Maybe SourceSpan) -> LuaTerm {-OptAnn SourceSpan-} BlockL
+translate = stripA . trans
 
 instance Trans (Lua.FunBody (Maybe SourceSpan)) FunBodyL where
   trans (Lua.FunBody a args varArg blk) = inject' $ (FunBody (trans args) (isJust varArg) (trans blk)) :&: a
