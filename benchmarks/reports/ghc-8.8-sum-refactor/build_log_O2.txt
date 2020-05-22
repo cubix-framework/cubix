@@ -1,0 +1,5 @@
+05/22/2020
+
+stack build cubix --ghc-options='-O2 -j +RTS -A256m -n2m -RTS'   312.89s user 12.82s system 196% cpu 2:45.65 total
+
+actual command : time stack build cubix --ghc-options='-O2 -j +RTS -A256m -n2m -RTS' --flag=cubix:only-one-language 
