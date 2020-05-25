@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 
 import Control.Lens ( (+=), (%=), use, makeClassy )
 
-import Data.Comp.Multi ( Cxt(..), (:&:)(..), (:<:), project', inj, HTraversable )
+import Data.Comp.Multi ( Cxt(..), (:&:)(..), (:-<:), project', inj, HTraversable, All, HFoldable, HFunctor )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, promoteRF, anytdR, tryR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 
@@ -53,7 +53,7 @@ gensymPrefix = "i_am_a_temp_replace_me"
 tmpVarPrefix :: String
 tmpVarPrefix = "t"
 
-gensym :: (MonadState s m, HasGensymState s, MonadAnnotater Label m, Ident :<: f) => m (TermLab f IdentL)
+gensym :: (MonadState s m, HasGensymState s, MonadAnnotater Label m, Ident :-<: fs) => m (TermLab fs IdentL)
 gensym = do
   gensymCounter += 1
   n <- use gensymCounter
@@ -64,7 +64,7 @@ gensym = do
    else
     annotateTop' (Ident id)
 
-finalizeGensymName :: (MonadState s m, HasGensymState s, HTraversable f, Ident :<: f) => RewriteM m (TermLab f) IdentL
+finalizeGensymName :: (MonadState s m, HasGensymState s, All HTraversable fs, Ident :-<: fs) => RewriteM m (TermLab fs) IdentL
 finalizeGensymName t@(project' -> Just (Ident s)) =
                                   let lab = getAnn t in
                                   if isPrefixOf gensymPrefix s then do
@@ -85,5 +85,13 @@ finalizeGensymName t@(project' -> Just (Ident s)) =
                                   else
                                     return t
 
-finalizeGensymNames :: (MonadState s m, HasGensymState s, HTraversable f, DynCase (TermLab f) IdentL, Ident :<: f) => GRewriteM m (TermLab f)
+finalizeGensymNames ::
+  ( MonadState s m
+  , HasGensymState s
+  , All HTraversable fs
+  , DynCase (TermLab fs) IdentL
+  , Ident :-<: fs
+  , All HFoldable fs
+  , All HFunctor fs
+  ) => GRewriteM m (TermLab fs)
 finalizeGensymNames = tryR $ anytdR $ promoteRF finalizeGensymName

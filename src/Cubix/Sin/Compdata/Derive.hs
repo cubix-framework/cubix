@@ -32,15 +32,20 @@ smartFConstructors fname = do
                   -- Check if the GADT phantom type is constrained
                   case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
                     [] -> iTp iVar t
-                    tp:_ -> Just tp
-              iTp _iVar (GadtC _ _ (AppT _ tp)) =
+                    tp:_ ->
+                      let args = case t of
+                            NormalC _ vs -> map snd vs
+                            RecC _ vs -> map (\(_, _, v) -> v) vs
+                            _ -> []
+                      in Just (args, tp)
+              iTp _iVar (GadtC _ vs (AppT _ tp)) =
                   case tp of
                     VarT _ -> Nothing
-                    _      -> Just tp
-              iTp _iVar (RecGadtC _ _ (AppT _ tp)) =
+                    _      -> Just (map snd vs, tp)
+              iTp _iVar (RecGadtC _ vs (AppT _ tp)) =
                   case tp of
                     VarT _ -> Nothing
-                    _      -> Just tp
+                    _      -> Just (map (\(_, _, v) -> v) vs, tp)
               iTp _ _ = Nothing
               genSmartConstr targs tname ((name, args), miTp) = do
                 let bname = nameBase name
@@ -54,25 +59,37 @@ smartFConstructors fname = do
                     body = maybe [|inject $val|] (const [|injectF $val|]) miTp
                     function = [funD sname [clause pats (normalB body) []]]
                 sequence $ sig ++ function
-              genSig targs tname sname 0 miTp = (:[]) $ do
-                fvar <- newName "f"
+              genSig targs tname sname tys miTp = (:[]) $ do
+                fsvar <- newName "fs"
                 hvar <- newName "h"
                 avar <- newName "a"
                 jvar <- newName "j"
                 let targs' = init $ init targs
-                    vars = hvar:fvar:avar:[jvar]++targs'
-                    f = varT fvar
+                    vars = hvar:fsvar:avar:[jvar]++targs'
+                    fs = varT fsvar
                     h = varT hvar
                     a = varT avar
                     j = varT jvar
                     ftype = foldl appT (conT tname) (map varT targs')
-                    typGen = foldl appT (conT ''Cxt) [h, f, a]
-                    typ = appT typGen j
-                    constr = classP ''(:<:) [ftype, f]
-                    constr' = classP ''InjF [f, maybe j return miTp, j]
+                    typGen = foldl appT (conT ''CxtS) [h, fs, a]
+                    args = case fst <$> miTp of
+                      Nothing -> []
+                      Just as -> map (mkArgType h fs a) as
+                    typ = arrow (args ++ [appT typGen j])
+                    constr = classP ''(:-<:) [ftype, fs]
+                    constr' = classP ''InjF [fs, maybe j (pure . snd) miTp, j]
                     typeSig = forallT (map PlainTV vars) (sequence [constr, constr']) typ
                 sigD sname typeSig
-              genSig _ _ _ _ _ = []
+
+              mkArgType h fs a (AppT (VarT _) t) =
+                -- NOTE: e ( .. ) case
+                foldl appT (conT ''CxtS) [h, fs, a, pure t]
+              mkArgType _ _ _ t =
+                pure t
+              arrow =
+                foldr1 (\a acc -> arrowT `appT` a `appT` acc)
+
+
 
 {-|
   This is the @Q@-lifted version of 'abstractNewtypeQ.

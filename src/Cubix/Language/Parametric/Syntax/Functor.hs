@@ -8,6 +8,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -70,12 +71,13 @@ module Cubix.Language.Parametric.Syntax.Functor
   , mapF
   ) where
 
-import Data.Comp.Multi ( HFunctor, (:<:), (:+:), (:&:), Cxt(..), Term, Context, K(..), unK, inject, project, project', caseH, RemA(..), NotSum )
+import Data.Comp.Multi ( HFunctor, (:<:), Sum, (:&:), Cxt(..), Context, K(..), unK, inject, project, project', RemA(..), NotSum, HFix, caseCxt, All, CxtS, (:-<:) )
 import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 
 import Data.Comp.Multi.Strategy.Classification
 
 import Data.Typeable ( Typeable, eqT )
+import Data.Proxy
 
 import Cubix.Language.Parametric.InjF
 
@@ -311,15 +313,21 @@ instance (Typeable l, Typeable l') => KDynCase EitherF (Either l l') where
 riNothingF :: forall h f a l. (MaybeF :<: f, Typeable l) => Cxt h f a (Maybe l)
 riNothingF = inject NothingF
 
-iJustF :: (MaybeF :<: f, InjF f (Maybe l) l', Typeable l) => Cxt h f a l -> Cxt h f a l'
-iJustF = injectF . JustF
+iJustF :: (MaybeF :-<: fs, InjF fs (Maybe l) l', Typeable l) => CxtS h fs a l -> CxtS h fs a l'
+iJustF = injF . iJust
+
+iJust :: (MaybeF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a (Maybe l)
+iJust = inject . JustF
 
 -- | Smart constructor for NilF. Restricted; cannot be lifted through a sort injection
 riNilF :: forall h f a l. (ListF :<: f, Typeable l) => Cxt h f a [l]
 riNilF = inject NilF
 
-iConsF :: (ListF :<: f, InjF f [l] l', Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a l'
-iConsF x y = injectF (ConsF x y)
+iConsF :: (ListF :-<: fs, InjF fs [l] l', Typeable l) => CxtS h fs a l -> CxtS h fs a [l] -> CxtS h fs a l'
+iConsF x y = injF (iCons x y)
+
+iCons :: (ListF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
+iCons x y = inject (ConsF x y)
 
 -- | Smart constructor for PairF. Restricted; cannot be lifted through a sort injection
 riPairF :: (PairF :<: f, Typeable i, Typeable j) => Cxt h f a i -> Cxt h f a j -> Cxt h f a (i, j)
@@ -371,11 +379,11 @@ class KExtractF' f g where
 instance KExtractF' f g => KExtractF f g where
   kextractF = kextractF'
 
-instance (KExtractF f g, KExtractF f h) => KExtractF f (g :+: h) where
-  kextractF = caseH kextractF kextractF
+instance (All (KExtractF f) gs) => KExtractF f (Sum gs) where
+  kextractF = caseCxt (Proxy @(KExtractF f)) kextractF
 
-instance (KExtractF' f g, KExtractF' f h) => KExtractF' f (g :+: h) where
-  kextractF' = caseH kextractF' kextractF'
+instance (All (KExtractF' f) gs) => KExtractF' f (Sum gs) where
+  kextractF' = caseCxt (Proxy @(KExtractF' f)) kextractF'
 
 instance (KExtractF f g) => KExtractF f (g :&: a) where
   kextractF = kextractF . remA
@@ -417,11 +425,11 @@ class KExtractF2' f g where
 instance KExtractF2' f g => KExtractF2 f g where
   kextractF2 = kextractF2'
 
-instance (KExtractF2 f g, KExtractF2 f h) => KExtractF2 f (g :+: h) where
-  kextractF2 = caseH kextractF2 kextractF2
+instance (All (KExtractF2 f) gs) => KExtractF2 f (Sum gs) where
+  kextractF2 = caseCxt (Proxy @(KExtractF2 f)) kextractF2
 
-instance (KExtractF2' f g, KExtractF2' f h) => KExtractF2' f (g :+: h) where
-  kextractF2' = caseH kextractF2' kextractF2'
+instance (All (KExtractF2' f) gs) => KExtractF2' f (Sum gs) where
+  kextractF2' = caseCxt (Proxy @(KExtractF2' f)) kextractF2'
 
 instance (KExtractF2 f g) => KExtractF2 f (g :&: a) where
   kextractF2 = kextractF2 . remA
@@ -429,7 +437,7 @@ instance (KExtractF2 f g) => KExtractF2 f (g :&: a) where
 instance (KExtractF2' f g) => KExtractF2' f (g :&: a) where
   kextractF2' = kextractF2' . remA
 
-instance (KExtractF2 f g) => ExtractF2 f (Term g) where
+instance (KExtractF2 f g) => ExtractF2 f (HFix g) where
   extractF2 (Term x) = kextractF2 x
 
 instance (NotSum g) => KExtractF2' f g where
@@ -458,11 +466,11 @@ class KExtractF3' f g where
 instance KExtractF3' f g => KExtractF3 f g where
   kextractF3 = kextractF3'
 
-instance (KExtractF3 f g, KExtractF3 f h) => KExtractF3 f (g :+: h) where
-  kextractF3 = caseH kextractF3 kextractF3
+instance (All (KExtractF3 f) gs) => KExtractF3 f (Sum gs) where
+  kextractF3 = caseCxt (Proxy @(KExtractF3 f)) kextractF3
 
-instance (KExtractF3' f g, KExtractF3' f h) => KExtractF3' f (g :+: h) where
-  kextractF3' = caseH kextractF3' kextractF3'
+instance (All (KExtractF3' f) gs) => KExtractF3' f (Sum gs) where
+  kextractF3' = caseCxt (Proxy @(KExtractF3' f)) kextractF3'
 
 instance (KExtractF3 f g) => KExtractF3 f (g :&: a) where
   kextractF3 = kextractF3 . remA
@@ -470,7 +478,7 @@ instance (KExtractF3 f g) => KExtractF3 f (g :&: a) where
 instance (KExtractF3' f g) => KExtractF3' f (g :&: a) where
   kextractF3' = kextractF3' . remA
 
-instance (KExtractF3 f g) => ExtractF3 f (Term g) where
+instance (KExtractF3 f g) => ExtractF3 f (HFix g) where
   extractF3 (Term x) = kextractF3 x
 
 instance (NotSum g) => KExtractF3' f g where
@@ -499,16 +507,16 @@ class (Functor f) => InsertF f e where
   insertF :: (Typeable l) => f (e l) -> e (f l)
 
 
-insertFHole :: (InsertF e (Context f (Term g)), Typeable l) => e (Term g l) -> Context f (Term g) (e l)
+insertFHole :: (InsertF e (Context f (HFix g)), Typeable l) => e (HFix g l) -> Context f (HFix g) (e l)
 insertFHole = insertF . fmap Hole
 
 instance (ListF :<: e, HFunctor e) => InsertF [] (Cxt h e a) where
   insertF [] = riNilF
-  insertF (x : xs) = x `iConsF` (insertF xs)
+  insertF (x : xs) = x `iCons` (insertF xs)
 
 instance (MaybeF :<: e, HFunctor e) => InsertF Maybe (Cxt h e a) where
   insertF Nothing = riNothingF
-  insertF (Just x) = iJustF x
+  insertF (Just x) = iJust x
 
 
 liftF :: (InsertF f h, ExtractF f g, Functor f, Typeable b) => (f (g a) -> f (h b)) -> g (f a) -> h (f b)

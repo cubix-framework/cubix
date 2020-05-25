@@ -1,14 +1,15 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE OverlappingInstances   #-}
 
 module Main where
 
-import Control.Monad ( when, liftM, (<=<), (=<<) )
+import Control.Monad ( when, liftM, (<=<) )
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char  ( toLower )
@@ -18,7 +19,7 @@ import Data.Maybe ( fromJust )
 import System.Environment ( getArgs )
 import System.IO ( hClose )
 
-import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF )
+import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Term, All )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import qualified Language.Dot.Pretty as Dot
@@ -107,7 +108,7 @@ putProj (PythonProj p) = putProject (prettyPython     . fromJust . dynProj . str
 putProj (LuaProj    p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
 
 
-debugTree' :: (ShowHF f, HFoldable f, CfgBuilder f) => Term f l -> IO ()
+debugTree' :: (All ShowHF fs, All HFoldable fs, CfgBuilder fs) => Term fs l -> IO ()
 debugTree' t = do
   gen <- mkCSLabelGen
   let tLab = labelProg gen t

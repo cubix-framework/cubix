@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE TemplateHaskell #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Derive.Utils
@@ -16,6 +17,7 @@ module Data.Comp.Derive.Utils where
 
 
 import Control.Monad
+import Data.Proxy
 import Language.Haskell.TH
 import Language.Haskell.TH.ExpandSyns
 import Language.Haskell.TH.Syntax
@@ -67,7 +69,7 @@ normalCon (RecC constr args) = (constr, map (\(_,s,t) -> (s,t)) args, Nothing)
 normalCon (InfixC a constr b) = (constr, [a,b], Nothing)
 normalCon (ForallC _ _ constr) = normalCon constr
 #if __GLASGOW_HASKELL__ >= 800
-normalCon (GadtC (constr:constrs) args typ) = (constr,args,Just typ)
+normalCon (GadtC (constr:_constrs) args typ) = (constr,args,Just typ)
 #endif
 
 normalCon' :: Con -> (Name,[Type], Maybe Type)
@@ -125,7 +127,7 @@ abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
 #if __GLASGOW_HASKELL__ >= 800
-abstractConType (GadtC (constr:_) args typ) = (constr,length args) -- Only first Name
+abstractConType (GadtC (constr:_) args _typ) = (constr,length args) -- Only first Name
 #endif
 
 {-|
@@ -208,40 +210,40 @@ mkInstanceD cxt ty decs = InstanceD Nothing cxt ty decs
 #endif
 
 
-
 -- | This function lifts type class instances over sums
--- ofsignatures. To this end it assumes that it contains only methods
+-- of signatures. To this end it assumes that it contains only methods
 -- with types of the form @f t1 .. tn -> t@ where @f@ is the signature
--- that is used to construct sums. Since this function is generic it
+-- that is used to construct sums. It also assumes that the sum of signatures
+-- occur in the last position in class head. Eg: HasVars v f
+-- Since this function is generic it
 -- assumes as its first argument the name of the function that is
 -- used to lift methods over sums i.e. a function of type
 --
 -- @
--- (f t1 .. tn -> t) -> (g t1 .. tn -> t) -> ((f :+: g) t1 .. tn -> t)
+-- (forall f. f t1 .. tn -> t) -> (Sum fs t1 .. tn -> t)
 -- @
 --
--- where @:+:@ is the sum type constructor. The second argument to
+-- where @Sum@ is the sum type constructor. The second argument to
 -- this function is expected to be the name of that constructor. The
 -- last argument is the name of the class whose instances should be
--- lifted over sums.
+-- lifted over sums. The class should be such that the last parameter
+-- is that of the signature.
 
-liftSumGen :: Name -> Name -> Name -> Q [Dec]
-liftSumGen caseName sumName fname = do
+liftSumGen :: Name -> Name -> Name -> Name -> Q [Dec]
+liftSumGen caseName sumName allName fname = do
   ClassI (ClassD _ name targs_ _ decs) _ <- reify fname
   let targs = map tyVarBndrName targs_
-  splitM <- findSig targs decs
-  case splitM of
-    Nothing -> do reportError $ "Class " ++ show name ++ " cannot be lifted to sums!"
-                  return []
-    Just (ts1_, ts2_) -> do
-      let f = VarT $ mkName "f"
-      let g = VarT $ mkName "g"
-      let ts1 = map VarT ts1_
-      let ts2 = map VarT ts2_
-      let cxt = [mkClassP name (ts1 ++ f : ts2),
-                 mkClassP name (ts1 ++ g : ts2)]
-      let tp = ((ConT sumName `AppT` f) `AppT` g)
-      let complType = foldl AppT (foldl AppT (ConT name) ts1 `AppT` tp) ts2
+      ts = map VarT (init targs)
+  fs <- newName "fs"
+  case null targs of
+    True -> do
+      reportError $ "Class " ++ show name ++ " cannot be lifted to sums!"
+      return []
+    False -> do
+      allCxt <- conT allName `appT` clsType `appT` varT fs
+      let cxt = [ allCxt ]
+      let tp = ConT sumName `AppT` VarT fs
+      let complType = foldl AppT (ConT name) ts `AppT` tp
       decs' <- sequence $ concatMap decl decs
       return [mkInstanceD cxt complType decs']
         where decl :: Dec -> [DecQ]
@@ -249,8 +251,11 @@ liftSumGen caseName sumName fname = do
               decl _ = []
               clause :: Name -> ClauseQ
               clause f = do x <- newName "x"
-                            let b = NormalB (VarE caseName `AppE` VarE f `AppE` VarE f `AppE` VarE x)
+                            pclsName <- pclsNameM
+                            let b = NormalB (VarE caseName `AppE` pclsName `AppE` VarE f `AppE` VarE x)
                             return $ Clause [VarP x] b []
+              pclsNameM = [e| Proxy :: Proxy $clsType |]
+              clsType = foldl (\acc a -> acc `appT` pure a) (conT name) ts
 
 
 findSig :: [Name] -> [Dec] -> Q (Maybe ([Name],[Name]))

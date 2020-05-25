@@ -7,7 +7,10 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Variables
@@ -72,7 +75,7 @@ substFun s (K v) = fmap unA $ Map.lookup v s
 {-| This multiparameter class defines functors with variables. An instance
   @HasVar f v@ denotes that values over @f@ might contain and bind variables of
   type @v@. -}
-class HasVars (f  :: (* -> *) -> * -> *) v where
+class HasVars v (f  :: (* -> *) -> * -> *) where
     -- | Indicates whether the @f@ constructor is a variable. The
     -- default implementation returns @Nothing@.
     isVar :: f a :=> Maybe v
@@ -108,7 +111,7 @@ $(derive [liftSum] [''HasVars])
 -- | Same as 'isVar' but it returns Nothing@ instead of @Just v@ if
 -- @v@ is contained in the given set of variables.
 
-isVar' :: (HasVars f v, Ord v) => Set v -> f a :=> Maybe v
+isVar' :: (HasVars v f, Ord v) => Set v -> f a :=> Maybe v
 isVar' b t = do v <- isVar t
                 if v `Set.member` b
                    then Nothing
@@ -117,7 +120,7 @@ isVar' b t = do v <- isVar t
 -- | This combinator pairs every argument of a given constructor with
 -- the set of (newly) bound variables according to the corresponding
 -- 'HasVars' type class instance.
-getBoundVars :: forall f a v i . (HasVars f v, HTraversable f) => f a i -> f (a :*: K (Set v)) i
+getBoundVars :: forall f a v i . (HasVars v f, HTraversable f) => f a i -> f (a :*: K (Set v)) i
 getBoundVars t = let n :: f (Numbered a) i
                      n = number t
                      m = bindsVars n
@@ -126,7 +129,7 @@ getBoundVars t = let n :: f (Numbered a) i
                  in hfmap trans n
 
 -- | This combinator combines 'getBoundVars' with the 'mfmap' function.
-hfmapBoundVars :: forall f a b v i . (HasVars f v, HTraversable f)
+hfmapBoundVars :: forall f a b v i . (HasVars v f, HTraversable f)
                   => (Set v -> a :-> b) -> f a i -> f b i
 hfmapBoundVars f t = let n :: f (Numbered a) i
                          n = number t
@@ -136,7 +139,7 @@ hfmapBoundVars f t = let n :: f (Numbered a) i
                      in hfmap trans n
 
 -- | This combinator combines 'getBoundVars' with the generic 'hfoldl' function.
-hfoldlBoundVars :: forall f a b v i . (HasVars f v, HTraversable f)
+hfoldlBoundVars :: forall f a b v i . (HasVars v f, HTraversable f)
                   => (b -> Set v ->  a :=> b) -> b -> f a i -> b
 hfoldlBoundVars f e t = let n :: f (Numbered a) i
                             n = number t
@@ -150,10 +153,10 @@ hfoldlBoundVars f e t = let n :: f (Numbered a) i
 -- Auxiliary data type, used only to define varsToHoles
 newtype C a b i = C{ unC :: a -> b i }
 
-varsToHoles :: forall f v. (HTraversable f, HasVars f v, Ord v) =>
-                Term f :-> Context f (K v)
+varsToHoles :: forall f v. (HTraversable f, HasVars v f, Ord v) =>
+                HFix f :-> Context f (K v)
 varsToHoles t = unC (cata alg t) Set.empty
-    where alg :: (HTraversable f, HasVars f v, Ord v) => Alg f (C (Set v) (Context f (K v)))
+    where alg :: (HTraversable f, HasVars v f, Ord v) => Alg f (C (Set v) (Context f (K v)))
           alg t = C $ \vars -> case isVar t of
             Just v | not (v `Set.member` vars) -> Hole $ K v
             _  -> Term $ hfmapBoundVars run t
@@ -162,7 +165,7 @@ varsToHoles t = unC (cata alg t) Set.empty
                 run newVars f = f `unC` (newVars `Set.union` vars)
 
 -- | Convert variables to holes, except those that are bound.
-containsVarAlg :: forall v f . (Ord v, HasVars f v, HTraversable f) => v -> Alg f (K Bool)
+containsVarAlg :: forall v f . (Ord v, HasVars v f, HTraversable f) => v -> Alg f (K Bool)
 containsVarAlg v t = K $ hfoldlBoundVars run local t
     where local = case isVar t of
                     Just v' -> v == v'
@@ -171,19 +174,19 @@ containsVarAlg v t = K $ hfoldlBoundVars run local t
           run acc vars (K b) = acc || (not (v `Set.member` vars) && b)
 
 {-| This function checks whether a variable is contained in a context. -}
-containsVar :: (Ord v, HasVars f v, HTraversable f, HFunctor f)
+containsVar :: (Ord v, HasVars v f, HTraversable f, HFunctor f)
             => v -> Cxt h f a :=> Bool
 containsVar v = unK . free (containsVarAlg v) (const $ K False)
 
 
 {-| This function computes the list of variables occurring in a context. -}
-variableList :: (HasVars f v, HTraversable f, HFunctor f, Ord v)
+variableList :: (HasVars v f, HTraversable f, HFunctor f, Ord v)
              => Cxt h f a :=> [v]
 variableList = Set.toList . variables
 
 -- |Algebra for checking whether a variable is contained in a term, except those
 -- that are bound.
-variablesAlg :: (Ord v, HasVars f v, HTraversable f) => Alg f (K (Set v))
+variablesAlg :: (Ord v, HasVars v f, HTraversable f) => Alg f (K (Set v))
 variablesAlg t = K $ hfoldlBoundVars run local t
     where local = case isVar t of
                     Just v -> Set.singleton v
@@ -191,12 +194,12 @@ variablesAlg t = K $ hfoldlBoundVars run local t
           run acc bvars (K vars) = acc `Set.union` (vars `Set.difference` bvars)
 
 {-| This function computes the set of variables occurring in a context. -}
-variables :: (Ord v, HasVars f v, HTraversable f, HFunctor f)
+variables :: (Ord v, HasVars v f, HTraversable f, HFunctor f)
             => Cxt h f a :=> Set v
 variables = unK . free variablesAlg (const $ K Set.empty)
 
 {-| This function computes the set of variables occurring in a context. -}
-variables' :: (Ord v, HasVars f v, HFoldable f, HFunctor f)
+variables' :: (Ord v, HasVars v f, HFoldable f, HFunctor f)
             => Const f :=> Set v
 variables' c =  case isVar c of
                   Nothing -> Set.empty
@@ -210,7 +213,7 @@ class SubstVars v t a where
 appSubst :: (Ord v, SubstVars v t a) => GSubst v t -> a :-> a
 appSubst subst = substVars (substFun subst)
 
-instance (Ord v, HasVars f v, HTraversable f) => SubstVars v (Cxt h f a) (Cxt h f a) where
+instance (Ord v, HasVars v f, HTraversable f) => SubstVars v (Cxt h f a) (Cxt h f a) where
     -- have to use explicit GADT pattern matching!!
     substVars subst = doSubst Set.empty
       where doSubst :: Set v -> Cxt h f a :-> Cxt h f a
@@ -228,6 +231,6 @@ instance (SubstVars v t a, HFunctor f) => SubstVars v t (f a) where
 applying the resulting substitution is equivalent to first applying
 @s2@ and then @s1@. -}
 
-compSubst :: (Ord v, HasVars f v, HTraversable f)
+compSubst :: (Ord v, HasVars v f, HTraversable f)
           => CxtSubst h a f v -> CxtSubst h a f v -> CxtSubst h a f v
 compSubst s1 = Map.map (\ (A t) -> A (appSubst s1 t))

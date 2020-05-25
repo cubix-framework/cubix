@@ -55,9 +55,13 @@ library
                         Data.Comp.Multi.Derive.Ordering
                         Data.Comp.Multi.Derive.Show
                         Data.Comp.Multi.Derive.SmartConstructors
+                        Data.Comp.Elem
+                        Data.Comp.Dict
+                        Data.Comp.Multi.Alt
+                        Data.Comp.Alt
 
   Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, derive,
-                        deepseq, th-expand-syns, transformers
+                        deepseq, th-expand-syns, transformers, vector, ghc-prim
   Extensions:           FlexibleContexts
   hs-source-dirs:       src
   ghc-options:          -W

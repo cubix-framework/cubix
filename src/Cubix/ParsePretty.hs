@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -64,18 +65,18 @@ import qualified Cubix.Language.Python.Parametric.Full as PFull
 import qualified Data.Text as T (unpack)
 
 
-type family RootSort (f :: (* -> *) -> * -> *)
+type family RootSort (fs :: [(* -> *) -> * -> *])
 
-class ParseFile f where
-  parseFile :: FilePath -> IO (Maybe (Term f (RootSort f)))
+class ParseFile fs where
+  parseFile :: FilePath -> IO (Maybe (Term fs (RootSort fs)))
 
-class Pretty f where
-  pretty :: Term f (RootSort f) -> String
+class Pretty fs where
+  pretty :: Term fs (RootSort fs) -> String
 
   -- FIXME: The only reason this is needed is because Project forgets
   -- what sort its contents are
-  prettyUnsafe :: Term f l -> String
-  default prettyUnsafe :: (DynCase (Term f) (RootSort f)) => Term f l -> String
+  prettyUnsafe :: Term fs l -> String
+  default prettyUnsafe :: (DynCase (Term fs) (RootSort fs)) => Term fs l -> String
   prettyUnsafe = pretty . fromDynProj
 
 -- | NOTE: This reflects the half-finished transition of Lua to annotated terms

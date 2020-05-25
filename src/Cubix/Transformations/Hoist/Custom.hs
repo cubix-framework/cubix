@@ -1,14 +1,15 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Cubix.Transformations.Hoist.Custom (
     HoistState
@@ -32,26 +33,23 @@ import qualified Data.Set as Set
 import Control.Lens ( makeLenses, (^.), (%=) )
 
 import Data.Comp.Multi ( project, Term )
-import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, allbuR, alltdR, promoteR, addFail )
+import Data.Comp.Multi.Strategic ( Rewrite, alltdR, promoteR, addFail )
 import Data.Comp.Multi.Strategy.Classification ( subterms )
 
 import Cubix.Language.C.Parametric.Common as CCommon
-import qualified Cubix.Language.C.Parametric.Full as CFull
 import Cubix.Language.Java.Parametric.Common as JCommon
 import Cubix.Language.JavaScript.Parametric.Common as JSCommon
 import Cubix.Language.Lua.Parametric.Common as LCommon
 
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax.Base
-import Cubix.Language.Parametric.Syntax.Functor as P
 
 import Cubix.Transformations.Variation
 
-type family SpecialHoistState (f :: (* -> *) -> * -> *) :: *
+type family SpecialHoistState (fs :: [(* -> *) -> * -> *]) :: *
 
-data HoistState f = HoistState {
+data HoistState fs = HoistState {
                                  _seenIdents   :: Set String
-                               , _specialState :: SpecialHoistState f
+                               , _specialState :: SpecialHoistState fs
                                }
 
 makeLenses ''HoistState
@@ -71,11 +69,11 @@ makeLenses ''JavaSpecialHoistState
 type instance SpecialHoistState MJavaSig = JavaSpecialHoistState
 #endif
 
-class HoistStateConstraints f where
-  emptyHoistState :: HoistState f
-  updateSpecialState :: (MonadState (HoistState f) m) => Term f l -> m ()
+class HoistStateConstraints fs where
+  emptyHoistState :: HoistState fs
+  updateSpecialState :: (MonadState (HoistState fs) m) => Term fs l -> m ()
 
-instance {-# OVERLAPPABLE #-} (SpecialHoistState f ~ ()) => HoistStateConstraints f where
+instance {-# OVERLAPPABLE #-} (SpecialHoistState fs ~ ()) => HoistStateConstraints fs where
   emptyHoistState = HoistState Set.empty ()
   updateSpecialState _ = return ()
 
@@ -149,18 +147,18 @@ instance VarDeclBinderToLhs MLuaTerm where
 
 -- Created this instead of messing with the normal hoist pipeline so that elementary
 -- hoist can remain unchanged
-class SpecialHoist f where
+class SpecialHoist fs where
   -- Let's not even pretend to support this
   --specialHoistSingle :: HoistState f -> Term f SingleLocalVarDeclL -> Maybe (Term f [BlockItemL], Term f [StatSort f])
 
-  specialHoistMulti  :: HoistState f
-                     -> Term f MultiLocalVarDeclCommonAttrsL
-                     -> Term f LocalVarDeclAttrsL
-                     -> Term f VarDeclBinderL
-                     -> Term f OptLocalVarInitL
-                     -> Maybe ([Term f BlockItemL], [Term f (StatSort f)])
+  specialHoistMulti  :: HoistState fs
+                     -> Term fs MultiLocalVarDeclCommonAttrsL
+                     -> Term fs LocalVarDeclAttrsL
+                     -> Term fs VarDeclBinderL
+                     -> Term fs OptLocalVarInitL
+                     -> Maybe ([Term fs BlockItemL], [Term fs (StatSort fs)])
 
-instance {-# OVERLAPPABLE #-} SpecialHoist f where
+instance {-# OVERLAPPABLE #-} SpecialHoist fs where
   --specialHoistSingle _ _ = Nothing
   specialHoistMulti _ _ _ _ _ = Nothing
 
@@ -256,10 +254,10 @@ instance {-# OVERLAPPABLE #-} SpecialHoist MCSig where
 --
 -- For instance, in Lua, changing "local _ENV = x" to "local _ENV; _ENV = x" will have the effect
 -- of temporarily setting _ENV to nil, which then renders all variables (including "x") inacessible
-class BuiltinSpecialIdents (f :: (* -> *) -> * -> *) where
-  builtinReferencedIdents :: Proxy f -> Set String
+class BuiltinSpecialIdents (fs :: [(* -> *) -> * -> *]) where
+  builtinReferencedIdents :: Proxy fs -> Set String
 
-instance {-# OVERLAPPABLE #-} BuiltinSpecialIdents f where
+instance {-# OVERLAPPABLE #-} BuiltinSpecialIdents fs where
   builtinReferencedIdents _ = Set.empty
 
 instance {-# OVERLAPPING #-} BuiltinSpecialIdents MLuaSig where
@@ -267,11 +265,11 @@ instance {-# OVERLAPPING #-} BuiltinSpecialIdents MLuaSig where
 
 
 -- The identifier set should probably be generalized to a language-specific hoist state
-class BlockHoisting f where
-  blockHoistSingle :: HoistState f -> Term f SingleLocalVarDeclL -> Bool
-  blockHoistMulti  :: HoistState f -> Term f MultiLocalVarDeclL  -> Bool
+class BlockHoisting fs where
+  blockHoistSingle :: HoistState fs -> Term fs SingleLocalVarDeclL -> Bool
+  blockHoistMulti  :: HoistState fs -> Term fs MultiLocalVarDeclL  -> Bool
 
-instance {-# OVERLAPPABLE #-} BlockHoisting f where
+instance {-# OVERLAPPABLE #-} BlockHoisting fs where
   blockHoistSingle _ _ = False
   blockHoistMulti  _ _ = False
 

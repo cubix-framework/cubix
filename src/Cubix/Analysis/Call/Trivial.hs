@@ -1,14 +1,13 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverlappingInstances   #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ViewPatterns           #-}
 
 module Cubix.Analysis.Call.Trivial (
     NodeIdx(..)
@@ -25,7 +24,7 @@ import qualified Data.Map as Map
 
 import Data.Foldable ( fold )
 
-import Data.Comp.Multi ( E(..), HTraversable, stripA, (:<:) )
+import Data.Comp.Multi ( E(..), HTraversable, stripA, (:-<:), All, HFoldable, HFunctor )
 import Data.Comp.Multi.Strategic ( TranslateM, GTranslateM, crushtdT, promoteTF, addFail )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 
@@ -53,31 +52,31 @@ instance (Ord k, Monoid v) => Monoid (AccumMap k v) where
 
 ----------------------------------------------------------------------------------------------------------------
 
-class CallAnalysis f where
-  callAnalysis :: Project f -> Map FunctionId [NodeIdx]
+class CallAnalysis fs where
+  callAnalysis :: Project fs -> Map FunctionId [NodeIdx]
 
 
-type TrivialCallAnalysisConstraints f = ( FunctionCall :<: f, Ident :<: f
-                                        , InjF f IdentL FunctionExpL, HTraversable f
-                                        , DynCase (TermLab f) FunctionCallL)
-type TCAC f = TrivialCallAnalysisConstraints f
+type TrivialCallAnalysisConstraints fs = ( FunctionCall :-<: fs, Ident :-<: fs
+                                        , InjF fs IdentL FunctionExpL, All HTraversable fs
+                                        , DynCase (TermLab fs) FunctionCallL)
+type TCAC fs = TrivialCallAnalysisConstraints fs
 
 
-getCalls' :: (TCAC f, Monad m) => TranslateM m (TermLab f) FunctionCallL (AccumMap FunctionId [Label])
+getCalls' :: (TCAC fs, Monad m) => TranslateM m (TermLab fs) FunctionCallL (AccumMap FunctionId [Label])
 getCalls' t@(stripA -> FunctionCall' _ f _) = return $ case projF f of
                                                          Just (Ident' n) -> AccumMap $ Map.singleton n [getAnn t]
                                                          Nothing         -> mempty
 
-getCalls :: (TCAC f) => GTranslateM Identity (TermLab f) (AccumMap FunctionId [Label])
+getCalls :: (TCAC fs, All HFoldable fs) => GTranslateM Identity (TermLab fs) (AccumMap FunctionId [Label])
 getCalls = crushtdT (promoteTF $ addFail getCalls')
 
-instance (TCAC f) => CallAnalysis f where
+instance (TCAC fs, All HFoldable fs) => CallAnalysis fs where
   callAnalysis prj = runAccumMap $ fold $ map getCallsAnnSource $ Map.toList prj
     where
       -- After a lot of painful debugging, I've determined that let-statements are evil
       -- (within a let statement, the typeclass-resolver will run wild and try to infer stuff
       --   while ignoring the things provided by the context)
-      getCallsAnnSource :: forall f. (TCAC f) => (FilePath, E (TermLab f)) -> AccumMap FunctionId [NodeIdx]
+      getCallsAnnSource :: forall fs. (TCAC fs, All HFoldable fs) => (FilePath, E (TermLab fs)) -> AccumMap FunctionId [NodeIdx]
       getCallsAnnSource (fil, E t) = case runIdentity $ getCalls t of
                                        AccumMap m -> AccumMap $ Map.map (map (NodeIdx fil)) m
 
@@ -85,25 +84,25 @@ instance (TCAC f) => CallAnalysis f where
 
 
 
-type TrivialFunctionAnalysisConstraints f = ( FunctionDef :<: f, Ident :<: f
-                                            , HTraversable f
-                                            , DynCase (TermLab f) FunctionDefL)
+type TrivialFunctionAnalysisConstraints fs = ( FunctionDef :-<: fs, Ident :-<: fs
+                                            , All HTraversable fs
+                                            , DynCase (TermLab fs) FunctionDefL)
 
-type TFAC f = TrivialFunctionAnalysisConstraints f
+type TFAC fs = TrivialFunctionAnalysisConstraints fs
 
-class FunctionAnalysis f where
-  functionAnalysis :: Project f -> Map FunctionId [NodeIdx]
+class FunctionAnalysis fs where
+  functionAnalysis :: Project fs -> Map FunctionId [NodeIdx]
 
 
-getFuncs' :: (TFAC f, Monad m) => TranslateM m (TermLab f) FunctionDefL (AccumMap FunctionId [Label])
+getFuncs' :: (TFAC fs, Monad m, All HFunctor fs) => TranslateM m (TermLab fs) FunctionDefL (AccumMap FunctionId [Label])
 getFuncs' t@(stripA -> FunctionDef' _ (Ident' n) _ _) = return $ AccumMap $ Map.singleton n [getAnn t]
 
-getFuncs :: (TFAC f) => GTranslateM Identity (TermLab f) (AccumMap FunctionId [Label])
+getFuncs :: (TFAC fs, All HFunctor fs, All HFoldable fs) => GTranslateM Identity (TermLab fs) (AccumMap FunctionId [Label])
 getFuncs = crushtdT (promoteTF $ addFail getFuncs')
 
-instance (TFAC f) => FunctionAnalysis f where
+instance (TFAC fs, All HFunctor fs, All HFoldable fs) => FunctionAnalysis fs where
   functionAnalysis prj = runAccumMap $ fold $ map getFuncsAnnSource $ Map.toList prj
     where
-      getFuncsAnnSource :: forall f. (TFAC f) => (FilePath, E (TermLab f)) -> AccumMap FunctionId [NodeIdx]
+      getFuncsAnnSource :: forall fs. (TFAC fs, All HFunctor fs, All HFoldable fs) => (FilePath, E (TermLab fs)) -> AccumMap FunctionId [NodeIdx]
       getFuncsAnnSource (fil, E t) = case runIdentity $ getFuncs t of
                                        AccumMap m -> AccumMap $ Map.map (map (NodeIdx fil)) m

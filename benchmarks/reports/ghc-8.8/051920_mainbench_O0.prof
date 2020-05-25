@@ -1,0 +1,36 @@
+	Fri May 22 13:01 2020 Time and Allocation Profiling Report  (Final)
+
+	   mainbench +RTS -N -p -h -RTS
+
+	total time  =       81.70 secs   (326815 ticks @ 1000 us, 4 processors)
+	total alloc = 173,845,785,712 bytes  (excludes profiling overheads)
+
+COST CENTRE       MODULE                                 SRC                                                     %time %alloc
+
+hfoldl            Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:(80,5)-(81,37)                12.9    7.1
+>>=               Data.Vector.Fusion.Util                Data/Vector/Fusion/Util.hs:36:3-18                       10.9    7.2
+hfmap             Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:(70,5)-(71,37)                 6.6   10.6
+inj'              Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:123:5-46                       5.2    9.0
+rnf               Main                                   benchmarks/Benchmarks.hs:(67,3)-(71,18)                   3.0    3.0
+basicUnsafeIndexM Data.Vector.Primitive                  Data/Vector/Primitive.hs:234:3-75                         2.7    1.4
+nf                Criterion.Measurement.Types            src/Criterion/Measurement/Types.hs:272:1-38               1.9    2.0
+caseH             Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:(65,1)-(67,28)                 1.8    0.0
+primitive         Control.Monad.Primitive                Control/Monad/Primitive.hs:93:3-16                        1.7    0.0
+basicUnsafeWrite  Data.Vector.Primitive.Mutable          Data/Vector/Primitive/Mutable.hs:124:3-69                 1.7    1.3
+kbnAdd            Numeric.Sum                            Numeric/Sum.hs:(164,1)-(167,39)                           1.7    0.5
+primitive         Control.Monad.Primitive                Control/Monad/Primitive.hs:205:3-16                       1.6    0.2
+transpose         Statistics.Matrix                      src/Statistics/Matrix.hs:(263,1)-(265,22)                 1.5    1.2
+fmap              Data.Vector.Fusion.Stream.Monadic      Data/Vector/Fusion/Stream/Monadic.hs:(133,3)-(135,20)     1.5    0.9
+uniform           System.Random.MWC                      System/Random/MWC.hs:241:5-35                             1.4    0.5
+hmapM             Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:(91,5)-(92,43)                 1.3    2.3
+rnf               Main                                   benchmarks/Benchmarks.hs:(74,3)-(76,19)                   1.0    0.7
+htraverse         Data.Comp.Multi.Ops                    src/Data/Comp/Multi/Ops.hs:(89,5)-(90,47)                 1.0    1.0
+hoistDeclarations Cubix.Transformations.Hoist.Hoisting   src/Cubix/Transformations/Hoist/Hoisting.hs:190:1-58      0.9    1.6
+main.\            Main                                   benchmarks/Benchmarks.hs:(225,46)-(240,21)                0.8    2.6
+main.\            Main                                   benchmarks/Benchmarks.hs:(169,46)-(185,21)                0.7    1.9
+showsPrec         Language.Python.Common.AST             src/Language/Python/Common/AST.hs:677:21-24               0.5    2.3
+appSigFun.run     Data.Comp.Multi.Algebra                src/Data/Comp/Multi/Algebra.hs:(219,11)-(220,49)          0.5    1.1
+main.\            Main                                   benchmarks/Benchmarks.hs:(206,46)-(222,21)                0.5    1.3
+indent            Language.Python.Common.PrettyAST       src/Language/Python/Common/PrettyAST.hs:30:1-23           0.3    1.0
+prettyPrint       Language.Java.Pretty                   Language/Java/Pretty.hs:21:1-27                           0.3    1.2
+showsPrec         Language.JavaScript.Parser.SrcLocation src/Language/JavaScript/Parser/SrcLocation.hs:17:22-25    0.3    1.4

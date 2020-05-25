@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Ordering
@@ -22,10 +24,13 @@ module Data.Comp.Multi.Ordering
      OrdHF(..)
     ) where
 
+import Data.Type.Equality
 import Data.Comp.Multi.Equality
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Term
+import Data.Comp.Dict
+import Data.Comp.Elem
 
 class KEq f => KOrd f where
     kcompare :: f i -> f j -> Ordering
@@ -42,11 +47,13 @@ instance Ord a => KOrd (K a) where
     kcompare (K x) (K y) = compare x y
 
 {-| 'OrdHF' is propagated through sums. -}
-instance (OrdHF f, OrdHF g) => OrdHF (f :+: g) where
-    compareHF (Inl x) (Inl y) = compareHF x y
-    compareHF (Inl _) (Inr _) = LT
-    compareHF (Inr x) (Inr y) = compareHF x y
-    compareHF (Inr _) (Inl _) = GT
+instance ( All OrdHF fs
+         , EqHF (Sum fs)
+         ) => OrdHF (Sum fs) where
+    compareHF (Sum wit1 x) (Sum wit2 y) =
+      case elemEq wit1 wit2 of
+        Just Refl -> compareHF x y \\ dictFor @OrdHF wit1
+        Nothing   -> comparePos wit1 wit2
 
 {-| From an 'OrdHF' difunctor an 'Ord' instance of the corresponding term type
   can be derived. -}

@@ -110,9 +110,9 @@ free f g = run
           run (Term c) = f $ hfmap run c
 
 -- | Construct a catamorphism from the given algebra.
-cata :: forall f a. HFunctor f => Alg f a -> Term f :-> a
+cata :: forall f a. HFunctor f => Alg f a -> HFix f :-> a
 cata f = run
-    where run :: Term f :-> a
+    where run :: HFix f :-> a
           run (Term t) = f (hfmap run t)
 
 -- | A generalisation of 'cata' from terms over @f@ to contexts over
@@ -148,9 +148,9 @@ freeM algm var = run
 
 -- | This is a monadic version of 'cata'.
 cataM :: forall f m a. (HTraversable f, Monad m) =>
-         AlgM m f a -> NatM m (Term f) a
+         AlgM m f a -> NatM m (HFix f) a
 cataM alg = run
-    where run :: NatM m (Term f) a
+    where run :: NatM m (HFix f) a
           run (Term x) = alg =<< hmapM run x
 -- cataM alg h (Term t) = alg =<< hmapM (cataM alg h) t
 
@@ -332,9 +332,9 @@ unravelling function. This is the unique homomorphism @a -> Term f@
 from the given coalgebra of type @a -> f a@ to the final coalgebra
 @Term f@. -}
 
-ana :: forall f a. HFunctor f => Coalg f a -> a :-> Term f
+ana :: forall f a. HFunctor f => Coalg f a -> a :-> HFix f
 ana f = run
-    where run :: a :-> Term f
+    where run :: a :-> HFix f
           run t = Term $ hfmap run (f t)
 
 type CoalgM m f a = NatM m a (f a)
@@ -345,9 +345,9 @@ type CoalgM m f a = NatM m a (f a)
 -- coalgebra @Term f@.
 
 anaM :: forall a m f. (HTraversable f, Monad m)
-          => CoalgM m f a -> NatM m a (Term f)
+          => CoalgM m f a -> NatM m a (HFix f)
 anaM f = run
-    where run :: NatM m a (Term f)
+    where run :: NatM m a (HFix f)
           run t = liftM Term $ f t >>= hmapM run
 
 --------------------------------
@@ -357,24 +357,24 @@ anaM f = run
 -- | This type represents r-algebras over functor @f@ and with domain
 -- @a@.
 
-type RAlg f a = f (Term f :*: a) :-> a
+type RAlg f a = f (HFix f :*: a) :-> a
 
 -- | This function constructs a paramorphism from the given r-algebra
-para :: forall f a. (HFunctor f) => RAlg f a -> Term f :-> a
+para :: forall f a. (HFunctor f) => RAlg f a -> HFix f :-> a
 para f = fsnd . cata run
-    where run :: Alg f  (Term f :*: a)
+    where run :: Alg f  (HFix f :*: a)
           run t = Term (hfmap ffst t) :*: f t
 
 -- | This type represents monadic r-algebras over monad @m@ and
 -- functor @f@ and with domain @a@.
-type RAlgM m f a = NatM m (f (Term f :*: a)) a
+type RAlgM m f a = NatM m (f (HFix f :*: a)) a
 
 -- | This function constructs a monadic paramorphism from the given
 -- monadic r-algebra
 paraM :: forall f m a. (HTraversable f, Monad m) =>
-         RAlgM m f a -> NatM m(Term f)  a
+         RAlgM m f a -> NatM m(HFix f)  a
 paraM f = liftM fsnd . cataM run
-    where run :: AlgM m f (Term f :*: a)
+    where run :: AlgM m f (HFix f :*: a)
           run t = do
             a <- f t
             return (Term (hfmap ffst t) :*: a)
@@ -382,37 +382,36 @@ paraM f = liftM fsnd . cataM run
 --------------------------------
 -- R-Coalgebras & Apomorphisms --
 --------------------------------
-
 -- | This type represents r-coalgebras over functor @f@ and with
 -- domain @a@.
-type RCoalg f a = a :-> f (Term f :+: a)
+type RCoalg f a = a :-> f (HFix f :+: a)
 
 -- | This function constructs an apomorphism from the given
 -- r-coalgebra.
-apo :: forall f a . (HFunctor f) => RCoalg f a -> a :-> Term f
+apo :: forall f a . (HFunctor f) => RCoalg f a -> a :-> HFix f
 apo f = run
-    where run :: a :-> Term f
+    where run :: a :-> HFix f
           run = Term . hfmap run' . f
-          run' :: Term f :+: a :-> Term f
+          run' :: HFix f :+: a :-> HFix f
           run' (Inl t) = t
           run' (Inr a) = run a
 
 -- | This type represents monadic r-coalgebras over monad @m@ and
 -- functor @f@ with domain @a@.
 
-type RCoalgM m f a = NatM m a (f (Term f :+: a))
+type RCoalgM m f a = NatM m a (f (HFix f :+: a))
 
 -- | This function constructs a monadic apomorphism from the given
 -- monadic r-coalgebra.
 apoM :: forall f m a . (HTraversable f, Monad m) =>
-        RCoalgM m f a -> NatM m a (Term f)
+        RCoalgM m f a -> NatM m a (HFix f)
 apoM f = run
-    where run :: NatM m a (Term f)
+    where run :: NatM m a (HFix f)
           run a = do
             t <- f a
             t' <- hmapM run' t
             return $ Term t'
-          run' :: NatM m (Term f :+: a)  (Term f)
+          run' :: NatM m (HFix f :+: a)  (HFix f)
           run' (Inl t) = return t
           run' (Inr a) = run a
 
@@ -430,7 +429,7 @@ type CVCoalg f a = a :-> f (Context f a)
 -- | This function constructs the unique futumorphism from the given
 -- cv-coalgebra to the term algebra.
 
-futu :: forall f a . HFunctor f => CVCoalg f a -> a :-> Term f
+futu :: forall f a . HFunctor f => CVCoalg f a -> a :-> HFix f
 futu coa = ana run . Hole
     where run :: Coalg f (Context f a)
           run (Hole a) = coa a
@@ -445,7 +444,7 @@ type CVCoalgM m f a = NatM m a (f (Context f a))
 -- | This function constructs the unique monadic futumorphism from the
 -- given monadic cv-coalgebra to the term algebra.
 futuM :: forall f a m . (HTraversable f, Monad m) =>
-         CVCoalgM m f a -> NatM m a (Term f)
+         CVCoalgM m f a -> NatM m a (HFix f)
 futuM coa = anaM run . Hole
     where run :: CoalgM m f (Context f a)
           run (Hole a) = coa a

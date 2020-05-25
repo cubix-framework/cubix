@@ -38,7 +38,6 @@ module Data.Comp.Trans (
 import Control.Monad ( liftM )
 import Control.Monad.Trans ( lift )
 
-import Data.Comp.Multi ( (:+:) )
 import Data.Data ( Data )
 
 import Language.Haskell.TH.Quote ( dataToExpQ )
@@ -142,9 +141,9 @@ getTypeParamVars = liftM concat . mapM getTypeArgs
 -- @
 -- 
 -- You can use `generateNameLists` to avoid spelling out the names manually
+
 makeSumType :: String -> [Name] -> CompTrans [Dec]
 makeSumType nm types = lift $ sequence $ [tySynD (mkName nm) [] $ sumType types]
   where
-    sumType []     = fail "Attempting to make empty sum type"
-    sumType [t]    = conT t
-    sumType (t:ts) = appT (appT (conT ''(:+:)) (conT t)) (sumType ts)
+    sumType [] = fail "Attempting to make empty sum type"
+    sumType ts = foldr (\a acc -> promotedConsT `appT` conT a `appT` acc) promotedNilT ts

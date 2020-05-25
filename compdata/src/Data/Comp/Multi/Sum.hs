@@ -1,15 +1,15 @@
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Sum
@@ -27,8 +27,8 @@
 module Data.Comp.Multi.Sum
     (
      (:<:),
-     (:+:),
-     caseH,
+     (:-<:),
+     Sum,
 
      -- * Projections for Signatures and Terms
      proj,
@@ -92,9 +92,8 @@ deepInject :: (HFunctor g, g :<: f) => CxtFun g f
 {-# INLINE deepInject #-}
 deepInject = appSigFun inj
 
-
-split :: (f :=: f1 :+: f2) => (f1 (Term f) :-> a) -> (f2 (Term f) :-> a) -> Term f :-> a
-split f1 f2 (Term t) = spl f1 f2 t
+split :: (f :=: Sum fs) => (forall e l. Alts fs (HFix f) e (a l)) -> HFix f :-> a
+split alts = spl alts . unTerm
 
 
 -- | This function injects a whole context into another context.
@@ -122,8 +121,8 @@ projectConst = fmap (hfmap (const (K ()))) . project
 -- Used to prevent typechecker from applying the default cases when it shouldn't,
 -- i.e.: it can't use the default case when it only has a type variable for the signature
 type family IsSum (f :: (* -> *) -> * -> *) :: Bool where
-  IsSum (f :+: g) = True
-  IsSum f         = False
+  IsSum (Sum fs) = True
+  IsSum f        = False
 
 type NotSum f = (IsSum f ~ False)
 

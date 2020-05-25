@@ -1,10 +1,14 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 --------------------------------------------------------------------------------
@@ -24,6 +28,7 @@
 module Data.Comp.Multi.Annotation
     (
      AnnTerm,
+     AnnHFix,
      (:&:) (..),
      RemA (..),
      liftA,
@@ -36,19 +41,31 @@ module Data.Comp.Multi.Annotation
      inj',
      inject',
      injectOpt,
-     caseH'
+     caseH',
+     caseCxt',
+     caseCxt'',
+     DistAnn,
+     AnnCxt,
+     AnnCxtS
     ) where
 
 import Data.Proxy ( Proxy )
-
+import Data.Comp.Dict
+import Data.Comp.Elem
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
-import qualified Data.Comp.Ops as O
 
-type AnnTerm a f = Term (f :&: a)
+type AnnHFix a f = HFix (f :&: a)
+type AnnTerm a fs = HFix (Sum fs :&: a)
+
+type AnnCxt p h f a = Cxt h (f :&: p) a
+-- type AnnContext p f a = AnnCxt p Hole f a
+
+type AnnCxtS p h fs a = AnnCxt p h (Sum fs) a
+-- type AnnContextS p fs a = AnnContext p (Sum fs) a
 
 -- | This function transforms a function with a domain constructed
 -- from a functor to a function with a domain constructed with the
@@ -94,9 +111,28 @@ inj' (x :&: p) = (inj x) :&: p
 inject' :: (f :<: g) => (f :&: p) (Cxt h (g :&: p) a) :-> Cxt h (g :&: p) a
 inject' = Term . inj'
 
-injectOpt :: (f :<: g) => f (AnnTerm (Maybe p) g) l -> AnnTerm (Maybe p) g l
+injectOpt :: (f :<: g) => f (AnnHFix (Maybe p) g) l -> AnnHFix (Maybe p) g l
 injectOpt t = inject' (t :&: Nothing)
 
-caseH' :: ((f :&: a) e l -> t) -> ((g :&: a) e l -> t) -> ((f :+: g) :&: a) e l -> t
-caseH' f g (Inl x :&: a) = f (x :&: a)
-caseH' f g (Inr x :&: a) = g (x :&: a)
+caseH' :: forall fs a e l t. Alts (DistAnn fs a) e l t -> (Sum fs :&: a) e l -> t
+caseH' alts = caseH alts . distAnn
+
+caseCxt' :: forall cxt fs a e l t. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt' _ f (Sum wit v :&: a) =
+  f (v :&: a) \\ dictFor @cxt wit
+
+caseCxt'' :: forall cxt fs a e l t. (All cxt (DistAnn fs a)) => Proxy cxt -> (forall f. (cxt (f :&: a)) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt'' _ f (Sum wit v :&: a) =
+  f (v :&: a) \\ dictFor @cxt (annWit wit)
+
+  where annWit :: Elem f fs -> Elem (f :&: a) (DistAnn fs a)
+        annWit = unsafeElem
+
+
+type family DistAnn (fs :: [(* -> *) -> * -> *]) (a :: *) :: [(* -> *) -> * -> *] where
+  DistAnn (f ': fs) a = f :&: a ': DistAnn fs a
+  DistAnn '[]       _ = '[]
+
+distAnn :: (Sum fs :&: a) e :-> Sum (DistAnn fs a) e
+distAnn (Sum wit v :&: a) =
+  unsafeMapSum wit v (:&: a)

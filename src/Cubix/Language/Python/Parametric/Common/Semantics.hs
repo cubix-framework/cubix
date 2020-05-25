@@ -17,7 +17,7 @@ import Control.Monad ( liftM )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
-import Data.Comp.Multi ( Cxt(..), (:<:), project, project', inject', (:&:)(..) )
+import Data.Comp.Multi ( Cxt(..), project, project', inject', (:&:)(..), (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
 
 import Cubix.Language.Info
@@ -28,7 +28,7 @@ import Cubix.Language.Parametric.Syntax
 
 import Cubix.Sin.Compdata.Annotation ( annM )
 
-instance {-# OVERLAPPING #-} (Op :<: g) => GetStrictness' g Expr where
+instance {-# OVERLAPPING #-} (Op :-<: gs) => GetStrictness' gs Expr where
   getStrictness' t@(BinaryOp op _ _ _) = case project op of
     Just (And _) -> [NoEval, Strict, GuardedBy (Place 1), NoEval]
     Just (Or _)  -> [NoEval, Strict, GuardedBy (NegPlace 1),    NoEval]
@@ -41,7 +41,7 @@ instance {-# OVERLAPPING #-} GetStrictness' g PyCondExpr where
 
 
 
-instance {-# OVERLAPPING #-} InsertAt' Statement MPythonSig StatementL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL Statement where
   insertAt' (BeforeIntermediateEvalPoint n) e (Conditional clauses els _ :&: l)
                 | (n > 0) && (n < length (extractF clauses)) = do
       let (former, latter) = splitAt n (extractF clauses)
@@ -62,12 +62,12 @@ instance {-# OVERLAPPING #-} InsertAt' Statement MPythonSig StatementL where
   canInsertAt' (BeforeIntermediateEvalPoint n) _ (Conditional clauses _ _ :&: _) = (n > 0) && (n < length (extractF clauses))
   canInsertAt' _                               _ _                               = False
 
-instance {-# OVERLAPPING #-} InsertAt' Statement MPythonSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL Statement where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
   canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
 
 
-instance {-# OVERLAPPING #-} InsertAt' PyWith MPythonSig StatementL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL PyWith where
   insertAt' (BeforeIntermediateEvalPoint n) e (PyWith binders body :&: l)
                   | (n > 0) && (n < length (extractF binders)) = do
       let (former, latter) = splitAt n (extractF binders)
@@ -86,13 +86,13 @@ instance {-# OVERLAPPING #-} InsertAt' PyWith MPythonSig StatementL where
   canInsertAt' (BeforeIntermediateEvalPoint n) _ (PyWith binders _ :&: _) = (n > 0) && (n < length (extractF binders))
   canInsertAt' _                               _ _                        = False
 
-instance {-# OVERLAPPING #-} InsertAt' PyWith MPythonSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL PyWith where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
   canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
 
 -- We can insert statements before lists of statements, *or* before lists of BlockItem's
 -- Python has both because scoping
-instance {-# OVERLAPPING #-} InsertAt' ListF MPythonSig StatementL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL ListF where
   insertAt' EnterEvalPoint e t =
                       case kdyncase t :: Maybe (_ :~: [StatementL]) of
                         Just p  -> gcastWith p $ inject' <$> annM (ConsF e (inject' t))
@@ -105,7 +105,7 @@ instance {-# OVERLAPPING #-} InsertAt' ListF MPythonSig StatementL where
                                      || kIsSort (Proxy :: Proxy [BlockItemL]) t
   canInsertAt' _              _  _ = False
 
-instance {-# OVERLAPPING #-} InsertAt' ListF MPythonSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL ListF where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
   canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
 

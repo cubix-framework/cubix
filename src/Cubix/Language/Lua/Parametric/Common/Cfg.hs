@@ -16,8 +16,8 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (%=), makeLenses )
 
-import Data.Comp.Multi ( (:<:), project, project', stripA, remA )
-import Data.Comp.Multi.Ops ( (:*:)(..), ffst )
+import Data.Comp.Multi ( project, project', stripA, remA, (:-<:) )
+import Data.Comp.Multi.Ops ( Sum, (:*:)(..), ffst )
 
 import Cubix.Language.Info
 
@@ -48,14 +48,19 @@ type instance CfgState MLuaSig = LuaCfgState
 nameString :: MLuaTermLab NameL -> String
 nameString (stripA -> project -> Just (IdentIsName (Ident' s))) = s
 
-extractClauses :: forall f s a b. (ListF :<: f, KExtractF2' (,) f, Typeable a, Typeable b)
-                                                                   => HState s (EnterExitPair f) [(a, b)]
-                                                                   -> State s [(EnterExitPair f a, EnterExitPair f b)]
+extractClauses ::
+  forall fs s a b.
+  ( ListF :-<: fs
+  , KExtractF2' (,) (Sum fs)
+  , Typeable a
+  , Typeable b
+  ) => HState s (EnterExitPair fs) [(a, b)]
+  -> State s [(EnterExitPair fs a, EnterExitPair fs b)]
 extractClauses hs = do
     (extractEEPList -> cs) <- unHState hs
     return $ map extractClause cs
   where
-    extractClause :: EnterExitPair f (a, b) -> (EnterExitPair f a, EnterExitPair f b)
+    extractClause :: EnterExitPair fs (a, b) -> (EnterExitPair fs a, EnterExitPair fs b)
     extractClause (SubPairs p) = kextractF2' p
 
 -- Lua's for loop is weird
@@ -91,7 +96,7 @@ constructCfgLuaForRange t mInit mFinal mOptStep mBody = do
   return $ EnterExitPair enterNode exitNode
 
 
-instance ConstructCfg Stat MLuaSig LuaCfgState where
+instance ConstructCfg MLuaSig LuaCfgState Stat where
   constructCfg (collapseFProd' -> (t :*: Break))        = HState $ constructCfgBreak t
   constructCfg (collapseFProd' -> (t :*: (While e b)))  = HState $ constructCfgWhile t (unHState e) (unHState b)
   constructCfg (collapseFProd' -> (t :*: (Repeat b e))) = HState $ constructCfgDoWhile t (unHState e) (unHState b)
@@ -105,7 +110,7 @@ instance ConstructCfg Stat MLuaSig LuaCfgState where
   constructCfg (collapseFProd' -> (t :*: (If clauses optElse)))                 = HState $ constructCfgIfElseIfElse t (extractClauses clauses) (extractEEPMaybe $ unHState optElse)
   constructCfg t = constructCfgDefault t
 
-instance ConstructCfg P.Block MLuaSig LuaCfgState where
+instance ConstructCfg MLuaSig LuaCfgState P.Block where
   constructCfg p@(collapseFProd' -> (t :*: _)) = case project' t of
     Just (P.Block xs r) -> case (extractF xs, project' r) of
       ([], Just (LuaBlockEnd e)) -> constructCfgGeneric p -- FIXME: Doesn't properly handle returns, but I think the TACer won't notice

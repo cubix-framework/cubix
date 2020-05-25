@@ -54,7 +54,6 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Data.Set ( Set, fromList )
-import qualified Data.Set as Set
 
 import Language.Haskell.TH.Syntax hiding ( lift )
 
@@ -222,7 +221,7 @@ defaultUnpropAnn x 1 = [x]
 defaultUnpropAnn _ _ = error "comptrans: Multiple annotation fields detected in constructor"
 
 isVar :: Type -> Bool
-isVar (VarT n) = True
+isVar (VarT _) = True
 isVar _        = False
 
 applySubsts :: (Data x) => Map Name Type -> x -> x

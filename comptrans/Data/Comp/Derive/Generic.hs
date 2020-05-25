@@ -1,8 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -25,26 +27,33 @@ import Control.Lens ( (%~), (&), traversed )
 import Control.Monad ( liftM, filterM, mplus, msum )
 
 import qualified Data.Comp.Multi as M
-import qualified Data.Comp.Multi.Ops as M
 
 import GHC.Generics ( Generic(..), (:*:)(..), (:+:)(..), K1(..), V1, Rec0, U1(..) )
 
 import Language.Haskell.TH
+import Data.Type.Equality
 
 import Data.Comp.Trans.Util
 
 --------------------------------------------------------------------------------
 -- Generic instances for general CDTs
 --------------------------------------------------------------------------------
+instance Generic (M.Sum '[] e l) where
+  type Rep (M.Sum '[] e l) = V1
 
-instance (Generic (f e l), Generic (g e l)) => Generic ((f M.:+: g) e l) where
-  type Rep ((f M.:+: g) e l) = (Rep (f e l)) :+: (Rep (g e l))
-  from = M.caseH (L1 . from) (R1 . from)
-  to (L1 x) = M.Inl $ to x
-  to (R1 x) = M.Inr $ to x
+instance (Generic (f e l), Generic (M.Sum fs e l)) => Generic (M.Sum (f ': fs) e l) where
+  type Rep (M.Sum (f ': fs) e l) = Rep (f e l) :+: Rep (M.Sum fs e l)
 
-instance (Generic (f (M.Term f) l)) => Generic (M.Term f l) where
-  type Rep (M.Term f l) = Rep (f (M.Term f) l)
+  from (M.Sum w a) = case M.contract w of
+    Right w0 -> R1 (from (M.Sum w0 a))
+    Left Refl -> L1 (from a)
+
+  to (L1 x) = M.Sum M.witness (to x :: f e l)
+  to (R1 x) = case to x :: M.Sum fs e l of
+    M.Sum w a -> M.Sum (M.extend w) a
+
+instance (Generic (f (M.HFix f) l)) => Generic (M.HFix f l) where
+  type Rep (M.HFix f l) = Rep (f (M.HFix f) l)
   from (M.Term x) = from x
   to x = M.Term $ to x
 

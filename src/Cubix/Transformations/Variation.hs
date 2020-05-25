@@ -1,13 +1,14 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds         #-}
+{-# LANGUAGE CPP                     #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE KindSignatures          #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE TypeSynonymInstances    #-}
+{-# LANGUAGE UndecidableInstances    #-}
 
 module Cubix.Transformations.Variation (
     StatSort
@@ -31,7 +32,7 @@ module Cubix.Transformations.Variation (
 import Data.Proxy ( Proxy )
 import Data.Constraint ( Dict(..) )
 
-import Data.Comp.Multi ( Cxt, (:<:), (:&:), (:+:) )
+import Data.Comp.Multi ( (:-<:), CxtS, (:&:), Sum )
 
 import Cubix.Language.C.Parametric.Common
 import Cubix.Language.Java.Parametric.Common
@@ -41,7 +42,7 @@ import Cubix.Language.Python.Parametric.Common as P
 
 import Cubix.Language.Parametric.InjF
 
-type family StatSort (f :: (* -> *) -> * -> *) :: *
+type family StatSort (fs :: [(* -> *) -> * -> *]) :: *
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance StatSort MCSig      = BlockItemL
@@ -49,10 +50,10 @@ type instance StatSort MJavaSig   = BlockItemL
 type instance StatSort MJSSig     = JS.JSStatementL
 type instance StatSort MPythonSig = P.StatementL
 #endif
-type instance StatSort MLuaSig    = BlockItemL
+type instance StatSort MLuaSig = BlockItemL
 
-class DefaultLocalVarDeclAttrs f where
-  defaultLocalVarDeclAttrs :: Cxt h f a LocalVarDeclAttrsL
+class DefaultLocalVarDeclAttrs fs where
+  defaultLocalVarDeclAttrs :: CxtS h fs a LocalVarDeclAttrsL
 
 #ifndef ONLY_ONE_LANGUAGE
 instance DefaultLocalVarDeclAttrs MJSSig where
@@ -62,24 +63,28 @@ instance DefaultLocalVarDeclAttrs MJSSig where
 instance DefaultLocalVarDeclAttrs MLuaSig where
   defaultLocalVarDeclAttrs = EmptyLocalVarDeclAttrs'
 
-class (DefaultLocalVarDeclAttrs f) => DefaultMultiLocalVarDeclCommonAttrs f where
-  defaultMultiLocalVarDeclCommonAttrs :: Cxt h f a MultiLocalVarDeclCommonAttrsL
+class (DefaultLocalVarDeclAttrs fs) => DefaultMultiLocalVarDeclCommonAttrs fs where
+  defaultMultiLocalVarDeclCommonAttrs :: CxtS h fs a MultiLocalVarDeclCommonAttrsL
 
 #ifndef ONLY_ONE_LANGUAGE
 instance DefaultMultiLocalVarDeclCommonAttrs MJSSig where
   defaultMultiLocalVarDeclCommonAttrs = EmptyMultiLocalVarDeclCommonAttrs'
 #endif
 
-type ContainsSingleDec f = (SingleLocalVarDecl :<: f, OptLocalVarInit :<: f)
+type ContainsSingleDec fs = (SingleLocalVarDecl :-<: fs, OptLocalVarInit :-<: fs)
 
 -- Using this to add to MultiDecInsertion/SingleDecInsertion is an ugly hack
 type family StripAnn (f :: (* -> *) -> * -> *) :: (* -> *) -> * -> * where
   StripAnn (f :&: a) = f
-  StripAnn (f :+: g) = (StripAnn f) :+: (StripAnn g)
+  StripAnn (Sum fs)  = Sum (StripAnnList fs)
   StripAnn x         = x
 
-type MultiDecInsertion  f g = (AInjF f MultiLocalVarDeclL, InjF f MultiLocalVarDeclL BlockItemL, InjF f MultiLocalVarDeclL (StatSort f), MultiLocalVarDecl :<: f, ContainsSingleDec f, g f)
-type SingleDecInsertion f h = (AInjF f SingleLocalVarDeclL, InjF f SingleLocalVarDeclL BlockItemL, InjF f SingleLocalVarDeclL (StatSort f), ContainsSingleDec f, h f)
+type family StripAnnList (fs :: [(* -> *) -> * -> *]) :: [(* -> *) -> * -> *] where
+  StripAnnList (f ': fs) = StripAnn f ': StripAnnList fs
+  StripAnnList '[]       = '[]
+
+type MultiDecInsertion  fs g = (AInjF fs MultiLocalVarDeclL, InjF fs MultiLocalVarDeclL BlockItemL, InjF fs MultiLocalVarDeclL (StatSort fs), MultiLocalVarDecl :-<: fs, ContainsSingleDec fs, g fs)
+type SingleDecInsertion fs h = (AInjF fs SingleLocalVarDeclL, InjF fs SingleLocalVarDeclL BlockItemL, InjF fs SingleLocalVarDeclL (StatSort fs), ContainsSingleDec fs, h fs)
 
 data VariableInsertionVariationDict f g h =
     MultiDecInsertionVariation  (Dict (MultiDecInsertion f g))
@@ -102,7 +107,7 @@ instance (g MJSSig) => VariableInsertionVariation MJSSig g h where
 instance (h MLuaSig) => VariableInsertionVariation MLuaSig g h where
   variableInsertionVariation _ _ _ = SingleDecInsertionVariation Dict
 
-type AssignmentInsertion f i = (InjF f AssignL BlockItemL, i f)
+type AssignmentInsertion fs i = (InjF fs AssignL BlockItemL, i fs)
 
 data ExplicitDeclsVariationDict f g h i =
     HasExplicitDeclsVariation (VariableInsertionVariationDict f g h)

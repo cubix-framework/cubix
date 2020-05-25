@@ -21,7 +21,7 @@ module Cubix.Language.JavaScript.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:), project, (:<:), HFunctor )
+import Data.Comp.Multi ( Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -67,7 +67,7 @@ data MaybeIdentIsJSIdent e l where
 
 deriveAll [''MaybeIdentIsJSIdent]
 
-pattern JSIdent' :: (MaybeIdentIsJSIdent :<: f, Ident :<: f, MaybeF :<: f, HFunctor f) => String -> Cxt h f a JSIdentL
+pattern JSIdent' :: (MaybeIdentIsJSIdent :-<: fs, Ident :-<: fs, MaybeF :-<: fs, All HFunctor fs) => String -> CxtS h fs a JSIdentL
 pattern JSIdent' ident <- (project -> Just (MaybeIdentIsJSIdent (Just' (Ident' ident)))) where
   JSIdent' ident = iMaybeIdentIsJSIdent $ Just' $ Ident' ident
 
@@ -136,8 +136,8 @@ type instance InjectableSorts MJSSig MultiLocalVarDeclL = [JSStatementL, BlockIt
 type MJSTerm = Term MJSSig
 type MJSTermLab = TermLab MJSSig
 
-type MJSCxt h a = Cxt h MJSSig a
-type MJSCxtA h a p = Cxt h (MJSSig :&: p) a
+type MJSCxt h a = CxtS h MJSSig a
+type MJSCxtA h a p = AnnCxtS p h MJSSig a
 
 
 -----------------------------------------------------------------------------------

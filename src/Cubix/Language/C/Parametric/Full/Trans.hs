@@ -1,13 +1,16 @@
 --{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE CPP                     #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TemplateHaskell         #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE UndecidableInstances    #-}
 
 -- This is a separate file due to GHC's phase restriction.
 
@@ -20,12 +23,13 @@ module Cubix.Language.C.Parametric.Full.Trans (
   , untranslate
   ) where
 
+import Data.Proxy
 import Data.Typeable ( Typeable )
 
 import qualified Language.C as C
 import qualified Language.Haskell.TH as TH
 
-import Data.Comp.Multi ( caseH, (:+:) )
+import Data.Comp.Multi ( caseCxt, Sum, All )
 import Data.Comp.Trans ( runCompTrans, withSubstitutions, deriveTrans, deriveUntrans )
 
 import Cubix.Language.C.Parametric.Full.Names
@@ -116,8 +120,8 @@ type instance Targ () = ()
 instance Untrans UnitF where
   untrans UnitF = T ()
 
-instance (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
 type instance Targ IntL = Int
 type instance Targ BoolL = Bool

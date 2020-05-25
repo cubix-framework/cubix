@@ -1,16 +1,17 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP                     #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE KindSignatures          #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE PartialTypeSignatures   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE ViewPatterns            #-}
+{-# LANGUAGE TemplateHaskell         #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE UndecidableInstances    #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.C.Parametric.Common.Trans () where
@@ -23,10 +24,11 @@ module Cubix.Language.C.Parametric.Common.Trans (
 import Control.Monad.Identity ( Identity(..) )
 
 import Data.Monoid ( Any(..) )
+import Data.Proxy
 import Data.List( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), (:+:), caseH, HFunctor(..) )
+import Data.Comp.Multi ( project, inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 import Data.Comp.Multi.Strategic ( crushtdT, addFail, promoteTF )
 
 import qualified Language.C as COrig
@@ -46,13 +48,13 @@ translate' = injF . translate
 class Trans f where
   trans :: f F.CTerm l -> MCTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MCSig, f :<: F.CSig) => f F.CTerm l -> MCTerm l
+transDefault :: (HFunctor f, f :-<: MCSig, f :-<: F.CSig) => f F.CTerm l -> MCTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MCSig, f :<: F.CSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MCSig, f :-<: F.CSig) => Trans f where
   trans = transDefault
 
 -- Damn language-c mixing in annotations. We drop them for the pure tree
@@ -167,13 +169,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MCTerm l -> F.CTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.CSig) => f MCTerm l -> F.CTerm l
+untransDefault :: (HFunctor f, f :-<: F.CSig) => f MCTerm l -> F.CTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.CSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.CSig) => Untrans f where
   untrans = untransDefault
 
 dummyNodeInfo :: F.CTerm F.NodeInfoL
@@ -263,7 +265,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsCFunctionDef where
           go [fromProjF -> CVarArgParam'] (l, b) = (l, True)
           go [] (l, b) = (l, b)
 
-untransError :: (HFunctor f, f :<: MCSig) => f MCTerm l -> F.CTerm l
+untransError :: (HFunctor f, f :-<: MCSig) => f MCTerm l -> F.CTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MCTerm _))
 
 do ipsNames <- sumToNames ''MCSig

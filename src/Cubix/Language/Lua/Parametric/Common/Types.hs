@@ -22,7 +22,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:<:), HFunctor, project )
+import Data.Comp.Multi ( Term, project', AnnTerm, (:-<:), All, HFunctor, project, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -90,15 +90,15 @@ deriveAll [''LuaVarArgsParam]
 
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
-pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :<: f, HFunctor f) => Cxt h f a [P.IdentL] -> Cxt h f a LuaFunctionDefinedObjL
+pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :-<: fs, All HFunctor fs) => CxtS h fs a [P.IdentL] -> CxtS h fs a LuaFunctionDefinedObjL
 pattern LuaFunctionDefinedObj' nms <- (project -> Just (LuaFunctionDefinedObj nms)) where
   LuaFunctionDefinedObj' nms = iLuaFunctionDefinedObj nms
 
-pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :<: f, HFunctor f) => Cxt h f a LuaFunctionDefinedObjL -> Cxt h f a FunctionDefAttrsL
+pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :-<: fs, All HFunctor fs) => CxtS h fs a LuaFunctionDefinedObjL -> CxtS h fs a FunctionDefAttrsL
 pattern LuaFunctionAttrs' o <- (project -> Just (LuaFunctionAttrs o)) where
   LuaFunctionAttrs' o = iLuaFunctionAttrs o
 
-pattern LuaVarArgsParam' :: (LuaVarArgsParam :<: f, HFunctor f) => Cxt h f a FunctionParameterL
+pattern LuaVarArgsParam' :: (LuaVarArgsParam :-<: fs, All HFunctor fs) => CxtS h fs a FunctionParameterL
 pattern LuaVarArgsParam' <- (project -> Just LuaVarArgsParam) where
   LuaVarArgsParam' = iLuaVarArgsParam
 
@@ -140,8 +140,8 @@ type instance InjectableSorts MLuaSig SingleLocalVarDeclL = '[StatL]
 type MLuaTerm = Term MLuaSig
 type MLuaTermLab = TermLab MLuaSig
 
-type MLuaCxt h a = Cxt h MLuaSig a
-type MLuaCxtA h a p = Cxt h (MLuaSig :&: p) a
+type MLuaCxt h a = CxtS h MLuaSig a
+type MLuaCxtA h a p = AnnCxtS p h MLuaSig a
 
 type MLuaTermOptAnn a = AnnTerm (Maybe a) MLuaSig
 

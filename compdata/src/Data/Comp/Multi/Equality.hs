@@ -1,6 +1,9 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Equality
@@ -26,6 +29,9 @@ import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Term
+import Data.Comp.Dict
+import Data.Comp.Elem
+import Data.Type.Equality
 
 class KEq f where
     keq :: f i -> f j -> Bool
@@ -44,10 +50,11 @@ instance KEq a => Eq (E a) where
 {-|
   'EqF' is propagated through sums.
 -}
-instance (EqHF f, EqHF g) => EqHF (f :+: g) where
-    eqHF (Inl x) (Inl y) = eqHF x y
-    eqHF (Inr x) (Inr y) = eqHF x y
-    eqHF _ _ = False
+instance (All EqHF fs) => EqHF (Sum fs) where
+    eqHF (Sum wit1 x) (Sum wit2 y) =
+      case elemEq wit1 wit2 of
+              Just Refl -> eqHF x y \\ dictFor @EqHF wit1
+              Nothing   -> False
 
 instance EqHF f => EqHF (Cxt h f) where
     eqHF (Term e1) (Term e2) = e1 `eqHF` e2
