@@ -26,11 +26,10 @@ module Cubix.Language.Parametric.Derive
 
 import Control.Monad ( liftM )
 
-import Language.Haskell.TH.ExpandSyns ( expandSyns )
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax hiding ( Cxt )
 
-import Data.Comp.Multi ( (:&:), (:-<:), project', HFunctor, All )
+import Data.Comp.Multi ( (:-<:), project', HFunctor, All )
 import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 import Data.Comp.Multi.Strategy.Derive ( makeDynCase )
 

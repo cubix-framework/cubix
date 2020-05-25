@@ -23,7 +23,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:)(..), (:<:), project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
+import Data.Comp.Multi ( Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info

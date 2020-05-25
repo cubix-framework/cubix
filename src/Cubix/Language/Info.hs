@@ -65,15 +65,12 @@ import Control.Lens ( Lens', (&), (.~), (^.), use, (.=) )
 import Control.Lens.TH ( makeClassy, makeLenses )
 import Control.Monad ( liftM, forM_ )
 import Control.Monad.IO.Class ( MonadIO(..) )
-import Control.Monad.State ( MonadState, StateT(..), state, evalState, runState )
-import Control.Monad.Trans ( lift )
+import Control.Monad.State ( MonadState, StateT(..), state, runState )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
 
 import Data.Data ( Data )
 import Data.Map ( Map )
 import qualified Data.Map as Map
-import Data.Set ( Set )
-import Data.Traversable ( traverse )
 import Data.Typeable ( Typeable )
 
 import GHC.Generics ( Generic )

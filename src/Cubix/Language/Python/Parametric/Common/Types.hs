@@ -21,7 +21,7 @@ module Cubix.Language.Python.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', project, HFunctor, (:<:), Sum, CxtS, All, (:-<:) )
+import Data.Comp.Multi ( Term, project', project, HFunctor, CxtS, All, (:-<:) )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info

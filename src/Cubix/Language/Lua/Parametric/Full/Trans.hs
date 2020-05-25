@@ -27,7 +27,6 @@ import Data.Typeable ( Typeable )
 
 import Data.Comp.Multi ( inject', caseCxt'', Sum, All, (:&:)(..), injectOpt, DistAnn, stripA )
 
-import qualified Language.Haskell.TH as TH
 import qualified Language.Lua.Annotated as Lua
 
 import Data.Comp.Trans ( runCompTrans, deriveTrans, deriveUntrans, withSubstitutions, withAnnotationProp, defaultUnpropAnn, withExcludedNames )

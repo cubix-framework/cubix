@@ -19,7 +19,6 @@ import Control.Monad.State ( State )
 import Control.Lens ( makeLenses )
 
 import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst )
-import Data.Maybe ( fromJust )
 
 import Cubix.Language.Info
 
@@ -28,7 +27,6 @@ import Cubix.Language.C.Parametric.Full.Types as F
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
-import Cubix.Language.Parametric.Syntax.Functor
 
 data CCfgState = CCfgState {
                    _ccs_cfg       :: Cfg MCSig

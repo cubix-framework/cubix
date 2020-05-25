@@ -42,8 +42,6 @@ module Data.Comp.Multi.HFunctor
      HMonad(..)
      ) where
 
-import Data.Traversable
-import Data.Foldable
 import Data.Functor.Compose
 
 -- | The identity Functor.

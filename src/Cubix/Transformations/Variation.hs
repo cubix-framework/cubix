@@ -32,7 +32,7 @@ module Cubix.Transformations.Variation (
 import Data.Proxy ( Proxy )
 import Data.Constraint ( Dict(..) )
 
-import Data.Comp.Multi ( Cxt, (:-<:), CxtS, (:&:), Sum )
+import Data.Comp.Multi ( (:-<:), CxtS, (:&:), Sum )
 
 import Cubix.Language.C.Parametric.Common
 import Cubix.Language.Java.Parametric.Common

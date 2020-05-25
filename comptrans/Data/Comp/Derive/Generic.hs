@@ -27,7 +27,6 @@ import Control.Lens ( (%~), (&), traversed )
 import Control.Monad ( liftM, filterM, mplus, msum )
 
 import qualified Data.Comp.Multi as M
-import qualified Data.Comp.Multi.Ops as M
 
 import GHC.Generics ( Generic(..), (:*:)(..), (:+:)(..), K1(..), V1, Rec0, U1(..) )
 

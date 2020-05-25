@@ -17,7 +17,6 @@ import Control.Monad ( liftM, liftM2, forM_ )
 
 import Control.Lens (  makeLenses, (%=), (^.), use )
 
-import Data.Map ( Map )
 import qualified Data.Map as Map
 
 import Data.Comp.Multi ( remA, stripA )
@@ -27,7 +26,6 @@ import Cubix.Language.Info
 
 import Cubix.Language.JavaScript.Parametric.Common.Types as C
 import Cubix.Language.JavaScript.Parametric.Full.Types as F
-import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
 

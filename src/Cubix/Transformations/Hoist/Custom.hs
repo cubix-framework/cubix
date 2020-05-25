@@ -33,18 +33,15 @@ import qualified Data.Set as Set
 import Control.Lens ( makeLenses, (^.), (%=) )
 
 import Data.Comp.Multi ( project, Term )
-import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, allbuR, alltdR, promoteR, addFail )
+import Data.Comp.Multi.Strategic ( Rewrite, alltdR, promoteR, addFail )
 import Data.Comp.Multi.Strategy.Classification ( subterms )
 
 import Cubix.Language.C.Parametric.Common as CCommon
-import qualified Cubix.Language.C.Parametric.Full as CFull
 import Cubix.Language.Java.Parametric.Common as JCommon
 import Cubix.Language.JavaScript.Parametric.Common as JSCommon
 import Cubix.Language.Lua.Parametric.Common as LCommon
 
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax.Base
-import Cubix.Language.Parametric.Syntax.Functor as P
 
 import Cubix.Transformations.Variation
 

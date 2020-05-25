@@ -49,7 +49,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (^.), (%=)  )
 
-import Data.Comp.Multi ( Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, (:<:), HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
+import Data.Comp.Multi ( Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import Cubix.Language.Info

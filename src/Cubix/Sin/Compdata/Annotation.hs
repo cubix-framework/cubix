@@ -25,7 +25,7 @@ module Cubix.Sin.Compdata.Annotation (
 
 import Control.Monad.Identity ( Identity(..) )
 import Data.Default ( Default(..) )
-import Data.Comp.Multi ( AnnTerm, Cxt(..), Term, (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
+import Data.Comp.Multi ( Cxt(..), (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
 import Data.Comp.Multi.Ops ((:&:)(..), Sum (..), contract)
 

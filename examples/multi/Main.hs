@@ -1,14 +1,15 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE OverlappingInstances   #-}
 
 module Main where
 
-import Control.Monad ( when, liftM, (<=<), (=<<) )
+import Control.Monad ( when, liftM, (<=<) )
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char  ( toLower )
@@ -18,7 +19,7 @@ import Data.Maybe ( fromJust )
 import System.Environment ( getArgs )
 import System.IO ( hClose )
 
-import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Sum, Term, All )
+import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Term, All )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import qualified Language.Dot.Pretty as Dot

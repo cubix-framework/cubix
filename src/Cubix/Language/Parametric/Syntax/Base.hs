@@ -38,7 +38,7 @@ module Cubix.Language.Parametric.Syntax.Base (
   ,        iUnitF
   ) where
 
-import Data.Comp.Multi ( Cxt, CxtS, All, HFunctor, (:-<:), project)
+import Data.Comp.Multi ( CxtS, All, HFunctor, (:-<:), project)
 
 import Cubix.Language.Parametric.Derive
 

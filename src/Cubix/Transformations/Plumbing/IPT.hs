@@ -21,17 +21,13 @@ module Cubix.Transformations.Plumbing.IPT (
   ) where
 
 
-import Control.Monad ( (=<<), guard )
 import Control.Monad.IO.Class ( MonadIO(..) )
 import Control.Monad.State ( MonadState, evalStateT )
-import Control.Monad.Trans ( lift )
-import Control.Monad.Trans.Maybe ( runMaybeT )
-import Control.Monad.Writer ( WriterT(..), tell )
 
 import Data.List ( findIndex, intercalate, nub )
 import Data.Map ( Map )
 import qualified Data.Map as Map
-import Data.Maybe ( fromMaybe, fromJust, maybeToList )
+import Data.Maybe ( fromMaybe, fromJust )
 import Data.Proxy ( Proxy(..) )
 import Data.Set ( Set )
 import qualified Data.Set as Set
@@ -40,9 +36,8 @@ import System.IO ( hFlush, stdout )
 
 import Control.Lens ( (&), (^.), makeClassy, use, at, (%%~), (%=) )
 
-import Data.Comp.Multi ( Cxt(..), isNode', project', HTraversable, ShowHF, EqHF, stripA, toCxt, E(..), runE, All, (:-<:), Term, HFunctor, OrdHF, HFoldable )
-import Data.Comp.Multi.Derive ( liftSum )
-import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
+import Data.Comp.Multi ( Cxt(..), isNode', project', HTraversable, ShowHF, EqHF, stripA, E(..), All, (:-<:), Term, HFunctor, OrdHF, HFoldable )
+import Data.Comp.Multi.Strategic ( RewriteM, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, dynProj )
 
 import qualified Language.Java.Syntax as JLib
@@ -60,7 +55,6 @@ import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Path
 import Cubix.Language.Parametric.ProgInfo
 import Cubix.Language.Parametric.Semantics.Cfg
-import Cubix.Language.Parametric.Syntax
 
 -- Input: List of functions, and consumed/produced rels
 ----- Initial version will ignore control flow.

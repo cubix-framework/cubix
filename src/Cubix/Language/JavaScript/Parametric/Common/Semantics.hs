@@ -18,7 +18,7 @@ import Data.Maybe ( fromJust )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
-import Data.Comp.Multi ( (:<:), project, project', inject', Cxt(..), appCxt, AnnTerm, (:-<:), ContextS )
+import Data.Comp.Multi ( project, project', inject', Cxt(..), appCxt, AnnTerm, (:-<:), ContextS )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort, dynProj )
 
 import Cubix.Language.JavaScript.Parametric.Common.Types

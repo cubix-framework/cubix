@@ -29,7 +29,6 @@ module Cubix.Language.Parametric.InjF
 
 import Control.Monad ( MonadPlus(..), liftM )
 
-import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 

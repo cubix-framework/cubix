@@ -13,8 +13,7 @@ module Cubix.Language.Parametric.ProgInfo (
   , labToPath
   ) where
 
-import Control.Monad.State ( MonadState )
-import Control.Lens ( makeClassy, (^.), use )
+import Control.Lens ( makeClassy, (^.))
 import Data.Map ( Map )
 import qualified Data.Map as Map
 
