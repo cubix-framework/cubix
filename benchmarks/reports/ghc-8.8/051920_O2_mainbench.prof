@@ -1,0 +1,32 @@
+	Mon May 25 10:21 2020 Time and Allocation Profiling Report  (Final)
+
+	   mainbench +RTS -N -p -h -RTS
+
+	total time  =       14.81 secs   (59232 ticks @ 1000 us, 4 processors)
+	total alloc = 27,075,615,288 bytes  (excludes profiling overheads)
+
+COST CENTRE       MODULE                            SRC                                                    %time %alloc
+
+hfoldl            Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(80,5)-(81,37)               14.8    9.8
+>>=               Data.Vector.Fusion.Util           Data/Vector/Fusion/Util.hs:36:3-18                       9.1    7.9
+hfmap             Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(70,5)-(71,37)                7.9   19.9
+inj'              Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:123:5-46                      4.6    5.5
+caseH             Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(65,1)-(67,28)                4.5    0.0
+grnf_             Control.DeepSeq.Generics          Control/DeepSeq/Generics.hs:96:5-24                      3.6    0.0
+caseH'            Data.Comp.Multi.Annotation        src/Data/Comp/Multi/Annotation.hs:(101,1)-(102,38)       2.8    4.7
+basicUnsafeIndexM Data.Vector.Primitive             Data/Vector/Primitive.hs:234:3-75                        2.4    1.5
+htraverse         Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(89,5)-(90,47)                2.3    4.6
+hmapM             Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(91,5)-(92,43)                2.0    5.6
+prj'              Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:(125,5)-(126,28)              1.5    0.0
+basicUnsafeWrite  Data.Vector.Primitive.Mutable     Data/Vector/Primitive/Mutable.hs:124:3-69                1.5    1.5
+kbnAdd            Numeric.Sum                       Numeric/Sum.hs:(164,1)-(167,39)                          1.4    0.6
+primitive         Control.Monad.Primitive           Control/Monad/Primitive.hs:93:3-16                       1.4    0.0
+primitive         Control.Monad.Primitive           Control/Monad/Primitive.hs:205:3-16                      1.3    0.2
+rnf               Main                              benchmarks/Benchmarks.hs:(74,3)-(76,19)                  1.3    0.0
+transpose         Statistics.Matrix                 src/Statistics/Matrix.hs:(263,1)-(265,22)                1.2    1.3
+rnf               Main                              benchmarks/Benchmarks.hs:(67,3)-(71,18)                  1.2    0.0
+fmap              Data.Vector.Fusion.Stream.Monadic Data/Vector/Fusion/Stream/Monadic.hs:(133,3)-(135,20)    1.2    1.0
+rnf               Cubix.Language.Info               src/Cubix/Language/Info.hs:93:29-44                      1.2    0.0
+uniform           System.Random.MWC                 System/Random/MWC.hs:241:5-35                            1.0    0.6
+wrapAnyR          Data.Comp.Multi.Strategic         Data/Comp/Multi/Strategic.hs:114:1-63                    0.9    1.9
+revAllbuR         Data.Comp.Multi.Strategic         Data/Comp/Multi/Strategic.hs:209:1-41                    0.6    1.2
