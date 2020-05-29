@@ -56,7 +56,7 @@ library:
   - Cubix.Transformations.Variation
   - Language.JavaScript.Pretty.Printer.Extended
   ghc-options:
-  - -fcontext-stack=200
+  - -fcontext-stack=300
   dependencies:
   - base
   - cubix-compdata
@@ -88,7 +88,7 @@ executables:
      - -threaded
      - -rtsopts
      - -with-rtsopts=-N
-     - -fcontext-stack=200
+     - -fcontext-stack=300
     dependencies:
     - base
     - cubix-compdata
@@ -193,7 +193,7 @@ benchmarks:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -fcontext-stack=200
+      - -fcontext-stack=300
     dependencies:
      - base
      - cubix-compdata
@@ -205,3 +205,16 @@ benchmarks:
      - language-lua
      - language-python
      - lens
+tests:
+  cfg-test:
+    main: Main.hs
+    source-dirs: cfg-test
+    dependencies:
+     - cubix
+     - hedgehog
+     - cubix-compdata
+     - compstrat
+     - containers
+     - lens
+     - mtl
+     - base
