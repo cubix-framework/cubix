@@ -95,6 +95,36 @@ constructCfgLuaForRange t mInit mFinal mOptStep mBody = do
 
   return $ EnterExitPair enterNode exitNode
 
+constructCfgLuaShortCircuitingBinOp ::
+  MLuaTermLab hs ->
+  State LuaCfgState (EnterExitPair MLuaSig ls) ->
+  State LuaCfgState (EnterExitPair MLuaSig rs) ->
+  State LuaCfgState (EnterExitPair MLuaSig es)
+constructCfgLuaShortCircuitingBinOp t mlArg mrArg = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  lArg <- mlArg
+  rArg <- mrArg
+  cur_cfg %= addEdge enterNode (enter lArg)
+  cur_cfg %= addEdge (exit lArg) (enter rArg)
+  -- NOTE: short circuit edge.
+  cur_cfg %= addEdge (exit lArg) exitNode
+  cur_cfg %= addEdge (exit rArg) exitNode
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgLuaOr ::
+  MLuaTermLab hs ->
+  State LuaCfgState (EnterExitPair MLuaSig ls) ->
+  State LuaCfgState (EnterExitPair MLuaSig rs) ->
+  State LuaCfgState (EnterExitPair MLuaSig es)
+constructCfgLuaOr t mlArg mrArg = constructCfgLuaShortCircuitingBinOp t mlArg mrArg
+
+constructCfgLuaAnd ::
+  MLuaTermLab hs ->
+  State LuaCfgState (EnterExitPair MLuaSig ls) ->
+  State LuaCfgState (EnterExitPair MLuaSig rs) ->
+  State LuaCfgState (EnterExitPair MLuaSig es)
+constructCfgLuaAnd t mlArg mrArg = constructCfgLuaShortCircuitingBinOp t mlArg mrArg
 
 instance ConstructCfg MLuaSig LuaCfgState Stat where
   constructCfg (collapseFProd' -> (t :*: Break))        = HState $ constructCfgBreak t
@@ -115,6 +145,19 @@ instance ConstructCfg MLuaSig LuaCfgState P.Block where
     Just (P.Block xs r) -> case (extractF xs, project' r) of
       ([], Just (LuaBlockEnd e)) -> constructCfgGeneric p -- FIXME: Doesn't properly handle returns, but I think the TACer won't notice
       _  -> constructCfgDefault p
+
+instance ConstructCfg MLuaSig LuaCfgState Exp where
+  constructCfg t'@(remA -> (Binop (op :*: _) _ _)) = do
+    let (t :*: (Binop _ el er)) = collapseFProd' t'
+    case extractOp op of
+      And -> HState $ constructCfgLuaAnd t (unHState el) (unHState er)
+      Or  -> HState $ constructCfgLuaOr t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MLuaTermLab BinopL -> Binop MLuaTerm BinopL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t = constructCfgDefault t
 
 instance CfgInitState MLuaSig where
   cfgInitState _ = LuaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
