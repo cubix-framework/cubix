@@ -24,8 +24,9 @@ import           Hedgehog
 
 import           Cubix.Language.Info
 import           Cubix.Language.Parametric.Semantics.Cfg
+import           Cubix.Language.Parametric.Semantics.SemanticProperties ( NodeEvaluationPoint (..) )
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, HFix, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), K(..), HFoldable (..), (:-<:), Mem, subterms, unTerm, EqHF )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, HFix, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), K(..), HFoldable (..), (:-<:), Mem, subterms, unTerm, EqHF, Cxt (..), proj )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 assertCfgWellFormedness :: (All ShowHF fs, All HFoldable fs, All HFunctor fs, MonadTest m, MonadReader (Cfg fs) m, All (AssertCfgWellFormed fs) fs) => TermLab fs l -> m ()
@@ -84,6 +85,12 @@ getLoopEntry ::
   ) => TermLab gs l -> m (CfgNode gs)
 getLoopEntry = getNodeFromAstLabel LoopEntryNode . getAnn
 
+getIEP ::
+  ( MonadReader (Cfg gs) m
+  , MonadTest m
+  ) => Int -> TermLab gs l -> m (CfgNode gs)
+getIEP i = getNodeFromAstLabel (evalPointToNodeType (BeforeIntermediateEvalPoint i)) . getAnn
+
 getNodeFromAstLabel ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
@@ -131,6 +138,7 @@ assertEdge _t from to = do
   let fl = from ^. cfg_node_lab
       tl = to   ^. cfg_node_lab
 
+  footnote ("Term: " ++ show _t ++ "From: " ++ show from ++ ", To: " ++ show to)
   assert (Set.member tl (from ^. cfg_node_succs))
   assert (Set.member fl (to ^. cfg_node_prevs))
   pure ()
@@ -149,3 +157,5 @@ assertNoEdge _t from to = do
   assert (not (Set.member fl (to ^. cfg_node_prevs)))
   pure ()
 
+project' :: (f :-<: fs) => TermLab fs l -> Maybe ((f :&: Label) (TermLab fs) l)
+project' (Term (s :&: l)) = fmap (:&: l) (proj s)
