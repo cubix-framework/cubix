@@ -27,7 +27,7 @@ import           Cubix.Language.Lua.Parametric.Common as LCommon
 import           Cubix.Language.Parametric.Semantics.Cfg
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', Cxt (..), inject' )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', Cxt (..), inject', EqHF )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -83,3 +83,73 @@ instance AssertCfgWellFormed MLuaSig Exp where
 
   assertCfgWellFormed t = assertCfgWellFormedDefault t
 
+assertCfgBreak :: (MonadTest m) => TermLab fs a -> m ()
+assertCfgBreak _ = pure ()
+
+assertCfgShortCircuit ::
+  ( MonadTest m
+  , MonadReader (Cfg fs) m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
+assertCfgShortCircuit t e1 e2 = do
+  (enSExp, exSExp) <- getEnterExitPair t
+  (enE1, exE1) <- getEnterExitPair e1
+  (enE2, exE2) <- getEnterExitPair e2
+
+  assertEdges t [ (enSExp, enE1)
+                , (exE1, exSExp)
+                , (exE1, enE2)
+                , (exE2, exSExp)
+                ]
+                [ enSExp, exSExp, enE1
+                , exE1, enE2, exE2
+                ]
+
+assertCfgWhile ::
+  ( MonadTest m
+  , MonadReader (Cfg gs) m
+  , All ShowHF gs
+  , All HFunctor gs
+  , All EqHF gs
+  ) => TermLab gs l -> TermLab gs i -> TermLab gs j -> m ()
+assertCfgWhile t e b = do
+  (enWhile, exWhile) <- getEnterExitPair t
+  loWhile <- getLoopEntry t
+
+  (enExp, exExp) <- getEnterExitPair e
+  (enBody, exBody) <- getEnterExitPair b
+  assertEdges t [ (enWhile, loWhile)
+                , (loWhile, enExp)
+                , (exExp, enBody)
+                , (exExp, exWhile)
+                , (exBody, loWhile)
+                ]
+                [ enWhile, exWhile, loWhile
+                , enExp, exExp, enBody, exBody
+                ]
+
+assertCfgDoWhile ::
+  ( MonadTest m
+  , MonadReader (Cfg gs) m
+  , All ShowHF gs
+  , All HFunctor gs
+  , All EqHF gs
+  ) => TermLab gs l -> TermLab gs i -> TermLab gs j -> m ()
+assertCfgDoWhile t b e = do
+  (enDoWhile, exDoWhile) <- getEnterExitPair t
+  loDoWhile <- getLoopEntry t
+
+  (enBody, exBody) <- getEnterExitPair b
+  (enExp, exExp) <- getEnterExitPair e
+
+  assertEdges t [ (enDoWhile, enBody)
+                , (exExp, enBody)
+                , (exExp, exDoWhile)
+                , (exBody, loDoWhile)
+                , (loDoWhile, enExp)
+                ]
+                [ enDoWhile, exDoWhile, loDoWhile
+                , enBody, exBody, enExp, exExp
+                ]
