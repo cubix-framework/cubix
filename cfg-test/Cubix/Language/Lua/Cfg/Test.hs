@@ -59,9 +59,11 @@ instance AssertCfgWellFormed MLuaSig Stat where
   assertCfgWellFormed t@(While e b :&: _) =
     assertCfgWhile (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(ForIn _ e b :&: _) = do
-    assertCfgWhile (inject' t) e (extractBlock b)
-  -- assertCfgWellFormed t@(Goto (n :*: _) :&: _) = HEnvM $ do
-  --  assertCfgGoto t (nameString n)
+    assertCfgFor (inject' t) (extractList e) (extractBlock b)
+  assertCfgWellFormed t@(Goto n :&: _) =
+    assertCfgGoto (inject' t) (nameString n)
+  assertCfgWellFormed t@(Label _ :&: _) =
+    assertCfgLabel (inject' t)
   assertCfgWellFormed t@(ForRange _ init final optStep body :&: _) = do
     assertCfgForRange (inject' t) init final (extractMaybe optStep) (extractBlock body)
   assertCfgWellFormed t@(If clauses optElse :&: _) =
@@ -81,11 +83,32 @@ instance AssertCfgWellFormed MLuaSig Exp where
   assertCfgWellFormed t = assertCfgWellFormedDefault t
 
 assertCfgBreak :: (MonadTest m) => TermLab fs a -> m ()
-assertCfgBreak _ = pure ()
+assertCfgBreak _break = pure ()
 
-assertCfgGoto :: (MonadTest m) => TermLab fs a -> m ()
-assertCfgGoto _ = pure ()
+assertCfgGoto ::
+  forall a m.
+  ( MonadTest m
+  , MonadReader (Cfg MLuaSig) m
+  ) => TermLab MLuaSig a -> String -> m ()
+assertCfgGoto t labName = do
+  (enGoto, exGoto) <- getEnterExitPair t
+  let jmpNodeLabs = enGoto ^. cfg_node_succs
+  assert (length jmpNodeLabs == 1)
 
+  let enJmpLab = head (Set.toList jmpNodeLabs)
+  menJump <- preview (cur_cfg.cfg_nodes.(ix enJmpLab))
+  enJmp <- assertJust "Cfg label lookup: " menJump
+  
+  assert (checkLab (enJmp ^.  cfg_node_term))
+  assert (length (exGoto ^. cfg_node_prevs) == 0)
+
+  where
+    checkLab ::  E (TermLab MLuaSig) -> Bool
+    checkLab (E (project' -> Just (Label (nameString -> n) :&: _)))
+          | labName == n = True
+          | otherwise = False
+    checkLab _ = False
+  
 assertCfgLabel ::
   ( MonadTest m
   , MonadReader (Cfg fs) m
@@ -103,13 +126,13 @@ assertCfgForRange ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs  
-  ) => TermLab fs a -> TermLab fs b -> TermLab fs c -> Maybe (TermLab fs d) -> TermLab fs e -> m ()
+  ) => TermLab fs a -> TermLab fs b -> TermLab fs c -> Maybe (TermLab fs d) -> BlockTermPairLab fs -> m ()
 assertCfgForRange t init final optStep body = do
   (enForRange, exForRange) <- getEnterExitPair t
   (enInit, exInit) <- getEnterExitPair init
   (enFinal, exFinal) <- getEnterExitPair final
   optStepN <- maybe (pure Nothing) (fmap Just) (getEnterExitPair <$> optStep)
-  (enBody, exBody) <- getEnterExitPair body
+  (enBody, exBody) <- getEEPBlock body
 
   assertEdges t ([ (exInit, enFinal)
                 , (enForRange, enInit)
@@ -140,11 +163,11 @@ assertCfgIfElse ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs  
-  ) => TermLab fs a -> [(TermLab fs e, TermLab fs b)] -> Maybe (TermLab fs b) -> m ()
+  ) => TermLab fs a -> [(TermLab fs e, BlockTermPairLab fs)] -> Maybe (BlockTermPairLab fs) -> m ()
 assertCfgIfElse t cs optElse = do
   (enIf, exIf) <- getEnterExitPair t
   eepExps <- mapM (getEnterExitPair . fst) cs
-  eepBodies <- mapM (getEnterExitPair . snd) cs
+  eepBodies <- mapM (getEEPBlock . snd) cs
   midNodes <- mapM (flip getIEP t) [0 .. length cs - 1]
 
   let evalEdges = concatMap (\( (_, exExp), (enBody, exBody)) ->
@@ -160,7 +183,7 @@ assertCfgIfElse t cs optElse = do
   (elseNodes, exitEdges) <- case optElse of
         Nothing -> pure ([], [(snd $ last eepExps, exIf)])
         Just e  -> do
-          (enElse, exElse) <- getEnterExitPair e
+          (enElse, exElse) <- getEEPBlock e
           pure ([enElse, exElse], [(snd $ last eepExps, enElse), (exElse, exIf)])
 
   assertEdges t ([(enIf, head midNodes)] ++ evalEdges ++ condEdges ++ condJmpEdges ++ exitEdges)
@@ -194,13 +217,13 @@ assertCfgWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
-  ) => TermLab gs l -> TermLab gs i -> TermLab gs j -> m ()
+  ) => TermLab gs l -> TermLab gs i -> BlockTermPairLab gs -> m ()
 assertCfgWhile t e b = do
   (enWhile, exWhile) <- getEnterExitPair t
   loWhile <- getLoopEntry t
 
   (enExp, exExp) <- getEnterExitPair e
-  (enBody, exBody) <- getEnterExitPair b
+  (enBody, exBody) <- getEEPBlock b
   assertEdges t [ (enWhile, loWhile)
                 , (loWhile, enExp)
                 , (exExp, enBody)
@@ -211,18 +234,44 @@ assertCfgWhile t e b = do
                 , enExp, exExp, enBody, exBody
                 ]
 
+assertCfgFor ::
+  ( MonadTest m
+  , MonadReader (Cfg gs) m
+  , All ShowHF gs
+  , All HFunctor gs
+  , All EqHF gs
+  ) => TermLab gs l -> [TermLab gs i] -> BlockTermPairLab gs -> m ()
+assertCfgFor t es b = do
+  (enWhile, exWhile) <- getEnterExitPair t
+  loWhile <- getLoopEntry t
+
+  enExps <- getEnterNode (head es)
+  exExps <- getExitNode (last es)
+
+  (enBody, exBody) <- getEEPBlock b  
+  assertEdges t [ (enWhile, loWhile)
+                , (loWhile, enExps)
+                , (exExps, enBody)
+                , (exExps, exWhile)
+                , (exBody, loWhile)
+                ]
+                [ enWhile, exWhile, loWhile
+                , enExps, exExps, enBody, exBody
+                ]
+
+
 assertCfgDoWhile ::
   ( MonadTest m
   , MonadReader (Cfg gs) m
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
-  ) => TermLab gs l -> TermLab gs i -> TermLab gs j -> m ()
+  ) => TermLab gs l -> BlockTermPairLab gs -> TermLab gs j -> m ()
 assertCfgDoWhile t b e = do
   (enDoWhile, exDoWhile) <- getEnterExitPair t
   loDoWhile <- getLoopEntry t
 
-  (enBody, exBody) <- getEnterExitPair b
+  (enBody, exBody) <- getEEPBlock b  
   (enExp, exExp) <- getEnterExitPair e
 
   assertEdges t [ (enDoWhile, enBody)
@@ -235,18 +284,41 @@ assertCfgDoWhile t b e = do
                 , enBody, exBody, enExp, exExp
                 ]
 
-extractClauses :: TermLab MLuaSig [(ExpL, LFull.BlockL)] -> [(TermLab MLuaSig ExpL, TermLab MLuaSig [BlockItemL])]
+extractClauses :: TermLab MLuaSig [(ExpL, LFull.BlockL)] -> [(TermLab MLuaSig ExpL, BlockTermPairLab MLuaSig)]
 extractClauses (project' -> Just (ConsF (project' -> Just (PairF e b :&: _)) xs :&: _)) = (inj e, extractBlock $ inj b) : extractClauses xs
 extractClauses (project' -> Just (NilF :&: _))       = []
 
-extractBlock :: TermLab MLuaSig LFull.BlockL -> TermLab MLuaSig [BlockItemL]
+type BlockTermPairLab fs = (E (TermLab fs), E (TermLab fs)) -- (Term with label for blockstart, Term with label for blockend)
+
+extractBlock :: TermLab MLuaSig LFull.BlockL -> BlockTermPairLab MLuaSig
 extractBlock (project' -> Just (BlockIsBlock blk :&: _)) =
   case project' blk of
     Just b@(Block body r :&: _) -> case (extractF body, project' r) of
-      ([], Just (LuaBlockEnd e :&: _)) -> error "TODO: Fill in"
-      _                                -> body
+      ([], Just (LuaBlockEnd e :&: _)) -> (E blk, E blk)
+      (_, Just (LuaBlockEnd e :&: _))  ->  case extractList <$> extractMaybe e of
+        Nothing -> (E body, E body)
+        Just [] -> (E body, E body)
+        Just xs -> (E body, E (last xs))
 
 extractMaybe :: MLuaTermLab (Maybe l) -> Maybe (MLuaTermLab l)
 extractMaybe (project' -> Just (JustF e :&: _)) = Just e        
 extractMaybe _ = Nothing
 
+extractList :: MLuaTermLab [l] -> [MLuaTermLab l]
+extractList (project' -> Just (ConsF x xs :&: _)) = x : extractList xs
+extractList (project' -> Just (NilF :&: _)) = []
+
+nameString :: MLuaTermLab LFull.NameL -> String
+nameString (stripA -> project -> Just (IdentIsName (Ident' s))) = s
+
+getEEPBlock ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All EqHF fs
+  , All HFunctor fs
+  ) => BlockTermPairLab fs -> m (CfgNode fs, CfgNode fs)
+getEEPBlock (bs, be) = do
+  enBody <- getEnterNodeE bs
+  exBody <- getExitNodeE be
+  return (enBody, exBody)

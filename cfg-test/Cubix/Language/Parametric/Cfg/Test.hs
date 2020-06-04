@@ -20,7 +20,7 @@ import qualified Data.Map as Map
 import           Data.Proxy
 import qualified Data.Set as Set
 import           Hedgehog
-
+import qualified Hedgehog.Internal.Property as H
 
 import           Cubix.Language.Info
 import           Cubix.Language.Parametric.Semantics.Cfg
@@ -60,48 +60,103 @@ instance {-# OVERLAPPABLE #-} AssertCfgWellFormed gs f where
 assertCfgWellFormedDefault :: (MonadTest m, MonadReader (Cfg fs) m) => (f :&: Label) (TermLab fs) l -> m ()
 assertCfgWellFormedDefault _ = pure ()
 
+getEnterExitPairE ::
+  ( MonadReader (Cfg gs) m
+  , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
+  ) => E (TermLab gs) -> m (CfgNode gs, CfgNode gs)
+getEnterExitPairE (E t) = getEnterExitPair t
+
 getEnterExitPair ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
   ) => TermLab gs l -> m (CfgNode gs, CfgNode gs)
 getEnterExitPair t = do
   (,) <$> getEnterNode t <*> getExitNode t
 
+getEnterNodeE ::
+  ( MonadReader (Cfg gs) m
+  , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
+  ) => E (TermLab gs) -> m (CfgNode gs)
+getEnterNodeE (E t) = getEnterNode t
+
 getEnterNode ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
   ) => TermLab gs l -> m (CfgNode gs)
-getEnterNode = getNodeFromAstLabel EnterNode . getAnn
+getEnterNode = getNodeFromAstLabel EnterNode
+
+getExitNodeE ::
+  ( MonadReader (Cfg gs) m
+  , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
+  ) => E (TermLab gs) -> m (CfgNode gs)
+getExitNodeE (E t) = getExitNode t
 
 getExitNode ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
   ) => TermLab gs l -> m (CfgNode gs)
-getExitNode = getNodeFromAstLabel ExitNode . getAnn
+getExitNode = getNodeFromAstLabel ExitNode
 
 getLoopEntry ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
   ) => TermLab gs l -> m (CfgNode gs)
-getLoopEntry = getNodeFromAstLabel LoopEntryNode . getAnn
+getLoopEntry = getNodeFromAstLabel LoopEntryNode
 
 getIEP ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
   ) => Int -> TermLab gs l -> m (CfgNode gs)
-getIEP i = getNodeFromAstLabel (evalPointToNodeType (BeforeIntermediateEvalPoint i)) . getAnn
+getIEP i = getNodeFromAstLabel (evalPointToNodeType (BeforeIntermediateEvalPoint i)) 
 
 getNodeFromAstLabel ::
-  ( MonadReader (Cfg gs) m
+  ( MonadReader (Cfg fs) m
   , MonadTest m
-  ) => CfgNodeType -> Label -> m (CfgNode gs)
-getNodeFromAstLabel nodeType astLab = do
-  mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))
-  nodeLab  <- assertJust "Ast label lookup: " mnodeLab
-  mcfgNode <- preview (cur_cfg.cfg_nodes.(ix nodeLab))
-  assertJust "Cfg label lookup: " mcfgNode
+  , All ShowHF fs
+  , All HFunctor fs
+  ) => CfgNodeType -> TermLab fs a -> m (CfgNode fs)
+getNodeFromAstLabel nodeType t =
+  getCfgNodeLabel t nodeType >>= getCfgNode t
 
-assertJust :: (MonadTest m) => String -> Maybe a -> m a
+getCfgNodeLabel :: (MonadTest m, MonadReader (Cfg fs) m, All ShowHF fs, All HFunctor fs) => TermLab fs a -> CfgNodeType -> m Label
+getCfgNodeLabel t nodeType = do
+  mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))
+  case mnodeLab of
+    Just lab -> pure lab
+    Nothing -> H.failWith Nothing msg
+
+  where astLab = getAnn t
+        msg = "Cannot find label for AST: \n" ++ show t ++
+              "\nfor nodetype: " ++ show nodeType
+
+getCfgNode :: (MonadTest m, MonadReader (Cfg fs) m, All ShowHF fs, All HFunctor fs) => TermLab fs a -> Label -> m (CfgNode fs)
+getCfgNode t nodeLab = do
+  mcfgNode <- preview (cur_cfg.cfg_nodes.(ix nodeLab))
+  case mcfgNode of
+    Just cfgNode -> pure cfgNode
+    Nothing -> H.failWith Nothing msg
+
+  where astLab = getAnn t
+        msg = "Cannot find CfgNode with Label: " ++ show nodeLab ++
+              " for AST: \n" ++ show t
+
+  
 assertJust s = evalEither . maybe (Left s) Right
 
 assertEdges ::
@@ -133,15 +188,11 @@ assertEdge ::
   ( MonadTest m
   , All ShowHF gs
   , All HFunctor gs
+  , All EqHF gs
   ) => TermLab gs l -> CfgNode gs -> CfgNode gs -> m ()
-assertEdge _t from to = do
-  let fl = from ^. cfg_node_lab
-      tl = to   ^. cfg_node_lab
-
-  footnote ("Term: " ++ show _t ++ "From: " ++ show from ++ ", To: " ++ show to)
-  assert (Set.member tl (from ^. cfg_node_succs))
-  assert (Set.member fl (to ^. cfg_node_prevs))
-  pure ()
+assertEdge t from to = do
+  assertMembership t from to "Incoming" (to ^. cfg_node_prevs)
+  assertMembership t to from "Outgoing" (from ^. cfg_node_succs)  
 
 assertNoEdge ::
   ( MonadTest m
@@ -149,13 +200,41 @@ assertNoEdge ::
   , All HFunctor gs
   , All EqHF gs
   ) => TermLab gs l -> CfgNode gs -> CfgNode gs -> m ()
-assertNoEdge _t from to = do
-  let fl = from ^. cfg_node_lab
-      tl = to   ^. cfg_node_lab
-
-  assert (not (Set.member tl (from ^. cfg_node_succs)))
-  assert (not (Set.member fl (to ^. cfg_node_prevs)))
-  pure ()
+assertNoEdge t from to = do
+  assertNonMembership t from "Incoming" (to ^. cfg_node_prevs)
+  assertNonMembership t to "Outgoing" (from ^. cfg_node_succs)    
 
 project' :: (f :-<: fs) => TermLab fs l -> Maybe ((f :&: Label) (TermLab fs) l)
 project' (Term (s :&: l)) = fmap (:&: l) (proj s)
+
+assertMembership ::
+  ( MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs
+  , All EqHF gs
+  ) => TermLab gs l -> CfgNode gs -> CfgNode gs -> String -> Set.Set Label -> m ()
+assertMembership t n1 n2  edgeType ls =
+  case Set.member (n1 ^. cfg_node_lab) ls of
+    True -> pure ()
+    False -> H.failWith Nothing msg
+
+    where msg =
+            "Node: " ++ show n1 ++ "\n does not exist in " ++ edgeType ++
+            " edges of cfg node: \n" ++ show n2 ++
+            "\n while checking cfg for term: \n" ++ show t
+
+assertNonMembership ::
+  ( MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs
+  , All EqHF gs
+  ) => TermLab gs l -> CfgNode gs -> String -> Set.Set Label -> m ()
+assertNonMembership t n edgeType ls =
+  case Set.member (n ^. cfg_node_lab) ls of
+    False -> pure ()
+    True -> H.failWith Nothing msg
+
+    where msg =
+            "Node: " ++ show n ++ "\n does exist in " ++ edgeType ++
+            " edges of cfg node: \n" ++ show n ++
+            "\n while checking cfg for term: \n" ++ show t
