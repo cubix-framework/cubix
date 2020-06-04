@@ -22,6 +22,7 @@ import           Data.Proxy
 import           Data.Typeable
 import qualified Data.Set as Set
 import           Hedgehog
+import qualified Hedgehog.Internal.Property as H
 
 
 import           Cubix.Language.Info
@@ -30,7 +31,7 @@ import qualified Cubix.Language.Lua.Parametric.Full as LFull
 import           Cubix.Language.Parametric.Semantics.Cfg
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -50,6 +51,9 @@ makeLuaEnv t = do
   let tLab = labelProg gen t
       cfg = makeCfg tLab
   pure (tLab, cfg)
+
+instance AssertCfgWellFormed MLuaSig Block where
+  assertCfgWellFormed t@(Block {} :&: _) = pure ()
 
 instance AssertCfgWellFormed MLuaSig Stat where
   assertCfgWellFormed t@(Break :&: _) =
@@ -82,9 +86,80 @@ instance AssertCfgWellFormed MLuaSig Exp where
 
   assertCfgWellFormed t = assertCfgWellFormedDefault t
 
-assertCfgBreak :: (MonadTest m) => TermLab fs a -> m ()
-assertCfgBreak _break = pure ()
+instance {-# OVERLAPPABLE #-}
+  ( f :-<: MLuaSig
+  ) => AssertCfgWellFormed MLuaSig f where
+  assertCfgWellFormed = assertCfgWellFormedDefault
 
+assertCfgWellFormedDefault :: (MonadTest m, MonadReader (Cfg MLuaSig) m, f :-<: MLuaSig) => (f :&: Label) MLuaTermLab l -> m ()
+assertCfgWellFormedDefault p@(inject' -> t) =
+  if labeledIsComputationSort t then
+    -- TODO: What has to be checked here?
+    pure ()
+  else if labeledIsSuspendedComputationSort t then
+    -- TODO: What has to be checked here?
+    pure ()
+  else if labeledIsContainer t then
+    assertCfgContainer t
+  else
+    pure ()
+
+-- NOTE: Asserts that a CFG node is not created for this AST node.
+assertCfgContainer ::
+  ( MonadTest m
+  , MonadReader (Cfg MLuaSig) m
+  ) => MLuaTermLab l -> m ()
+assertCfgContainer t = do
+  mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab))
+  case mnodeLab of
+    Nothing -> pure ()
+    Just l  -> H.failWith Nothing (msg l)
+
+    where astLab = getAnn t
+          msg l = "unexpected CfgNode created for AST: " ++
+                  show t ++ "\n CfgNode is: " ++ show l
+
+-- NOTE: Asserts that
+--       * there in only one outgoing edge from entry node of `break`.
+--       * that outgoing edge is to a node which has an `ExitNode` type.
+--       * that outgoing edge is to a node which is loop-like (is one of `ForRange/ForIn/ While/Repeat`)
+--         (TODO: assert that it is the *nearest* such loop-like AST)
+--       * there are no incoming nodes in exit node of `break`.
+assertCfgBreak ::
+  ( MonadTest m
+  , MonadReader (Cfg MLuaSig) m
+  ) => TermLab MLuaSig a -> m ()
+assertCfgBreak b = do
+  (enBreak, exBreak) <- getEnterExitPair b
+  let jmpNodeLabs = enBreak ^. cfg_node_succs
+  assert (length jmpNodeLabs == 1)
+
+  let enJmpLab = head (Set.toList jmpNodeLabs)
+  menJump <- preview (cur_cfg.cfg_nodes.(ix enJmpLab))
+  enJmp <- assertJust "Cfg label lookup: " menJump
+  assert (checkNodeType enJmp)
+  assert (length (exBreak ^. cfg_node_prevs) == 0)
+
+    where
+      checkNodeType :: CfgNode MLuaSig -> Bool
+      checkNodeType node =
+        node ^. cfg_node_type == ExitNode                    &&
+        (\(E t) -> isLoopLikeNode t) (node ^. cfg_node_term)
+
+      isLoopLikeNode :: TermLab MLuaSig l -> Bool
+      isLoopLikeNode (project' -> Just (While {} :&: _))= True
+      isLoopLikeNode (project' -> Just (Repeat {} :&: _)) = True
+      isLoopLikeNode (project' -> Just (ForIn {} :&: _)) = True
+      isLoopLikeNode (project' -> Just (ForRange {} :&: _)) = True
+      isLoopLikeNode _ = False
+
+      -- addCount t | isLoopNode (inject' t) = fmap (+ 1) <$> hfold t
+      --            | unAnn t == getAnn b     = Just 0
+
+-- NOTE: Asserts that
+--       * there in only one outgoing edge from entry node of `goto`
+--       * that outgoing edge is to a node which has is a `Label` with right label name
+--       * there are no incoming nodes in exit node of `goto`.
 assertCfgGoto ::
   forall a m.
   ( MonadTest m

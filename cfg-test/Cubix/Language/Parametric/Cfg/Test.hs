@@ -54,12 +54,6 @@ class AssertCfgWellFormed fs f where
 instance (All (AssertCfgWellFormed gs) fs) => AssertCfgWellFormed gs (Sum fs) where
   assertCfgWellFormed = caseCxt' (Proxy @(AssertCfgWellFormed gs)) assertCfgWellFormed
 
-instance {-# OVERLAPPABLE #-} AssertCfgWellFormed gs f where
-  assertCfgWellFormed = assertCfgWellFormedDefault
-
-assertCfgWellFormedDefault :: (MonadTest m, MonadReader (Cfg fs) m) => (f :&: Label) (TermLab fs) l -> m ()
-assertCfgWellFormedDefault _ = pure ()
-
 getEnterExitPairE ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
@@ -156,7 +150,7 @@ getCfgNode t nodeLab = do
         msg = "Cannot find CfgNode with Label: " ++ show nodeLab ++
               " for AST: \n" ++ show t
 
-  
+assertJust :: (MonadTest m) => String -> Maybe a -> m a
 assertJust s = evalEither . maybe (Left s) Right
 
 assertEdges ::
