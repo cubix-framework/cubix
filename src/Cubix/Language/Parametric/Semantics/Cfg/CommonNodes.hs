@@ -36,6 +36,9 @@ module Cubix.Language.Parametric.Semantics.Cfg.CommonNodes (
   , constructCfgScopedLabeledBreak
   , constructCfgScopedLabeledContinue
 
+  , constructCfgShortCircuitingBinOp
+  , constructCfgCondOp
+
 ) where
 
 import Control.Monad ( liftM, when )
@@ -401,3 +404,37 @@ constructCfgScopedLabeledContinue t labStr = do
   -- do not connect enter to exit
 
   return $ EnterExitPair enterNode exitNode
+
+
+constructCfgShortCircuitingBinOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es)
+constructCfgShortCircuitingBinOp t mlArg mrArg = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  lArg <- mlArg
+  rArg <- mrArg
+  cur_cfg %= addEdge enterNode (enter lArg)
+  cur_cfg %= addEdge (exit lArg) (enter rArg)
+  -- NOTE: short circuit edge.
+  cur_cfg %= addEdge (exit lArg) exitNode
+  cur_cfg %= addEdge (exit rArg) exitNode
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgCondOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es) -> m (EnterExitPair fs es)
+constructCfgCondOp t mtest msucc mfail = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  test <- mtest
+  succ <- msucc
+  fail <- mfail
+  cur_cfg %= addEdge enterNode (enter test)
+  cur_cfg %= addEdge (exit test) (enter succ)
+  cur_cfg %= addEdge (exit test) (enter fail)
+  cur_cfg %= addEdge (exit succ) exitNode
+  cur_cfg %= addEdge (exit fail) exitNode
+  return (EnterExitPair enterNode exitNode)

@@ -18,7 +18,7 @@ import Control.Monad.State ( State )
 
 import Control.Lens ( makeLenses )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst )
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, project )
 
 import Cubix.Language.Info
 
@@ -101,6 +101,23 @@ instance ConstructCfg MCSig CCfgState CStatement where
 
 
   -- Making a conscious choice to skip switch's
+
+  constructCfg t = constructCfgDefault t
+
+instance ConstructCfg MCSig CCfgState CExpression where
+  constructCfg t'@(remA -> (CBinary (op :*: _) _ _ _)) = do
+    let (t :*: (CBinary _ el er _)) = collapseFProd' t'
+    case extractOp op of
+      CLndOp -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      CLorOp  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MCTermLab CBinaryOpL -> CBinaryOp MCTerm CBinaryOpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> CCond {}) = HState $ do
+    let (t :*: (CCond test succ fail _)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
 
   constructCfg t = constructCfgDefault t
 

@@ -19,8 +19,9 @@ import Control.Lens (  makeLenses, (%=), (^.), use )
 
 import qualified Data.Map as Map
 
-import Data.Comp.Multi ( remA, stripA )
+import Data.Comp.Multi ( remA, stripA, project )
 import Data.Comp.Multi.Ops ( (:*:)(..), fsnd )
+import Data.Foldable
 
 import Cubix.Language.Info
 
@@ -137,6 +138,9 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
 
     popBreakNode
 
+    -- NOTE: fallthrough
+    _ <- foldlM combineEnterExit EmptyEnterExit blocks
+
     return $ EnterExitPair enterNode exitNode
 
   constructCfg t = constructCfgDefault t
@@ -146,6 +150,20 @@ instance ConstructCfg MJSSig JSCfgState FunctionDef where
 
 instance ConstructCfg MJSSig JSCfgState JSExpression where
   constructCfg (collapseFProd' -> (t :*: (JSFunctionExpression _ _ _ _ _ body))) = HState (unHState body >> constructCfgEmpty t)
+
+  constructCfg t'@(remA -> (JSExpressionBinary _ (op :*: _) _)) = do
+    let (t :*: (JSExpressionBinary el _ er)) = collapseFProd' t'
+    case extractOp op of
+      JSBinOpAnd {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      JSBinOpOr {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MJSTermLab JSBinOpL -> JSBinOp MJSTerm JSBinOpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> JSExpressionTernary {}) = HState $ do
+    let (t :*: (JSExpressionTernary test _ succ _ fail)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
   constructCfg t = constructCfgDefault t
 
 instance ConstructCfg MJSSig JSCfgState C.JSFor where

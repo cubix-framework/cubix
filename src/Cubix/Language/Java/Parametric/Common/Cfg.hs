@@ -18,7 +18,8 @@ import Control.Monad.State ( MonadState )
 
 import Control.Lens ( makeLenses, (%=) )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, proj, project' )
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, proj, project', project )
+import Data.Foldable
 
 import Cubix.Language.Info
 
@@ -130,6 +131,9 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
                              cur_cfg %= addEdge (exit expEE) bEnt
                              cur_cfg %= addEdge bEx exitNode
 
+    -- NOTE: fallthrough
+    _ <- foldlM combineEnterExit EmptyEnterExit blocks
+
     return $ EnterExitPair enterNode exitNode
 
 
@@ -152,6 +156,23 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
 
 
   -- Skipping labels
+
+  constructCfg t = constructCfgDefault t
+
+instance ConstructCfg MJavaSig JavaCfgState Exp where
+  constructCfg t'@(remA -> (BinOp _ (op :*: _) _)) = do
+    let (t :*: (BinOp el _ er)) = collapseFProd' t'
+    case extractOp op of
+      And -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      Or  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MJavaTermLab OpL -> Op MJavaTerm OpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> Cond {}) = HState $ do
+    let (t :*: (Cond test succ fail)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
 
   constructCfg t = constructCfgDefault t
 
