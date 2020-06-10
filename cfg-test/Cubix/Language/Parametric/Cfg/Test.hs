@@ -23,7 +23,7 @@ import           Hedgehog
 import qualified Hedgehog.Internal.Property as H
 
 import           Cubix.Language.Info
-import           Cubix.Language.Parametric.Semantics.Cfg
+import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
 import           Cubix.Language.Parametric.Semantics.SemanticProperties ( NodeEvaluationPoint (..) )
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
 import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, HFix, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), K(..), HFoldable (..), (:-<:), Mem, subterms, unTerm, EqHF, Cxt (..), proj )
@@ -195,8 +195,8 @@ assertNoEdge ::
   , All EqHF gs
   ) => TermLab gs l -> CfgNode gs -> CfgNode gs -> m ()
 assertNoEdge t from to = do
-  assertNonMembership t from "Incoming" (to ^. cfg_node_prevs)
-  assertNonMembership t to "Outgoing" (from ^. cfg_node_succs)    
+  assertNonMembership t from to "Incoming" (to ^. cfg_node_prevs)
+  assertNonMembership t to from "Outgoing" (from ^. cfg_node_succs)    
 
 project' :: (f :-<: fs) => TermLab fs l -> Maybe ((f :&: Label) (TermLab fs) l)
 project' (Term (s :&: l)) = fmap (:&: l) (proj s)
@@ -222,13 +222,40 @@ assertNonMembership ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
-  ) => TermLab gs l -> CfgNode gs -> String -> Set.Set Label -> m ()
-assertNonMembership t n edgeType ls =
-  case Set.member (n ^. cfg_node_lab) ls of
+  ) => TermLab gs l -> CfgNode gs -> CfgNode gs -> String -> Set.Set Label -> m ()
+assertNonMembership t n1 n2 edgeType ls =
+  case Set.member (n1 ^. cfg_node_lab) ls of
     False -> pure ()
     True -> H.failWith Nothing msg
 
     where msg =
-            "Node: " ++ show n ++ "\n does exist in " ++ edgeType ++
-            " edges of cfg node: \n" ++ show n ++
+            "Node: " ++ show n1 ++ "\n does exist in " ++ edgeType ++
+            " edges of cfg node: \n" ++ show n2 ++
             "\n while checking cfg for term: \n" ++ show t
+
+type Edge a = (a, a)
+type Edges a = [Edge a]
+
+joinEdges :: Edges a -> Edge a -> Edge a -> (Edge a, Edges a)
+joinEdges vs e1 e2 = (bound, innerEdge : vs)
+  where enter0 = fst
+        exit0  = snd
+        innerEdge = (exit e1, enter e2)
+        bound = (enter e1, exit e2)
+        
+mJoinEdgesR :: Edges a -> Edge a -> Maybe (Edge a) -> (Edge a, Edges a)
+mJoinEdgesR vs e1 (Just e2) = joinEdges vs e1 e2
+mJoinEdgesR vs e1 Nothing   = (e1, vs)
+
+mJoinEdgesL :: Edges a -> Maybe (Edge a) -> (Edge a) -> (Edge a, Edges a)
+mJoinEdgesL vs (Just e1) e2 = joinEdges vs e1 e2
+mJoinEdgesL vs  Nothing  e2 = (e2, vs)
+
+enter :: Edge a -> a
+enter = fst
+
+exit :: Edge a -> a
+exit = snd
+
+identEdge :: a -> Edge a
+identEdge a = (a, a)

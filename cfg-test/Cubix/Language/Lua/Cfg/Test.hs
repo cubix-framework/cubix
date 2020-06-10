@@ -24,7 +24,6 @@ import qualified Data.Set as Set
 import           Hedgehog
 import qualified Hedgehog.Internal.Property as H
 
-
 import           Cubix.Language.Info
 import           Cubix.Language.Lua.Parametric.Common as LCommon
 import qualified Cubix.Language.Lua.Parametric.Full as LFull
@@ -50,7 +49,7 @@ makeLuaEnv t = do
   gen <- mkCSLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
-  pure (tLab, cfg)
+  pure (cfg `seq` (tLab, cfg))
 
 instance AssertCfgWellFormed MLuaSig Block where
   assertCfgWellFormed t@(Block {} :&: _) = pure ()
@@ -317,20 +316,20 @@ assertCfgFor ::
   , All EqHF gs
   ) => TermLab gs l -> [TermLab gs i] -> BlockTermPairLab gs -> m ()
 assertCfgFor t es b = do
-  (enWhile, exWhile) <- getEnterExitPair t
-  loWhile <- getLoopEntry t
+  (enFor, exFor) <- getEnterExitPair t
+  loFor <- getLoopEntry t
 
   enExps <- getEnterNode (head es)
   exExps <- getExitNode (last es)
 
   (enBody, exBody) <- getEEPBlock b  
-  assertEdges t [ (enWhile, loWhile)
-                , (loWhile, enExps)
+  assertEdges t [ (enFor, loFor)
+                , (loFor, enExps)
                 , (exExps, enBody)
-                , (exExps, exWhile)
-                , (exBody, loWhile)
+                , (exExps, exFor)
+                , (exBody, loFor)
                 ]
-                [ enWhile, exWhile, loWhile
+                [ enFor, exFor, loFor
                 , enExps, exExps, enBody, exBody
                 ]
 
@@ -397,3 +396,19 @@ getEEPBlock (bs, be) = do
   enBody <- getEnterNodeE bs
   exBody <- getExitNodeE be
   return (enBody, exBody)
+
+-- hardcoded integration tests
+integration_lua_cfg :: Map.Map Int Int -> FilePath -> Property
+integration_lua_cfg edges path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    (_, cfg) <- makeLuaEnv t
+    assertEdgesEqual edges (concatMap nodeEdges (nodes cfg))
+
+    where nodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
+          nodeEdges n = map ((,) (n ^. cfg_node_lab)) (Set.toList $ n ^. cfg_node_succs)
+
+          assertEdgesEqual es as =
+            map (\(a, b) -> (show a, show b)) (Map.toList es) === map (\(a, b) -> (ppLabel a, ppLabel b)) as
+
