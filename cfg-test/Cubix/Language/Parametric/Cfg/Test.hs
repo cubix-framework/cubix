@@ -54,6 +54,34 @@ class AssertCfgWellFormed fs f where
 instance (All (AssertCfgWellFormed gs) fs) => AssertCfgWellFormed gs (Sum fs) where
   assertCfgWellFormed = caseCxt' (Proxy @(AssertCfgWellFormed gs)) assertCfgWellFormed
 
+assertCfgIsSuspended' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs  
+  ) => TermLab fs l -> TermLab fs l1 -> TermLab fs l2 -> m ()
+assertCfgIsSuspended' t t1 t2 = do
+  en <- getEnterNode t1
+  ex <- getExitNode t2
+  (en ^.cfg_node_prevs) === Set.empty
+  (ex ^.cfg_node_succs) === Set.empty  
+
+assertCfgIsSuspended ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs  
+  ) => TermLab fs l -> TermLab fs s -> m ()
+assertCfgIsSuspended t t0 = assertCfgIsSuspended' t t0 t0
+  
+getEnterExitPairMaybe ::
+  ( MonadReader (Cfg gs) m
+  , MonadTest m
+  , All ShowHF gs
+  , All HFunctor gs  
+  ) => Maybe (TermLab gs l) -> m (Maybe (CfgNode gs, CfgNode gs))
+getEnterExitPairMaybe = traverse getEnterExitPair
+
 getEnterExitPairE ::
   ( MonadReader (Cfg gs) m
   , MonadTest m
