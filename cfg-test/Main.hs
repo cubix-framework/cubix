@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import           Cubix.Language.Info
 import           Cubix.Language.Lua.Cfg.Test
 import           Cubix.Language.Java.Cfg.Test
-
+import           Cubix.Language.JavaScript.Cfg.Test
 
 tests :: IO Bool
 tests = do
@@ -18,6 +18,7 @@ tests = do
         
         -- , ("integration_lua_cfg_bar", integration_lua_cfg bar_edges "input-files/lua/Bar.lua")
         , ("unit_java_cfg_bar", unit_java_cfg "input-files/java/Bar.java")        
+        , ("unit_js_cfg_baz", unit_js_cfg "input-files/javascript/Zap.js")        
         ]
 
 main = tests
