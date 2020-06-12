@@ -73,35 +73,7 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
   constructCfg (collapseFProd' -> (t :*: (JSIf _ _ cond _ thn))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState thn)) (return Nothing)
   constructCfg (collapseFProd' -> (t :*: (JSIfElse _ _ cond _ thn _ els))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState thn)) (liftM Just $ unHState els)
 
-  constructCfg tp@(remA -> JSLabelled ((stripA -> JSIdent' nam) :*: _) _ (s :*: mStmt)) = HState $ do
-    let t = fprodFst' tp
-
-    enterNode     <- addCfgNode t EnterNode
-    loopEntryNode <- addCfgNode t LoopEntryNode
-    exitNode      <- addCfgNode t ExitNode
-
-    -- Using a label as a continue target is not valid unless the labeled statement is a loop
-    -- We assume that this code is valid JS, and hence loopEntryNode is unused unless
-    -- stmt is a loop
-    let labMap = Map.fromList [ (LoopEntryNode, loopEntryNode ^. cfg_node_lab)
-                              , (ExitNode, exitNode ^. cfg_node_lab)
-                              ]
-
-    stmt <- withScopedLabel nam labMap $ unHState mStmt
-
-    cur_cfg %= addEdge enterNode (enter stmt)
-    cur_cfg %= addEdge (exit stmt) exitNode
-
-    -- loopEntryNode is just a temporary; contract it out
-    gr <- use cur_cfg
-    case cfgNodeForTerm gr LoopEntryNode s of
-      Nothing -> return ()
-      Just n  -> cur_cfg %= addEdge loopEntryNode n
-
-    cur_cfg %= contractNode (loopEntryNode ^. cfg_node_lab)
-
-    return (EnterExitPair enterNode exitNode)
-
+  constructCfg tp@(remA -> JSLabelled ((stripA -> JSIdent' nam) :*: _) _ (s :*: mStmt)) = HState $ constructCfgScopedLabel (fprodFst' tp) nam s (unHState mStmt)
 
   constructCfg (collapseFProd' -> (t :*: JSReturn _ e _)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
@@ -134,7 +106,6 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
                           -- EmptyEnterExit -> cur_cfg %= addEdge (exit expEE) exitNode
                            EnterExitPair bEnt bEx -> do
                              cur_cfg %= addEdge (exit expEE) bEnt
-                             cur_cfg %= addEdge bEx exitNode
 
     popBreakNode
 

@@ -35,6 +35,7 @@ module Cubix.Language.Parametric.Semantics.Cfg.CommonNodes (
   , edgeToScopedLabel
   , constructCfgScopedLabeledBreak
   , constructCfgScopedLabeledContinue
+  , constructCfgScopedLabel
 
   , constructCfgShortCircuitingBinOp
   , constructCfgCondOp
@@ -405,6 +406,36 @@ constructCfgScopedLabeledContinue t labStr = do
 
   return $ EnterExitPair enterNode exitNode
 
+constructCfgScopedLabel ::
+  ( HasScopedLabelMap s
+  , MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> String -> TermLab fs s0 -> m (EnterExitPair fs s0) -> m (EnterExitPair fs i)
+constructCfgScopedLabel t labName s mStmt = do
+  enterNode     <- addCfgNode t EnterNode
+  loopEntryNode <- addCfgNode t LoopEntryNode
+  exitNode      <- addCfgNode t ExitNode
+
+  -- Using a label as a continue target is not valid unless the labeled statement is a loop
+  -- We assume that this code is valid JS / Java, and hence loopEntryNode is unused unless
+  -- stmt is a loop
+  let labMap = Map.fromList [ (LoopEntryNode, loopEntryNode ^. cfg_node_lab)
+                            , (ExitNode, exitNode ^. cfg_node_lab)
+                            ]
+
+  stmt <- withScopedLabel labName labMap mStmt
+  cur_cfg %= addEdge enterNode (enter stmt)
+  cur_cfg %= addEdge (exit stmt) exitNode
+
+  -- loopEntryNode is just a temporary; contract it out
+  gr <- use cur_cfg
+  case cfgNodeForTerm gr LoopEntryNode s of
+    Nothing -> return ()
+    Just n  -> cur_cfg %= addEdge loopEntryNode n
+
+  cur_cfg %= contractNode (loopEntryNode ^. cfg_node_lab)
+
+  return (EnterExitPair enterNode exitNode)
 
 constructCfgShortCircuitingBinOp ::
   ( MonadState s m

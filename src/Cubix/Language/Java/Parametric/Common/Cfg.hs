@@ -32,7 +32,7 @@ data JavaCfgState = JavaCfgState {
                    _jcs_cfg       :: Cfg MJavaSig
                  , _jcs_labeler   :: LabelGen
                  , _jcs_stack     :: LoopStack
-                 , _jcs_goto_labs :: LabelMap
+                 , _jcs_scoped_labs :: ScopedLabelMap
                  }
 
 makeLenses ''JavaCfgState
@@ -40,7 +40,7 @@ makeLenses ''JavaCfgState
 instance HasCurCfg JavaCfgState MJavaSig where cur_cfg = jcs_cfg
 instance HasLabelGen JavaCfgState where labelGen = jcs_labeler
 instance HasLoopStack JavaCfgState where loopStack = jcs_stack
-instance HasLabelMap JavaCfgState where labelMap = jcs_goto_labs
+instance HasScopedLabelMap JavaCfgState where scopedLabelMap = jcs_scoped_labs
 
 type instance ComputationSorts MJavaSig = '[StmtL, ExpL, BlockStmtL, [BlockItemL]]
 
@@ -103,6 +103,13 @@ extractAndRunSwitchBlocks switchBlocks = mapM collapseEnterExit =<< (map extract
     extractBlock :: EnterExitPair MJavaSig SwitchBlockL -> EnterExitPair MJavaSig [BlockStmtL]
     extractBlock (SubPairs (proj -> Just (SwitchBlock _ body))) = body
 
+nameString' :: MJavaTermLab F.IdentL -> String
+nameString' = nameString . stripA
+
+nameString :: MJavaTerm F.IdentL -> String
+nameString (project -> Just (IdentIsIdent (Ident' s))) = s
+
+
 instance ConstructCfg MJavaSig JavaCfgState Stmt where
   constructCfg (collapseFProd' -> (_ :*: subCfgs@(StmtBlock _))) = HState $ runSubCfgs subCfgs
 
@@ -129,7 +136,6 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
                            EmptyEnterExit -> cur_cfg %= addEdge (exit expEE) exitNode
                            EnterExitPair bEnt bEx -> do
                              cur_cfg %= addEdge (exit expEE) bEnt
-                             cur_cfg %= addEdge bEx exitNode
 
     -- NOTE: fallthrough
     _ <- foldlM combineEnterExit EmptyEnterExit blocks
@@ -141,7 +147,8 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
 
   constructCfg t@(remA -> Break ((stripA -> Nothing') :*: _)) = HState $ constructCfgBreak (ffst $ collapseFProd' t)
   constructCfg t@(remA -> Continue ((stripA -> Nothing') :*: _)) = HState $ constructCfgContinue (ffst $ collapseFProd' t)
-  -- Skippping labeled variants
+  constructCfg t@(remA -> Break ((stripA -> Just' targ) :*: _)) = HState $ constructCfgScopedLabeledBreak (fprodFst' t) (nameString targ)
+  constructCfg t@(remA -> Continue ((stripA -> Just' targ) :*: _)) = HState $ constructCfgScopedLabeledContinue (fprodFst' t) (nameString targ)
 
   constructCfg (collapseFProd' -> (t :*: Return e)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
@@ -154,8 +161,7 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
     unHState finally
     constructCfgEmpty t
 
-
-  -- Skipping labels
+  constructCfg tp@(remA -> Labeled (name :*: _) (s :*: mStmt)) = HState $  constructCfgScopedLabel (fprodFst' tp) (nameString' name) s (unHState mStmt)
 
   constructCfg t = constructCfgDefault t
 
@@ -177,5 +183,5 @@ instance ConstructCfg MJavaSig JavaCfgState Exp where
   constructCfg t = constructCfgDefault t
 
 instance CfgInitState MJavaSig where
-  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
+  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyScopedLabelMap
 #endif
