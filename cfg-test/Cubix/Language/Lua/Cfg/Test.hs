@@ -18,10 +18,11 @@ import           Control.Lens hiding ( para )
 import           Control.Monad.IO.Class (MonadIO (..))
 import           Control.Monad.Reader (MonadReader (..), ReaderT, runReaderT)
 import qualified Data.Map as Map
+import           Data.Maybe ( fromJust )
 import           Data.Proxy
 import           Data.Typeable
 import qualified Data.Set as Set
-import           Hedgehog
+import           Hedgehog hiding ( Var )
 import qualified Hedgehog.Internal.Property as H
 
 import           Cubix.Language.Info
@@ -34,6 +35,7 @@ import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
+import qualified Cubix.Language.Parametric.Syntax as S
 
 unit_lua_cfg :: FilePath -> Property
 unit_lua_cfg fp =
@@ -51,72 +53,108 @@ makeLuaEnv t = do
       cfg = makeCfg tLab
   pure (cfg `seq` (tLab, cfg))
 
+instance AssertCfgWellFormed MLuaSig EmptyParameterAttrs
+instance AssertCfgWellFormed MLuaSig PositionalParameter
+
+instance AssertCfgWellFormed MLuaSig SelfParameter
+instance AssertCfgWellFormed MLuaSig EmptyFunctionDefAttrs
+
+instance AssertCfgWellFormed MLuaSig FunctionDef where
+  assertCfgWellFormed t@(remA -> FunctionDef _ _ _ b) =
+    case project' b of
+      Just (BlockIsFunctionBody blk :&: _) ->
+        case extractBlock' blk of
+          (E t1, E t2) -> assertCfgIsSuspended' (inject' t) t1 t2
+
+-- NOTE: couldn't find FunctionIdent in output
+instance AssertCfgWellFormed MLuaSig FunctionIdent
+instance AssertCfgWellFormed MLuaSig ReceiverArg
+instance AssertCfgWellFormed MLuaSig PositionalArgument
+instance AssertCfgWellFormed MLuaSig FunctionArgumentList
+instance AssertCfgWellFormed MLuaSig EmptyFunctionCallAttrs
+instance AssertCfgWellFormed MLuaSig FunctionCall
+instance AssertCfgWellFormed MLuaSig EmptyLocalVarDeclAttrs
+instance AssertCfgWellFormed MLuaSig AssignOpEquals
+instance AssertCfgWellFormed MLuaSig Ident
+
+-- NOTE: investigate following
+-- NOTE: why dooes tuplebinder not have cfg node
+--       but assign does?
+-- NOTE: shouldn't TupleBinder check that its expressions are connected?
+instance AssertCfgWellFormed MLuaSig TupleBinder
+
+instance AssertCfgWellFormed MLuaSig Assign where
+  assertCfgWellFormed t@(remA -> Assign (project' -> Just (LuaLhs lhs :&: _)) _ (project' -> Just (LuaRhs rhs :&: _))) = do
+    assertCfgIsGeneric (inject' t) $ (map E (S.extractF lhs)) ++ (map E (S.extractF rhs))
+
+instance AssertCfgWellFormed MLuaSig SingleLocalVarDecl
+instance AssertCfgWellFormed MLuaSig OptLocalVarInit
+
 instance AssertCfgWellFormed MLuaSig Block where
-  assertCfgWellFormed t@(Block {} :&: _) = pure ()
+  assertCfgWellFormed t@(remA -> Block body r) = do
+    case (extractF body, project' r) of
+      ([], Just (LuaBlockEnd e :&: _)) -> case extractList <$> extractMaybe e of
+        Nothing -> assertCfgIsGeneric (inject' t) [E body]
+        Just [] -> assertCfgIsGeneric (inject' t) [E body]
+        Just xs -> assertCfgIsGeneric (inject' t) $ [E body] ++ map E xs
+      (_, Just (LuaBlockEnd e :&: _)) -> assertCfgNoCfgNode (inject' t)
 
 instance AssertCfgWellFormed MLuaSig Stat where
-  assertCfgWellFormed t@(Break :&: _) =
+  assertCfgWellFormed t@(remA -> Break) =
     assertCfgBreak (inject' t)
-  assertCfgWellFormed t@(Repeat b e :&: _) =    
+  assertCfgWellFormed t@(remA -> Repeat b e) =    
     assertCfgDoWhile (inject' t) (extractBlock b) e
-  assertCfgWellFormed t@(While e b :&: _) =
+  assertCfgWellFormed t@(remA -> While e b) =
     assertCfgWhile (inject' t) e (extractBlock b)
-  assertCfgWellFormed t@(ForIn _ e b :&: _) = do
+  assertCfgWellFormed t@(remA -> ForIn _ e b) = do
     assertCfgFor (inject' t) (extractList e) (extractBlock b)
-  assertCfgWellFormed t@(Goto n :&: _) =
+  assertCfgWellFormed t@(remA -> Goto n) =
     assertCfgGoto (inject' t) (nameString n)
-  assertCfgWellFormed t@(Label _ :&: _) =
+  assertCfgWellFormed t@(remA -> Label _) =
     assertCfgLabel (inject' t)
-  assertCfgWellFormed t@(ForRange _ init final optStep body :&: _) = do
+  assertCfgWellFormed t@(remA -> ForRange _ init final optStep body) = do
     assertCfgForRange (inject' t) init final (extractMaybe optStep) (extractBlock body)
-  assertCfgWellFormed t@(If clauses optElse :&: _) =
+  assertCfgWellFormed t@(remA -> If clauses optElse) =
     assertCfgIfElse (inject' t) (extractClauses clauses) (extractBlock <$> extractMaybe optElse)
-  assertCfgWellFormed t = assertCfgWellFormedDefault t
+  assertCfgWellFormed t@(remA -> FunCall c) = do
+    assertCfgIsGeneric (inject' t) [E c]
+  assertCfgWellFormed t@(remA -> EmptyStat) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> Do b) =
+    assertCfgIsGeneric (inject' t) (extractBlockAll b)
+  -- AssignIsStat covers Assign
+  -- FunctionDefIsStat covers FunAssign and LocalFunAssign
+  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 instance AssertCfgWellFormed MLuaSig Exp where
   assertCfgWellFormed t@(Binop op e1 e2 :&: _) = do
     case extractOp op of
       And -> assertCfgShortCircuit (inject' t) e1 e2
       Or  -> assertCfgShortCircuit (inject' t) e1 e2
-      _   -> pure ()
+      _   -> assertCfgIsGeneric (inject' t) [E e1, E e2]
 
     where extractOp :: MLuaTermLab BinopL -> Binop MLuaTerm BinopL
           extractOp (stripA -> project -> Just bp) = bp
-
-  assertCfgWellFormed t = assertCfgWellFormedDefault t
-
-instance {-# OVERLAPPABLE #-}
-  ( f :-<: MLuaSig
-  ) => AssertCfgWellFormed MLuaSig f where
-  assertCfgWellFormed = assertCfgWellFormedDefault
-
-assertCfgWellFormedDefault :: (MonadTest m, MonadReader (Cfg MLuaSig) m, f :-<: MLuaSig) => (f :&: Label) MLuaTermLab l -> m ()
-assertCfgWellFormedDefault p@(inject' -> t) =
-  if labeledIsComputationSort t then
-    -- TODO: What has to be checked here?
+  assertCfgWellFormed t@(remA -> Nil) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> Bool {}) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> String {}) =
+    assertCfgIsGeneric (inject' t) []    
+  assertCfgWellFormed t@(remA -> Number {}) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> Vararg {}) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> EFunDef _def) =
+    -- TODO: Fix EFunDef
     pure ()
-  else if labeledIsSuspendedComputationSort t then
-    -- TODO: What has to be checked here?
-    pure ()
-  else if labeledIsContainer t then
-    assertCfgContainer t
-  else
-    pure ()
-
--- NOTE: Asserts that a CFG node is not created for this AST node.
-assertCfgContainer ::
-  ( MonadTest m
-  , MonadReader (Cfg MLuaSig) m
-  ) => MLuaTermLab l -> m ()
-assertCfgContainer t = do
-  mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab))
-  case mnodeLab of
-    Nothing -> pure ()
-    Just l  -> H.failWith Nothing (msg l)
-
-    where astLab = getAnn t
-          msg l = "unexpected CfgNode created for AST: " ++
-                  show t ++ "\n CfgNode is: " ++ show l
+  assertCfgWellFormed t@(remA -> PrefixExp pexp) =
+    assertCfgIsGeneric (inject' t) [E pexp]    
+  assertCfgWellFormed t@(remA -> TableConst (project' -> Just (remA -> Table flds))) =
+    assertCfgIsGeneric (inject' t) (map E $ S.extractF flds)
+  assertCfgWellFormed t@(remA -> Unop _ e) =
+    assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 -- NOTE: Asserts that
 --       * there in only one outgoing edge from entry node of `break`.
@@ -129,7 +167,7 @@ assertCfgBreak ::
   , MonadReader (Cfg MLuaSig) m
   ) => TermLab MLuaSig a -> m ()
 assertCfgBreak b = do
-  (enBreak, exBreak) <- getEnterExitPair b
+  (enBreak, exBreak) <- getEnterExitPair b b
   let jmpNodeLabs = enBreak ^. cfg_node_succs
   assert (length jmpNodeLabs == 1)
 
@@ -165,7 +203,7 @@ assertCfgGoto ::
   , MonadReader (Cfg MLuaSig) m
   ) => TermLab MLuaSig a -> String -> m ()
 assertCfgGoto t labName = do
-  (enGoto, exGoto) <- getEnterExitPair t
+  (enGoto, exGoto) <- getEnterExitPair t t
   let jmpNodeLabs = enGoto ^. cfg_node_succs
   assert (length jmpNodeLabs == 1)
 
@@ -191,7 +229,7 @@ assertCfgLabel ::
   , All EqHF fs
   ) => TermLab fs a -> m ()
 assertCfgLabel t = do
-  (enLab, exLab) <- getEnterExitPair t
+  (enLab, exLab) <- getEnterExitPair t t
   assertEdges t [(enLab, exLab)] [enLab, exLab]
 
 assertCfgForRange ::
@@ -202,11 +240,11 @@ assertCfgForRange ::
   , All EqHF fs  
   ) => TermLab fs a -> TermLab fs b -> TermLab fs c -> Maybe (TermLab fs d) -> BlockTermPairLab fs -> m ()
 assertCfgForRange t init final optStep body = do
-  (enForRange, exForRange) <- getEnterExitPair t
-  (enInit, exInit) <- getEnterExitPair init
-  (enFinal, exFinal) <- getEnterExitPair final
-  optStepN <- maybe (pure Nothing) (fmap Just) (getEnterExitPair <$> optStep)
-  (enBody, exBody) <- getEEPBlock body
+  (enForRange, exForRange) <- getEnterExitPair t t
+  (enInit, exInit) <- getEnterExitPair t init
+  (enFinal, exFinal) <- getEnterExitPair t final
+  optStepN <- maybe (pure Nothing) (fmap Just) (getEnterExitPair t <$> optStep)
+  (enBody, exBody) <- getEEPBlock t body
 
   assertEdges t ([ (exInit, enFinal)
                 , (enForRange, enInit)
@@ -239,10 +277,10 @@ assertCfgIfElse ::
   , All EqHF fs  
   ) => TermLab fs a -> [(TermLab fs e, BlockTermPairLab fs)] -> Maybe (BlockTermPairLab fs) -> m ()
 assertCfgIfElse t cs optElse = do
-  (enIf, exIf) <- getEnterExitPair t
-  eepExps <- mapM (getEnterExitPair . fst) cs
-  eepBodies <- mapM (getEEPBlock . snd) cs
-  midNodes <- mapM (flip getIEP t) [0 .. length cs - 1]
+  (enIf, exIf) <- getEnterExitPair t t
+  eepExps <- mapM (getEnterExitPair t . fst) cs
+  eepBodies <- mapM (getEEPBlock t . snd) cs
+  midNodes <- mapM (\i -> getIEP i t t) [0 .. length cs - 1]
 
   let evalEdges = concatMap (\( (_, exExp), (enBody, exBody)) ->
                          [ (exExp, enBody)
@@ -257,7 +295,7 @@ assertCfgIfElse t cs optElse = do
   (elseNodes, exitEdges) <- case optElse of
         Nothing -> pure ([], [(snd $ last eepExps, exIf)])
         Just e  -> do
-          (enElse, exElse) <- getEEPBlock e
+          (enElse, exElse) <- getEEPBlock t e
           pure ([enElse, exElse], [(snd $ last eepExps, enElse), (exElse, exIf)])
 
   assertEdges t ([(enIf, head midNodes)] ++ evalEdges ++ condEdges ++ condJmpEdges ++ exitEdges)
@@ -272,9 +310,9 @@ assertCfgShortCircuit ::
   , All EqHF fs
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
-  (enSExp, exSExp) <- getEnterExitPair t
-  (enE1, exE1) <- getEnterExitPair e1
-  (enE2, exE2) <- getEnterExitPair e2
+  (enSExp, exSExp) <- getEnterExitPair t t
+  (enE1, exE1) <- getEnterExitPair t e1
+  (enE2, exE2) <- getEnterExitPair t e2
 
   assertEdges t [ (enSExp, enE1)
                 , (exE1, exSExp)
@@ -293,11 +331,11 @@ assertCfgWhile ::
   , All EqHF gs
   ) => TermLab gs l -> TermLab gs i -> BlockTermPairLab gs -> m ()
 assertCfgWhile t e b = do
-  (enWhile, exWhile) <- getEnterExitPair t
-  loWhile <- getLoopEntry t
+  (enWhile, exWhile) <- getEnterExitPair t t
+  loWhile <- getLoopEntry t t
 
-  (enExp, exExp) <- getEnterExitPair e
-  (enBody, exBody) <- getEEPBlock b
+  (enExp, exExp) <- getEnterExitPair t e
+  (enBody, exBody) <- getEEPBlock t b
   assertEdges t [ (enWhile, loWhile)
                 , (loWhile, enExp)
                 , (exExp, enBody)
@@ -316,13 +354,13 @@ assertCfgFor ::
   , All EqHF gs
   ) => TermLab gs l -> [TermLab gs i] -> BlockTermPairLab gs -> m ()
 assertCfgFor t es b = do
-  (enFor, exFor) <- getEnterExitPair t
-  loFor <- getLoopEntry t
+  (enFor, exFor) <- getEnterExitPair t t
+  loFor <- getLoopEntry t t
 
-  enExps <- getEnterNode (head es)
-  exExps <- getExitNode (last es)
+  enExps <- getEnterNode t (head es)
+  exExps <- getExitNode t (last es)
 
-  (enBody, exBody) <- getEEPBlock b  
+  (enBody, exBody) <- getEEPBlock t b  
   assertEdges t [ (enFor, loFor)
                 , (loFor, enExps)
                 , (exExps, enBody)
@@ -342,11 +380,11 @@ assertCfgDoWhile ::
   , All EqHF gs
   ) => TermLab gs l -> BlockTermPairLab gs -> TermLab gs j -> m ()
 assertCfgDoWhile t b e = do
-  (enDoWhile, exDoWhile) <- getEnterExitPair t
-  loDoWhile <- getLoopEntry t
+  (enDoWhile, exDoWhile) <- getEnterExitPair t t
+  loDoWhile <- getLoopEntry t t
 
-  (enBody, exBody) <- getEEPBlock b  
-  (enExp, exExp) <- getEnterExitPair e
+  (enBody, exBody) <- getEEPBlock t b  
+  (enExp, exExp) <- getEnterExitPair t e
 
   assertEdges t [ (enDoWhile, enBody)
                 , (exExp, enBody)
@@ -366,6 +404,10 @@ type BlockTermPairLab fs = (E (TermLab fs), E (TermLab fs)) -- (Term with label 
 
 extractBlock :: TermLab MLuaSig LFull.BlockL -> BlockTermPairLab MLuaSig
 extractBlock (project' -> Just (BlockIsBlock blk :&: _)) =
+  extractBlock' blk
+
+extractBlock' :: TermLab MLuaSig BlockL -> BlockTermPairLab MLuaSig
+extractBlock' blk =
   case project' blk of
     Just b@(Block body r :&: _) -> case (extractF body, project' r) of
       ([], Just (LuaBlockEnd e :&: _)) -> (E blk, E blk)
@@ -373,6 +415,17 @@ extractBlock (project' -> Just (BlockIsBlock blk :&: _)) =
         Nothing -> (E body, E body)
         Just [] -> (E body, E body)
         Just xs -> (E body, E (last xs))
+
+extractBlockAll :: TermLab MLuaSig LFull.BlockL -> [E MLuaTermLab]
+extractBlockAll (project' -> Just (BlockIsBlock blk :&: _)) =
+  case project' blk of
+    Just b@(Block body r :&: _) -> case (extractF body, project' r) of
+      ([], Just (LuaBlockEnd e :&: _)) -> [E blk]
+      (_, Just (LuaBlockEnd e :&: _))  ->  case extractList <$> extractMaybe e of
+        Nothing -> [E body]
+        Just [] -> [E body]
+        Just xs -> (E body :  map E xs)
+  
 
 extractMaybe :: MLuaTermLab (Maybe l) -> Maybe (MLuaTermLab l)
 extractMaybe (project' -> Just (JustF e :&: _)) = Just e        
@@ -391,10 +444,10 @@ getEEPBlock ::
   , All ShowHF fs
   , All EqHF fs
   , All HFunctor fs
-  ) => BlockTermPairLab fs -> m (CfgNode fs, CfgNode fs)
-getEEPBlock (bs, be) = do
-  enBody <- getEnterNodeE bs
-  exBody <- getExitNodeE be
+  ) => TermLab fs a -> BlockTermPairLab fs -> m (CfgNode fs, CfgNode fs)
+getEEPBlock t (bs, be) = do
+  enBody <- getEnterNodeE t bs
+  exBody <- getExitNodeE t be
   return (enBody, exBody)
 
 -- hardcoded integration tests
@@ -412,3 +465,112 @@ integration_lua_cfg edges path =
           assertEdgesEqual es as =
             map (\(a, b) -> (show a, show b)) (Map.toList es) === map (\(a, b) -> (ppLabel a, ppLabel b)) as
 
+instance AssertCfgWellFormed MLuaSig IdentIsName
+
+instance AssertCfgWellFormed MLuaSig AssignIsStat where
+  assertCfgWellFormed t@(remA -> AssignIsStat s) = assertCfgIsGeneric (inject' t) [E s]
+
+instance AssertCfgWellFormed MLuaSig BlockIsBlock
+instance AssertCfgWellFormed MLuaSig StatIsBlockItem
+
+instance AssertCfgWellFormed MLuaSig SingleLocalVarDeclIsStat where
+  assertCfgWellFormed t@(remA -> SingleLocalVarDeclIsStat (project' -> Just (remA -> SingleLocalVarDecl _ _ init))) =
+    case project' init of
+      Just (remA -> JustLocalVarInit (project' -> Just (remA -> LuaLocalVarInit is))) -> do
+        assertCfgIsGeneric (inject' t) (map E (S.extractF is))
+      Just (remA -> NoLocalVarInit) -> do
+        assertCfgIsGeneric (inject' t) []
+
+instance AssertCfgWellFormed MLuaSig FunctionCallIsFunCall where
+  assertCfgWellFormed t@(remA -> FunctionCallIsFunCall fc) = do
+    let pes = maybe (error $ show (inject' t)) id $ do
+          (remA -> FunctionCall _ pefe args)  <- project' fc
+          pure $ go1 pefe ++ go args
+    assertCfgIsGeneric (inject' t) pes
+
+    where go2 :: MLuaTermLab FunctionArgumentL -> E MLuaTermLab
+          go2 (project' -> Just (remA -> PositionalArgument exp)) =
+            case project' exp of
+              Just (remA -> ExpIsPositionalArgExp e) -> E e
+          go2 (project' -> Just (remA -> ReceiverArg exp)) =
+              case project' exp of
+                Just (remA -> PrefixExpIsReceiver e) -> E e
+
+          go1 :: MLuaTermLab FunctionExpL -> [E MLuaTermLab]
+          go1 (project' -> Just (remA -> PrefixExpIsFunctionExp pe)) = [E pe]
+          go1 (project' -> Just (remA -> FunctionIdent _)) = []
+
+          go :: MLuaTermLab FunctionArgumentsL -> [E MLuaTermLab]
+          go (project' -> Just (remA -> FunctionArgumentList as)) = map go2 (S.extractF as)
+          go (project' -> Just (remA -> LuaTableArg tab)) =
+            case project' tab of
+              Just (remA -> Table flds) -> (map E $ S.extractF flds)
+          go (project' -> Just (remA -> LuaStringArg {})) = []
+          go (project' -> Just (remA -> LuaReceiverAndTableArg pe t)) = do
+            case project' t of
+              Just (remA -> Table flds) -> E pe : (map E $ S.extractF flds)
+          go (project' -> Just (remA -> LuaReceiverAndStringArg pe _)) = [E pe]          
+          
+instance AssertCfgWellFormed MLuaSig ExpIsPositionalArgExp
+instance AssertCfgWellFormed MLuaSig PrefixExpIsFunctionExp
+instance AssertCfgWellFormed MLuaSig PrefixExpIsReceiver
+
+instance AssertCfgWellFormed MLuaSig FunctionDefIsStat where
+  assertCfgWellFormed t@(remA -> FunctionDefIsStat def) =
+    -- NOTE: FunctionDef is a suspended computation, so just check
+    -- if start and end of this node are connected
+    assertCfgIsGeneric (inject' t) []
+
+instance AssertCfgWellFormed MLuaSig BlockIsFunctionBody
+
+-- lua specific
+
+instance AssertCfgWellFormed MLuaSig LuaVarArgsParam
+instance AssertCfgWellFormed MLuaSig LuaFunctionAttrs
+instance AssertCfgWellFormed MLuaSig LuaFunctionDefinedObj
+instance AssertCfgWellFormed MLuaSig LuaSpecialFunArg
+
+instance AssertCfgWellFormed MLuaSig LuaBlockEnd
+
+instance AssertCfgWellFormed MLuaSig LuaRhs
+instance AssertCfgWellFormed MLuaSig LuaLhs
+instance AssertCfgWellFormed MLuaSig LuaLocalVarInit
+
+instance AssertCfgWellFormed MLuaSig NumberType
+
+instance AssertCfgWellFormed MLuaSig Var where
+  assertCfgWellFormed t@(remA -> VarName {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> Select pe e) = assertCfgIsGeneric (inject' t) [E pe, E e]
+  assertCfgWellFormed t@(remA -> SelectName pe _) = assertCfgIsGeneric (inject' t) [E pe]
+
+instance AssertCfgWellFormed MLuaSig Unop
+
+instance AssertCfgWellFormed MLuaSig TableField where
+  assertCfgWellFormed t@(remA -> ExpField e1 e2) = assertCfgIsGeneric (inject' t) [E e1, E e2]
+  assertCfgWellFormed t@(remA -> NamedField _ e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> Field e) = assertCfgIsGeneric (inject' t) [E e]
+  
+instance AssertCfgWellFormed MLuaSig Table
+
+instance AssertCfgWellFormed MLuaSig PrefixExp where
+  assertCfgWellFormed t@(remA -> PEVar v) = assertCfgIsGeneric (inject' t) [E v]
+  assertCfgWellFormed t@(remA -> PEFunCall fcall) = assertCfgIsGeneric (inject' t) [E fcall]
+  assertCfgWellFormed t@(remA -> Paren v) = assertCfgIsGeneric (inject' t) [E v]
+
+instance AssertCfgWellFormed MLuaSig FunName
+
+-- NOTE: seems like FunDef and FunBody is only used for lambdas
+-- get more information about this
+instance AssertCfgWellFormed MLuaSig FunDef
+instance AssertCfgWellFormed MLuaSig FunBody
+
+instance AssertCfgWellFormed MLuaSig Binop 
+
+
+-- containers
+instance AssertCfgWellFormed MLuaSig PairF
+instance AssertCfgWellFormed MLuaSig ListF where
+  assertCfgWellFormed _ = pure () -- error "TODO"
+
+instance AssertCfgWellFormed MLuaSig MaybeF
+instance AssertCfgWellFormed MLuaSig UnitF

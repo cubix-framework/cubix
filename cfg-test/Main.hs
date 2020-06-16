@@ -4,6 +4,9 @@ import           Hedgehog hiding (label)
 
 import           Control.Arrow
 import qualified Data.Map as Map
+import           Data.String ( IsString (..))
+import           System.Directory
+import           System.FilePath
 
 import           Cubix.Language.Info
 import           Cubix.Language.Lua.Cfg.Test
@@ -12,14 +15,22 @@ import           Cubix.Language.JavaScript.Cfg.Test
 
 tests :: IO Bool
 tests = do
-  checkParallel $ Group "cfg-tests" [
-          ("unit_lua_cfg_foo", unit_lua_cfg "input-files/lua/Foo.lua")
-        , ("unit_lua_cfg_bar", unit_lua_cfg "input-files/lua/Bar.lua")
+  let lua_path = "/home/sreenidhi/Work/cubix/cubix/test/lua/lua-5.3.3-tests" -- "/home/sreenidhi/Work/cubix/lua_files"
+      java_path = "/home/sreenidhi/Work/cubix/java-semantics/tests"
+  lua_files <- listDirectory lua_path
+  java_files <- listRecursive java_path
+  checkParallel $ Group "cfg-tests" $ [
+        --   ("unit_lua_cfg_foo", unit_lua_cfg "input-files/lua/Foo.lua")
+        -- , ("unit_lua_cfg_bar", unit_lua_cfg "input-files/lua/Bar.lua")
+        -- , ("unit_lua_cfg_zap", unit_lua_cfg "input-files/lua/Zap.lua")
         
         -- , ("integration_lua_cfg_bar", integration_lua_cfg bar_edges "input-files/lua/Bar.lua")
-        , ("unit_java_cfg_bar", unit_java_cfg "input-files/java/Bar.java")        
-        , ("unit_js_cfg_baz", unit_js_cfg "input-files/javascript/Zap.js")        
-        ]
+        ("unit_java_cfg_bar", unit_java_cfg "input-files/java/Baz.java")        
+        -- ("unit_js_cfg_baz", unit_js_cfg "input-files/javascript/Zap.js")        
+        ] ++ (map (\fileName -> (fromString fileName, unit_lua_cfg (lua_path </> fileName))) lua_files)
+          ++ (map (\fileName -> (fromString fileName, unit_java_cfg (java_path </> fileName))) java_files)
+        
+                                    
 
 main = tests
 
@@ -82,3 +93,16 @@ bar_edges =
    (52,1)
   ]
 
+listRecursive :: FilePath -> IO [FilePath]
+listRecursive fp = go fp
+
+  where go0 cur v = do
+          isDir <- doesDirectoryExist (fp </> cur </> v)
+          case isDir of
+            True -> go (cur </> v)
+            False | takeExtension v == ".java" -> pure [cur </> v]
+                  | otherwise                 -> pure []
+
+        go cur = do
+          vs <- listDirectory (fp </> cur)
+          concat <$> mapM (go0 cur) vs

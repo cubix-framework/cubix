@@ -224,3 +224,5 @@ tests:
      - mtl
      - base
      - deepseq
+     - directory
+     - filepath

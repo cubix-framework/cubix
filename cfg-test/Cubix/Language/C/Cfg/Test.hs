@@ -15,7 +15,7 @@
 {-# OPTIONS_GHC -fcontext-stack=300     #-}
 
 module Cubix.Language.C.Cfg.Test where
-
+{-
 import           Control.Lens hiding ( para )
 import           Control.Monad ( when )
 import           Control.Monad.IO.Class (MonadIO (..))
@@ -405,3 +405,4 @@ extractBlock t = E t
 
 nameString :: MCTermLab CFull.IdentL -> String
 nameString (stripA -> projF -> Just (Ident' n)) = n
+-}
