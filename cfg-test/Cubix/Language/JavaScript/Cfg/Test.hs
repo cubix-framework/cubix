@@ -58,8 +58,95 @@ makeJavascriptEnv t = do
       cfg = makeCfg tLab
   pure (tLab, cfg)
 
-instance {-# OVERLAPPABLE #-} AssertCfgWellFormed MJSSig a where
-  assertCfgWellFormed t = pure ()
+instance AssertCfgWellFormed MJSSig S.MaybeF
+instance AssertCfgWellFormed MJSSig S.ListF where
+  -- TODO: fix this
+  assertCfgWellFormed _ = pure ()
+  
+instance AssertCfgWellFormed MJSSig BlockWithPrelude
+instance AssertCfgWellFormed MJSSig CommentAnnotation
+instance AssertCfgWellFormed MJSSig TokenPosn
+instance AssertCfgWellFormed MJSSig JSCommaTrailingListF
+instance AssertCfgWellFormed MJSSig JSCommaListF
+instance AssertCfgWellFormed MJSSig JSUnaryOp
+instance AssertCfgWellFormed MJSSig JSTryFinally
+instance AssertCfgWellFormed MJSSig JSTryCatch
+instance AssertCfgWellFormed MJSSig JSSwitchParts
+instance AssertCfgWellFormed MJSSig JSSemi
+instance AssertCfgWellFormed MJSSig JSPropertyName
+instance AssertCfgWellFormed MJSSig JSObjectProperty
+instance AssertCfgWellFormed MJSSig JSBlock
+instance AssertCfgWellFormed MJSSig JSBinOp
+instance AssertCfgWellFormed MJSSig JSAssignOp
+instance AssertCfgWellFormed MJSSig JSArrayElement
+instance AssertCfgWellFormed MJSSig JSAnnot
+instance AssertCfgWellFormed MJSSig JSAccessor
+instance AssertCfgWellFormed MJSSig JSAST
+
+instance AssertCfgWellFormed MJSSig S.EmptyParameterAttrs
+instance AssertCfgWellFormed MJSSig S.PositionalParameter
+instance AssertCfgWellFormed MJSSig S.EmptyFunctionDefAttrs
+instance AssertCfgWellFormed MJSSig S.FunctionDef where
+  assertCfgWellFormed t@(remA -> S.FunctionDef {}) =
+    -- NOTE: def is suspended, so check that
+    assertCfgIsGenericAuto (inject' t) []
+    
+  
+instance AssertCfgWellFormed MJSSig S.PositionalArgument
+instance AssertCfgWellFormed MJSSig S.FunctionArgumentList
+instance AssertCfgWellFormed MJSSig S.EmptyFunctionCallAttrs
+instance AssertCfgWellFormed MJSSig S.FunctionCall
+instance AssertCfgWellFormed MJSSig S.EmptyMultiLocalVarDeclCommonAttrs
+instance AssertCfgWellFormed MJSSig S.EmptyBlockEnd
+instance AssertCfgWellFormed MJSSig S.MultiLocalVarDecl
+instance AssertCfgWellFormed MJSSig S.EmptyLocalVarDeclAttrs
+instance AssertCfgWellFormed MJSSig S.TupleBinder
+instance AssertCfgWellFormed MJSSig S.Block
+instance AssertCfgWellFormed MJSSig S.Assign
+instance AssertCfgWellFormed MJSSig S.AssignOpEquals
+instance AssertCfgWellFormed MJSSig S.Ident
+instance AssertCfgWellFormed MJSSig S.SingleLocalVarDecl
+instance AssertCfgWellFormed MJSSig S.OptLocalVarInit
+
+-- Is
+instance AssertCfgWellFormed MJSSig MaybeIdentIsJSIdent
+instance AssertCfgWellFormed MJSSig JSBlockIsFunctionBody
+instance AssertCfgWellFormed MJSSig FunctionDefIsJSStatement where
+  assertCfgWellFormed t@(remA -> FunctionDefIsJSStatement def) =
+    assertCfgIsGenericAuto (inject' t) [E def]
+  
+instance AssertCfgWellFormed MJSSig JSExpressionIsFunctionExp
+instance AssertCfgWellFormed MJSSig JSExpressionIsPositionalArgExp
+instance AssertCfgWellFormed MJSSig JSBlockIsJSAST
+instance AssertCfgWellFormed MJSSig JSStatementIsBlockItem
+instance AssertCfgWellFormed MJSSig JSAssignOpIsAssignOp
+instance AssertCfgWellFormed MJSSig JSExpressionIsLhs
+instance AssertCfgWellFormed MJSSig JSExpressionIsRhs
+instance AssertCfgWellFormed MJSSig JSExpressionIsVarDeclBinder
+instance AssertCfgWellFormed MJSSig JSExpressionIsLocalVarInit
+
+instance AssertCfgWellFormed MJSSig IdentIsJSExpression where
+  assertCfgWellFormed t@(remA -> IdentIsJSExpression e) =
+    assertCfgIsGeneric (inject' t) []
+instance AssertCfgWellFormed MJSSig FunctionCallIsJSExpression where
+  assertCfgWellFormed t@(remA -> FunctionCallIsJSExpression call) =
+    assertCfgIsGenericAuto (inject' t) [E call]
+  
+instance AssertCfgWellFormed MJSSig BlockIsJSStatement
+instance AssertCfgWellFormed MJSSig AssignIsJSExpression where
+  assertCfgWellFormed t@(remA -> AssignIsJSExpression asn) =
+    case project' asn of
+      Just (remA -> Assign lhs _ rhs) -> assertCfgIsGeneric (inject' t) [eLhs lhs, eRhs rhs]
+
+    where eLhs :: MJSTermLab LhsL -> E MJSTermLab
+          eLhs (project' -> Just (remA -> JSExpressionIsLhs e)) = E e
+
+          eRhs :: MJSTermLab RhsL -> E MJSTermLab
+          eRhs (project' -> Just (remA -> JSExpressionIsRhs e)) = E e
+
+instance AssertCfgWellFormed MJSSig MultiLocalVarDeclIsJSStatement where
+  assertCfgWellFormed t@(remA -> MultiLocalVarDeclIsJSStatement dec) =
+    assertCfgIsGenericAuto (inject' t) [E dec]
 
 instance AssertCfgWellFormed MJSSig JSExpression where
   assertCfgWellFormed t@(JSExpressionTernary test _ succ _ fail :&: _) = do
@@ -68,37 +155,95 @@ instance AssertCfgWellFormed MJSSig JSExpression where
     case extractOp op of
       JSBinOpAnd _ -> assertCfgShortCircuit (inject' t) e1 e2
       JSBinOpOr _  -> assertCfgShortCircuit (inject' t) e1 e2
-      _   -> pure ()
+      _   -> assertCfgIsGeneric (inject' t) [E e1, E e2]
 
     where extractOp :: MJSTermLab JSBinOpL -> JSBinOp MJSTerm JSBinOpL
           extractOp (stripA -> project -> Just bp) = bp
 
-  assertCfgWellFormed t = assertCfgWellFormedDefault t
+  assertCfgWellFormed t@(remA -> JSIdentifier {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSDecimal {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSLiteral {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSHexInteger {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSOctal {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSStringLiteral {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSRegEx {}) = assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSArrayLiteral _ elems _) =
+    assertCfgIsGeneric (inject' t) (concatMap go $ S.extractF elems)
+
+    where go :: MJSTermLab JSArrayElementL -> [E MJSTermLab]
+          go t = case project' t of
+            Just (remA -> JSArrayElement e) -> [E e]
+            Just (remA -> JSArrayComma {})  -> []
+  -- JSAssignExpression does not occur
+  -- JSCallExpression does not occur
+  assertCfgWellFormed t@(remA -> JSCallExpressionDot b _ a) = assertCfgIsGeneric (inject' t) [E b, E a]
+  assertCfgWellFormed t@(remA -> JSCallExpressionSquare b _ a _) = assertCfgIsGeneric (inject' t) [E b, E a]  
+  assertCfgWellFormed t@(remA -> JSCommaExpression l _ r) = assertCfgIsGeneric (inject' t) [E l, E r]
+  assertCfgWellFormed t@(remA -> JSExpressionParen _ e _) = assertCfgIsGeneric (inject' t) [E e]  
+  assertCfgWellFormed t@(remA -> JSExpressionPostfix e _) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> JSFunctionExpression _ _ _ _ _ blk) =
+    -- TODO: extractJSBlock needs to be expanded
+    {-
+    case extractJSBlock blk of
+      E blk0 -> assertCfgIsSuspended (inject' t) blk0
+    -}
+    pure ()
+  assertCfgWellFormed t@(remA -> JSMemberDot l _ r) = assertCfgIsGeneric (inject' t) [E l, E r]
+  assertCfgWellFormed t@(remA -> JSNewExpression _ e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> JSUnaryExpression _ e) = assertCfgIsGeneric (inject' t) [E e]  
+  assertCfgWellFormed t@(remA -> JSObjectLiteral _ objPropList _) = assertCfgIsGenericAuto (inject' t) [E objPropList]
+  assertCfgWellFormed t@(remA -> JSMemberExpression e _ es _) = assertCfgIsGenericAuto (inject' t) [E e, E es]
+  assertCfgWellFormed t@(remA -> JSMemberNew _ e _ es _) = assertCfgIsGenericAuto (inject' t) [E e, E es]
+  assertCfgWellFormed t@(remA -> JSMemberSquare e1 _ e2 _) = assertCfgIsGenericAuto (inject' t) [E e1, E e2]
+  assertCfgWellFormed t@(remA -> JSVarInitExpression e init) = assertCfgIsGenericAuto (inject' t) [E e, E init]
+  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 instance AssertCfgWellFormed MJSSig JSStatement where
-  assertCfgWellFormed t@(JSDoWhile _ body _ _ cond _ _ :&: _) =
+  assertCfgWellFormed t@(remA -> JSDoWhile _ body _ _ cond _ _) =
     assertCfgDoWhile (inject' t) (extractBlock body) cond
-  assertCfgWellFormed t@(JSIf _ _ cond _ thn :&: _) =
+  assertCfgWellFormed t@(remA -> JSIf _ _ cond _ thn) =
     assertCfgIf (inject' t) cond (extractBlock thn)
-  assertCfgWellFormed t@(JSIfElse _ _ cond _ thn _ els :&: _) =
+  assertCfgWellFormed t@(remA -> JSIfElse _ _ cond _ thn _ els) =
     assertCfgIfElse (inject' t) cond (extractBlock thn) (extractBlock els)
-  assertCfgWellFormed t@(JSReturn _ e _ :&: _) =
+  assertCfgWellFormed t@(remA -> JSReturn _ e _) =
     assertCfgReturn (inject' t) (S.extractF e)
-  assertCfgWellFormed t@(JSThrow _ e _ :&: _) =
+  assertCfgWellFormed t@(remA -> JSThrow _ e _) =
     assertCfgReturn (inject' t) (Just e)
-  assertCfgWellFormed t@(JSTry _ block catchs finally :&: _) =
+  assertCfgWellFormed t@(remA -> JSTry _ block catchs finally) =
     assertCfgTry (inject' t) (extractJSBlock block) (map extractJSCatch $ S.extractF catchs) (extractJSFinally finally)
-  assertCfgWellFormed t@(JSWhile _ _ e _ b :&: _) =
+  assertCfgWellFormed t@(remA -> JSWhile _ _ e _ b) =
     assertCfgWhile (inject' t) e (extractBlock b)
-  assertCfgWellFormed t@(JSSwitch _ _ exp _ _ cases _ _ :&: _) =
-    error "TODO"
-  assertCfgWellFormed t@(JSBreak _ (stripA -> JSIdent' targ) _ :&: _) = error "TODO"
-  assertCfgWellFormed t@(JSBreak _ _ _ :&: _) =
+  assertCfgWellFormed t@(remA -> JSSwitch _ _ exp _ _ cases _ _) =
+    pure ()
+    -- assertCfgSwitch (inject' t) exp (S.extractF cases)
+  assertCfgWellFormed t@(remA -> JSBreak _ (stripA -> JSIdent' targ) _) =
+    assertCfgBreakLabeled (inject' t) targ
+  assertCfgWellFormed t@(remA -> JSBreak {}) =
     assertCfgBreak (inject' t)
-  assertCfgWellFormed t@(JSContinue _ (stripA -> JSIdent' targ) _ :&: _) = error "TODO"
-  assertCfgWellFormed t@(JSContinue _ _ _ :&: _) =
+  assertCfgWellFormed t@(remA -> JSContinue _ (stripA -> JSIdent' targ) _) =
+    assertCfgContinueLabeled (inject' t) targ
+  assertCfgWellFormed t@(remA -> JSContinue {}) =
     assertCfgContinue (inject' t)
-  assertCfgWellFormed t = assertCfgWellFormedDefault t
+  assertCfgWellFormed t@(remA -> JSLabelled _ _ stmt) =
+    assertCfgIsGeneric (inject' t) [extractBlock stmt]    
+  assertCfgWellFormed t@(remA -> JSEmptyStatement {}) =
+    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> JSExpressionStatement e _) =
+    assertCfgIsGeneric (inject' t) [E e]    
+  assertCfgWellFormed t@(remA -> JSStatementBlock _ stmts _ _) =
+    case S.extractF stmts of
+      [] -> assertCfgIsGeneric (inject' t) [E stmts]
+      vs -> assertCfgSubterms (inject' t) (map E vs)
+  assertCfgWellFormed t@(remA -> JSWith _ _ e _ stmt _) =
+    assertCfgIsGeneric (inject' t) [E e, extractBlock stmt]
+  -- JSStatementBlock does not exist
+  -- JSConstant does not exist
+  -- JSAssignStatement does not exist
+  -- JSFunction  does not exist
+  -- JSMethodCall does not exist
+  -- JSVariable does not exist
+  -- JSFor, JSForIn, JSForVar, JSForVarIn does not exist
+  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 instance AssertCfgWellFormed MJSSig JSCommon.JSFor where
   assertCfgWellFormed t@(JSCommon.JSFor init cond step body :&: _) =
@@ -108,7 +253,8 @@ instance AssertCfgWellFormed MJSSig JSCommon.JSFor where
             toMaybe xs = error $ "Panic: unexpected list: " ++ show xs
 
   assertCfgWellFormed t@(JSCommon.JSForVar init cond step body :&: _) = do
-    error "TODO" -- assertCfgWhile (inject' t) e (extractBlock body)
+    -- TODO: complete this
+    pure ()
   assertCfgWellFormed t@(JSCommon.JSForIn _ _ e body :&: _) = do
     assertCfgWhile (inject' t) e (extractBlock body)
   assertCfgWellFormed t@(JSCommon.JSForVarIn _ _ e body :&: _) = do
@@ -122,9 +268,9 @@ assertCfgShortCircuit ::
   , All EqHF fs
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
-  (enSExp, exSExp) <- getEnterExitPair t
-  (enE1, exE1) <- getEnterExitPair e1
-  (enE2, exE2) <- getEnterExitPair e2
+  (enSExp, exSExp) <- getEnterExitPair t t
+  (enE1, exE1) <- getEnterExitPair t e1
+  (enE2, exE2) <- getEnterExitPair t e2
 
   assertEdges t [ (enSExp, enE1)
                 , (exE1, exSExp)
@@ -143,13 +289,77 @@ assertCfgCondOp ::
   , All EqHF fs
   ) => TermLab fs e -> TermLab fs e -> TermLab fs e -> TermLab fs e -> m ()
 assertCfgCondOp t test succ fail = do
-  (enTop, exTop) <- getEnterExitPair t
-  (enTest, exTest) <- getEnterExitPair test
-  (enSucc, exSucc) <- getEnterExitPair succ
-  (enFail, exFail) <- getEnterExitPair fail
+  (enTop, exTop) <- getEnterExitPair t t
+  (enTest, exTest) <- getEnterExitPair t test
+  (enSucc, exSucc) <- getEnterExitPair t succ
+  (enFail, exFail) <- getEnterExitPair t fail
 
   assertEdges t [(enTop, enTest), (exTest, enSucc), (exTest, enFail), (exSucc, exTop), (exFail, exTop)]
                 [enTop, exTop, enTest, exTest, enSucc, exSucc, enFail, exFail]
+
+-- NOTE: Asserts that
+--       * there in only one outgoing edge from entry node of `break`.
+--       * that outgoing edge is to a node which has an `ExitNode` type.
+--       * that outgoing edge is to a node which has a label with this name
+--       * there are no incoming nodes in exit node of `break`.
+assertCfgBreakLabeled ::
+  ( MonadTest m
+  , MonadReader (Cfg MJSSig) m
+  ) => TermLab MJSSig a -> String -> m ()
+assertCfgBreakLabeled b labName = do
+  (enBreak, exBreak) <- getEnterExitPair b b
+  let jmpNodeLabs = enBreak ^. cfg_node_succs
+  assert (length jmpNodeLabs == 1)
+
+  let enJmpLab = head (Set.toList jmpNodeLabs)
+  menJump <- preview (cur_cfg.cfg_nodes.(ix enJmpLab))
+  enJmp <- assertJust "Cfg label lookup: " menJump
+  assert (checkNodeType enJmp)
+  assert (checkLab (enJmp ^.  cfg_node_term))  
+  assert (length (exBreak ^. cfg_node_prevs) == 0)
+
+    where
+      checkNodeType :: CfgNode MJSSig -> Bool
+      checkNodeType node =
+        node ^. cfg_node_type == ExitNode
+
+      checkLab ::  E (TermLab MJSSig) -> Bool
+      checkLab (E (project' -> Just (remA -> JSLabelled (stripA -> JSIdent' n) _ _)))
+        | labName == n = True
+        | otherwise = False
+      checkLab _ = False
+
+-- NOTE: Asserts that
+--       * there in only one outgoing edge from entry node of `continue`.
+--       * that outgoing edge is to a node which has an `LoopEntry` type.
+--       * that outgoing edge is to a node which has a label with this name [ TODO: need to be added; but how to get to the label? ]
+--       * there are no incoming nodes in exit node of `continue`.
+assertCfgContinueLabeled ::
+  ( MonadTest m
+  , MonadReader (Cfg MJSSig) m
+  ) => TermLab MJSSig a -> String -> m ()
+assertCfgContinueLabeled b labName = do
+  (enContinue, exContinue) <- getEnterExitPair b b
+  let jmpNodeLabs = enContinue ^. cfg_node_succs
+  assert (length jmpNodeLabs == 1)
+
+  let enJmpLab = head (Set.toList jmpNodeLabs)
+  menJump <- preview (cur_cfg.cfg_nodes.(ix enJmpLab))
+  enJmp <- assertJust "Cfg label lookup: " menJump
+  assert (checkNodeType enJmp)
+  -- assert (checkLab (enJmp ^.  cfg_node_term)) 
+  assert (length (exContinue ^. cfg_node_prevs) == 0)
+
+    where
+      checkNodeType :: CfgNode MJSSig -> Bool
+      checkNodeType node =
+        node ^. cfg_node_type == LoopEntryNode
+
+      checkLab ::  E (TermLab MJSSig) -> Bool
+      checkLab (E (project' -> Just (remA -> JSLabelled (stripA -> JSIdent' n) _ _)))
+        | labName == n = True
+        | otherwise = False
+      checkLab _ = False
 
 -- NOTE: Asserts that
 --       * there in only one outgoing edge from entry node of `break`.
@@ -162,7 +372,7 @@ assertCfgBreak ::
   , MonadReader (Cfg MJSSig) m
   ) => TermLab MJSSig a -> m ()
 assertCfgBreak b = do
-  (enBreak, exBreak) <- getEnterExitPair b
+  (enBreak, exBreak) <- getEnterExitPair b b
   let jmpNodeLabs = enBreak ^. cfg_node_succs
   assert (length jmpNodeLabs == 1)
 
@@ -175,9 +385,8 @@ assertCfgBreak b = do
     where
       checkNodeType :: CfgNode MJSSig -> Bool
       checkNodeType node =
-        node ^. cfg_node_type == ExitNode                    -- &&
-        -- TODO: implement switch check; loopLike check
-        -- (\(E t) -> isLoopLikeNode t) (node ^. cfg_node_term)
+        node ^. cfg_node_type == ExitNode                    &&
+        (\(E t) -> isLoopLikeNode t || isSwitchNode t) (node ^. cfg_node_term)
 
 assertCfgWellFormedDefault :: (MonadTest m, MonadReader (Cfg MJSSig) m, f :-<: MJSSig) => (f :&: Label) MJSTermLab l -> m ()
 assertCfgWellFormedDefault p = pure ()
@@ -190,11 +399,11 @@ assertCfgDoWhile ::
   , All EqHF gs
   ) => TermLab gs l -> E (TermLab gs) -> TermLab gs j -> m ()
 assertCfgDoWhile t (E b) e = do
-  (enDoWhile, exDoWhile) <- getEnterExitPair t
-  loDoWhile <- getLoopEntry t
+  (enDoWhile, exDoWhile) <- getEnterExitPair t t
+  loDoWhile <- getLoopEntry t t
 
-  (enBody, exBody) <- getEnterExitPair b
-  (enExp, exExp) <- getEnterExitPair e
+  (enBody, exBody) <- getEnterExitPair t b
+  (enExp, exExp) <- getEnterExitPair t e
 
   assertEdges t [ (enDoWhile, enBody)
                 , (exExp, enBody)
@@ -214,11 +423,11 @@ assertCfgIfElse ::
   , All EqHF fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> E (TermLab fs) -> m ()
 assertCfgIfElse t cond (E thn) (E els) = do
-  (enIf, exIf) <- getEnterExitPair t
-  (enCond, exCond) <- getEnterExitPair cond
-  (enThn, exThn) <- getEnterExitPair thn
-  (enEls, exEls) <- getEnterExitPair els
-  midNode <- getIEP 0 t
+  (enIf, exIf) <- getEnterExitPair t t
+  (enCond, exCond) <- getEnterExitPair t cond
+  (enThn, exThn) <- getEnterExitPair t thn
+  (enEls, exEls) <- getEnterExitPair t els
+  midNode <- getIEP 0 t t
   assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exThn, exIf), (exCond, enEls), (exEls, exIf)]
                 [enIf, exIf, midNode, enCond, exCond, enThn, exThn, enEls, exEls]
 
@@ -230,10 +439,10 @@ assertCfgIf ::
   , All EqHF fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgIf t cond (E thn) = do
-  (enIf, exIf) <- getEnterExitPair t
-  (enCond, exCond) <- getEnterExitPair cond
-  (enThn, exThn) <- getEnterExitPair thn
-  midNode <- getIEP 0 t
+  (enIf, exIf) <- getEnterExitPair t t
+  (enCond, exCond) <- getEnterExitPair t cond
+  (enThn, exThn) <- getEnterExitPair t thn
+  midNode <- getIEP 0 t t
   assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf) ]
                 [enIf, exIf, midNode, enCond, exCond, enThn, exThn]
 
@@ -251,12 +460,12 @@ assertCfgReturn ::
   , All EqHF fs
   ) => TermLab fs l -> Maybe (TermLab fs e) -> m ()
 assertCfgReturn t me = do
-  (enReturn, exReturn) <- getEnterExitPair t
+  (enReturn, exReturn) <- getEnterExitPair t t
   assertNoEdge t enReturn exReturn
   case me of
     Nothing -> pure ()
     Just exp -> do
-      (enExp, exExp) <- getEnterExitPair exp
+      (enExp, exExp) <- getEnterExitPair t exp
       assertEdge t enReturn enExp
       assertNoEdge t exExp exReturn
 
@@ -269,10 +478,10 @@ assertCfgWhile ::
   , All EqHF fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgWhile t e (E b) = do
-  (enWhile, exWhile) <- getEnterExitPair t
-  loWhile <- getLoopEntry t
-  (enCond, exCond) <- getEnterExitPair e
-  (enBody, exBody) <- getEnterExitPair b
+  (enWhile, exWhile) <- getEnterExitPair t t
+  loWhile <- getLoopEntry t t
+  (enCond, exCond) <- getEnterExitPair t e
+  (enBody, exBody) <- getEnterExitPair t b
 
   assertEdges t ([ (enWhile, loWhile)
                  , (loWhile, enCond)
@@ -295,7 +504,7 @@ assertCfgContinue ::
   , MonadReader (Cfg MJSSig) m
   ) => TermLab MJSSig a -> m ()
 assertCfgContinue c = do
-  (enContinue, exContinue) <- getEnterExitPair c
+  (enContinue, exContinue) <- getEnterExitPair c c
   let jmpNodeLabs = enContinue ^. cfg_node_succs
   assert (length jmpNodeLabs == 1)
 
@@ -308,9 +517,8 @@ assertCfgContinue c = do
     where
       checkNodeType :: CfgNode MJSSig -> Bool
       checkNodeType node =
-        node ^. cfg_node_type == LoopEntryNode                -- &&
-        -- TODO: add looplike check
-        -- (\(E t) -> isLoopLikeNode t) (node ^. cfg_node_term)
+        node ^. cfg_node_type == LoopEntryNode                &&
+        (\(E t) -> isLoopLikeNode t) (node ^. cfg_node_term)
 
 assertCfgFor ::
   ( MonadTest m
@@ -320,12 +528,12 @@ assertCfgFor ::
   , All EqHF fs
   ) => TermLab fs l -> Maybe (TermLab fs i) -> Maybe (TermLab fs e) -> Maybe (TermLab fs e) -> E (TermLab fs) -> m ()
 assertCfgFor t mInit mCond mStep (E body) = do
-  eepFor <- getEnterExitPair t
-  loFor <- getLoopEntry t
-  eepBody <- getEnterExitPair body
-  mEEPInit <- getEnterExitPairMaybe mInit
-  mEEPCond <- getEnterExitPairMaybe mCond
-  mEEPStep <- getEnterExitPairMaybe mStep
+  eepFor <- getEnterExitPair t t
+  loFor <- getLoopEntry t t
+  eepBody <- getEnterExitPair t body
+  mEEPInit <- traverse (getEnterExitPair t) mInit
+  mEEPCond <- traverse (getEnterExitPair t) mCond
+  mEEPStep <- traverse (getEnterExitPair t) mStep
 
   let edges =
         let (e0, vs0) = mJoinEdgesR [] (identEdge $ enter eepFor) mEEPInit
@@ -360,7 +568,29 @@ assertCfgTry t (E blk) catchs finally = do
     uncurryE :: (forall l1 l2. TermLab fs l1 -> TermLab fs l2 -> m ()) -> (E (TermLab fs), E (TermLab fs)) -> m ()
     uncurryE f (E t1, E t2) = f t1 t2
 
-assertCfgSwitch = undefined
+assertCfgSwitch ::
+  forall m l.
+  ( MonadReader (Cfg MJSSig) m
+  , MonadTest m
+  ) => TermLab MJSSig l -> TermLab MJSSig JSExpressionL -> [TermLab MJSSig JSSwitchPartsL] -> m ()
+assertCfgSwitch t e cs = do
+  (swEn, swEx) <- getEnterExitPair t t
+  (eEn, eEx) <- getEnterExitPair t e
+  csEEPs <- mapM getEEPCase cs
+
+  let jumps = map (\cEEP -> (eEx, fst cEEP)) csEEPs
+      fallthrough = zipWith (\p n -> (snd p, fst n)) csEEPs (tail csEEPs) ++ [(snd (last  csEEPs), swEx)]
+  assertEdges t ([(swEn, eEn), (eEn, eEx)] ++ jumps ++ fallthrough)
+                ([swEn, swEx, eEn, eEx] ++ map fst csEEPs ++ map snd csEEPs)
+  
+  where getEEPCase :: TermLab MJSSig JSSwitchPartsL -> m (CfgNode MJSSig, CfgNode MJSSig)
+        getEEPCase t0 = case project' t0 of
+          Just (remA -> JSCase _ e _ es) -> do
+            eEEP <- getEnterExitPair t e
+            esEEP <- getEnterExitPair t es
+            pure (fst eEEP, snd esEEP)
+          Just (remA -> JSDefault _ _ es) ->
+            getEnterExitPair t es
 
 extractBlock :: TermLab MJSSig JSStatementL -> E (TermLab MJSSig)
 extractBlock t@(project' -> Just (JSStatementBlock _ stmts _ _ :&: _)) =
@@ -369,8 +599,9 @@ extractBlock t@(project' -> Just (JSStatementBlock _ stmts _ _ :&: _)) =
     _  -> E stmts
 extractBlock t                                                       = E t
 
+-- TODO: BlockWithPrelude as well
 extractJSBlock :: TermLab MJSSig JSBlockL -> E (TermLab MJSSig)
-extractJSBlock t@(project' -> Just (JSBlock _ stmts _ :&: _)) = E stmts
+extractJSBlock (project' -> Just (JSBlock _ stmts _ :&: _)) = E stmts
 
 extractJSCatch :: TermLab MJSSig JSTryCatchL -> (E (TermLab MJSSig), E (TermLab MJSSig))
 extractJSCatch t@(project' -> Just (JSCatch _ _ e _ b :&: _)) = (E e, extractJSBlock b)
@@ -380,3 +611,15 @@ extractJSFinally :: TermLab MJSSig JSTryFinallyL -> Maybe (E (TermLab MJSSig))
 extractJSFinally t@(project' -> Just (JSFinally _ b :&: _)) = Just (extractJSBlock b)
 extractJSFinally t@(project' -> Just (JSNoFinally :&: _)) = Nothing
 
+isLoopLikeNode :: TermLab MJSSig l -> Bool
+isLoopLikeNode (project' -> Just (JSWhile {} :&: _))= True
+isLoopLikeNode (project' -> Just (JSDoWhile {} :&: _)) = True
+isLoopLikeNode (project' -> Just (JSFor {} :&: _)) = True
+isLoopLikeNode (project' -> Just (JSForVar {} :&: _)) = True
+isLoopLikeNode (project' -> Just (JSForIn {} :&: _)) = True
+isLoopLikeNode (project' -> Just (JSForVarIn {} :&: _)) = True
+isLoopLikeNode _ = False
+
+isSwitchNode :: TermLab MJSSig l -> Bool
+isSwitchNode (project' -> Just (JSSwitch {} :&: _))= True
+isSwitchNode _ = False

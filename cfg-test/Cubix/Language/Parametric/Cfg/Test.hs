@@ -15,7 +15,7 @@
 module Cubix.Language.Parametric.Cfg.Test where
 
 import           Control.Lens hiding ( para, children )
-import           Data.Maybe ( catMaybes )
+import           Data.Maybe ( catMaybes, fromJust )
 import           Control.Monad ( forM_, when )
 import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Reader (MonadReader (..), ReaderT )
@@ -23,6 +23,7 @@ import           Data.Foldable ( traverse_, foldlM )
 import qualified Data.Map as Map
 import           Data.Proxy
 import qualified Data.Set as Set
+import qualified Debug.Trace as DT
 import           Hedgehog
 import qualified Hedgehog.Internal.Property as H
 
@@ -348,8 +349,23 @@ identEdge a = (a, a)
 children :: (All HFoldable gs, All HFunctor gs) => TermLab gs l -> [E (TermLab gs)]
 children = reverse . hfoldl (\vs t0 -> E t0 : vs) [] . unTerm
 
--- NOTE: Given a term, generically finds the CFG nodes corresponding to the given term's
---       immedeate children, and asserts that child EEPs are connected
+-- NOTE: Given a term, finds its immedeate children,
+--       generically finds the CFG nodes corresponding to the given term's
+--       children if they exist, and asserts that child EEPs are connected
+--       and that the given term is connected to the children.
+assertCfgIsGenericFullyAuto ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> m ()
+assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto' t catMaybes (children t)
+
+-- NOTE: Given a term, and its relevant children,
+--       generically finds the CFG nodes corresponding to the given term's
+--       children, and asserts that child EEPs are connected
 --       and that the given term is connected to the children.
 assertCfgIsGenericAuto ::
   ( MonadReader (Cfg fs) m
@@ -358,10 +374,20 @@ assertCfgIsGenericAuto ::
   , All HFunctor fs
   , All EqHF fs
   , All HFoldable fs
-  ) => TermLab fs l -> m ()
-assertCfgIsGenericAuto t = do
+  ) => TermLab fs l -> [E (TermLab fs)] -> m ()
+assertCfgIsGenericAuto t = assertCfgIsGenericAuto' t catMaybes
+
+assertCfgIsGenericAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> ([(Maybe (CfgNode fs, CfgNode fs))] -> [(CfgNode fs, CfgNode fs)]) -> [E (TermLab fs)] -> m ()
+assertCfgIsGenericAuto' t f children0 = do
   (en, ex) <- getEnterExitPair t t
-  subsEEP <- subtermsCfg t
+  subsEEP <- subtermsCfg t f children0
   let edges = if null subsEEP
         then [(en, ex)]
         else (en, fst (head subsEEP)) :
@@ -369,7 +395,7 @@ assertCfgIsGenericAuto t = do
               (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
       nodes = [en, ex] ++ map fst subsEEP ++ map snd subsEEP
   assertEdges t edges nodes
-                  
+
 assertCfgSubtermsAuto ::
   ( MonadReader (Cfg fs) m
   , MonadTest m
@@ -377,9 +403,9 @@ assertCfgSubtermsAuto ::
   , All HFunctor fs
   , All EqHF fs
   , All HFoldable fs
-  ) => TermLab fs l -> m ()
-assertCfgSubtermsAuto t = do
-  subsEEP <- subtermsCfg t
+  ) => TermLab fs l -> [E (TermLab fs)] -> m ()
+assertCfgSubtermsAuto t children0 = do
+  subsEEP <- subtermsCfg t (map fromJust) children0
   assertEdges t (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
                 (map fst subsEEP ++ map snd subsEEP)
 
@@ -390,12 +416,16 @@ subtermsCfg ::
   , All HFunctor fs
   , All EqHF fs
   , All HFoldable fs
-  ) => TermLab fs l -> m [(CfgNode fs, CfgNode fs)]
-subtermsCfg =
-  fmap catMaybes . mapM go . children
+  ) => TermLab fs l ->
+      ([(Maybe (CfgNode fs, CfgNode fs))] -> [(CfgNode fs, CfgNode fs)]) ->
+      [E (TermLab fs)] ->
+      m [(CfgNode fs, CfgNode fs)]
+subtermsCfg _t f =
+  fmap f . mapM go
 
   where go :: (MonadTest m, All HFoldable fs, All HFunctor fs, MonadReader (Cfg fs) m) => E (TermLab fs) -> m (Maybe (CfgNode fs, CfgNode fs))
         go t0 = do
+          
           -- For each piece of subterm, we get "leftmost"
           -- and "rightmost" CFG node
           l <- go0 children EnterNode t0
@@ -409,6 +439,3 @@ subtermsCfg =
           mcfgNode <- maybe (pure Nothing) (\nodeLab -> preview (cur_cfg.cfg_nodes.(ix nodeLab))) mnodeLab
           let cs = children0 t0           
           foldlM (\acc a -> maybe (go0 children0 nodeType a) (pure . Just) acc) mcfgNode cs
-        
-          
-  

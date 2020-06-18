@@ -163,10 +163,10 @@ instance AssertCfgWellFormed MJavaSig VarInitIsLocalVarInit
 instance AssertCfgWellFormed MJavaSig FunctionDef
 
 instance AssertCfgWellFormed MJavaSig AssignIsExp where
-  assertCfgWellFormed t = assertCfgIsGenericAuto (inject' t)
+  assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
 
 instance AssertCfgWellFormed MJavaSig MultiLocalVarDeclIsBlockStmt where
-  assertCfgWellFormed t = assertCfgIsGenericAuto (inject' t)
+  assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
 
 instance AssertCfgWellFormed MJavaSig Exp where
   assertCfgWellFormed t@(remA -> Cond test succ fail) = do
@@ -183,8 +183,8 @@ instance AssertCfgWellFormed MJavaSig Exp where
   assertCfgWellFormed t@(remA -> ClassLit {}) = assertCfgIsGeneric (inject' t) []  
   assertCfgWellFormed t@(remA -> This) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> ThisClass {}) = assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> InstanceCreation {}) = assertCfgIsGenericAuto (inject' t)
-  assertCfgWellFormed t@(remA -> QualInstanceCreation {}) = assertCfgIsGenericAuto (inject' t)
+  assertCfgWellFormed t@(remA -> InstanceCreation _ _ args cb) = assertCfgIsGenericAuto (inject' t) [E args, E cb]
+  assertCfgWellFormed t@(remA -> QualInstanceCreation e _ _ args cb) = assertCfgIsGenericAuto (inject' t) [E e, E args, E cb]
   assertCfgWellFormed t@(remA -> ArrayCreate _ exps _) = assertCfgIsGeneric (inject' t) (map E . S.extractF $ exps)
   assertCfgWellFormed t@(remA -> ArrayCreateInit _ _ inits) =
     assertCfgIsGeneric (inject' t) exps
@@ -209,9 +209,9 @@ instance AssertCfgWellFormed MJavaSig Exp where
             Just _ -> []                      
           
   assertCfgWellFormed t@(remA -> MethodInv {}) =
-    assertCfgIsGenericAuto (inject' t)
+    assertCfgIsGenericFullyAuto (inject' t)
   assertCfgWellFormed t@(remA -> InstanceOf {}) =
-    assertCfgIsGenericAuto (inject' t)    
+    assertCfgIsGenericFullyAuto (inject' t)    
   assertCfgWellFormed t@(remA -> ArrayAccess ix) =
     assertCfgIsGeneric (inject' t) exps
 
@@ -255,9 +255,7 @@ instance AssertCfgWellFormed MJavaSig Stmt where
   assertCfgWellFormed t@(remA -> EnhancedFor _ _ _ e b) =
     assertCfgEnhancedFor (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(remA -> Switch exp switchBlocks) =
-    -- TODO: Fix switch
-    pure ()
-    -- assertCfgSwitch (inject' t) exp (S.extractF switchBlocks)
+    assertCfgSwitch (inject' t) exp (S.extractF switchBlocks)
   assertCfgWellFormed t@(remA -> Do b e) =
     assertCfgDoWhile (inject' t) (extractBlock b) e
   assertCfgWellFormed t@(remA -> Break ml) =
@@ -639,20 +637,17 @@ assertCfgSwitch t e cs = do
 
   let jumps = map (\cEEP -> (eEx, fst cEEP)) csEEPs
       csEEPs = catMaybes mcsEEPs
-      fallthrough = zipWith (\p n -> (snd p, fst n)) csEEPs (tail csEEPs)
+      fallthrough = zipWith (\p n -> (snd p, fst n)) csEEPs (tail csEEPs) ++ [(snd (last csEEPs), swEx)]
   assertEdges t ([(swEn, eEn), (eEn, eEx)] ++ jumps ++ fallthrough)
                 ([swEn, swEx, eEn, eEx] ++ map fst csEEPs ++ map snd csEEPs)
   
   where getEEPCase :: TermLab MJavaSig SwitchBlockL -> m (Maybe (CfgNode MJavaSig, CfgNode MJavaSig))
         getEEPCase t0 = case project' t0 of
-          Just (remA -> SwitchBlock lab es) -> do
-            mlabEEP <- getEEPLabel lab
+          Just (remA -> SwitchBlock _ es) -> do
             esEEP <- mapM (getEnterExitPair t) (extractF es)            
-            case mlabEEP of
-              Just labEEP | null esEEP -> pure (Just (fst labEEP, snd labEEP))
-                          | otherwise -> pure (Just labEEP)
-              Nothing | null esEEP -> pure Nothing
-                      | otherwise  -> pure (Just (fst (head esEEP), snd (last esEEP)))
+            case null esEEP of
+                True  -> pure Nothing
+                False -> pure (Just (fst (head esEEP), snd (last esEEP)))
 
         getEEPLabel :: TermLab MJavaSig SwitchLabelL -> m (Maybe (CfgNode MJavaSig, CfgNode MJavaSig))
         getEEPLabel t0 = case project' t0 of
