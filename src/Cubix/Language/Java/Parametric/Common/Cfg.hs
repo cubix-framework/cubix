@@ -80,7 +80,7 @@ constructCfgWhileJava t mExp mBody = do
   exitNode      <- addCfgNode t ExitNode
 
   exp <- mExp >>= collapseEnterExit
-  pushLoopNode enterNode exitNode
+  pushLoopNode loopEntryNode exitNode
   body <- mBody
   popLoopNode
 
@@ -119,7 +119,6 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
   constructCfg (collapseFProd' -> (t :*: (BasicFor init cond step body))) = HState $ constructCfgFor t (extractEEPMaybe $ unHState init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
   constructCfg (collapseFProd' -> (t :*: (EnhancedFor _ _ _ e s))) = HState $ constructCfgWhile t (unHState e) (unHState s)
 
-  -- FIXME: Slightly hackish so we can get tests passing. Doesn't handle pass-through properly
   constructCfg (collapseFProd' -> (t :*: (Switch exp switchBlocks))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -138,7 +137,8 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
                              cur_cfg %= addEdge (exit expEE) bEnt
 
     -- NOTE: fallthrough
-    _ <- foldlM combineEnterExit EmptyEnterExit blocks
+    blockEE <- foldlM combineEnterExit EmptyEnterExit blocks
+    _ <- combineEnterExit blockEE (identEnterExit exitNode)
 
     return $ EnterExitPair enterNode exitNode
 

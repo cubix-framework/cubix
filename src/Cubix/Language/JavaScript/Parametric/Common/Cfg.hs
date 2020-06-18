@@ -89,8 +89,6 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
 
   constructCfg (collapseFProd' -> (t :*: (JSWhile _ _ e _ s))) = HState $ constructCfgWhile t (unHState e) (unHState s)
 
-
-  -- FIXME: Slightly hackish so we can get tests passing. Doesn't handle pass-through properly
   constructCfg (collapseFProd' -> (t :*: (JSSwitch _ _ exp _ _ switchParts _ _))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -110,7 +108,8 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
     popBreakNode
 
     -- NOTE: fallthrough
-    _ <- foldlM combineEnterExit EmptyEnterExit blocks
+    blockEE <- foldlM combineEnterExit EmptyEnterExit blocks
+    _ <- combineEnterExit blockEE (identEnterExit exitNode)
 
     return $ EnterExitPair enterNode exitNode
 
