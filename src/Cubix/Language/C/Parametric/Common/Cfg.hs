@@ -13,12 +13,16 @@
 module Cubix.Language.C.Parametric.Common.Cfg () where
 
 #ifndef ONLY_ONE_LANGUAGE
-import Control.Monad ( liftM, liftM2 )
-import Control.Monad.State ( State )
+import Control.Monad ( liftM, liftM2, forM_ )
+import Control.Monad.State ( State, MonadState )
 
-import Control.Lens ( makeLenses )
+import Control.Lens ( makeLenses, (%=), (.=), use )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, project )
+import Data.Foldable ( foldlM )
+import Data.List as List ( (\\) )
+import Data.Map as Map ( empty )
+
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, project, proj, E(..), (:&:)(..), subterms, (:-<:), Cxt (..) )
 
 import Cubix.Language.Info
 
@@ -83,8 +87,6 @@ instance ConstructCfg MCSig CCfgState CStatement where
 
   constructCfg (collapseFProd' -> (t :*: (CFor init cond step body _))) = HState $ constructCfgFor t (extractForInit init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
 
-  -- TODO: Stopgap to get tests to pass while we're waiting for the revamped break/continue support
-  -- Doesn't handle fall-through properly
   constructCfg (collapseFProd' -> (t :*: (CSwitch exp body _))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -95,12 +97,38 @@ instance ConstructCfg MCSig CCfgState CStatement where
     bodyEE <- unHState body
     popBreakNode
 
-    r1 <- combineEnterExit (identEnterExit enterNode) expEE
-    r2 <- combineEnterExit r1 bodyEE
-    combineEnterExit r2 (identEnterExit exitNode)
+    cur_cfg %= addEdge enterNode (enter expEE)
+    cur_cfg %= addEdge (exit expEE) (enter bodyEE)
+    cur_cfg %= addEdge (exit bodyEE) exitNode
 
+    forM_ cases $ \(E case0) -> do
+      ccfg <- use cur_cfg
+      let Just enCase = cfgNodeForTerm ccfg EnterNode case0
+      cur_cfg %= addEdge (exit expEE) enCase
 
-  -- Making a conscious choice to skip switch's
+    return $ EnterExitPair enterNode exitNode
+
+      where cases = case project0 t of
+              Just (remA -> CSwitch _ b0 _) -> extractCases b0
+
+            extractCases t0 =
+              let subs = subterms t0
+                  cases0 = filter isCase subs
+                  switches = filter isSwitch subs
+                  subcases = filter isCase (concatMap (\(E e0) -> subterms e0) switches)
+              in  cases0 List.\\ subcases
+
+            isCase :: E MCTermLab -> Bool
+            isCase (E (project0 -> Just (remA -> CCase {}))) = True
+            isCase (E (project0 -> Just (remA -> CDefault {}))) = True
+            isCase _ = False
+
+            isSwitch :: E MCTermLab -> Bool
+            isSwitch (E (project0 -> Just (remA -> CSwitch {}))) = True
+            isSwitch _ = False
+
+            project0 :: (f :-<: MCSig) => MCTermLab l -> Maybe ((f :&: Label) MCTermLab l)
+            project0 (Term (s :&: l)) = fmap (:&: l) (proj s)
 
   constructCfg t = constructCfgDefault t
 
@@ -117,14 +145,48 @@ instance ConstructCfg MCSig CCfgState CExpression where
 
   constructCfg t'@(remA -> CCond {}) = HState $ do
     let (t :*: (CCond test succ fail _)) = collapseFProd' t'
-    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
+    constructCfgCCondOp t (unHState test) (extractEEPMaybe (unHState succ)) (unHState fail)
 
   constructCfg t = constructCfgDefault t
 
+-- NOTE: because of gcc extension which allows things like x ? : y
+constructCfgCCondOp ::
+  ( MonadState s m
+  , CfgComponent MCSig s
+  ) => TermLab MCSig l -> m (EnterExitPair MCSig ls) -> m (Maybe (EnterExitPair MCSig rs)) -> m (EnterExitPair MCSig es) -> m (EnterExitPair MCSig es)
+constructCfgCCondOp t mtest msucc mfail = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+
+  test <- mtest
+  fail <- mfail
+  succ <- msucc
+
+  case succ of
+    Just succ0 -> do
+      cur_cfg %= addEdge enterNode (enter test)
+      cur_cfg %= addEdge (exit test) (enter succ0)
+      cur_cfg %= addEdge (exit test) (enter fail)
+      cur_cfg %= addEdge (exit succ0) exitNode
+      cur_cfg %= addEdge (exit fail) exitNode
+    Nothing -> do
+      cur_cfg %= addEdge enterNode (enter test)
+      cur_cfg %= addEdge (exit test) (enter fail)
+      cur_cfg %= addEdge (exit test) exitNode
+      cur_cfg %= addEdge (exit fail) exitNode
+
+  return (EnterExitPair enterNode exitNode)
 
 -- CLabelBlock's getting nodes is messing everything up
 instance ConstructCfg MCSig CCfgState CLabeledBlock where
   constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ runSubCfgs subCfgs
+
+instance ConstructCfg MCSig CCfgState P.FunctionDef where
+  constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ do
+    -- reset label map on function entry
+    label_map .= Map.empty
+    ee <- runSubCfgs subCfgs
+    pure ee
 
 instance CfgInitState MCSig where
   cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap

@@ -301,7 +301,6 @@ emptyLabelMap = LabelMap Map.empty
 
 makeClassy ''LabelMap
 
--- FIXME: This will probably break in Java when there's reuse of a labeled block name
 speculativeGetLabel :: (MonadState s m, HasLabelMap s, HasLabelGen s) => String -> m Label
 speculativeGetLabel s = do
   lm <- use label_map
@@ -339,6 +338,7 @@ constructCfgLabel t name = do
     Just (l, prevs) -> do
       n <- addCfgNodeWithLabel t l EnterNode
       for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy gs) p l
+      label_map %= Map.delete name
       return n
 
 
