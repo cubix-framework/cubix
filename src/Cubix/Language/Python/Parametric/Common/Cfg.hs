@@ -20,7 +20,7 @@ import Control.Lens ( (%=), makeLenses )
 
 import Data.Traversable ( for )
 
-import Data.Comp.Multi ( (:*:)(..) )
+import Data.Comp.Multi ( (:*:)(..), remA, stripA, project )
 
 import Cubix.Language.Info
 
@@ -66,7 +66,7 @@ constructCfgWhileElse t mExp mBody mElse = do
   exitNode      <- addCfgNode t ExitNode
 
   exp <- mExp >>= collapseEnterExit
-  pushLoopNode enterNode exitNode
+  pushLoopNode loopEntryNode exitNode
   body <- mBody
   popLoopNode
 
@@ -77,7 +77,7 @@ constructCfgWhileElse t mExp mBody mElse = do
   cur_cfg %= addEdge enterNode loopEntryNode
   cur_cfg %= addEdge loopEntryNode (enter exp)
   cur_cfg %= addEdge (exit exp) (enter body)
-  cur_cfg %= addEdge (exit exp) (exit end)
+  cur_cfg %= addEdge (exit exp) (enter end)
   cur_cfg %= addEdge (exit body) loopEntryNode
 
   return $ EnterExitPair enterNode exitNode
@@ -108,7 +108,7 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement wh
     combineEnterExit p (identEnterExit exitNode)
 
   constructCfg (collapseFProd' -> (t :*: Raise e _)) = HState $ constructCfgReturn t (liftM Just $ unHState e)
-  constructCfg (collapseFProd' -> (t :*: Break _)) = HState $ constructCfgContinue t
+  constructCfg (collapseFProd' -> (t :*: Break _)) = HState $ constructCfgBreak t
   constructCfg (collapseFProd' -> (t :*: Continue _)) = HState $ constructCfgContinue t
 
   constructCfg t = constructCfgDefault t
@@ -155,7 +155,22 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyWith where
 
     return $ EnterExitPair enterNode exitNode
 
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
+  constructCfg t'@(remA -> (BinaryOp (op :*: _) _ _ _)) = do
+    let (t :*: (BinaryOp _ el er _)) = collapseFProd' t'
+    case extractOp op of
+      And {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      Or {}  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
 
+    where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> CondExpr {}) = HState $ do
+    let (t :*: (CondExpr test succ fail _)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
+
+  constructCfg t = constructCfgDefault t
 
 instance CfgInitState MPythonSig where
   cfgInitState _ = PythonCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
