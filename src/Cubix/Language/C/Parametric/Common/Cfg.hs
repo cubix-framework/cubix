@@ -185,8 +185,8 @@ instance ConstructCfg MCSig CCfgState P.FunctionDef where
   constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ do
     -- reset label map on function entry
     label_map .= Map.empty
-    ee <- runSubCfgs subCfgs
-    pure ee
+    runSubCfgs subCfgs
+    pure EmptyEnterExit
 
 instance CfgInitState MCSig where
   cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap

@@ -19,7 +19,7 @@ import qualified Data.Map as Map
 import Data.Proxy
 import Data.Typeable ( Typeable )
 
-import Control.Lens ( (%=), makeLenses, Lens', to, use, (^..), (^.) )
+import Control.Lens ( (%=), makeLenses, Lens', to, use, (^..), (^.), (&), (%~), (.=), over )
 
 import Data.Comp.Multi ( project, project', stripA, remA, (:-<:) )
 import Data.Comp.Multi.Ops ( Sum, (:*:)(..), ffst )
@@ -36,11 +36,16 @@ import Cubix.Language.Parametric.Syntax as P
 
 -- So we push a new stack of label map or Fun marker whenever we enter a new block or a function respectively
 
-type LuaLabelMapStack = [LuaLabelMap]
 
 data LuaLabelMap = Fun
                  | BlockLabelMap { _block_label_map :: LabelMap }
                  deriving ( Eq, Ord, Show)
+
+data LuaLabelMapStack = LuaLabelMapStack { _label_map_stack :: [LuaLabelMap]
+                                         } deriving ( Eq, Ord, Show)
+
+makeLenses ''LuaLabelMapStack
+
 
 data LuaCfgState = LuaCfgState {
                    _lcs_cfg       :: Cfg MLuaSig
@@ -54,7 +59,7 @@ makeLenses ''LuaCfgState
 instance HasCurCfg LuaCfgState MLuaSig where cur_cfg = lcs_cfg
 instance HasLabelGen LuaCfgState where labelGen = lcs_labeler
 instance HasLoopStack LuaCfgState where loopStack = lcs_stack
-instance HasLabelMap LuaCfgState where labelMap = lcs_goto_labs._head.block_label_map
+instance HasLabelMap LuaCfgState where labelMap = lcs_goto_labs.label_map_stack._head.block_label_map
 
 type instance ComputationSorts MLuaSig = '[StatL, ExpL, PrefixExpL, VarL, TableFieldL, FunCallL, [BlockItemL], AssignL]
 type instance SuspendedComputationSorts MLuaSig = '[P.FunctionDefL]
@@ -128,25 +133,17 @@ instance ConstructCfg MLuaSig LuaCfgState Stat where
 instance ConstructCfg MLuaSig LuaCfgState P.FunctionDef where
   constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ do
     pushFunLabelMapStack
-    ee <- runSubCfgs subCfgs
+    runSubCfgs subCfgs
     popLabelMapStack
-    pure ee
+    return EmptyEnterExit
 
 instance ConstructCfg MLuaSig LuaCfgState P.Block where
   constructCfg p@(collapseFProd' -> (t :*: _)) = case project' t of
     Just (P.Block xs r) -> case (extractF xs, project' r) of
       ([], Just (LuaBlockEnd e)) -> HState $ do
-        pushBlockLabelMapStack emptyLabelMap
-        ee <- unHState $ constructCfgGeneric p -- FIXME: Doesn't properly handle returns, but I think the TACer won't notice
-        resolveVisibleLabels
-        popLabelMapStack
-        pure ee
+        withBlockLabelMap (unHState $ constructCfgGeneric p) -- FIXME: Doesn't properly handle returns, but I think the TACer won't notice
       _  -> HState $ do
-        pushBlockLabelMapStack emptyLabelMap
-        ee <- unHState $ constructCfgDefault p
-        resolveVisibleLabels
-        popLabelMapStack
-        pure ee
+        withBlockLabelMap (unHState $ constructCfgDefault p)
 
 instance ConstructCfg MLuaSig LuaCfgState Exp where
   constructCfg t'@(remA -> (Binop (op :*: _) _ _)) = do
@@ -164,35 +161,60 @@ instance ConstructCfg MLuaSig LuaCfgState Exp where
 instance CfgInitState MLuaSig where
   cfgInitState _ = LuaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMapStack
 
+withBlockLabelMap :: (MonadState LuaCfgState m) => m a -> m a
+withBlockLabelMap mee = do
+  pushBlockLabelMapStack emptyLabelMap
+  ee <- mee
+  lm <- use labelMap
+  popLabelMapStack
+  mergeLabelMap lm
+  pure ee
+
 pushFunLabelMapStack :: (MonadState LuaCfgState m) => m ()
 pushFunLabelMapStack =
-  lcs_goto_labs %= (Fun :)
+  lcs_goto_labs.label_map_stack %= (Fun :)
 
 pushBlockLabelMapStack :: (MonadState LuaCfgState m) => LabelMap -> m ()
 pushBlockLabelMapStack m =
-  lcs_goto_labs %= (:) (BlockLabelMap m)
+  lcs_goto_labs.label_map_stack %= (:) (BlockLabelMap m)
 
 popLabelMapStack :: (MonadState LuaCfgState m) => m ()
 popLabelMapStack =
-  lcs_goto_labs %= init
+  lcs_goto_labs.label_map_stack %= tail
 
 emptyLabelMapStack :: LuaLabelMapStack
-emptyLabelMapStack = []
+emptyLabelMapStack = LuaLabelMapStack []
 
-resolveVisibleLabels :: (MonadState LuaCfgState m) => m ()
-resolveVisibleLabels = do
-  vs <- use lcs_goto_labs
-  lm <- use labelMap
-  let visLabs = List.takeWhile isBlockLabelMap vs ^.. traverse.block_label_map.label_map
-  forM_ (Map.toList (lm ^. label_map)) $ \(fst -> lab) -> do
-    let Just (l, prevs) =
-          List.foldl' (\acc a -> case acc of
-                        Nothing -> Map.lookup lab a
-                        Just a0  -> Just a0) Nothing visLabs
-    forM_ prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy MLuaSig) p l
+-- NOTE: Merges the top of the stack with the subsequent
+--       element in the stack, adding in the unresolved labels in the top
+mergeLabelMap :: (MonadState LuaCfgState m) => LabelMap -> m ()
+mergeLabelMap x = do
+  lmstack <- use (lcs_goto_labs.label_map_stack)
+  case lmstack of
+    (y : _) -> do
+      case y of
+        BlockLabelMap y0 -> do
+          y1 <- go (x ^. label_map) y0
+          labelMap.label_map .= y1
+        Fun -> pure ()
+    [] -> pure ()
 
-      where isBlockLabelMap (BlockLabelMap {}) = True
-            isBlockLabelMap _                  = False
+  where go x0 y0 =
+          Map.foldrWithKey go0 (pure (y0 ^. label_map)) x0
+
+        go0 _ (_, []) b = b
+        go0 k (a, vs) b = do
+          b0 <- b
+          case Map.lookup k b0 of
+            Nothing -> pure (Map.insert k (a, vs) b0)
+            Just (a0, vs0) -> case vs0 of
+              [] -> do
+                forM_ vs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy MLuaSig) p a0
+                pure b0
+              _  -> do
+                pure (Map.insertWith go2 k (a, vs) b0)
+
+        go2 (_, vs0) (a1, vs1) = (a1, vs0 ++ vs1)
 
 -- Unsafe constructs
 -- Taken from Data-List-Lens

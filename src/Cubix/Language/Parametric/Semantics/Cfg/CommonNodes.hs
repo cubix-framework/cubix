@@ -50,7 +50,7 @@ import qualified Data.Map as Map
 import Data.Proxy ( Proxy(..) )
 import Data.Traversable ( for )
 
-import Control.Lens ( (^.), (%~), (%=), (.=), _2, at, use, makeClassy )
+import Control.Lens ( (^.), (%~), (%=), (.=), (.~), _2, at, use, makeClassy )
 
 import Data.Comp.Multi ( HTraversable(..), All, HFunctor, HFoldable )
 
@@ -334,11 +334,16 @@ constructCfgLabel t name = do
   lm <- use label_map
 
   enterNode <- case Map.lookup name lm of
-    Nothing -> addCfgNode t EnterNode
+    Nothing -> do
+      l <- nextLabel
+      n <- addCfgNodeWithLabel t l EnterNode
+      label_map %= Map.insert name (l, [])
+      pure n
+
     Just (l, prevs) -> do
       n <- addCfgNodeWithLabel t l EnterNode
       for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy gs) p l
-      label_map %= Map.delete name
+      label_map . at name %= fmap (_2 .~ [])
       return n
 
 
