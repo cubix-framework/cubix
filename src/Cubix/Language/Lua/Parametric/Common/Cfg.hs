@@ -31,6 +31,11 @@ import Cubix.Language.Lua.Parametric.Full.Types as F
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
 
+-----------------------------------------------------------------------------------
+---------------           Labelling mechanism              ------------------------
+-----------------------------------------------------------------------------------
+
+
 -- For Lua - quoting ref:
 -- A label is visible in the entire block where it is defined, except inside nested blocks where a label with the same name is defined and inside nested functions. A goto may jump to any visible label as long as it does not enter into the scope of a local variable.
 
@@ -55,6 +60,79 @@ data LuaCfgState = LuaCfgState {
                  }
 
 makeLenses ''LuaCfgState
+
+withBlockLabelMap :: (MonadState LuaCfgState m) => m a -> m a
+withBlockLabelMap mee = do
+  pushBlockLabelMapStack emptyLabelMap
+  ee <- mee
+  lm <- use labelMap
+  popLabelMapStack
+  mergeLabelMap lm
+  pure ee
+
+pushFunLabelMapStack :: (MonadState LuaCfgState m) => m ()
+pushFunLabelMapStack =
+  lcs_goto_labs.label_map_stack %= (Fun :)
+
+pushBlockLabelMapStack :: (MonadState LuaCfgState m) => LabelMap -> m ()
+pushBlockLabelMapStack m =
+  lcs_goto_labs.label_map_stack %= (:) (BlockLabelMap m)
+
+popLabelMapStack :: (MonadState LuaCfgState m) => m ()
+popLabelMapStack =
+  lcs_goto_labs.label_map_stack %= tail
+
+emptyLabelMapStack :: LuaLabelMapStack
+emptyLabelMapStack = LuaLabelMapStack []
+
+-- NOTE: Merges the top of the stack with the subsequent
+--       element in the stack, adding in the unresolved labels in the top
+mergeLabelMap :: (MonadState LuaCfgState m) => LabelMap -> m ()
+mergeLabelMap x = do
+  lmstack <- use (lcs_goto_labs.label_map_stack)
+  case lmstack of
+    (y : _) -> do
+      case y of
+        BlockLabelMap y0 -> do
+          y1 <- go (x ^. label_map) y0
+          labelMap.label_map .= y1
+        Fun -> pure ()
+    [] -> pure ()
+
+  where go x0 y0 =
+          Map.foldrWithKey go0 (pure (y0 ^. label_map)) x0
+
+        go0 _ (_, []) b = b
+        go0 k (a, vs) b = do
+          b0 <- b
+          case Map.lookup k b0 of
+            Nothing -> pure (Map.insert k (a, vs) b0)
+            Just (a0, vs0) -> case vs0 of
+              [] -> do
+                forM_ vs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy MLuaSig) p a0
+                pure b0
+              _  -> do
+                pure (Map.insertWith go2 k (a, vs) b0)
+
+        go2 (_, vs0) (a1, vs1) = (a1, vs0 ++ vs1)
+
+-- Unsafe constructs
+-- Taken from Data-List-Lens
+_head :: Lens' [a] a
+_head _ [] = error "_head: empty list"
+_head f (a:as) = (:as) <$> f a
+{-# INLINE _head #-}
+
+block_label_map :: Lens' LuaLabelMap LabelMap
+block_label_map _ Fun = error "block_label_map: unexpected Fun"
+block_label_map f (BlockLabelMap a) = BlockLabelMap <$> f a
+{-# INLINE block_label_map #-}
+
+
+-----------------------------------------------------------------------------------
+---------------           CfgConstruction Instances        ------------------------
+-----------------------------------------------------------------------------------
+
 
 instance HasCurCfg LuaCfgState MLuaSig where cur_cfg = lcs_cfg
 instance HasLabelGen LuaCfgState where labelGen = lcs_labeler
@@ -160,70 +238,3 @@ instance ConstructCfg MLuaSig LuaCfgState Exp where
 
 instance CfgInitState MLuaSig where
   cfgInitState _ = LuaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMapStack
-
-withBlockLabelMap :: (MonadState LuaCfgState m) => m a -> m a
-withBlockLabelMap mee = do
-  pushBlockLabelMapStack emptyLabelMap
-  ee <- mee
-  lm <- use labelMap
-  popLabelMapStack
-  mergeLabelMap lm
-  pure ee
-
-pushFunLabelMapStack :: (MonadState LuaCfgState m) => m ()
-pushFunLabelMapStack =
-  lcs_goto_labs.label_map_stack %= (Fun :)
-
-pushBlockLabelMapStack :: (MonadState LuaCfgState m) => LabelMap -> m ()
-pushBlockLabelMapStack m =
-  lcs_goto_labs.label_map_stack %= (:) (BlockLabelMap m)
-
-popLabelMapStack :: (MonadState LuaCfgState m) => m ()
-popLabelMapStack =
-  lcs_goto_labs.label_map_stack %= tail
-
-emptyLabelMapStack :: LuaLabelMapStack
-emptyLabelMapStack = LuaLabelMapStack []
-
--- NOTE: Merges the top of the stack with the subsequent
---       element in the stack, adding in the unresolved labels in the top
-mergeLabelMap :: (MonadState LuaCfgState m) => LabelMap -> m ()
-mergeLabelMap x = do
-  lmstack <- use (lcs_goto_labs.label_map_stack)
-  case lmstack of
-    (y : _) -> do
-      case y of
-        BlockLabelMap y0 -> do
-          y1 <- go (x ^. label_map) y0
-          labelMap.label_map .= y1
-        Fun -> pure ()
-    [] -> pure ()
-
-  where go x0 y0 =
-          Map.foldrWithKey go0 (pure (y0 ^. label_map)) x0
-
-        go0 _ (_, []) b = b
-        go0 k (a, vs) b = do
-          b0 <- b
-          case Map.lookup k b0 of
-            Nothing -> pure (Map.insert k (a, vs) b0)
-            Just (a0, vs0) -> case vs0 of
-              [] -> do
-                forM_ vs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy MLuaSig) p a0
-                pure b0
-              _  -> do
-                pure (Map.insertWith go2 k (a, vs) b0)
-
-        go2 (_, vs0) (a1, vs1) = (a1, vs0 ++ vs1)
-
--- Unsafe constructs
--- Taken from Data-List-Lens
-_head :: Lens' [a] a
-_head _ [] = error "_head: empty list"
-_head f (a:as) = (:as) <$> f a
-{-# INLINE _head #-}
-
-block_label_map :: Lens' LuaLabelMap LabelMap
-block_label_map _ Fun = error "block_label_map: unexpected Fun"
-block_label_map f (BlockLabelMap a) = BlockLabelMap <$> f a
-{-# INLINE block_label_map #-}
