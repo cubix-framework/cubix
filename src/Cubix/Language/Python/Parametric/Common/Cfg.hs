@@ -166,11 +166,19 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
     where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
           extractOp (stripA -> project -> Just bp) = bp
 
-  constructCfg t'@(remA -> CondExpr {}) = HState $ do
-    let (t :*: (CondExpr test succ fail _)) = collapseFProd' t'
-    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
+  constructCfg (collapseFProd' -> (t :*: (Lambda _ e _))) = HState $ do
+    -- NOTE: similar to FunctionDef, ignoring default arguments here.
+    unHState e
+    enterNode <- addCfgNode t EnterNode
+    exitNode  <- addCfgNode t ExitNode
+
+    combineEnterExit (identEnterExit enterNode) (identEnterExit exitNode)
 
   constructCfg t = constructCfgDefault t
+
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyCondExpr where
+  constructCfg (collapseFProd' -> (t :*: (PyCondExpr test succ fail))) = HState $ do
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
 
 instance CfgInitState MPythonSig where
   cfgInitState _ = PythonCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
