@@ -14,7 +14,7 @@
 
 module Cubix.Language.Parametric.Cfg.Test where
 
-import           Control.Lens hiding ( para, children )
+import           Control.Lens hiding ( para, children, (<.>) )
 import           Data.Maybe ( catMaybes, fromJust )
 import           Control.Monad ( forM_, when )
 import           Control.Monad.IO.Class ( liftIO )
@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import qualified Debug.Trace as DT
 import           Hedgehog
 import qualified Hedgehog.Internal.Property as H
+import           System.FilePath ((<.>))
 
 import           Cubix.Language.Info
 import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
@@ -470,3 +471,8 @@ integration_cfg edges cfg =
                   []      -> error "assertEdgesEqual: edges are empty"
                 ppLabelMinusBase l = labelVal l - base
             mapM_ (\(x, y) -> (fst x, snd x) === (ppLabelMinusBase (fst y), ppLabelMinusBase (snd y))) vs
+
+parseEdges :: FilePath -> IO [(Int, Int)]
+parseEdges fp = do
+  let graphFP = fp <.> "graph"
+  read <$> readFile graphFP

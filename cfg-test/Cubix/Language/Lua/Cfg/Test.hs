@@ -556,68 +556,12 @@ instance AssertCfgWellFormed MLuaSig MaybeF
 instance AssertCfgWellFormed MLuaSig UnitF
 
 -- hardcoded integration tests
-integration_lua_cfg :: [(Int, Int)] -> FilePath -> Property
-integration_lua_cfg edges path = 
+integration_lua_cfg :: FilePath -> Property
+integration_lua_cfg path = 
   withTests 1 $
   property $ do
     Just t <- liftIO $ parseFile path
+    edges <- liftIO $ parseEdges path
+    
     (_, cfg) <- makeLuaEnv t
     integration_cfg edges cfg
-
-bar_edges :: [(Int, Int)]
-bar_edges =
-  [
-   (0,2),
-   (2,7),
-   (3,5),
-   (4,51),
-   (5,6),
-   (6,4),   
-   (6,7),
-   (7,9),
-   (8,3),
-   (9,11),
-   (10,25),
-   (11,13),
-   (12,10),
-   (13,14),
-   (14,15),
-   (15,17),
-   (16,12),
-   (17,19),
-   (18,23),
-   (19,21),
-   (20,18),
-   (21,22),
-   (22,20),
-   (23,24),
-   (24,16),
-   (25,27),
-   (26,8),
-   (27,28),
-   (28,29),
-   (29,31),
-   (30,26),
-   (31,33),
-   (32,49),
-   (33,35),
-   (34,32),
-   (35,37),
-   (36,39),
-   (37,38),
-   (38,36),
-   (39,41),
-   (40,34),
-   (41,43),
-   (42,40),
-   (43,45),
-   (44,42),
-   (45,47),
-   (46,44),
-   (47,48),
-   (48,46),
-   (49,50),
-   (50,30),
-   (51,52),
-   (52,1)
-  ]

@@ -32,7 +32,7 @@ tests = do
       ]
 
   checkParallel $ Group "cfg-integration-tests" $ [
-        ("integration_lua_cfg_bar", integration_lua_cfg bar_edges "input-files/lua/Bar.lua")
+        ("integration_lua_cfg_goto", integration_lua_cfg "integration-test-input-files/lua/goto.lua")
       ]
     
                                     
