@@ -257,6 +257,9 @@ instance AssertCfgWellFormed MPythonSig Expr where
   assertCfgWellFormed t@(remA -> UnicodeStrings {}) =
     assertCfgIsGeneric (inject' t) []
   -- skipping call
+  assertCfgWellFormed t@(remA -> Subscript e1 e2 _) =
+    assertCfgIsGenericAuto (inject' t) [E e1, E e2]
+  
   assertCfgWellFormed t@(remA -> SlicedExpr e es _) =
     assertCfgIsGenericAuto (inject' t) [E e, E es]
   assertCfgWellFormed t@(remA -> CondExpr tru cond fls _) =

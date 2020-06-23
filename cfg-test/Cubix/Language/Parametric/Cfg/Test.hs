@@ -56,8 +56,11 @@ getCfgLabs cfg t = case Map.lookup astLab (cfg ^. cfg_ast_nodes) of
 class AssertCfgWellFormed fs f where
   assertCfgWellFormed :: (MonadTest m, MonadReader (Cfg fs) m) => (f :&: Label) (TermLab fs) l -> m ()
 
-  default assertCfgWellFormed :: (MonadTest m, MonadReader (Cfg fs) m, Mem f fs, All ShowHF fs, All HFunctor fs) => (f :&: Label) (TermLab fs) l -> m ()
-  assertCfgWellFormed = assertCfgNoCfgNode . inject'
+  default assertCfgWellFormed :: (MonadTest m, MonadReader (Cfg fs) m, Mem f fs, All ShowHF fs, All HFunctor fs, All EqHF fs, All HFoldable fs) => (f :&: Label) (TermLab fs) l -> m ()
+  assertCfgWellFormed t = do
+    let t0 = inject' t
+    assertCfgNoCfgNode t0
+    -- assertCfgSubtermsFullyAuto t0
 
 instance (All (AssertCfgWellFormed gs) fs) => AssertCfgWellFormed gs (Sum fs) where
   assertCfgWellFormed = caseCxt' (Proxy @(AssertCfgWellFormed gs)) assertCfgWellFormed
@@ -361,7 +364,7 @@ assertCfgIsGenericFullyAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> m ()
-assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto' t catMaybes (children t)
+assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto' t (children t)
 
 -- NOTE: Given a term, and its relevant children,
 --       generically finds the CFG nodes corresponding to the given term's
@@ -375,7 +378,7 @@ assertCfgIsGenericAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
-assertCfgIsGenericAuto t = assertCfgIsGenericAuto' t catMaybes
+assertCfgIsGenericAuto t = assertCfgIsGenericAuto' t
 
 assertCfgIsGenericAuto' ::
   ( MonadReader (Cfg fs) m
@@ -384,10 +387,10 @@ assertCfgIsGenericAuto' ::
   , All HFunctor fs
   , All EqHF fs
   , All HFoldable fs
-  ) => TermLab fs l -> ([(Maybe (CfgNode fs, CfgNode fs))] -> [(CfgNode fs, CfgNode fs)]) -> [E (TermLab fs)] -> m ()
-assertCfgIsGenericAuto' t f children0 = do
+  ) => TermLab fs l -> [E (TermLab fs)] -> m ()
+assertCfgIsGenericAuto' t children0 = do
   (en, ex) <- getEnterExitPair t t
-  subsEEP <- subtermsCfg t f children0
+  subsEEP <- subtermsCfg t catMaybes children0
   let edges = if null subsEEP
         then [(en, ex)]
         else (en, fst (head subsEEP)) :
@@ -395,6 +398,17 @@ assertCfgIsGenericAuto' t f children0 = do
               (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
       nodes = [en, ex] ++ map fst subsEEP ++ map snd subsEEP
   assertEdges t edges nodes
+-- similar to assertCfgIsGenericFullyAuto  
+assertCfgSubtermsFullyAuto ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> m ()
+assertCfgSubtermsFullyAuto t =
+  assertCfgSubtermsAuto t (children t)
 
 assertCfgSubtermsAuto ::
   ( MonadReader (Cfg fs) m
@@ -439,3 +453,20 @@ subtermsCfg _t f =
           mcfgNode <- maybe (pure Nothing) (\nodeLab -> preview (cur_cfg.cfg_nodes.(ix nodeLab))) mnodeLab
           let cs = children0 t0           
           foldlM (\acc a -> maybe (go0 children0 nodeType a) (pure . Just) acc) mcfgNode cs
+
+-- hardcoded integration tests
+integration_cfg :: (MonadTest m) => [(Int, Int)] -> Cfg fs -> m ()
+integration_cfg edges cfg = 
+    assertEdgesEqual edges (concatMap nodeEdges (nodes cfg))
+
+    where nodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
+          nodeEdges n = map ((,) (n ^. cfg_node_lab)) (Set.toList $ n ^. cfg_node_succs)
+
+          assertEdgesEqual es as = do
+            let vs = zip es as
+                labelVal a = read (ppLabel a) :: Int
+                base = case as of
+                  (a : _) -> labelVal (fst a)
+                  []      -> error "assertEdgesEqual: edges are empty"
+                ppLabelMinusBase l = labelVal l - base
+            mapM_ (\(x, y) -> (fst x, snd x) === (ppLabelMinusBase (fst y), ppLabelMinusBase (snd y))) vs

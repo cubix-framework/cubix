@@ -51,7 +51,7 @@ makeLuaEnv t = do
   gen <- mkCSLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
-  pure (cfg `seq` (tLab, cfg))
+  pure (tLab, cfg)
 
 instance AssertCfgWellFormed MLuaSig EmptyParameterAttrs
 instance AssertCfgWellFormed MLuaSig PositionalParameter
@@ -76,11 +76,6 @@ instance AssertCfgWellFormed MLuaSig FunctionCall
 instance AssertCfgWellFormed MLuaSig EmptyLocalVarDeclAttrs
 instance AssertCfgWellFormed MLuaSig AssignOpEquals
 instance AssertCfgWellFormed MLuaSig Ident
-
--- NOTE: investigate following
--- NOTE: why dooes tuplebinder not have cfg node
---       but assign does?
--- NOTE: shouldn't TupleBinder check that its expressions are connected?
 instance AssertCfgWellFormed MLuaSig TupleBinder
 
 instance AssertCfgWellFormed MLuaSig Assign where
@@ -210,7 +205,7 @@ assertCfgGoto t labName = do
   let enJmpLab = head (Set.toList jmpNodeLabs)
   menJump <- preview (cur_cfg.cfg_nodes.(ix enJmpLab))
   enJmp <- assertJust "Cfg label lookup: " menJump
-  
+
   assert (checkLab (enJmp ^.  cfg_node_term))
   assert (length (exGoto ^. cfg_node_prevs) == 0)
 
@@ -450,21 +445,6 @@ getEEPBlock t (bs, be) = do
   exBody <- getExitNodeE t be
   return (enBody, exBody)
 
--- hardcoded integration tests
-integration_lua_cfg :: Map.Map Int Int -> FilePath -> Property
-integration_lua_cfg edges path = 
-  withTests 1 $
-  property $ do
-    Just t <- liftIO $ parseFile path
-    (_, cfg) <- makeLuaEnv t
-    assertEdgesEqual edges (concatMap nodeEdges (nodes cfg))
-
-    where nodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
-          nodeEdges n = map ((,) (n ^. cfg_node_lab)) (Set.toList $ n ^. cfg_node_succs)
-
-          assertEdgesEqual es as =
-            map (\(a, b) -> (show a, show b)) (Map.toList es) === map (\(a, b) -> (ppLabel a, ppLabel b)) as
-
 instance AssertCfgWellFormed MLuaSig IdentIsName
 
 instance AssertCfgWellFormed MLuaSig AssignIsStat where
@@ -574,3 +554,70 @@ instance AssertCfgWellFormed MLuaSig ListF where
 
 instance AssertCfgWellFormed MLuaSig MaybeF
 instance AssertCfgWellFormed MLuaSig UnitF
+
+-- hardcoded integration tests
+integration_lua_cfg :: [(Int, Int)] -> FilePath -> Property
+integration_lua_cfg edges path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    (_, cfg) <- makeLuaEnv t
+    integration_cfg edges cfg
+
+bar_edges :: [(Int, Int)]
+bar_edges =
+  [
+   (0,2),
+   (2,7),
+   (3,5),
+   (4,51),
+   (5,6),
+   (6,4),   
+   (6,7),
+   (7,9),
+   (8,3),
+   (9,11),
+   (10,25),
+   (11,13),
+   (12,10),
+   (13,14),
+   (14,15),
+   (15,17),
+   (16,12),
+   (17,19),
+   (18,23),
+   (19,21),
+   (20,18),
+   (21,22),
+   (22,20),
+   (23,24),
+   (24,16),
+   (25,27),
+   (26,8),
+   (27,28),
+   (28,29),
+   (29,31),
+   (30,26),
+   (31,33),
+   (32,49),
+   (33,35),
+   (34,32),
+   (35,37),
+   (36,39),
+   (37,38),
+   (38,36),
+   (39,41),
+   (40,34),
+   (41,43),
+   (42,40),
+   (43,45),
+   (44,42),
+   (45,47),
+   (46,44),
+   (47,48),
+   (48,46),
+   (49,50),
+   (50,30),
+   (51,52),
+   (52,1)
+  ]
