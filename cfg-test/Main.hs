@@ -54,6 +54,15 @@ tests = do
       , ("integration_java_cfg_jwhale", integration_java_cfg "integration-test-input-files/java/jwhale.java")
       , ("integration_java_cfg_mix1", integration_java_cfg "integration-test-input-files/java/mix1.java")
       , ("integration_java_cfg_while_break", integration_java_cfg "integration-test-input-files/java/while_break.java")
+      , ("integration_javascript_cfg_forLabelConBreak", integration_javascript_cfg "integration-test-input-files/javascript/forLabelConBreak.js")
+      , ("integration_javascript_cfg_jsDoWhale", integration_javascript_cfg "integration-test-input-files/javascript/jsDoWhale.js")
+      , ("integration_javascript_cfg_jsFor", integration_javascript_cfg "integration-test-input-files/javascript/jsFor.js")
+      , ("integration_javascript_cfg_jsIF", integration_javascript_cfg "integration-test-input-files/javascript/jsIF.js")
+      , ("integration_javascript_cfg_jsLoopConBreak", integration_javascript_cfg "integration-test-input-files/javascript/jsLoopConBreak.js")
+      , ("integration_javascript_cfg_jsSwitch", integration_javascript_cfg "integration-test-input-files/javascript/jsSwitch.js")
+      , ("integration_javascript_cfg_jsWhale", integration_javascript_cfg "integration-test-input-files/javascript/jsWhale.js")
+      , ("integration_javascript_cfg_whileDoLabelConBreak", integration_javascript_cfg "integration-test-input-files/javascript/whileDoLabelConBreak.js")
+      , ("integration_javascript_cfg_Foo", integration_javascript_cfg "integration-test-input-files/javascript/Foo.js")
       ]
     
                                     

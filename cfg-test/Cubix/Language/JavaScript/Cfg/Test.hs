@@ -623,3 +623,15 @@ isLoopLikeNode _ = False
 isSwitchNode :: TermLab MJSSig l -> Bool
 isSwitchNode (project' -> Just (JSSwitch {} :&: _))= True
 isSwitchNode _ = False
+
+
+-- hardcoded integration tests
+integration_javascript_cfg :: FilePath -> Property
+integration_javascript_cfg path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    edges <- liftIO $ parseEdges path
+    
+    (_, cfg) <- makeJavascriptEnv t
+    integration_cfg edges cfg
