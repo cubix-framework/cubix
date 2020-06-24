@@ -82,6 +82,12 @@ constructCfgWhileElse t mExp mBody mElse = do
 
   return $ EnterExitPair enterNode exitNode
 
+-- Excludes evaluating default arguments from the CFG. I don't remember why I did this.
+constructCfgFunctionDef ::
+  ( CfgComponent gs s
+  , MonadState s m
+  ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs l)
+constructCfgFunctionDef t body = body >> constructCfgEmpty t
 
 -- When developing this, I ran afoul of a GHC bug that resulted in my program segfaulting (and changed when
 -- I swapped the order of my instance declarations). Luckily, a "stack clean" fixed the problem
@@ -113,9 +119,9 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement wh
 
   constructCfg t = constructCfgDefault t
 
--- Excludes evaluating default arguments from the CFG. I don't remember why I did this.
 instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState FunctionDef where
-  constructCfg a@(collapseFProd' -> t :*: FunctionDef _ _ _ body) = HState (unHState body >> (constructCfgEmpty t))
+  constructCfg (collapseFProd' -> t :*: FunctionDef _ _ _ body) = HState $
+    constructCfgFunctionDef t (unHState body)
 
 -- | Control flow actually does flow through for classes; it's not a suspended computation.
 -- This is a bit of a hack, used to prevent "del" statements in TAC from crossing a scope boundary,
@@ -167,12 +173,7 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
           extractOp (stripA -> project -> Just bp) = bp
 
   constructCfg (collapseFProd' -> (t :*: (Lambda _ e _))) = HState $ do
-    -- NOTE: similar to FunctionDef, ignoring default arguments here.
-    unHState e
-    enterNode <- addCfgNode t EnterNode
-    exitNode  <- addCfgNode t ExitNode
-
-    combineEnterExit (identEnterExit enterNode) (identEnterExit exitNode)
+    constructCfgFunctionDef t (unHState e)
 
   constructCfg t = constructCfgDefault t
 
