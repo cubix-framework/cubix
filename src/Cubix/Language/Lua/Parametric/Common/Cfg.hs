@@ -233,6 +233,8 @@ instance ConstructCfg MLuaSig LuaCfgState Exp where
 
     where extractOp :: MLuaTermLab BinopL -> Binop MLuaTerm BinopL
           extractOp (stripA -> project -> Just bp) = bp
+  constructCfg (collapseFProd' -> t :*: EFunDef body) = HState $
+    unHState body >> constructCfgEmpty t
 
   constructCfg t = constructCfgDefault t
 

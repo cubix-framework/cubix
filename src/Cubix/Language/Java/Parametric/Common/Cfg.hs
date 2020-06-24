@@ -45,7 +45,7 @@ instance HasScopedLabelMap JavaCfgState where scopedLabelMap = jcs_scoped_labs
 type instance ComputationSorts MJavaSig = '[StmtL, ExpL, BlockStmtL, [BlockItemL]]
 
 -- Putting catch's here is a hack
-type instance SuspendedComputationSorts MJavaSig = '[MethodBodyL, ConstructorBodyL, LambdaExpressionL, CatchL]
+type instance SuspendedComputationSorts MJavaSig = '[MethodBodyL, ConstructorBodyL, LambdaExpressionL, CatchL, FunctionDefL]
 type instance ContainerFunctors MJavaSig = '[PairF, ListF, MaybeF, SwitchBlock]
 type instance CfgState MJavaSig = JavaCfgState
 
