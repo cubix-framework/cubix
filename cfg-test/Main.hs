@@ -43,6 +43,17 @@ tests = do
       , ("integration_c_cfg_mix_2", integration_c_cfg "integration-test-input-files/c/mix_2.c")
       , ("integration_c_cfg_switch", integration_c_cfg "integration-test-input-files/c/switch.c")
       , ("integration_c_cfg_whale", integration_c_cfg "integration-test-input-files/c/whale.c")
+      , ("integration_java_cfg_do_while_break", integration_java_cfg "integration-test-input-files/java/do_while_break.java")
+      , ("integration_java_cfg_Foo", integration_java_cfg "integration-test-input-files/java/Foo.java")
+      , ("integration_java_cfg_for_break", integration_java_cfg "integration-test-input-files/java/for_break.java")
+      , ("integration_java_cfg_ifelse", integration_java_cfg "integration-test-input-files/java/ifelse.java")
+      , ("integration_java_cfg_jdo_whale", integration_java_cfg "integration-test-input-files/java/jdo_whale.java")
+      , ("integration_java_cfg_jfor", integration_java_cfg "integration-test-input-files/java/jfor.java")
+      , ("integration_java_cfg_j_lBreak", integration_java_cfg "integration-test-input-files/java/j_lBreak.java")
+      , ("integration_java_cfg_jSwitch", integration_java_cfg "integration-test-input-files/java/jSwitch.java")
+      , ("integration_java_cfg_jwhale", integration_java_cfg "integration-test-input-files/java/jwhale.java")
+      , ("integration_java_cfg_mix1", integration_java_cfg "integration-test-input-files/java/mix1.java")
+      , ("integration_java_cfg_while_break", integration_java_cfg "integration-test-input-files/java/while_break.java")
       ]
     
                                     

@@ -737,3 +737,14 @@ extractBlockFromCatch (project' -> Just (Catch _ blkIsBlk :&: _)) = fromJust $ d
 
 nameString :: MJavaTermLab JFull.IdentL -> String
 nameString (stripA -> project -> Just (IdentIsIdent (Ident' s))) = s
+
+-- hardcoded integration tests
+integration_java_cfg :: FilePath -> Property
+integration_java_cfg path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    edges <- liftIO $ parseEdges path
+    
+    (_, cfg) <- makeJavaEnv t
+    integration_cfg edges cfg
