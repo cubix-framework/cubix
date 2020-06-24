@@ -606,3 +606,14 @@ extractBlock' t = E t
 
 nameString :: MCTermLab CFull.IdentL -> String
 nameString (stripA -> projF -> Just (Ident' n)) = n
+
+-- hardcoded integration tests
+integration_c_cfg :: FilePath -> Property
+integration_c_cfg path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    edges <- liftIO $ parseEdges path
+    
+    (_, cfg) <- makeCEnv t
+    integration_cfg edges cfg

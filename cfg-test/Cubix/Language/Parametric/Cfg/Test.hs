@@ -466,11 +466,17 @@ integration_cfg edges cfg =
           assertEdgesEqual es as = do
             let vs = zip es as
                 labelVal a = read (ppLabel a) :: Int
-                base = case as of
+                base1 = case as of
                   (a : _) -> labelVal (fst a)
                   []      -> error "assertEdgesEqual: edges are empty"
-                ppLabelMinusBase l = labelVal l - base
-            mapM_ (\(x, y) -> (fst x, snd x) === (ppLabelMinusBase (fst y), ppLabelMinusBase (snd y))) vs
+                ppLabelMinusBase1 l = labelVal l - base1
+                
+                base2 = case es of
+                  (a : _) -> fst a
+                  []      -> error "assertEdgesEqual: edges are empty"
+                ppLabelMinusBase2 l =  l - base2
+            
+            mapM_ (\(x, y) -> (ppLabelMinusBase2 (fst x), ppLabelMinusBase2 (snd x)) === (ppLabelMinusBase1 (fst y), ppLabelMinusBase1 (snd y))) vs
 
 parseEdges :: FilePath -> IO [(Int, Int)]
 parseEdges fp = do
