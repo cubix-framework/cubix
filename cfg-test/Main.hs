@@ -63,6 +63,15 @@ tests = do
       , ("integration_javascript_cfg_jsWhale", integration_javascript_cfg "integration-test-input-files/javascript/jsWhale.js")
       , ("integration_javascript_cfg_whileDoLabelConBreak", integration_javascript_cfg "integration-test-input-files/javascript/whileDoLabelConBreak.js")
       , ("integration_javascript_cfg_Foo", integration_javascript_cfg "integration-test-input-files/javascript/Foo.js")
+      , ("integration_python_cfg_Foo", integration_python_cfg "integration-test-input-files/python/Foo.py")
+      , ("integration_python_cfg_pForConBreak", integration_python_cfg "integration-test-input-files/python/pForConBreak.py")
+      , ("integration_python_cfg_pfor", integration_python_cfg "integration-test-input-files/python/pfor.py")
+      , ("integration_python_cfg_pif", integration_python_cfg "integration-test-input-files/python/pif.py")
+      , ("integration_python_cfg_pInnerFun", integration_python_cfg "integration-test-input-files/python/pInnerFun.py")
+      , ("integration_python_cfg_pLambda", integration_python_cfg "integration-test-input-files/python/pLambda.py")
+      , ("integration_python_cfg_pRemDup", integration_python_cfg "integration-test-input-files/python/pRemDup.py")
+      , ("integration_python_cfg_pwhale", integration_python_cfg "integration-test-input-files/python/pwhale.py")
+      , ("integration_python_cfg_pWhileConBreak", integration_python_cfg "integration-test-input-files/python/pWhileConBreak.py")
       ]
     
                                     
