@@ -33,6 +33,12 @@ tests = do
 
   checkParallel $ Group "cfg-integration-tests" $ [
         ("integration_lua_cfg_goto", integration_lua_cfg "integration-test-input-files/lua/goto.lua")
+      , ("integration_lua_cfg_lExpr", integration_lua_cfg "integration-test-input-files/lua/lExpr.lua")
+      , ("integration_lua_cfg_lFunReturn", integration_lua_cfg "integration-test-input-files/lua/lFunReturn.lua")
+      , ("integration_lua_cfg_lIf", integration_lua_cfg "integration-test-input-files/lua/lIf.lua")
+      , ("integration_lua_cfg_lLamda", integration_lua_cfg "integration-test-input-files/lua/lLamda.lua")
+      , ("integration_lua_cfg_lRepUntil", integration_lua_cfg "integration-test-input-files/lua/lRepUntil.lua")
+      , ("integration_lua_cfg_lWhile", integration_lua_cfg "integration-test-input-files/lua/lWhile.lua")
       , ("integration_c_cfg_Bar2", integration_c_cfg "integration-test-input-files/c/Bar2.c")
       , ("integration_c_cfg_Bar", integration_c_cfg "integration-test-input-files/c/Bar.c")
       , ("integration_c_cfg_do_whale", integration_c_cfg "integration-test-input-files/c/do_whale.c")
