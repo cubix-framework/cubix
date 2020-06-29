@@ -36,7 +36,7 @@ import qualified Cubix.Language.JavaScript.Parametric.Full as JSFull
 import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, HFoldable )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -60,8 +60,13 @@ makeJavascriptEnv t = do
 
 instance AssertCfgWellFormed MJSSig S.MaybeF
 instance AssertCfgWellFormed MJSSig S.ListF where
-  -- TODO: fix this
-  assertCfgWellFormed _ = pure ()
+  assertCfgWellFormed t@(inject' -> stripA -> t0)
+    | isSort (Proxy :: Proxy [BlockItemL]) t0 ||
+      isSort (Proxy :: Proxy [JSStatementL]) t0 = do
+        case t of
+          (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []
+    | otherwise = assertCfgNoCfgNode (inject' t)  
   
 instance AssertCfgWellFormed MJSSig BlockWithPrelude
 instance AssertCfgWellFormed MJSSig CommentAnnotation
@@ -182,12 +187,7 @@ instance AssertCfgWellFormed MJSSig JSExpression where
   assertCfgWellFormed t@(remA -> JSExpressionParen _ e _) = assertCfgIsGeneric (inject' t) [E e]  
   assertCfgWellFormed t@(remA -> JSExpressionPostfix e _) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> JSFunctionExpression _ _ _ _ _ blk) =
-    -- TODO: extractJSBlock needs to be expanded
-    {-
-    case extractJSBlock blk of
-      E blk0 -> assertCfgIsSuspended (inject' t) blk0
-    -}
-    pure ()
+    assertCfgFunction (inject' t) (extractJSBlock blk)
   assertCfgWellFormed t@(remA -> JSMemberDot l _ r) = assertCfgIsGeneric (inject' t) [E l, E r]
   assertCfgWellFormed t@(remA -> JSNewExpression _ e) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> JSUnaryExpression _ e) = assertCfgIsGeneric (inject' t) [E e]  
@@ -214,8 +214,7 @@ instance AssertCfgWellFormed MJSSig JSStatement where
   assertCfgWellFormed t@(remA -> JSWhile _ _ e _ b) =
     assertCfgWhile (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(remA -> JSSwitch _ _ exp _ _ cases _ _) =
-    pure ()
-    -- assertCfgSwitch (inject' t) exp (S.extractF cases)
+    assertCfgSwitch (inject' t) exp (S.extractF cases)
   assertCfgWellFormed t@(remA -> JSBreak _ (stripA -> JSIdent' targ) _) =
     assertCfgBreakLabeled (inject' t) targ
   assertCfgWellFormed t@(remA -> JSBreak {}) =
@@ -233,7 +232,7 @@ instance AssertCfgWellFormed MJSSig JSStatement where
   assertCfgWellFormed t@(remA -> JSStatementBlock _ stmts _ _) =
     case S.extractF stmts of
       [] -> assertCfgIsGeneric (inject' t) [E stmts]
-      vs -> assertCfgSubterms (inject' t) (map E vs)
+      _  -> assertCfgSubtermsAuto (inject' t) [E stmts]
   assertCfgWellFormed t@(remA -> JSWith _ _ e _ stmt _) =
     assertCfgIsGeneric (inject' t) [E e, extractBlock stmt]
   -- JSStatementBlock does not exist
@@ -246,19 +245,26 @@ instance AssertCfgWellFormed MJSSig JSStatement where
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 instance AssertCfgWellFormed MJSSig JSCommon.JSFor where
-  assertCfgWellFormed t@(JSCommon.JSFor init cond step body :&: _) =
-    assertCfgFor (inject' t) (toMaybe $ S.extractF init) (toMaybe $ S.extractF cond) (toMaybe $ S.extractF step) (extractBlock body)
+  assertCfgWellFormed t@(JSCommon.JSFor init cond step body :&: _) = do
+    let inits = fmap (\t -> (E t, E t)) (toMaybe $ S.extractF init)
+    assertCfgFor (inject' t) inits (toMaybe $ S.extractF cond) (toMaybe $ S.extractF step) (extractBlock body)
       where toMaybe [] = Nothing
             toMaybe [x] = Just x
             toMaybe xs = error $ "Panic: unexpected list: " ++ show xs
-
   assertCfgWellFormed t@(JSCommon.JSForVar init cond step body :&: _) = do
-    -- TODO: complete this
-    pure ()
+    inits0 <- subtermWithCfg (inject' t) init
+    assertCfgFor (inject' t) inits0 (toMaybe $ S.extractF cond) (toMaybe $ S.extractF step) (extractBlock body)
+      where toMaybe [] = Nothing
+            toMaybe [x] = Just x
+            toMaybe xs = error $ "Panic: unexpected list: " ++ show xs
+            
+{-
   assertCfgWellFormed t@(JSCommon.JSForIn _ _ e body :&: _) = do
     assertCfgWhile (inject' t) e (extractBlock body)
   assertCfgWellFormed t@(JSCommon.JSForVarIn _ _ e body :&: _) = do
     assertCfgWhile (inject' t) e (extractBlock body)
+-}
+  assertCfgWellFormed t = error $ "Impossible case for JSFor" ++ show (inject' t)
 
 assertCfgShortCircuit ::
   ( MonadTest m
@@ -266,6 +272,7 @@ assertCfgShortCircuit ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
   (enSExp, exSExp) <- getEnterExitPair t t
@@ -287,6 +294,7 @@ assertCfgCondOp ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs e -> TermLab fs e -> TermLab fs e -> TermLab fs e -> m ()
 assertCfgCondOp t test succ fail = do
   (enTop, exTop) <- getEnterExitPair t t
@@ -397,6 +405,7 @@ assertCfgDoWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs
   ) => TermLab gs l -> E (TermLab gs) -> TermLab gs j -> m ()
 assertCfgDoWhile t (E b) e = do
   (enDoWhile, exDoWhile) <- getEnterExitPair t t
@@ -421,6 +430,7 @@ assertCfgIfElse ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> E (TermLab fs) -> m ()
 assertCfgIfElse t cond (E thn) (E els) = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -437,13 +447,14 @@ assertCfgIf ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgIf t cond (E thn) = do
   (enIf, exIf) <- getEnterExitPair t t
   (enCond, exCond) <- getEnterExitPair t cond
   (enThn, exThn) <- getEnterExitPair t thn
   midNode <- getIEP 0 t t
-  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf) ]
+  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf), (exCond, exIf) ]
                 [enIf, exIf, midNode, enCond, exCond, enThn, exThn]
 
 -- NOTE: Asserts that
@@ -476,6 +487,7 @@ assertCfgWhile ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgWhile t e (E b) = do
   (enWhile, exWhile) <- getEnterExitPair t t
@@ -526,12 +538,15 @@ assertCfgFor ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
-  ) => TermLab fs l -> Maybe (TermLab fs i) -> Maybe (TermLab fs e) -> Maybe (TermLab fs e) -> E (TermLab fs) -> m ()
+  , All HFoldable fs
+  ) => TermLab fs l -> Maybe (E (TermLab fs), E (TermLab fs)) -> Maybe (TermLab fs e) -> Maybe (TermLab fs e) -> E (TermLab fs) -> m ()
 assertCfgFor t mInit mCond mStep (E body) = do
   eepFor <- getEnterExitPair t t
   loFor <- getLoopEntry t t
   eepBody <- getEnterExitPair t body
-  mEEPInit <- traverse (getEnterExitPair t) mInit
+  mEnInit <- traverse (getEnterNodeE t . fst) mInit
+  mExInit <- traverse (getExitNodeE t . snd) mInit
+  let mEEPInit = (,) <$> mEnInit <*> mExInit
   mEEPCond <- traverse (getEnterExitPair t) mCond
   mEEPStep <- traverse (getEnterExitPair t) mStep
 
@@ -592,6 +607,14 @@ assertCfgSwitch t e cs = do
           Just (remA -> JSDefault _ _ es) ->
             getEnterExitPair t es
 
+assertCfgFunction ::
+  ( MonadTest m
+  , MonadReader (Cfg MJSSig) m
+  ) => TermLab MJSSig a -> E (TermLab MJSSig) -> m ()
+assertCfgFunction t (E body) = do
+  assertCfgIsSuspended t body
+  assertCfgSubtermsAuto t []
+
 extractBlock :: TermLab MJSSig JSStatementL -> E (TermLab MJSSig)
 extractBlock t@(project' -> Just (JSStatementBlock _ stmts _ _ :&: _)) =
   case S.extractF stmts of
@@ -599,9 +622,11 @@ extractBlock t@(project' -> Just (JSStatementBlock _ stmts _ _ :&: _)) =
     _  -> E stmts
 extractBlock t                                                       = E t
 
--- TODO: BlockWithPrelude as well
 extractJSBlock :: TermLab MJSSig JSBlockL -> E (TermLab MJSSig)
 extractJSBlock (project' -> Just (JSBlock _ stmts _ :&: _)) = E stmts
+extractJSBlock (project' -> Just (BlockWithPrelude _ blk :&: _)) =
+  case project' blk of
+    Just (remA -> Block stmts _) -> E stmts
 
 extractJSCatch :: TermLab MJSSig JSTryCatchL -> (E (TermLab MJSSig), E (TermLab MJSSig))
 extractJSCatch t@(project' -> Just (JSCatch _ _ e _ b :&: _)) = (E e, extractJSBlock b)

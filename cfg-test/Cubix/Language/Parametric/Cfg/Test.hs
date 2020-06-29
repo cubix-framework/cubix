@@ -34,25 +34,14 @@ import           Cubix.Language.Parametric.Semantics.SemanticProperties ( NodeEv
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
 import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, HFix, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), K(..), HFoldable (..), (:-<:), Mem, subterms, unTerm, EqHF, Cxt (..), proj, inject', remA )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
+import qualified Debug.Trace as DT
 
 assertCfgWellFormedness :: (All ShowHF fs, All HFoldable fs, All HFunctor fs, MonadTest m, MonadReader (Cfg fs) m, All (AssertCfgWellFormed fs) fs) => TermLab fs l -> m ()
 assertCfgWellFormedness t = do
   mapM_ (\(E t0) -> go t0) $ subterms t
 
-  where go t0 = do
-          cfg0 <- ask
-          let cfgLab = getCfgLabs cfg0 t0
-          if length cfgLab > 0 then do
-            assertCfgWellFormed (unTerm t0)
-          else
-            pure ()
-
-getCfgLabs :: forall fs l. Cfg fs -> TermLab fs l -> Map.Map CfgNodeType Label
-getCfgLabs cfg t = case Map.lookup astLab (cfg ^. cfg_ast_nodes) of
-                    Nothing -> Map.empty
-                    Just m -> m
-  where
-    astLab = getAnn t
+  where go t0 =
+          assertCfgWellFormed (unTerm t0)
 
 class AssertCfgWellFormed fs f where
   assertCfgWellFormed :: (MonadTest m, MonadReader (Cfg fs) m) => (f :&: Label) (TermLab fs) l -> m ()
@@ -61,7 +50,6 @@ class AssertCfgWellFormed fs f where
   assertCfgWellFormed t = do
     let t0 = inject' t
     assertCfgNoCfgNode t0
-    -- assertCfgSubtermsFullyAuto t0
 
 instance (All (AssertCfgWellFormed gs) fs) => AssertCfgWellFormed gs (Sum fs) where
   assertCfgWellFormed = caseCxt' (Proxy @(AssertCfgWellFormed gs)) assertCfgWellFormed
@@ -85,6 +73,14 @@ assertCfgNoCfgNode t = do
 
 -- NOTE: Actually has to list the immedeate intermediate edges
 --       and ensure that they are connected.
+assertCfgIsSuspendedE' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs  
+  ) => TermLab fs l -> E (TermLab fs) -> E (TermLab fs) -> m ()
+assertCfgIsSuspendedE' t (E t1) (E t2) = assertCfgIsSuspended' t t1 t2
+
 assertCfgIsSuspended' ::
   ( MonadReader (Cfg fs) m
   , MonadTest m
@@ -94,8 +90,15 @@ assertCfgIsSuspended' ::
 assertCfgIsSuspended' t t1 t2 = do
   en <- getEnterNode t t1
   ex <- getExitNode t t2
-  (en ^.cfg_node_prevs) === Set.empty
-  (ex ^.cfg_node_succs) === Set.empty  
+  when ((en ^.cfg_node_prevs) /= Set.empty) $
+    H.failWith Nothing (msg "Previous" t1 en) 
+  when ((ex ^.cfg_node_succs) /= Set.empty) $
+    H.failWith Nothing (msg "Successor" t2 ex)
+
+    where msg ord t0 node =
+            "unexpected " ++ ord ++ " edges created for AST: " ++
+            show t0 ++ "\n Outer AST is: " ++ show t ++
+            "\n CFG nodes are: " ++ show node
 
 assertCfgIsSuspended ::
   ( MonadReader (Cfg fs) m
@@ -104,6 +107,44 @@ assertCfgIsSuspended ::
   , All HFunctor fs  
   ) => TermLab fs l -> TermLab fs s -> m ()
 assertCfgIsSuspended t t0 = assertCfgIsSuspended' t t0 t0
+
+assertCfgIsSuspendedAuto ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> TermLab fs s -> m ()
+assertCfgIsSuspendedAuto t t0 = do
+  subsEEP <- subtermsCfg t [E t0]
+
+  case subsEEP of
+    [] -> error ("Panic: No cfgs inside AST @assertCfgIsSuspendedAuto: " ++ show t)
+    _  -> assertCfgIsSuspendedE' t0 (leftmost subsEEP) (rightmost subsEEP)
+
+    where leftmost eeps  = head eeps ^. (_1.cfg_node_term)
+          rightmost eeps = last eeps ^. (_2.cfg_node_term)
+
+-- NOTE: Given a term, get the leftmost and rightmost subterms which has
+--       a CFG node
+subtermWithCfg ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> TermLab fs a -> m (Maybe (E (TermLab fs), E (TermLab fs)))
+subtermWithCfg t t0 = do
+  vs <- subtermsCfg t (children t0)
+  pure $ case vs of 
+    [] -> Nothing
+    _ -> Just ( leftmost vs, rightmost vs )
+
+    where
+      leftmost eeps  = head eeps ^. (_1.cfg_node_term)
+      rightmost eeps = last eeps ^. (_2.cfg_node_term)
 
 -- NOTE: Asserts that subterms are connected left to right
 -- and enter of term is connected to leftmost subterm
@@ -114,9 +155,9 @@ assertCfgIsGeneric ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
 assertCfgIsGeneric t subs = do
-  -- assertCfgSubterms t subs
   (gEn, gEx) <- getEnterExitPair t t
   subsEEP <- mapM (getEnterExitPairE t) subs
   case subsEEP of
@@ -246,14 +287,15 @@ assertEdges ::
   , All HFunctor gs
   , All EqHF gs
   , MonadReader (Cfg gs) m
+  , All HFoldable gs
   ) => TermLab gs l -> [(CfgNode gs, CfgNode gs)] -> [CfgNode gs] -> m ()
 assertEdges t vs as = do
   mrelNodes <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(to Map.elems))
   mapM_ (\pair -> case pair `elem` vs of
             True -> uncurry (assertEdge t) pair
             False -> do
-              isRel <- isRelevantEdge mrelNodes pair
-              when isRel $ 
+              cond <- condM mrelNodes pair
+              when cond  $ 
                 uncurry (assertNoEdge t) pair
         ) nodes
 
@@ -266,7 +308,37 @@ assertEdges t vs as = do
           y ^. cfg_node_lab `elem` ns
         isRelevantEdge Nothing _ =
           failure
+        
+        hasSameAST x y = x ^. cfg_node_term == y ^. cfg_node_term
         astLab = getAnn t
+
+        -- NOTE: in code => if true ...; according to if's spec, its test condition's
+        -- exit and enter should not be connected, but true's exit and enter is connected
+        -- (that is a property of true's CFG); because of these cases, a lot of false negatives
+        -- are thrown up. To avoid this, we disable negative checks for pairs of CFG nodes for the same AST node
+        -- which do not have further children.
+        -- This also needs to be done for suspended computations.
+
+        -- despite this, there are a number of false positive cases noted, like
+        -- while(true) break; break has a node back to while's exit- which is not the case
+        -- according to while's spec.
+        condM mrelNodes pair
+          | uncurry hasSameAST pair = do
+              pure False
+              {-
+              case pair ^. _1.cfg_node_term of
+                E t0 -> do
+                  scfgs <- subtermsCfg t0 (children t0)
+                  case scfgs of
+                    [] -> do
+                      -- NOTE: indicates that this is a leaf
+                      --       so don't have negative checks on this.
+                      pure False
+                    _  -> pure True
+              -}
+          | otherwise = pure True
+          
+
 
 assertEdge ::
   ( MonadTest m
@@ -365,7 +437,7 @@ assertCfgIsGenericFullyAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> m ()
-assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto' t (children t)
+assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto t (children t)
 
 -- NOTE: Given a term, and its relevant children,
 --       generically finds the CFG nodes corresponding to the given term's
@@ -379,19 +451,9 @@ assertCfgIsGenericAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
-assertCfgIsGenericAuto t = assertCfgIsGenericAuto' t
-
-assertCfgIsGenericAuto' ::
-  ( MonadReader (Cfg fs) m
-  , MonadTest m
-  , All ShowHF fs
-  , All HFunctor fs
-  , All EqHF fs
-  , All HFoldable fs
-  ) => TermLab fs l -> [E (TermLab fs)] -> m ()
-assertCfgIsGenericAuto' t children0 = do
+assertCfgIsGenericAuto t children0 = do
   (en, ex) <- getEnterExitPair t t
-  subsEEP <- subtermsCfg t catMaybes children0
+  subsEEP <- subtermsCfg t children0
   let edges = if null subsEEP
         then [(en, ex)]
         else (en, fst (head subsEEP)) :
@@ -399,6 +461,7 @@ assertCfgIsGenericAuto' t children0 = do
               (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
       nodes = [en, ex] ++ map fst subsEEP ++ map snd subsEEP
   assertEdges t edges nodes
+
 -- similar to assertCfgIsGenericFullyAuto  
 assertCfgSubtermsFullyAuto ::
   ( MonadReader (Cfg fs) m
@@ -420,7 +483,7 @@ assertCfgSubtermsAuto ::
   , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
 assertCfgSubtermsAuto t children0 = do
-  subsEEP <- subtermsCfg t (map fromJust) children0
+  subsEEP <- subtermsCfg t children0
   assertEdges t (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
                 (map fst subsEEP ++ map snd subsEEP)
 
@@ -432,22 +495,27 @@ subtermsCfg ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l ->
-      ([(Maybe (CfgNode fs, CfgNode fs))] -> [(CfgNode fs, CfgNode fs)]) ->
       [E (TermLab fs)] ->
       m [(CfgNode fs, CfgNode fs)]
-subtermsCfg _t f =
-  fmap f . mapM go
+subtermsCfg _t =
+  fmap catMaybes . mapM subtermCfg
 
-  where go :: (MonadTest m, All HFoldable fs, All HFunctor fs, MonadReader (Cfg fs) m) => E (TermLab fs) -> m (Maybe (CfgNode fs, CfgNode fs))
-        go t0 = do
+subtermCfg ::
+  ( MonadTest m
+  , All HFoldable fs
+  , All HFunctor fs
+  , MonadReader (Cfg fs) m
+  ) => E (TermLab fs) -> m (Maybe (CfgNode fs, CfgNode fs))
+subtermCfg t0 = do
           
-          -- For each piece of subterm, we get "leftmost"
-          -- and "rightmost" CFG node
-          l <- go0 children EnterNode t0
-          r <- go0 (reverse . children) ExitNode t0
-          pure ((,) <$> l <*> r)
+  -- For each piece of subterm, we get "leftmost"
+  -- and "rightmost" CFG node
+  l <- go0 children EnterNode t0
+  r <- go0 (reverse . children) ExitNode t0
+  pure ((,) <$> l <*> r)
 
-        go0 :: (MonadTest m, All HFoldable fs, All HFunctor fs, MonadReader (Cfg fs) m) => (forall l. TermLab fs l -> [E (TermLab fs)]) -> CfgNodeType -> E (TermLab fs) -> m (Maybe (CfgNode fs))
+  where
+        go0 :: ( MonadTest m, All HFoldable fs, All HFunctor fs, MonadReader (Cfg fs) m) => (forall l. TermLab fs l -> [E (TermLab fs)]) -> CfgNodeType -> E (TermLab fs) -> m (Maybe (CfgNode fs))
         go0 children0 nodeType (E t0) = do
           let astLab = getAnn t0
           mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))

@@ -31,11 +31,12 @@ import qualified Cubix.Language.Lua.Parametric.Full as LFull
 import           Cubix.Language.Parametric.Semantics.Cfg
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, HFoldable )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
 import qualified Cubix.Language.Parametric.Syntax as S
+import qualified Debug.Trace as DT
 
 unit_lua_cfg :: FilePath -> Property
 unit_lua_cfg fp =
@@ -140,9 +141,8 @@ instance AssertCfgWellFormed MLuaSig Exp where
     assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Vararg {}) =
     assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> EFunDef _def) =
-    -- TODO: Fix EFunDef
-    pure ()
+  assertCfgWellFormed t@(remA -> EFunDef def) =
+    assertCfgLambda (inject' t) def
   assertCfgWellFormed t@(remA -> PrefixExp pexp) =
     assertCfgIsGeneric (inject' t) [E pexp]    
   assertCfgWellFormed t@(remA -> TableConst (project' -> Just (remA -> Table flds))) =
@@ -222,6 +222,7 @@ assertCfgLabel ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> m ()
 assertCfgLabel t = do
   (enLab, exLab) <- getEnterExitPair t t
@@ -232,7 +233,8 @@ assertCfgForRange ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs b -> TermLab fs c -> Maybe (TermLab fs d) -> BlockTermPairLab fs -> m ()
 assertCfgForRange t init final optStep body = do
   (enForRange, exForRange) <- getEnterExitPair t t
@@ -269,7 +271,8 @@ assertCfgIfElse ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> [(TermLab fs e, BlockTermPairLab fs)] -> Maybe (BlockTermPairLab fs) -> m ()
 assertCfgIfElse t cs optElse = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -303,6 +306,7 @@ assertCfgShortCircuit ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
   (enSExp, exSExp) <- getEnterExitPair t t
@@ -324,6 +328,7 @@ assertCfgWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs
   ) => TermLab gs l -> TermLab gs i -> BlockTermPairLab gs -> m ()
 assertCfgWhile t e b = do
   (enWhile, exWhile) <- getEnterExitPair t t
@@ -347,6 +352,7 @@ assertCfgFor ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs
   ) => TermLab gs l -> [TermLab gs i] -> BlockTermPairLab gs -> m ()
 assertCfgFor t es b = do
   (enFor, exFor) <- getEnterExitPair t t
@@ -373,6 +379,7 @@ assertCfgDoWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs
   ) => TermLab gs l -> BlockTermPairLab gs -> TermLab gs j -> m ()
 assertCfgDoWhile t b e = do
   (enDoWhile, exDoWhile) <- getEnterExitPair t t
@@ -540,7 +547,6 @@ instance AssertCfgWellFormed MLuaSig PrefixExp where
 instance AssertCfgWellFormed MLuaSig FunName
 
 -- NOTE: seems like FunDef and FunBody is only used for lambdas
--- get more information about this
 instance AssertCfgWellFormed MLuaSig FunDef
 instance AssertCfgWellFormed MLuaSig FunBody
 
@@ -549,9 +555,14 @@ instance AssertCfgWellFormed MLuaSig Binop
 
 -- containers
 instance AssertCfgWellFormed MLuaSig PairF
-instance AssertCfgWellFormed MLuaSig ListF where
-  assertCfgWellFormed _ = pure () -- error "TODO"
-
+instance AssertCfgWellFormed MLuaSig ListF where  
+  assertCfgWellFormed t
+    | isSort (Proxy :: Proxy [BlockItemL]) (stripA (inject' t)) = do
+        case t of
+          (remA -> ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> NilF)       -> assertCfgIsGeneric (inject' t) []
+    | otherwise = assertCfgNoCfgNode (inject' t)
+  
 instance AssertCfgWellFormed MLuaSig MaybeF
 instance AssertCfgWellFormed MLuaSig UnitF
 
@@ -565,3 +576,11 @@ integration_lua_cfg path =
     
     (_, cfg) <- makeLuaEnv t
     integration_cfg edges cfg
+
+assertCfgLambda ::
+  ( MonadTest m
+  , MonadReader (Cfg MLuaSig) m
+  ) => TermLab MLuaSig a -> TermLab MLuaSig b -> m ()
+assertCfgLambda t body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgIsGeneric t []

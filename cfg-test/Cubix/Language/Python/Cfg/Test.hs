@@ -28,6 +28,7 @@ import           Data.Typeable
 import qualified Data.Set as Set
 import           Hedgehog hiding ( Var )
 import qualified Hedgehog.Internal.Property as H
+import qualified Debug.Trace as DT
 
 
 import           Cubix.Language.Info
@@ -36,7 +37,7 @@ import qualified Cubix.Language.Python.Parametric.Full as Full
 import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, HFoldable )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -94,8 +95,7 @@ instance AssertCfgWellFormed MPythonSig IdentIsIdent
 instance AssertCfgWellFormed MPythonSig PositionalParameter
 instance AssertCfgWellFormed MPythonSig FunctionDef where
   assertCfgWellFormed t@(remA -> S.FunctionDef _ _ _ body) =
-    -- NOTE: suspended
-    assertCfgIsGeneric (inject' t) []
+    assertCfgFunctionDef (inject' t) body
     
 instance AssertCfgWellFormed MPythonSig ReceiverArg
 instance AssertCfgWellFormed MPythonSig PositionalArgument
@@ -111,19 +111,32 @@ instance AssertCfgWellFormed MPythonSig Assign
 instance AssertCfgWellFormed MPythonSig AssignOpEquals
 instance AssertCfgWellFormed MPythonSig S.Ident
 
-instance AssertCfgWellFormed MPythonSig PyCondExpr
+instance AssertCfgWellFormed MPythonSig PyCondExpr where
+  assertCfgWellFormed t@(remA -> PyCondExpr c t0 e) =
+    assertCfgCondOp (inject' t) c t0 e
+    
 instance AssertCfgWellFormed MPythonSig PyComp
 instance AssertCfgWellFormed MPythonSig PyClass where
   assertCfgWellFormed t@(remA -> PyClass _ args body) =
-    assertCfgPyClass (inject' t) args body
+    assertCfgPyClass (inject' t) (map E (S.extractF args)) body
 
 assertCfgPyClass ::
   ( MonadTest m
   , MonadReader (Cfg MPythonSig) m
-  ) => TermLab MPythonSig a -> TermLab MPythonSig b -> TermLab MPythonSig c -> m ()
-assertCfgPyClass t =
-  error "TODO: PyClass"
-  
+  ) => TermLab MPythonSig a -> [E (TermLab MPythonSig)] -> TermLab MPythonSig c -> m ()
+assertCfgPyClass t args body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgIsGenericAuto t args
+
+assertCfgFunctionDef ::
+  ( MonadTest m
+  , MonadReader (Cfg MPythonSig) m
+  ) => TermLab MPythonSig a -> TermLab MPythonSig b -> m ()
+assertCfgFunctionDef t body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgIsGenericAuto t []
+
+
 instance AssertCfgWellFormed MPythonSig PyBlock
 instance AssertCfgWellFormed MPythonSig PyStringLit
 instance AssertCfgWellFormed MPythonSig PythonParam
@@ -134,14 +147,18 @@ instance AssertCfgWellFormed MPythonSig PyWithBinder
 
 instance AssertCfgWellFormed MPythonSig PyWith where
   assertCfgWellFormed t@(remA -> PyWith binds body) = do
-    assertCfgPyWith (inject' t) (map extractBinder $ S.extractF binds) body
+    binds0 <- mapM extractBinder $ S.extractF binds
+    assertCfgPyWith (inject' t) binds0 body
     
     where
-      extractBinder :: MPythonTermLab PyWithBinderL -> MPythonTermLab ExprL
-      extractBinder (project' -> Just (remA -> PyWithBinder e _)) = e 
+      extractBinder :: ( MonadReader (Cfg MPythonSig) m, MonadTest m ) => MPythonTermLab PyWithBinderL -> m (E MPythonTermLab, E MPythonTermLab)
+      extractBinder (project' -> Just (remA -> PyWithBinder e pyl)) = do
+        lvs <- subtermWithCfg (inject' t) pyl
+        case lvs of
+          Nothing -> pure (E e, E e)
+          Just (_, lve) -> pure (E e, lve)
     
 instance AssertCfgWellFormed MPythonSig PyLhs
-
 instance AssertCfgWellFormed MPythonSig ParenLValue
 instance AssertCfgWellFormed MPythonSig SliceLValue
 instance AssertCfgWellFormed MPythonSig SubscriptLValue
@@ -171,7 +188,6 @@ instance AssertCfgWellFormed MPythonSig CompIf
 instance AssertCfgWellFormed MPythonSig CompFor
 instance AssertCfgWellFormed MPythonSig Full.AssignOp
 instance AssertCfgWellFormed MPythonSig Argument
-
 instance AssertCfgWellFormed MPythonSig S.CharF
 instance AssertCfgWellFormed MPythonSig S.UnitF
 
@@ -179,8 +195,14 @@ instance AssertCfgWellFormed MPythonSig S.UnitF
 -- containers
 instance AssertCfgWellFormed MPythonSig S.MaybeF
 instance AssertCfgWellFormed MPythonSig S.ListF where
-  -- TODO: ListF
-  assertCfgWellFormed _ = pure ()
+  assertCfgWellFormed t@(inject' -> stripA -> t0)
+    | isSort (Proxy :: Proxy [BlockItemL]) t0 ||
+      isSort (Proxy :: Proxy [StatementL]) t0 = do
+        case t of
+          (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []
+    | otherwise = assertCfgNoCfgNode (inject' t)
+
 instance AssertCfgWellFormed MPythonSig S.PairF
 
 instance AssertCfgWellFormed MPythonSig Statement where
@@ -199,12 +221,12 @@ instance AssertCfgWellFormed MPythonSig Statement where
   assertCfgWellFormed t@(remA -> Continue _) =
     assertCfgContinue (inject' t)
   -- NOTE: Assign and Fun does not exist
-  assertCfgWellFormed t@(remA -> AsyncFor {}) =
-    error "TODO: AsyncFor"
-  assertCfgWellFormed t@(remA -> AsyncFun {}) =
-    error "TODO: AsyncFun"
-  assertCfgWellFormed t@(remA -> AsyncWith {}) =
-    error "TODO: AsyncWith"    
+  assertCfgWellFormed t@(remA -> AsyncFor f _) =
+    assertCfgIsGeneric (inject' t) [E f]
+  assertCfgWellFormed t@(remA -> AsyncFun f _) =
+    assertCfgIsGeneric (inject' t) [E f]    
+  assertCfgWellFormed t@(remA -> AsyncWith w _) =
+    assertCfgIsGeneric (inject' t) [E w]    
   assertCfgWellFormed t@(remA -> Import {}) =
     assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> FromImport {}) =
@@ -262,8 +284,7 @@ instance AssertCfgWellFormed MPythonSig Expr where
   
   assertCfgWellFormed t@(remA -> SlicedExpr e es _) =
     assertCfgIsGenericAuto (inject' t) [E e, E es]
-  assertCfgWellFormed t@(remA -> CondExpr tru cond fls _) =
-    assertCfgCondOp (inject' t) cond tru fls
+  -- skipping CondExpr
   assertCfgWellFormed t@(remA -> BinaryOp op l r _) =
     case extractOp op of
       And _ -> assertCfgShortCircuit (inject' t) l r
@@ -276,28 +297,32 @@ instance AssertCfgWellFormed MPythonSig Expr where
     assertCfgIsGeneric (inject' t) [E e]    
   assertCfgWellFormed t@(remA -> Dot e _ _) =
     assertCfgIsGeneric (inject' t) [E e]    
-  assertCfgWellFormed t@(remA -> Lambda {}) =
-    error "TODO: Lambda"
+  assertCfgWellFormed t@(remA -> Lambda _ body _) =
+    assertCfgFunctionDef (inject' t) body 
   assertCfgWellFormed t@(remA -> Tuple es _) =
     assertCfgIsGeneric (inject' t) (map E $ S.extractF es)    
-  assertCfgWellFormed t@(remA -> Yield {}) =
-    error "TODO: Yield"
+  assertCfgWellFormed t@(remA -> Yield a _) =
+    assertCfgIsGenericAuto (inject' t) [E a]
   assertCfgWellFormed t@(remA -> Generator {}) =
-    error "TODO: Generator"
-  assertCfgWellFormed t@(remA -> Await {}) =
-    error "TODO: Await"
+    -- TODO
+    pure ()
+  assertCfgWellFormed t@(remA -> Await e _) =
+    assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> List es _) =
     assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
   assertCfgWellFormed t@(remA -> ListComp _ _) =
-    error "TODO: ListComp"
+    -- TODO
+    pure ()
   assertCfgWellFormed t@(remA -> Dictionary ds _) =
     assertCfgIsGenericAuto (inject' t) (map E $ S.extractF ds)
   assertCfgWellFormed t@(remA -> DictComp {}) =
-    error "TODO: DictComp"
+    -- TODO
+    pure ()
   assertCfgWellFormed t@(remA -> Set es _) =
     assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
   assertCfgWellFormed t@(remA -> SetComp {}) =
-    error "TODO: SetComp"
+    -- TODO
+    pure ()
   assertCfgWellFormed t@(remA -> Starred e _) =
     assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> Paren e _) =
@@ -322,7 +347,8 @@ assertCfgIfElse ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs a -> [(TermLab fs e, TermLab fs b)] -> TermLab fs b -> m ()
 assertCfgIfElse t cs els = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -358,7 +384,8 @@ assertCfgReturn ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> Maybe (TermLab fs e) -> m ()
 assertCfgReturn t me = do
   (enReturn, exReturn) <- getEnterExitPair t t
@@ -381,18 +408,19 @@ assertCfgRaise ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> [TermLab fs e] -> m ()
 assertCfgRaise t exps = do
-  (enReturn, exReturn) <- getEnterExitPair t t
-  assertNoEdge t enReturn exReturn  
+  (enRaise, exRaise) <- getEnterExitPair t t
+  assertNoEdge t enRaise exRaise
   case exps of
     [] -> pure ()
     _ -> do
-      (enExp, exExp) <- getEnterExitPair t (head exps)
-      (enExp, exExp) <- getEnterExitPair t (last exps)      
-      assertEdge t enReturn enExp
-      assertNoEdge t exExp exReturn
+      (enExp, _) <- getEnterExitPair t (head exps)
+      (_, exExp) <- getEnterExitPair t (last exps)      
+      assertEdge t enRaise enExp
+      assertNoEdge t exExp exRaise
   
 extractRaiseExprs :: MPythonTermLab RaiseExprL -> [MPythonTermLab ExprL]
 extractRaiseExprs (project' -> Just (remA -> RaiseV3 r)) =
@@ -467,10 +495,12 @@ assertCfgContinue c = do
 assertCfgPyWith  ::
   ( MonadTest m
   , MonadReader (Cfg MPythonSig) m
-  ) => MPythonTermLab w -> [MPythonTermLab b] -> MPythonTermLab a -> m ()
+  ) => MPythonTermLab w -> [(E MPythonTermLab, E MPythonTermLab)] -> MPythonTermLab a -> m ()
 assertCfgPyWith t bs body = do
   (enWith, exWith) <- getEnterExitPair t t
-  bsEEP <- mapM (getEnterExitPair t) bs
+  bsEEPL <- mapM (getEnterNodeE t) (map fst bs)
+  bsEEPR <- mapM (getExitNodeE t) (map snd bs)
+  let bsEEP = zip bsEEPL bsEEPR
   midNodes <- mapM (\i -> getIEP i t t) [0..(length bs - 1)]
   (enBody, exBody) <- getEnterExitPair t body
 
@@ -530,6 +560,7 @@ assertCfgCondOp ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs e -> TermLab fs e -> TermLab fs e -> TermLab fs e -> m ()
 assertCfgCondOp t test succ fail = do
   (enTop, exTop) <- getEnterExitPair t t
@@ -546,6 +577,7 @@ assertCfgShortCircuit ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
   (enSExp, exSExp) <- getEnterExitPair t t
@@ -560,3 +592,4 @@ assertCfgShortCircuit t e1 e2 = do
                 [ enSExp, exSExp, enE1
                 , exE1, enE2, exE2
                 ]
+

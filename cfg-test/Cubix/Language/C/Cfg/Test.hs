@@ -16,7 +16,7 @@
 
 module Cubix.Language.C.Cfg.Test where
 
-import           Control.Lens hiding ( para )
+import           Control.Lens hiding ( para, children )
 import           Control.Monad ( when )
 import           Control.Monad.IO.Class (MonadIO (..))
 import           Control.Monad.Reader (MonadReader (..), ReaderT, runReaderT)
@@ -36,7 +36,7 @@ import qualified Cubix.Language.C.Parametric.Full as CFull
 import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, subterms )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, subterms, HFoldable )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -68,10 +68,14 @@ instance AssertCfgWellFormed MCSig MaybeF
 instance AssertCfgWellFormed MCSig TripleF
 instance AssertCfgWellFormed MCSig PairF
 
-
 instance AssertCfgWellFormed MCSig ListF where
-  assertCfgWellFormed _ = pure ()
-
+  assertCfgWellFormed t
+    | isSort (Proxy :: Proxy [BlockItemL]) (stripA (inject' t)) = do
+        case t of
+          (remA -> ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> NilF)       -> assertCfgIsGeneric (inject' t) []
+    | otherwise = assertCfgNoCfgNode (inject' t)
+  
 
 instance AssertCfgWellFormed MCSig CStatementIsFunctionBody
 instance AssertCfgWellFormed MCSig COldStyleParamIsFunctionParameter
@@ -139,7 +143,7 @@ instance AssertCfgWellFormed MCSig CConstant
 instance AssertCfgWellFormed MCSig CCompoundBlockItem where
   assertCfgWellFormed t@(remA -> CBlockStmt stmt) = assertCfgIsGeneric (inject' t) (extractBlock stmt)
   assertCfgWellFormed t@(remA -> CBlockDecl decl) = assertCfgIsGenericAuto (inject' t) [E decl]
-  assertCfgWellFormed t@(remA -> CNestedFunDef def) =
+  assertCfgWellFormed t@(remA -> CNestedFunDef _def) =
     -- NOTE: functiondef is suspended, so we just check whether the start and end are connected
     assertCfgIsGeneric (inject' t) []
   
@@ -156,8 +160,8 @@ instance AssertCfgWellFormed MCSig Name
 
 instance AssertCfgWellFormed MCSig PositionalParameter
 instance AssertCfgWellFormed MCSig FunctionDef where
-  -- TODO: Complete functiondef
-  assertCfgWellFormed _ = pure ()
+  assertCfgWellFormed t@(remA -> FunctionDef _ _ _ e) =
+    assertCfgFunction (inject' t) e
 
 instance AssertCfgWellFormed MCSig PositionalParameterDeclOptionalIdent
 instance AssertCfgWellFormed MCSig FunctionDecl
@@ -240,14 +244,10 @@ instance AssertCfgWellFormed MCSig CStatement where
     assertCfgBreak (inject' t)
   assertCfgWellFormed t@(remA -> CReturn e _) =
     assertCfgReturn (inject' t) (S.extractF e)
-  assertCfgWellFormed t@(remA -> CFor init cond step body _) =
-    -- TODO: complete
-    pure ()
-    -- assertCfgFor (inject' t) init0 (S.extractF cond) (S.extractF step) (extractBlock body)
-    where init0 = case S.extractF2 init of
-            Left t0 -> S.extractF t0
-            -- TODO: complete this
-            Right _d -> Nothing
+  assertCfgWellFormed t@(remA -> CFor init cond step body _) = do
+    inits0 <- inits
+    assertCfgFor (inject' t) inits0 (S.extractF cond) (S.extractF step) (extractBlock body)
+    where inits = subtermWithCfg (inject' t) init            
   assertCfgWellFormed t@(remA -> CSwitch exp body _) =
     assertCfgSwitch (inject' t) exp (extractBlock body)
   assertCfgWellFormed t@(remA -> CAsm stmt _) = assertCfgIsGenericAuto (inject' t) [E stmt]
@@ -291,7 +291,8 @@ assertCfgLabel ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs a -> E (TermLab fs) -> m ()
 assertCfgLabel t (E body) = do
   (enLabel, exLabel) <- getEnterExitPair t t
@@ -304,7 +305,8 @@ assertCfgIfElse ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> [E (TermLab fs)] -> [E (TermLab fs)] -> m ()
 assertCfgIfElse t cond thns elss = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -327,7 +329,8 @@ assertCfgIf ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs 
   ) => TermLab fs a -> TermLab fs e -> [E (TermLab fs)] -> m ()
 assertCfgIf t cond thns = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -336,6 +339,7 @@ assertCfgIf t cond thns = do
   midNode <- getIEP 0 t t
   let edges = [ (enIf, midNode), (midNode, enCond)
               , (exCond, enThn), (exThn, exIf)
+              , (exCond, exIf)
               ]
       nodes = [enIf, exIf, midNode, enCond, exCond] ++
               map fst thnEEPs ++
@@ -351,6 +355,7 @@ assertCfgWhile ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs a -> TermLab fs e -> [E (TermLab fs)] -> m ()
 assertCfgWhile t e bs = do
   (enWhile, exWhile) <- getEnterExitPair t t
@@ -375,6 +380,7 @@ assertCfgDoWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs  
   ) => TermLab gs l -> [E (TermLab gs)] -> TermLab gs j -> m ()
 assertCfgDoWhile t bs e = do
   (enDoWhile, exDoWhile) <- getEnterExitPair t t
@@ -400,14 +406,17 @@ assertCfgFor ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
-  ) => TermLab fs l -> Maybe (TermLab fs i) -> Maybe (TermLab fs e) -> Maybe (TermLab fs e) -> [E (TermLab fs)] -> m ()
+  , All EqHF fs
+  , All HFoldable fs 
+  ) => TermLab fs l -> Maybe (E (TermLab fs), E (TermLab fs)) -> Maybe (TermLab fs e) -> Maybe (TermLab fs e) -> [E (TermLab fs)] -> m ()
 assertCfgFor t mInit mCond mStep bs = do
   eepFor <- getEnterExitPair t t
   loFor <- getLoopEntry t t
   bodyEEPs <- mapM (getEnterExitPairE t) bs
   let eepBody = (fst (head bodyEEPs), snd (last bodyEEPs))
-  mEEPInit <- traverse (getEnterExitPair t) mInit
+  mEEPInitS <- traverse (getEnterExitPairE t) (fmap fst mInit)
+  mEEPInitE <- traverse (getEnterExitPairE t) (fmap snd mInit)
+  let mEEPInit = (,) <$> (fmap fst mEEPInitS) <*> (fmap snd mEEPInitE)
   mEEPCond <- traverse (getEnterExitPair t) mCond
   mEEPStep <- traverse (getEnterExitPair t) mStep
 
@@ -446,6 +455,7 @@ assertCfgCondOp ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs e -> TermLab fs e -> Maybe (TermLab fs e) -> TermLab fs e -> m ()
 assertCfgCondOp t test succ fail = do
   (enTop, exTop) <- getEnterExitPair t t
@@ -467,6 +477,7 @@ assertCfgShortCircuit ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
   (enSExp, exSExp) <- getEnterExitPair t t
@@ -485,7 +496,7 @@ assertCfgShortCircuit t e1 e2 = do
 -- NOTE: Asserts that
 --       * there in only one outgoing edge from entry node of `continue`.
 --       * that outgoing edge is to a node which has an `LoopEntryNode` type.
---       * that outgoing edge is to a node which is loop-like (is one of `Do while/EnhancedFor/BasicFor/ While`)
+--       * that outgoing edge is to a node which is loop-like (is one of `Do while/For/While`)
 --         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `continue`.
 assertCfgContinue ::
@@ -520,7 +531,8 @@ assertCfgReturn ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> Maybe (TermLab fs e) -> m ()
 assertCfgReturn t me = do
   (enReturn, exReturn) <- getEnterExitPair t t
@@ -535,7 +547,7 @@ assertCfgReturn t me = do
 -- NOTE: Asserts that
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
---       * that outgoing edge is to a node which is switch or loop-like (is one of `Do while/EnhancedFor/BasicFor/While`)
+--       * that outgoing edge is to a node which is switch or loop-like (is one of `Do while/For/While`)
 --         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
@@ -586,6 +598,14 @@ assertCfgGoto t labName = do
           | labName == n = True
           | otherwise = False
     checkLab _ = False
+
+assertCfgFunction ::
+  ( MonadTest m
+  , MonadReader (Cfg MCSig) m
+  ) => TermLab MCSig a -> TermLab MCSig b -> m ()
+assertCfgFunction t body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgSubtermsAuto t []
 
 -- NOTE: Label adjustment is necessary because
 --       Label node sort of does not respect compositionality

@@ -169,8 +169,8 @@ instance ConstructCfg MJavaSig JavaCfgState Exp where
   constructCfg t'@(remA -> (BinOp _ (op :*: _) _)) = do
     let (t :*: (BinOp el _ er)) = collapseFProd' t'
     case extractOp op of
-      And -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
-      Or  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      CAnd -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      COr  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
       _   -> constructCfgDefault t'
 
     where extractOp :: MJavaTermLab OpL -> Op MJavaTerm OpL

@@ -36,7 +36,7 @@ import qualified Cubix.Language.Java.Parametric.Full as JFull
 import           Cubix.Language.Parametric.Semantics.Cfg hiding ( enter, exit )
 import           Cubix.ParsePretty
 import           Cubix.Sin.Compdata.Annotation ( getAnn )
-import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold )
+import           Data.Comp.Multi ( E (..), project, stripA, (:&:) (..), Sum, All, caseCxt', para, (:*:), HFix, (:->), NatM, ffst, hfmap, ShowHF, HFunctor, (:*:) (..), inj', inject', EqHF, remA, (:-<:), proj, Cxt (..), inj, hfoldMap, K (..), cata, hfold, HFoldable )
 import           Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import           Cubix.Language.Parametric.Cfg.Test
@@ -59,10 +59,22 @@ makeJavaEnv t = do
   pure (tLab, cfg)
 
 instance AssertCfgWellFormed MJavaSig BlockStmt where
-  assertCfgWellFormed _ = pure ()
+  assertCfgWellFormed t@(remA -> BlockStmt stmt) =
+    assertCfgIsGeneric (inject' t) [E stmt]
+  assertCfgWellFormed t@(remA -> LocalClass cls) =
+    -- TODO: Verify LocalClass
+    -- assertCfgLocalClass (inject' t) [E cls]    
+    pure ()
+  assertCfgWellFormed t@(remA -> LocalVars _ _ var) =
+    assertCfgIsGenericAuto (inject' t) [E var]
 
 instance AssertCfgWellFormed MJavaSig ListF where
-  assertCfgWellFormed _ = pure ()
+  assertCfgWellFormed t@(inject' -> stripA -> t0)
+    | isSort (Proxy :: Proxy [BlockItemL]) t0 =
+        case t of
+          (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []
+    | otherwise = assertCfgNoCfgNode (inject' t)  
 
 -- containers
 instance AssertCfgWellFormed MJavaSig MaybeF
@@ -94,7 +106,9 @@ instance AssertCfgWellFormed MJavaSig EnumConstant
 instance AssertCfgWellFormed MJavaSig EnumBody
 instance AssertCfgWellFormed MJavaSig ElementValue
 instance AssertCfgWellFormed MJavaSig Decl
-instance AssertCfgWellFormed MJavaSig ConstructorBody
+instance AssertCfgWellFormed MJavaSig ConstructorBody where
+  assertCfgWellFormed t@(remA -> ConstructorBody p e) =
+    assertCfgConstructor (inject' t) p e
 instance AssertCfgWellFormed MJavaSig CompilationUnit
 instance AssertCfgWellFormed MJavaSig ClassDecl
 instance AssertCfgWellFormed MJavaSig ClassBody
@@ -160,7 +174,10 @@ instance AssertCfgWellFormed MJavaSig BlockIsBlock
 instance AssertCfgWellFormed MJavaSig IdentIsIdent
 instance AssertCfgWellFormed MJavaSig ModifiersTypeIsMultiLocalVarDeclCommonAttrs
 instance AssertCfgWellFormed MJavaSig VarInitIsLocalVarInit
-instance AssertCfgWellFormed MJavaSig FunctionDef
+
+instance AssertCfgWellFormed MJavaSig FunctionDef where
+  assertCfgWellFormed t@(remA -> FunctionDef _ _ _ e) =
+    assertCfgFunction (inject' t) e  
 
 instance AssertCfgWellFormed MJavaSig AssignIsExp where
   assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
@@ -228,7 +245,9 @@ instance AssertCfgWellFormed MJavaSig Exp where
   assertCfgWellFormed t@(remA -> PreBitCompl exp) = assertCfgIsGeneric (inject' t) [E exp]
   assertCfgWellFormed t@(remA -> PreNot exp) = assertCfgIsGeneric (inject' t) [E exp]
   assertCfgWellFormed t@(remA -> Cast _ exp) = assertCfgIsGeneric (inject' t) [E exp]
-  assertCfgWellFormed t@(remA -> Lambda {}) = pure ()  -- TODO: fix Lambda
+  assertCfgWellFormed t@(remA -> Lambda _ e) =
+    assertCfgLambda (inject' t) e
+
   assertCfgWellFormed t@(remA -> MethodRef {}) = assertCfgIsGeneric (inject' t) []
   
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)  
@@ -243,15 +262,11 @@ instance AssertCfgWellFormed MJavaSig Stmt where
   assertCfgWellFormed t@(remA -> While e b) =
     assertCfgWhile (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(remA -> BasicFor init cond step b) =
-    -- TODO: Fix forinits
-    pure ()
-    {-
     assertCfgFor (inject' t)
                  (extractForInits <$> extractMaybe init)
                  (extractMaybe cond)
                  (extractList <$> extractMaybe step)
                  (extractBlock b)
-   -}
   assertCfgWellFormed t@(remA -> EnhancedFor _ _ _ e b) =
     assertCfgEnhancedFor (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(remA -> Switch exp switchBlocks) =
@@ -297,7 +312,8 @@ assertCfgIfElse ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> E (TermLab fs) -> m ()
 assertCfgIfElse t cond (E thn) (E els) = do
   (enIf, exIf) <- getEnterExitPair t t
@@ -313,14 +329,15 @@ assertCfgIf ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgIf t cond (E thn) = do
   (enIf, exIf) <- getEnterExitPair t t
   (enCond, exCond) <- getEnterExitPair t cond
   (enThn, exThn) <- getEnterExitPair t thn
   midNode <- getIEP 0 t t
-  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf) ]
+  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf), (exCond, exIf) ]
                 [enIf, exIf, midNode, enCond, exCond, enThn, exThn]
 
 assertCfgWhile ::
@@ -331,7 +348,8 @@ assertCfgWhile ::
   , All HFunctor fs
   , All EqHF fs
   , Exp :-<: fs
-  , Literal :-<: fs  
+  , Literal :-<: fs
+  , All HFoldable fs  
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgWhile t e (E b) = do
   (enWhile, exWhile) <- getEnterExitPair t t
@@ -369,7 +387,8 @@ assertCfgEnhancedFor ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs 
+  , All HFoldable fs
   ) => TermLab fs a -> TermLab fs e -> E (TermLab fs) -> m ()
 assertCfgEnhancedFor t e (E b) = do
   (enEnFor, exEnFor) <- getEnterExitPair t t
@@ -394,6 +413,7 @@ assertCfgDoWhile ::
   , All ShowHF gs
   , All HFunctor gs
   , All EqHF gs
+  , All HFoldable gs    
   ) => TermLab gs l -> E (TermLab gs) -> TermLab gs j -> m ()
 assertCfgDoWhile t (E b) e = do
   (enDoWhile, exDoWhile) <- getEnterExitPair t t
@@ -559,7 +579,8 @@ assertCfgFor ::
   , MonadReader (Cfg fs) m
   , All ShowHF fs
   , All HFunctor fs
-  , All EqHF fs  
+  , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs l -> Maybe [TermLab fs i] -> Maybe (TermLab fs e) -> Maybe [TermLab fs e] -> E (TermLab fs) -> m ()
 assertCfgFor t mInit mCond mStep (E body) = do
   eepFor <- getEnterExitPair t t
@@ -580,22 +601,21 @@ assertCfgFor t mInit mCond mStep (E body) = do
             (_,  vs6) = joinEdges  vs5 e5 eepBody
             
             (_,  vs7) = mJoinEdgesL vs6 mEEPCond (identEdge $ exit eepFor)
-
-            (mstepOutEdge, stepInEdges) = go mEEPSteps
-              where go Nothing = (Nothing, [])
-                    go (Just []) = (Nothing, [])
-                    go (Just xs) = (Just (enter (head xs), exit (last xs)), xs)
-
-            (minitOutEdge, initInEdges) = go mEEPInits
-              where go Nothing = (Nothing, [])
-                    go (Just []) = (Nothing, [])
-                    go (Just xs) = (Just (enter (head xs), exit (last xs)), xs)
-  
-        in  vs7 ++ initInEdges ++ stepInEdges
+        in  vs7
       nodes =
-        let ns = catMaybes [mEEPCond] ++ [ eepFor, eepBody ] ++ maybe [] id mEEPInits ++ maybe [] id mEEPSteps
-        in loFor : map enter ns ++ map exit ns
+        let ns = catMaybes [mEEPCond] ++ [ eepFor, eepBody ]
+            both0 p = [fst p, snd p]
+        in loFor : map enter ns ++ map exit ns ++ maybe [] both0 mstepOutEdge ++ maybe [] both0 minitOutEdge
+        
+      mstepOutEdge = go mEEPSteps
+        where go Nothing   = Nothing
+              go (Just []) = Nothing
+              go (Just xs) = Just (enter (head xs), exit (last xs))
 
+      minitOutEdge = go mEEPInits
+        where go Nothing   = Nothing
+              go (Just []) = Nothing
+              go (Just xs) = Just (enter (head xs), exit (last xs))
   assertEdges t (nub edges) nodes
 
 -- NOTE: Asserts that
@@ -660,6 +680,7 @@ assertCfgShortCircuit ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
 assertCfgShortCircuit t e1 e2 = do
   (enSExp, exSExp) <- getEnterExitPair t t
@@ -681,6 +702,7 @@ assertCfgCondOp ::
   , All ShowHF fs
   , All HFunctor fs
   , All EqHF fs
+  , All HFoldable fs  
   ) => TermLab fs e -> TermLab fs e -> TermLab fs e -> TermLab fs e -> m ()
 assertCfgCondOp t test succ fail = do
   (enTop, exTop) <- getEnterExitPair t t
@@ -723,11 +745,23 @@ extractBlockFromBlock (project' -> Just (BlockIsBlock blk :&: _)) = fromJust $ d
   (remA -> S.Block blkItems _) <- project' blk
   pure (E blkItems)
 
-
--- TODO: handle LocalVars case
 extractForInits :: TermLab MJavaSig ForInitL -> [TermLab MJavaSig ExpL]
 extractForInits (project' -> Just (JFull.ForInitExps exps :&: _)) = S.extractF exps
-extractForInits (project' -> Just (JFull.ForLocalVars _ _ decls :&: _)) = []
+extractForInits (project' -> Just (JFull.ForLocalVars _ _ decls :&: _)) = concatMap extractExps (S.extractF decls)
+
+  where extractExps :: TermLab MJavaSig VarDeclL -> [TermLab MJavaSig ExpL]
+        extractExps (project' -> Just (remA -> (VarDecl _ e))) = case S.extractF e of
+          Just e0 -> extractVarInit e0
+          Nothing -> []
+
+        extractVarInit :: TermLab MJavaSig VarInitL -> [TermLab MJavaSig ExpL]
+        extractVarInit v = case project' v of
+            Just (remA -> InitExp e) -> [e]
+            Just (remA -> InitArray arr) -> extractArrInit arr
+
+        extractArrInit :: TermLab MJavaSig ArrayInitL -> [TermLab MJavaSig ExpL]
+        extractArrInit (project' -> Just (remA -> ArrayInit vs)) = concatMap extractVarInit (S.extractF vs)
+          
                  
 extractBlockFromCatch :: TermLab MJavaSig CatchL -> E (TermLab MJavaSig)
 extractBlockFromCatch (project' -> Just (Catch _ blkIsBlk :&: _)) = fromJust $ do
@@ -748,3 +782,27 @@ integration_java_cfg path =
     
     (_, cfg) <- makeJavaEnv t
     integration_cfg edges cfg
+
+assertCfgFunction ::
+  ( MonadTest m
+  , MonadReader (Cfg MJavaSig) m
+  ) => TermLab MJavaSig a -> TermLab MJavaSig b -> m ()
+assertCfgFunction t body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgSubtermsAuto t []
+
+assertCfgConstructor ::
+  ( MonadTest m
+  , MonadReader (Cfg MJavaSig) m
+  ) => TermLab MJavaSig a -> TermLab MJavaSig p -> TermLab MJavaSig b -> m ()
+assertCfgConstructor t param body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgSubtermsAuto t [E param]
+
+assertCfgLambda ::
+  ( MonadTest m
+  , MonadReader (Cfg MJavaSig) m
+  ) => TermLab MJavaSig a -> TermLab MJavaSig b -> m ()
+assertCfgLambda t body = do
+  assertCfgIsSuspendedAuto t body
+  assertCfgIsGenericAuto t []
