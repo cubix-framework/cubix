@@ -40,6 +40,12 @@ tests = do
 -}{-  
   checkParallel $ Group "cfg-integration-tests" $ [
         ("integration_lua_cfg_goto", integration_lua_cfg "integration-test-input-files/lua/goto.lua")
+      , ("integration_lua_cfg_lExpr", integration_lua_cfg "integration-test-input-files/lua/lExpr.lua")
+      , ("integration_lua_cfg_lFunReturn", integration_lua_cfg "integration-test-input-files/lua/lFunReturn.lua")
+      , ("integration_lua_cfg_lIf", integration_lua_cfg "integration-test-input-files/lua/lIf.lua")
+      , ("integration_lua_cfg_lLamda", integration_lua_cfg "integration-test-input-files/lua/lLamda.lua")
+      , ("integration_lua_cfg_lRepUntil", integration_lua_cfg "integration-test-input-files/lua/lRepUntil.lua")
+      , ("integration_lua_cfg_lWhile", integration_lua_cfg "integration-test-input-files/lua/lWhile.lua")
       , ("integration_c_cfg_Bar2", integration_c_cfg "integration-test-input-files/c/Bar2.c")
       , ("integration_c_cfg_Bar", integration_c_cfg "integration-test-input-files/c/Bar.c")
       , ("integration_c_cfg_do_whale", integration_c_cfg "integration-test-input-files/c/do_whale.c")
@@ -50,6 +56,9 @@ tests = do
       , ("integration_c_cfg_mix_2", integration_c_cfg "integration-test-input-files/c/mix_2.c")
       , ("integration_c_cfg_switch", integration_c_cfg "integration-test-input-files/c/switch.c")
       , ("integration_c_cfg_whale", integration_c_cfg "integration-test-input-files/c/whale.c")
+      , ("integration_c_cfg_duffdevice", integration_c_cfg "integration-test-input-files/c/duffdevice.c")
+      , ("integration_c_cfg_nestedConBreak", integration_c_cfg "integration-test-input-files/c/nestedConBreak.c")
+      , ("integration_c_cfg_operations", integration_c_cfg "integration-test-input-files/c/operations.c")
       , ("integration_java_cfg_do_while_break", integration_java_cfg "integration-test-input-files/java/do_while_break.java")
       , ("integration_java_cfg_Foo", integration_java_cfg "integration-test-input-files/java/Foo.java")
       , ("integration_java_cfg_for_break", integration_java_cfg "integration-test-input-files/java/for_break.java")
@@ -70,6 +79,15 @@ tests = do
       , ("integration_javascript_cfg_jsWhale", integration_javascript_cfg "integration-test-input-files/javascript/jsWhale.js")
       , ("integration_javascript_cfg_whileDoLabelConBreak", integration_javascript_cfg "integration-test-input-files/javascript/whileDoLabelConBreak.js")
       , ("integration_javascript_cfg_Foo", integration_javascript_cfg "integration-test-input-files/javascript/Foo.js")
+      , ("integration_python_cfg_Foo", integration_python_cfg "integration-test-input-files/python/Foo.py")
+      , ("integration_python_cfg_pForConBreak", integration_python_cfg "integration-test-input-files/python/pForConBreak.py")
+      , ("integration_python_cfg_pfor", integration_python_cfg "integration-test-input-files/python/pfor.py")
+      , ("integration_python_cfg_pif", integration_python_cfg "integration-test-input-files/python/pif.py")
+      , ("integration_python_cfg_pInnerFun", integration_python_cfg "integration-test-input-files/python/pInnerFun.py")
+      , ("integration_python_cfg_pLambda", integration_python_cfg "integration-test-input-files/python/pLambda.py")
+      , ("integration_python_cfg_pRemDup", integration_python_cfg "integration-test-input-files/python/pRemDup.py")
+      , ("integration_python_cfg_pwhale", integration_python_cfg "integration-test-input-files/python/pwhale.py")
+      , ("integration_python_cfg_pWhileConBreak", integration_python_cfg "integration-test-input-files/python/pWhileConBreak.py")
       ]
 -}{-
   let lua_path = "/home/sreenidhi/Work/cubix/cubix/test/lua/lua-5.3.3-tests"

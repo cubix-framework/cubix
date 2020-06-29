@@ -593,3 +593,13 @@ assertCfgShortCircuit t e1 e2 = do
                 , exE1, enE2, exE2
                 ]
 
+-- hardcoded integration tests
+integration_python_cfg :: FilePath -> Property
+integration_python_cfg path = 
+  withTests 1 $
+  property $ do
+    Just t <- liftIO $ parseFile path
+    edges <- liftIO $ parseEdges path
+    
+    (_, cfg) <- makePyEnv t
+    integration_cfg edges cfg
