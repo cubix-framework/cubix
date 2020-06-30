@@ -17,27 +17,20 @@ import           Cubix.Language.Python.Cfg.Test
 
 tests :: IO Bool
 tests = do
-  checkParallel $ Group "cfg-fast-check" $ [
-        ("unit_java_cfg_zap", unit_java_cfg "input-files/java/Baz.java")
-        ]
-{-
+  
   checkParallel $ Group "cfg-unit-tests" $ [
         ("unit_lua_cfg_foo", unit_lua_cfg "input-files/lua/Foo.lua")
       , ("unit_lua_cfg_bar", unit_lua_cfg "input-files/lua/Bar.lua")
       , ("unit_java_cfg_foo", unit_java_cfg "input-files/java/Foo.java")
       , ("unit_java_cfg_bar", unit_java_cfg "input-files/java/Bar.java")  
       , ("unit_c_cfg_foo", unit_c_cfg "input-files/c/Foo.c")
-      , ("unit_c_cfg_bar", unit_c_cfg "input-files/c/Bar.c")
-      , ("unit_c_cfg_baz", unit_c_cfg "input-files/c/baz.c")
-      , ("unit_c_cfg_thud", unit_c_cfg "input-files/c/thud.c")
-      , ("unit_c_cfg_variadic", unit_c_cfg "input-files/c/variadic.c")
+      , ("unit_c_cfg_bar", unit_c_cfg "input-files/c/Bar.c")      
       , ("unit_js_cfg_foo", unit_js_cfg "input-files/javascript/Foo.js")
       , ("unit_js_cfg_bar", unit_js_cfg "input-files/javascript/Bar.js")
       , ("unit_py_cfg_foo", unit_python_cfg "input-files/python/Foo.py")
-      , ("unit_py_cfg_bar", unit_python_cfg "input-files/python/Bar.py")
-      , ("unit_py_cfg_baz", unit_python_cfg "input-files/python/Baz.py")
+      , ("unit_py_cfg_bar", unit_python_cfg "input-files/python/Bar.py")      
       ]
--}{-  
+
   checkParallel $ Group "cfg-integration-tests" $ [
         ("integration_lua_cfg_goto", integration_lua_cfg "integration-test-input-files/lua/goto.lua")
       , ("integration_lua_cfg_lExpr", integration_lua_cfg "integration-test-input-files/lua/lExpr.lua")
@@ -70,6 +63,10 @@ tests = do
       , ("integration_java_cfg_jwhale", integration_java_cfg "integration-test-input-files/java/jwhale.java")
       , ("integration_java_cfg_mix1", integration_java_cfg "integration-test-input-files/java/mix1.java")
       , ("integration_java_cfg_while_break", integration_java_cfg "integration-test-input-files/java/while_break.java")
+      , ("integration_java_cfg_jNestedConBreak", integration_java_cfg "integration-test-input-files/java/jNestedConBreak.java")
+      , ("integration_java_cfg_jLocalClass", integration_java_cfg "integration-test-input-files/java/jLocalClass.java")
+      , ("integration_java_cfg_jTryAndCatchMe", integration_java_cfg "integration-test-input-files/java/jTryAndCatchMe.java")
+      , ("integration_java_cfg_operations", integration_java_cfg "integration-test-input-files/java/operations.java")
       , ("integration_javascript_cfg_forLabelConBreak", integration_javascript_cfg "integration-test-input-files/javascript/forLabelConBreak.js")
       , ("integration_javascript_cfg_jsDoWhale", integration_javascript_cfg "integration-test-input-files/javascript/jsDoWhale.js")
       , ("integration_javascript_cfg_jsFor", integration_javascript_cfg "integration-test-input-files/javascript/jsFor.js")
@@ -89,23 +86,8 @@ tests = do
       , ("integration_python_cfg_pwhale", integration_python_cfg "integration-test-input-files/python/pwhale.py")
       , ("integration_python_cfg_pWhileConBreak", integration_python_cfg "integration-test-input-files/python/pWhileConBreak.py")
       ]
--}{-
-  let lua_path = "/home/sreenidhi/Work/cubix/cubix/test/lua/lua-5.3.3-tests"
-  lua_files <- listDirectory lua_path
-  checkParallel $ Group "cfg-unit-lua-tests" $
-    map (\fileName -> (fromString fileName, unit_lua_cfg (lua_path </> fileName))) lua_files
--}{-    
-  let c_path = "/home/sreenidhi/Work/cubix/gcc/gcc/testsuite/gcc.c-torture/execute/"
-  c_files <- listRecursive "c" c_path
-  checkParallel $ Group "cfg-unit-c-tests" $
-    map (\fileName -> (fromString fileName, unit_c_cfg (c_path </> fileName))) c_files  -}
-{-
-  let python_path = "/home/sreenidhi/Work/cubix/cpython-made/lib/python3.10"
-  python_files <- listRecursive "py" python_path
-  checkParallel $ Group "cfg-unit-python-tests" $
-    map (\fileName -> (fromString fileName, unit_python_cfg (python_path </> fileName))) (take 10 (drop 50 python_files))
--}
-  
+    
+                                    
 main = tests
 
 listRecursive :: String -> FilePath -> IO [FilePath]
