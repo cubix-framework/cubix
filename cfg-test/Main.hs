@@ -89,6 +89,9 @@ tests = do
       , ("integration_python_cfg_pRemDup", integration_python_cfg "integration-test-input-files/python/pRemDup.py")
       , ("integration_python_cfg_pwhile", integration_python_cfg "integration-test-input-files/python/pwhile.py")
       , ("integration_python_cfg_pWhileConBreak", integration_python_cfg "integration-test-input-files/python/pWhileConBreak.py")
+      , ("integration_python_cfg_operations", integration_python_cfg "integration-test-input-files/python/operations.py")
+      , ("integration_python_cfg_pAttendYourClasses", integration_python_cfg "integration-test-input-files/python/pAttendYourClasses.py")
+      , ("integration_python_cfg_pCatchMeIfYouCan", integration_python_cfg "integration-test-input-files/python/pCatchMeIfYouCan.py")
       ]
     
                                     
