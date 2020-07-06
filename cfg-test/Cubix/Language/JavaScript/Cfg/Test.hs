@@ -131,8 +131,14 @@ instance AssertCfgWellFormed MJSSig JSExpressionIsVarDeclBinder
 instance AssertCfgWellFormed MJSSig JSExpressionIsLocalVarInit
 
 instance AssertCfgWellFormed MJSSig IdentIsJSExpression where
-  assertCfgWellFormed t@(remA -> IdentIsJSExpression e) =
-    assertCfgIsGeneric (inject' t) []
+  assertCfgWellFormed t@(remA -> IdentIsJSExpression e) = do
+    let t0 = inject' t
+    -- NOTE: This lookup is necessary, because we ignore
+    --       Idents in the for loop in CFGs
+    mlab <- lookupCfgNodeLabel t0 EnterNode
+    case mlab of
+      Just _ -> assertCfgIsGenericAuto (inject' t) []
+      _      -> pure ()
 instance AssertCfgWellFormed MJSSig FunctionCallIsJSExpression where
   assertCfgWellFormed t@(remA -> FunctionCallIsJSExpression call) =
     assertCfgIsGenericAuto (inject' t) [E call]
@@ -257,14 +263,10 @@ instance AssertCfgWellFormed MJSSig JSCommon.JSFor where
       where toMaybe [] = Nothing
             toMaybe [x] = Just x
             toMaybe xs = error $ "Panic: unexpected list: " ++ show xs
-            
-{-
-  assertCfgWellFormed t@(JSCommon.JSForIn _ _ e body :&: _) = do
-    assertCfgWhile (inject' t) e (extractBlock body)
-  assertCfgWellFormed t@(JSCommon.JSForVarIn _ _ e body :&: _) = do
-    assertCfgWhile (inject' t) e (extractBlock body)
--}
-  assertCfgWellFormed t = error $ "Impossible case for JSFor" ++ show (inject' t)
+  assertCfgWellFormed t@(JSCommon.JSForIn _ _ e0 body :&: _) = do
+    assertCfgWhile (inject' t) e0 (extractBlock body)
+  assertCfgWellFormed t@(JSCommon.JSForVarIn _ _ e0 body :&: _) = do
+    assertCfgWhile (inject' t) e0 (extractBlock body)
 
 assertCfgShortCircuit ::
   ( MonadTest m
@@ -373,7 +375,6 @@ assertCfgContinueLabeled b labName = do
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
 --       * that outgoing edge is to a node which is switch or loop-like (is one of `Do while/For*/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
   ( MonadTest m
@@ -509,7 +510,6 @@ assertCfgWhile t e (E b) = do
 --       * there in only one outgoing edge from entry node of `continue`.
 --       * that outgoing edge is to a node which has an `LoopEntryNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `Do while/For*/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `continue`.
 assertCfgContinue ::
   ( MonadTest m

@@ -71,8 +71,6 @@ assertCfgNoCfgNode t = do
           msg l = "unexpected CfgNode created for AST: " ++
                   show t ++ "\n CfgNode is: " ++ show l
 
--- NOTE: Actually has to list the immedeate intermediate edges
---       and ensure that they are connected.
 assertCfgIsSuspendedE' ::
   ( MonadReader (Cfg fs) m
   , MonadTest m
@@ -116,15 +114,49 @@ assertCfgIsSuspendedAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> TermLab fs s -> m ()
-assertCfgIsSuspendedAuto t t0 = do
-  subsEEP <- subtermsCfg t [E t0]
+assertCfgIsSuspendedAuto t t0 =
+  assertCfgIsSuspendedPiecesAuto t [E t0]
+
+assertCfgIsSuspendedAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> (forall a. TermLab fs a -> Bool) -> TermLab fs s -> m ()
+assertCfgIsSuspendedAuto' t f t0 =
+  assertCfgIsSuspendedPiecesAuto' t f [E t0]  
+
+assertCfgIsSuspendedPiecesAuto ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> [E (TermLab fs)] -> m ()
+assertCfgIsSuspendedPiecesAuto t =
+  assertCfgIsSuspendedPiecesAuto' t (const False)
+
+assertCfgIsSuspendedPiecesAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> (forall a. TermLab fs a -> Bool) -> [E (TermLab fs)] -> m ()
+assertCfgIsSuspendedPiecesAuto' t f cs = do
+  subsEEP <- subtermsCfg t f cs
 
   case subsEEP of
-    [] -> error ("Panic: No cfgs inside AST @assertCfgIsSuspendedAuto: " ++ show t)
-    _  -> assertCfgIsSuspendedE' t0 (leftmost subsEEP) (rightmost subsEEP)
+    [] -> pure ()
+    _  -> assertCfgIsSuspendedE' t (leftmost subsEEP) (rightmost subsEEP)
 
     where leftmost eeps  = head eeps ^. (_1.cfg_node_term)
-          rightmost eeps = last eeps ^. (_2.cfg_node_term)
+          rightmost eeps = last eeps ^. (_2.cfg_node_term)          
+
 
 -- NOTE: Given a term, get the leftmost and rightmost subterms which has
 --       a CFG node
@@ -137,7 +169,7 @@ subtermWithCfg ::
   , All HFoldable fs
   ) => TermLab fs l -> TermLab fs a -> m (Maybe (E (TermLab fs), E (TermLab fs)))
 subtermWithCfg t t0 = do
-  vs <- subtermsCfg t (children t0)
+  vs <- subtermsCfg t (const False) (children t0)
   pure $ case vs of 
     [] -> Nothing
     _ -> Just ( leftmost vs, rightmost vs )
@@ -257,16 +289,20 @@ getNodeFromAstLabel nodeType t t0 =
 
 getCfgNodeLabel :: (MonadTest m, MonadReader (Cfg fs) m, All ShowHF fs, All HFunctor fs) => TermLab fs a -> TermLab fs l -> CfgNodeType -> m Label
 getCfgNodeLabel t t0 nodeType = do
-  mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))
+  mnodeLab <- lookupCfgNodeLabel t0 nodeType
   case mnodeLab of
     Just lab -> pure lab
     Nothing -> H.failWith Nothing msg
 
-  where astLab = getAnn t0
-        msg = "Cannot find label for AST: \n" ++ show t0 ++
+  where msg = "Cannot find label for AST: \n" ++ show t0 ++
               "\nfor nodetype: " ++ show nodeType ++
               "\n while checking cfg for term: \n" ++ show t
 
+lookupCfgNodeLabel :: (MonadTest m, MonadReader (Cfg fs) m, All ShowHF fs, All HFunctor fs) => TermLab fs l -> CfgNodeType -> m (Maybe Label)
+lookupCfgNodeLabel t nodeType =
+  preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))
+  where astLab = getAnn t
+        
 getCfgNode :: (MonadTest m, MonadReader (Cfg fs) m, All ShowHF fs, All HFunctor fs) => TermLab fs a -> TermLab fs l -> Label -> m (CfgNode fs)
 getCfgNode t t0 nodeLab = do
   mcfgNode <- preview (cur_cfg.cfg_nodes.(ix nodeLab))
@@ -439,6 +475,16 @@ assertCfgIsGenericFullyAuto ::
   ) => TermLab fs l -> m ()
 assertCfgIsGenericFullyAuto t = assertCfgIsGenericAuto t (children t)
 
+assertCfgIsGenericFullyAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> (forall a. TermLab fs a -> Bool) -> m ()
+assertCfgIsGenericFullyAuto' t f = assertCfgIsGenericAuto' t f (children t)
+
 -- NOTE: Given a term, and its relevant children,
 --       generically finds the CFG nodes corresponding to the given term's
 --       children, and asserts that child EEPs are connected
@@ -451,9 +497,20 @@ assertCfgIsGenericAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
-assertCfgIsGenericAuto t children0 = do
+assertCfgIsGenericAuto t =
+  assertCfgIsGenericAuto' t (const False) 
+
+assertCfgIsGenericAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> (forall a. TermLab fs a -> Bool) -> [E (TermLab fs)] -> m ()
+assertCfgIsGenericAuto' t f children0 = do
   (en, ex) <- getEnterExitPair t t
-  subsEEP <- subtermsCfg t children0
+  subsEEP <- subtermsCfg t f children0
   let edges = if null subsEEP
         then [(en, ex)]
         else (en, fst (head subsEEP)) :
@@ -482,8 +539,19 @@ assertCfgSubtermsAuto ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l -> [E (TermLab fs)] -> m ()
-assertCfgSubtermsAuto t children0 = do
-  subsEEP <- subtermsCfg t children0
+assertCfgSubtermsAuto t = 
+  assertCfgSubtermsAuto' t (const False)
+
+assertCfgSubtermsAuto' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> (forall a. TermLab fs a -> Bool) -> [E (TermLab fs)] -> m ()
+assertCfgSubtermsAuto' t f children0 = do
+  subsEEP <- subtermsCfg t f children0
   assertEdges t (zipWith (\p n -> (snd p, fst n)) subsEEP (tail subsEEP))
                 (map fst subsEEP ++ map snd subsEEP)
 
@@ -495,19 +563,20 @@ subtermsCfg ::
   , All EqHF fs
   , All HFoldable fs
   ) => TermLab fs l ->
+      (forall a. TermLab fs a -> Bool) ->
       [E (TermLab fs)] ->
       m [(CfgNode fs, CfgNode fs)]
-subtermsCfg _t =
-  fmap catMaybes . mapM subtermCfg
+subtermsCfg _t f =
+  fmap catMaybes . mapM (subtermCfg f)
 
 subtermCfg ::
+  forall m fs.
   ( MonadTest m
   , All HFoldable fs
   , All HFunctor fs
   , MonadReader (Cfg fs) m
-  ) => E (TermLab fs) -> m (Maybe (CfgNode fs, CfgNode fs))
-subtermCfg t0 = do
-          
+  ) => (forall a. TermLab fs a -> Bool) -> E (TermLab fs) -> m (Maybe (CfgNode fs, CfgNode fs))
+subtermCfg stopRecursion t0 = do
   -- For each piece of subterm, we get "leftmost"
   -- and "rightmost" CFG node
   l <- go0 children EnterNode t0
@@ -520,7 +589,9 @@ subtermCfg t0 = do
           let astLab = getAnn t0
           mnodeLab <- preview (cur_cfg.cfg_ast_nodes.(ix astLab).(ix nodeType))
           mcfgNode <- maybe (pure Nothing) (\nodeLab -> preview (cur_cfg.cfg_nodes.(ix nodeLab))) mnodeLab
-          let cs = children0 t0           
+          let cs = case stopRecursion t0 of
+                True -> []
+                False -> children0 t0           
           foldlM (\acc a -> maybe (go0 children0 nodeType a) (pure . Just) acc) mcfgNode cs
 
 -- hardcoded integration tests

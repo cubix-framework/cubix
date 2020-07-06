@@ -60,19 +60,17 @@ makeJavaEnv t = do
 
 instance AssertCfgWellFormed MJavaSig BlockStmt where
   assertCfgWellFormed t@(remA -> BlockStmt stmt) =
-    assertCfgIsGeneric (inject' t) [E stmt]
+    assertCfgIsGenericAuto' (inject' t) isSuspended [E stmt]
   assertCfgWellFormed t@(remA -> LocalClass cls) =
-    -- TODO: Verify LocalClass
-    -- assertCfgLocalClass (inject' t) [E cls]    
-    pure ()
+    assertCfgIsGenericAuto' (inject' t) isSuspended [E cls]    
   assertCfgWellFormed t@(remA -> LocalVars _ _ var) =
-    assertCfgIsGenericAuto (inject' t) [E var]
+    assertCfgIsGenericAuto' (inject' t) isSuspended [E var]
 
 instance AssertCfgWellFormed MJavaSig ListF where
   assertCfgWellFormed t@(inject' -> stripA -> t0)
     | isSort (Proxy :: Proxy [BlockItemL]) t0 =
         case t of
-          (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
+          (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto' (inject' t) isSuspended [E v, E vs]
           (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []
     | otherwise = assertCfgNoCfgNode (inject' t)  
 
@@ -180,18 +178,18 @@ instance AssertCfgWellFormed MJavaSig FunctionDef where
     assertCfgFunction (inject' t) e  
 
 instance AssertCfgWellFormed MJavaSig AssignIsExp where
-  assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
+  assertCfgWellFormed t = assertCfgIsGenericFullyAuto' (inject' t) isSuspended
 
 instance AssertCfgWellFormed MJavaSig MultiLocalVarDeclIsBlockStmt where
-  assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
+  assertCfgWellFormed t = assertCfgIsGenericFullyAuto' (inject' t) isSuspended
 
 instance AssertCfgWellFormed MJavaSig Exp where
   assertCfgWellFormed t@(remA -> Cond test succ fail) = do
     assertCfgCondOp (inject' t) test succ fail
   assertCfgWellFormed t@(remA -> BinOp e1 op e2) = do
     case extractOp op of
-      And -> assertCfgShortCircuit (inject' t) e1 e2
-      Or  -> assertCfgShortCircuit (inject' t) e1 e2
+      CAnd -> assertCfgShortCircuit (inject' t) e1 e2
+      COr  -> assertCfgShortCircuit (inject' t) e1 e2
       _   -> assertCfgIsGeneric (inject' t) [E e1, E e2]
     where extractOp :: MJavaTermLab OpL -> Op MJavaTerm OpL
           extractOp (stripA -> project -> Just bp) = bp
@@ -200,8 +198,8 @@ instance AssertCfgWellFormed MJavaSig Exp where
   assertCfgWellFormed t@(remA -> ClassLit {}) = assertCfgIsGeneric (inject' t) []  
   assertCfgWellFormed t@(remA -> This) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> ThisClass {}) = assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> InstanceCreation _ _ args cb) = assertCfgIsGenericAuto (inject' t) [E args, E cb]
-  assertCfgWellFormed t@(remA -> QualInstanceCreation e _ _ args cb) = assertCfgIsGenericAuto (inject' t) [E e, E args, E cb]
+  assertCfgWellFormed t@(remA -> InstanceCreation _ _ args cb) = assertCfgIsGenericAuto' (inject' t) isSuspended [E args, E cb]
+  assertCfgWellFormed t@(remA -> QualInstanceCreation e _ _ args cb) = assertCfgIsGenericAuto' (inject' t) isSuspended [E e, E args, E cb]
   assertCfgWellFormed t@(remA -> ArrayCreate _ exps _) = assertCfgIsGeneric (inject' t) (map E . S.extractF $ exps)
   assertCfgWellFormed t@(remA -> ArrayCreateInit _ _ inits) =
     assertCfgIsGeneric (inject' t) exps
@@ -226,9 +224,9 @@ instance AssertCfgWellFormed MJavaSig Exp where
             Just _ -> []                      
           
   assertCfgWellFormed t@(remA -> MethodInv {}) =
-    assertCfgIsGenericFullyAuto (inject' t)
+    assertCfgIsGenericFullyAuto' (inject' t) isSuspended
   assertCfgWellFormed t@(remA -> InstanceOf {}) =
-    assertCfgIsGenericFullyAuto (inject' t)    
+    assertCfgIsGenericFullyAuto' (inject' t) isSuspended
   assertCfgWellFormed t@(remA -> ArrayAccess ix) =
     assertCfgIsGeneric (inject' t) exps
 
@@ -501,7 +499,6 @@ assertCfgContinueLabeled b labName = do
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
 --       * that outgoing edge is to a node which is switch or loop-like (is one of `Do while/EnhancedFor/BasicFor/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
   ( MonadTest m
@@ -528,7 +525,6 @@ assertCfgBreak b = do
 --       * there in only one outgoing edge from entry node of `continue`.
 --       * that outgoing edge is to a node which has an `LoopEntryNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `Do while/EnhancedFor/BasicFor/ While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `continue`.
 assertCfgContinue ::
   ( MonadTest m
@@ -669,10 +665,10 @@ assertCfgSwitch t e cs = do
                 True  -> pure Nothing
                 False -> pure (Just (fst (head esEEP), snd (last esEEP)))
 
-        getEEPLabel :: TermLab MJavaSig SwitchLabelL -> m (Maybe (CfgNode MJavaSig, CfgNode MJavaSig))
-        getEEPLabel t0 = case project' t0 of
-          Just (remA -> SwitchCase e) -> Just <$> getEnterExitPair t e
-          Just (remA -> Default)      -> pure Nothing
+        -- getEEPLabel :: TermLab MJavaSig SwitchLabelL -> m (Maybe (CfgNode MJavaSig, CfgNode MJavaSig))
+        -- getEEPLabel t0 = case project' t0 of
+        --   Just (remA -> SwitchCase e) -> Just <$> getEnterExitPair t e
+        --   Just (remA -> Default)      -> pure Nothing
 
 assertCfgShortCircuit ::
   ( MonadTest m
@@ -788,21 +784,33 @@ assertCfgFunction ::
   , MonadReader (Cfg MJavaSig) m
   ) => TermLab MJavaSig a -> TermLab MJavaSig b -> m ()
 assertCfgFunction t body = do
-  assertCfgIsSuspendedAuto t body
-  assertCfgSubtermsAuto t []
+  assertCfgIsSuspendedAuto' t isSuspended body
+  assertCfgSubtermsAuto' t isSuspended []
 
 assertCfgConstructor ::
   ( MonadTest m
   , MonadReader (Cfg MJavaSig) m
   ) => TermLab MJavaSig a -> TermLab MJavaSig p -> TermLab MJavaSig b -> m ()
 assertCfgConstructor t param body = do
-  assertCfgIsSuspendedAuto t body
-  assertCfgSubtermsAuto t [E param]
+  assertCfgIsSuspendedPiecesAuto' t isSuspended [E param, E body]
+  assertCfgSubtermsAuto' t isSuspended []
 
 assertCfgLambda ::
   ( MonadTest m
   , MonadReader (Cfg MJavaSig) m
   ) => TermLab MJavaSig a -> TermLab MJavaSig b -> m ()
 assertCfgLambda t body = do
-  assertCfgIsSuspendedAuto t body
-  assertCfgIsGenericAuto t []
+  assertCfgIsSuspendedAuto' t isSuspended body
+  assertCfgIsGenericAuto' t isSuspended []
+
+-- NOTE: This is necessary because Java
+--       is not assigned a node for
+--       suspended computations of
+--       FunctionDef and ConstructorBody
+isSuspended :: TermLab MJavaSig a -> Bool
+isSuspended (stripA -> t0)
+  | isSort (Proxy :: Proxy FunctionDefL) t0 = True
+  | isSort (Proxy :: Proxy ConstructorBodyL) t0 = True
+  | isSort (Proxy :: Proxy LambdaExpressionL) t0 = True
+  | isSort (Proxy :: Proxy CatchL) t0 = True
+  | otherwise = False

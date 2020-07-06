@@ -160,8 +160,8 @@ instance AssertCfgWellFormed MCSig Name
 
 instance AssertCfgWellFormed MCSig PositionalParameter
 instance AssertCfgWellFormed MCSig FunctionDef where
-  assertCfgWellFormed t@(remA -> FunctionDef _ _ _ e) =
-    assertCfgFunction (inject' t) e
+  assertCfgWellFormed t@(remA -> FunctionDef attrs _ params e) =
+    assertCfgFunction (inject' t) attrs params e
 
 instance AssertCfgWellFormed MCSig PositionalParameterDeclOptionalIdent
 instance AssertCfgWellFormed MCSig FunctionDecl
@@ -497,7 +497,6 @@ assertCfgShortCircuit t e1 e2 = do
 --       * there in only one outgoing edge from entry node of `continue`.
 --       * that outgoing edge is to a node which has an `LoopEntryNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `Do while/For/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `continue`.
 assertCfgContinue ::
   ( MonadTest m
@@ -548,7 +547,6 @@ assertCfgReturn t me = do
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
 --       * that outgoing edge is to a node which is switch or loop-like (is one of `Do while/For/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
   ( MonadTest m
@@ -602,9 +600,9 @@ assertCfgGoto t labName = do
 assertCfgFunction ::
   ( MonadTest m
   , MonadReader (Cfg MCSig) m
-  ) => TermLab MCSig a -> TermLab MCSig b -> m ()
-assertCfgFunction t body = do
-  assertCfgIsSuspendedAuto t body
+  ) => TermLab MCSig a -> TermLab MCSig as -> TermLab MCSig ps -> TermLab MCSig b -> m ()
+assertCfgFunction t attrs params body = do
+  assertCfgIsSuspendedPiecesAuto t [E attrs, E params, E body]
   assertCfgSubtermsAuto t []
 
 -- NOTE: Label adjustment is necessary because

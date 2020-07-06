@@ -70,7 +70,7 @@ instance AssertCfgWellFormed MPythonSig ExprIsPositionalArgExp
 instance AssertCfgWellFormed MPythonSig ExprIsFunctionExp
 instance AssertCfgWellFormed MPythonSig FunctionCallIsExpr where
   assertCfgWellFormed t@(remA -> FunctionCallIsExpr call) =
-    assertCfgIsGenericAuto (inject' t) [E call]
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) [E call]
   
 instance AssertCfgWellFormed MPythonSig PyClassIsStatement where
   assertCfgWellFormed t@(remA -> PyClassIsStatement call) =
@@ -79,7 +79,7 @@ instance AssertCfgWellFormed MPythonSig PyClassIsStatement where
 instance AssertCfgWellFormed MPythonSig IdentIsPyLValue
 instance AssertCfgWellFormed MPythonSig PyCompIsExpr where
   assertCfgWellFormed t@(remA -> PyCompIsExpr comp) =
-    assertCfgIsGenericAuto (inject' t) [E comp]
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) [E comp]
     
   
 instance AssertCfgWellFormed MPythonSig StatementIsBlockItem
@@ -258,76 +258,106 @@ instance AssertCfgWellFormed MPythonSig Statement where
   
 instance AssertCfgWellFormed MPythonSig Expr where
   assertCfgWellFormed t@(remA -> Var {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Int {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   -- skipping LongInt (v2 only)
   assertCfgWellFormed t@(remA -> Float {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Imaginary {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Bool {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> None {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Ellipsis {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> ByteStrings {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> Strings {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> UnicodeStrings {}) =
-    assertCfgIsGeneric (inject' t) []
+    withPyExprCheck assertCfgIsGeneric (inject' t) []
   -- skipping call
   assertCfgWellFormed t@(remA -> Subscript e1 e2 _) =
-    assertCfgIsGenericAuto (inject' t) [E e1, E e2]
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) [E e1, E e2]
   
   assertCfgWellFormed t@(remA -> SlicedExpr e es _) =
-    assertCfgIsGenericAuto (inject' t) [E e, E es]
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) [E e, E es]
   -- skipping CondExpr
   assertCfgWellFormed t@(remA -> BinaryOp op l r _) =
     case extractOp op of
       And _ -> assertCfgShortCircuit (inject' t) l r
       Or _  -> assertCfgShortCircuit (inject' t) l r
-      _   -> assertCfgIsGeneric (inject' t) [E l, E r]
+      _   -> withPyExprCheck assertCfgIsGeneric (inject' t) [E l, E r]
 
     where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
           extractOp (stripA -> project -> Just op) = op
   assertCfgWellFormed t@(remA -> UnaryOp _ e _) =
-    assertCfgIsGeneric (inject' t) [E e]    
+    withPyExprCheck assertCfgIsGeneric (inject' t) [E e]    
   assertCfgWellFormed t@(remA -> Dot e _ _) =
-    assertCfgIsGeneric (inject' t) [E e]    
-  assertCfgWellFormed t@(remA -> Lambda _ body _) =
-    assertCfgFunctionDef (inject' t) body 
+    withPyExprCheck assertCfgIsGeneric (inject' t) [E e]    
+  assertCfgWellFormed t@(remA -> Lambda _ body _) = do
+    let t0 = inject' t
+    withPyExprCheck' t0 (assertCfgFunctionDef t0 body)
   assertCfgWellFormed t@(remA -> Tuple es _) =
-    assertCfgIsGeneric (inject' t) (map E $ S.extractF es)    
+    withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)
   assertCfgWellFormed t@(remA -> Yield a _) =
-    assertCfgIsGenericAuto (inject' t) [E a]
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) [E a]
   assertCfgWellFormed t@(remA -> Generator {}) =
     -- TODO
     pure ()
   assertCfgWellFormed t@(remA -> Await e _) =
-    assertCfgIsGeneric (inject' t) [E e]
+    withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> List es _) =
-    assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
+    withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
   assertCfgWellFormed t@(remA -> ListComp _ _) =
     -- TODO
     pure ()
   assertCfgWellFormed t@(remA -> Dictionary ds _) =
-    assertCfgIsGenericAuto (inject' t) (map E $ S.extractF ds)
+    withPyExprCheck assertCfgIsGenericAuto (inject' t) (map E $ S.extractF ds)
   assertCfgWellFormed t@(remA -> DictComp {}) =
     -- TODO
     pure ()
   assertCfgWellFormed t@(remA -> Set es _) =
-    assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
+    withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
   assertCfgWellFormed t@(remA -> SetComp {}) =
     -- TODO
     pure ()
   assertCfgWellFormed t@(remA -> Starred e _) =
-    assertCfgIsGeneric (inject' t) [E e]
+    withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> Paren e _) =
-    assertCfgIsGeneric (inject' t) [E e]          
+    withPyExprCheck assertCfgIsGeneric (inject' t) [E e]          
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
+
+
+-- NOTE: because we are skipping exprs in
+--       defaults, those exprs do not get
+--       nodes in CFG. So we check if a node
+--       is allocated and only then perform check
+withPyExprCheck ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => (TermLab fs l -> [E (TermLab fs)] -> m ()) -> TermLab fs l -> [E (TermLab fs)] -> m ()
+withPyExprCheck f t es = withPyExprCheck' t (f t es)
+
+withPyExprCheck' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> m () -> m ()
+withPyExprCheck' t act = do
+  mNodeLab <- lookupCfgNodeLabel t EnterNode
+  case mNodeLab of
+    Just _ -> act
+    Nothing -> pure ()    
 
 assertCfgWhileOrForElse ::
   ( MonadReader (Cfg MPythonSig) m
@@ -442,7 +472,6 @@ extractRaiseExprs (project' -> Just (remA -> RaiseV2 r)) =
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `For/While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
   ( MonadTest m
@@ -469,7 +498,6 @@ assertCfgBreak b = do
 --       * there in only one outgoing edge from entry node of `continue`.
 --       * that outgoing edge is to a node which has an `LoopEntryNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `For/ While`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `continue`.
 assertCfgContinue ::
   ( MonadTest m
@@ -562,14 +590,15 @@ assertCfgCondOp ::
   , All EqHF fs
   , All HFoldable fs  
   ) => TermLab fs e -> TermLab fs e -> TermLab fs e -> TermLab fs e -> m ()
-assertCfgCondOp t test succ fail = do
-  (enTop, exTop) <- getEnterExitPair t t
-  (enTest, exTest) <- getEnterExitPair t test
-  (enSucc, exSucc) <- getEnterExitPair t succ
-  (enFail, exFail) <- getEnterExitPair t fail
+assertCfgCondOp t test succ fail =
+  withPyExprCheck' t $ do
+    (enTop, exTop) <- getEnterExitPair t t
+    (enTest, exTest) <- getEnterExitPair t test
+    (enSucc, exSucc) <- getEnterExitPair t succ
+    (enFail, exFail) <- getEnterExitPair t fail
 
-  assertEdges t [(enTop, enTest), (exTest, enSucc), (exTest, enFail), (exSucc, exTop), (exFail, exTop)]
-                [enTop, exTop, enTest, exTest, enSucc, exSucc, enFail, exFail]
+    assertEdges t [(enTop, enTest), (exTest, enSucc), (exTest, enFail), (exSucc, exTop), (exFail, exTop)]
+                  [enTop, exTop, enTest, exTest, enSucc, exSucc, enFail, exFail]
 
 assertCfgShortCircuit ::
   ( MonadTest m
@@ -579,7 +608,7 @@ assertCfgShortCircuit ::
   , All EqHF fs
   , All HFoldable fs  
   ) => TermLab fs l -> TermLab fs e1 -> TermLab fs e2 -> m ()
-assertCfgShortCircuit t e1 e2 = do
+assertCfgShortCircuit t e1 e2 = withPyExprCheck' t $ do
   (enSExp, exSExp) <- getEnterExitPair t t
   (enE1, exE1) <- getEnterExitPair t e1
   (enE2, exE2) <- getEnterExitPair t e2

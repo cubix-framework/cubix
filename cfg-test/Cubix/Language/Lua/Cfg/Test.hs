@@ -155,7 +155,6 @@ instance AssertCfgWellFormed MLuaSig Exp where
 --       * there in only one outgoing edge from entry node of `break`.
 --       * that outgoing edge is to a node which has an `ExitNode` type.
 --       * that outgoing edge is to a node which is loop-like (is one of `ForRange/ForIn/ While/Repeat`)
---         (TODO: assert that it is the *nearest* such loop-like AST)
 --       * there are no incoming nodes in exit node of `break`.
 assertCfgBreak ::
   ( MonadTest m
@@ -184,9 +183,6 @@ assertCfgBreak b = do
       isLoopLikeNode (project' -> Just (ForIn {} :&: _)) = True
       isLoopLikeNode (project' -> Just (ForRange {} :&: _)) = True
       isLoopLikeNode _ = False
-
-      -- addCount t | isLoopNode (inject' t) = fmap (+ 1) <$> hfold t
-      --            | unAnn t == getAnn b     = Just 0
 
 -- NOTE: Asserts that
 --       * there in only one outgoing edge from entry node of `goto`
