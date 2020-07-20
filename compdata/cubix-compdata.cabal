@@ -60,7 +60,7 @@ library
                         Data.Comp.Multi.Alt
                         Data.Comp.Alt
 
-  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, derive,
+  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck,
                         deepseq, th-expand-syns, transformers, vector, ghc-prim
   Extensions:           FlexibleContexts
   hs-source-dirs:       src
@@ -72,5 +72,5 @@ Test-Suite test
   Main-is:                      Data_Test.hs
   hs-source-dirs:               testsuite/tests examples src
   Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
-                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2, derive,
+                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
                         th-expand-syns, deepseq, transformers
