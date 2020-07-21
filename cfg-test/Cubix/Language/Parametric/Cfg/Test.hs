@@ -157,6 +157,20 @@ assertCfgIsSuspendedPiecesAuto' t f cs = do
     where leftmost eeps  = head eeps ^. (_1.cfg_node_term)
           rightmost eeps = last eeps ^. (_2.cfg_node_term)          
 
+-- NOTE: Given a term, if it has a CFG node, return it or get the leftmost and rightmost subterms which has a CFG node
+subtermWithCfg' ::
+  ( MonadReader (Cfg fs) m
+  , MonadTest m
+  , All ShowHF fs
+  , All HFunctor fs
+  , All EqHF fs
+  , All HFoldable fs
+  ) => TermLab fs l -> TermLab fs a -> m (Maybe (E (TermLab fs), E (TermLab fs)))
+subtermWithCfg' t b = do
+  mNodeLab <- lookupCfgNodeLabel b EnterNode
+  case mNodeLab of
+      Just _ -> pure (Just (E b, E b))
+      Nothing -> subtermWithCfg t b
 
 -- NOTE: Given a term, get the leftmost and rightmost subterms which has
 --       a CFG node

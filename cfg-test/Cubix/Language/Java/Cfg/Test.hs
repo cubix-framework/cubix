@@ -335,7 +335,7 @@ assertCfgIf t cond (E thn) = do
   (enCond, exCond) <- getEnterExitPair t cond
   (enThn, exThn) <- getEnterExitPair t thn
   midNode <- getIEP 0 t t
-  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf), (exCond, exIf) ]
+  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enThn), (exCond, exIf), (exThn, exIf) ]
                 [enIf, exIf, midNode, enCond, exCond, enThn, exThn]
 
 assertCfgWhile ::

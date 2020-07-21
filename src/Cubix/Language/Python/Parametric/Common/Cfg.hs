@@ -13,7 +13,7 @@
 module Cubix.Language.Python.Parametric.Common.Cfg () where
 
 #ifndef ONLY_ONE_LANGUAGE
-import Control.Monad ( liftM )
+import Control.Monad ( liftM, liftM2 )
 import Control.Monad.State ( MonadState )
 
 import Control.Lens ( (%=), makeLenses )
@@ -180,6 +180,13 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
 instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyCondExpr where
   constructCfg (collapseFProd' -> (t :*: (PyCondExpr test succ fail))) = HState $ do
     constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
+
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyComprehension where
+  constructCfg (collapseFProd' -> (t :*: (PyComprehensionFor _ _ e body))) = HState $ do
+    constructCfgWhile t (unHState e) (unHState body)
+  constructCfg (collapseFProd' -> (t :*: (PyComprehensionIf cond body))) = HState $ do
+     constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState body)) (return Nothing)
+  constructCfg t = constructCfgDefault t
 
 instance CfgInitState MPythonSig where
   cfgInitState _ = PythonCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap

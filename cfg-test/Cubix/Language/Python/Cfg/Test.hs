@@ -114,7 +114,27 @@ instance AssertCfgWellFormed MPythonSig S.Ident
 instance AssertCfgWellFormed MPythonSig PyCondExpr where
   assertCfgWellFormed t@(remA -> PyCondExpr c t0 e) =
     assertCfgCondOp (inject' t) c t0 e
-    
+
+instance AssertCfgWellFormed MPythonSig PyComprehensionExpr where
+  assertCfgWellFormed t@(remA -> PyListComprehension e) =
+    assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> PyDictComprehension e) =
+    assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> PySetComprehension e) =
+    assertCfgIsGeneric (inject' t) [E e]
+
+instance AssertCfgWellFormed MPythonSig PyComprehension where
+  assertCfgWellFormed t@(remA -> PyComprehensionFor _ _ e body) = do
+    let t0 = inject' t
+    b0 <- subtermWithCfg' t0 body
+    assertCfgComprehensionFor t0 e b0
+  assertCfgWellFormed t@(remA -> PyComprehensionIf e body) = do
+    let t0 = inject' t
+    b0 <- subtermWithCfg' t0 body
+    assertCfgComprehensionIf t0 e b0
+  assertCfgWellFormed t@(remA -> PyComprehensionBody body) = do
+    assertCfgSubtermsAuto (inject' t) [E body]
+
 instance AssertCfgWellFormed MPythonSig PyComp
 instance AssertCfgWellFormed MPythonSig PyClass where
   assertCfgWellFormed t@(remA -> PyClass _ args body) =
@@ -284,7 +304,7 @@ instance AssertCfgWellFormed MPythonSig Expr where
   
   assertCfgWellFormed t@(remA -> SlicedExpr e es _) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) [E e, E es]
-  -- skipping CondExpr
+  -- skipping CondExpr, Comprehensions
   assertCfgWellFormed t@(remA -> BinaryOp op l r _) =
     case extractOp op of
       And _ -> assertCfgShortCircuit (inject' t) l r
@@ -311,19 +331,10 @@ instance AssertCfgWellFormed MPythonSig Expr where
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> List es _) =
     withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
-  assertCfgWellFormed t@(remA -> ListComp _ _) =
-    -- TODO
-    pure ()
   assertCfgWellFormed t@(remA -> Dictionary ds _) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) (map E $ S.extractF ds)
-  assertCfgWellFormed t@(remA -> DictComp {}) =
-    -- TODO
-    pure ()
   assertCfgWellFormed t@(remA -> Set es _) =
     withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
-  assertCfgWellFormed t@(remA -> SetComp {}) =
-    -- TODO
-    pure ()
   assertCfgWellFormed t@(remA -> Starred e _) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> Paren e _) =
@@ -371,6 +382,33 @@ assertCfgWhileOrForElse t cond body els = do
   (enEls, exEls) <- getEnterExitPair t els
   assertEdges t [(enWhile, loWhile), (loWhile, enCond), (exCond, enBody), (exBody, loWhile), (exCond, enEls), (exEls, exWhile)]
                 [enWhile, exWhile, loWhile, enCond, exCond, enBody, exBody, enEls, exEls]  
+
+assertCfgComprehensionFor ::
+  ( MonadReader (Cfg MPythonSig) m
+  , MonadTest m
+  ) => MPythonTermLab l -> MPythonTermLab e -> Maybe (E MPythonTermLab, E MPythonTermLab) -> m ()
+assertCfgComprehensionFor t e (Just (bs, be)) = do
+  (enCFor, exCFor) <- getEnterExitPair t t
+  loCFor <- getLoopEntry t t
+  (enExp, exExp) <- getEnterExitPair t e
+  enBody <- getEnterNodeE t bs
+  exBody <- getExitNodeE t be
+  assertEdges t [(enCFor, loCFor), (loCFor, enExp), (exExp, enBody), (exBody, loCFor), (exExp, exCFor)]
+                [enCFor, exCFor, loCFor, enExp, exExp, enBody, exBody]
+
+assertCfgComprehensionIf ::
+  ( MonadTest m
+  , MonadReader (Cfg MPythonSig) m
+  ) => MPythonTermLab a -> MPythonTermLab e -> Maybe (E MPythonTermLab, E MPythonTermLab) -> m ()
+assertCfgComprehensionIf t cond (Just (bs, be)) = do
+  (enIf, exIf) <- getEnterExitPair t t
+  (enCond, exCond) <- getEnterExitPair t cond
+  enBody <- getEnterNodeE t bs
+  exBody <- getExitNodeE t be
+  midNode <- getIEP 0 t t
+  assertEdges t [ (enIf, midNode), (midNode, enCond), (exCond, enBody), (exCond, exIf), (exBody, exIf) ]
+                [enIf, exIf, midNode, enCond, exCond, enBody, exBody]
+
 
 assertCfgIfElse ::
   ( MonadTest m
