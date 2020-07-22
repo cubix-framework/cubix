@@ -16,13 +16,13 @@ module Cubix.Language.C.Parametric.Common.Cfg () where
 import Control.Monad ( liftM, liftM2, forM_ )
 import Control.Monad.State ( State, MonadState )
 
-import Control.Lens ( makeLenses, (%=), (.=), use )
+import Control.Lens ( makeLenses, (%=), (.=), use, uses )
 
-import Data.Foldable ( foldlM )
 import Data.List as List ( (\\) )
-import Data.Map as Map ( empty )
+import Data.Map as Map ( Map, partitionWithKey, delete )
+import Data.Set as Set ( Set, member, empty, fromList )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, project, proj, E(..), (:&:)(..), subterms, (:-<:), Cxt (..) )
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, fsnd, project, proj, E(..), (:&:)(..), subterms, (:-<:), Cxt (..) )
 
 import Cubix.Language.Info
 
@@ -37,9 +37,82 @@ data CCfgState = CCfgState {
                  , _ccs_labeler   :: LabelGen
                  , _ccs_stack     :: LoopStack
                  , _ccs_goto_labs :: LabelMap
+                 , _ccs_local_goto_labs :: LocalLabels
                  }
 
+type LocalLabels = Set String
+
 makeLenses ''CCfgState
+
+-----------------------------------------------------------------------------------
+---------------           Labelling mechanism              ------------------------
+-----------------------------------------------------------------------------------
+
+-- With a GNU C extension it is possible to have nested function definitions.
+-- From GCC docs:
+-- GCC allows you to declare local labels in any nested block scope.
+-- A local label is just like an ordinary label, but you can only reference it
+-- (with a goto statement, or by taking its address) within the block in which it is declared.
+-- Local label declarations also make the labels they declare visible to nested functions.
+
+type LabelMap0 = Map.Map String (Label, [Label])
+
+cLabeledBlockLabMap ::
+  ( Monad m
+  , MonadState CCfgState m
+  ) => [String] -> m a -> m a
+cLabeledBlockLabMap lls act = do
+  let curLocalLabs = Set.fromList lls
+  withExtendedLocalLabels curLocalLabs $ do
+    -- NOTE: resets outer labels which shadows local labels in this block
+    --       and after the work is done, restores it.
+    (shLabMap, labMap) <- uses label_map (splitLocalLabMap curLocalLabs)
+    label_map .= labMap
+    res <- act
+    label_map %= mergeLocalLabMap curLocalLabs shLabMap
+    return res
+
+withExtendedLocalLabels :: (Monad m, MonadState CCfgState m) => LocalLabels -> m a -> m a
+withExtendedLocalLabels lls act = do
+  prevLocalLabs <- use ccs_local_goto_labs
+  ccs_local_goto_labs .= prevLocalLabs <> lls
+  res <- act
+  ccs_local_goto_labs .= prevLocalLabs
+  return res
+
+splitLocalLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
+splitLocalLabMap lls lm = Map.partitionWithKey go lm
+  where go k _ = k `Set.member` lls
+
+mergeLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0 -> LabelMap0
+mergeLocalLabMap lls ovlm lm = foldr go lm lls <> ovlm
+  where go = Map.delete
+
+getLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0
+getLocalLabMap lls lm = fst (splitLocalLabMap lls lm)
+
+functionDefLabelMap ::
+  ( Monad m
+  , MonadState CCfgState m
+  ) => m a -> m a
+functionDefLabelMap act = do
+  oldLabMap <- use label_map
+  localLabs <- use ccs_local_goto_labs
+  -- NOTE: Let the (outer) local labels alone
+  --       be seen inside the function.
+  label_map %= getLocalLabMap localLabs
+  res <- act
+  shLabMap <- uses label_map (getLocalLabMap localLabs)
+  label_map .= oldLabMap <> shLabMap
+  pure res
+
+emptyLocalLabels :: LocalLabels
+emptyLocalLabels = Set.empty
+
+-----------------------------------------------------------------------------------
+---------------           CfgConstruction Instances        ------------------------
+-----------------------------------------------------------------------------------
+
 
 instance HasCurCfg CCfgState MCSig where cur_cfg = ccs_cfg
 instance HasLabelGen CCfgState where labelGen = ccs_labeler
@@ -179,15 +252,19 @@ constructCfgCCondOp t mtest msucc mfail = do
 
 -- CLabelBlock's getting nodes is messing everything up
 instance ConstructCfg MCSig CCfgState CLabeledBlock where
-  constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ runSubCfgs subCfgs
+  constructCfg t@(remA -> (CLabeledBlock (idents :*: _) _)) = HState $ do
+    cLabeledBlockLabMap labels $
+      runSubCfgs (fsnd $ collapseFProd' t)
+
+      where labels = map getIdent (extractF idents)
+            getIdent (stripA -> projF -> Just (Ident' s)) = s
 
 instance ConstructCfg MCSig CCfgState P.FunctionDef where
   constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ do
-    -- reset label map on function entry
-    label_map .= Map.empty
-    runSubCfgs subCfgs
-    pure EmptyEnterExit
+    functionDefLabelMap $ do
+      runSubCfgs subCfgs
+      pure EmptyEnterExit
 
 instance CfgInitState MCSig where
-  cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
+  cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap emptyLocalLabels
 #endif
