@@ -66,10 +66,10 @@ cLabeledBlockLabMap lls act = do
   withExtendedLocalLabels curLocalLabs $ do
     -- NOTE: resets outer labels which shadows local labels in this block
     --       and after the work is done, restores it.
-    (shLabMap, labMap) <- uses label_map (splitLocalLabMap curLocalLabs)
+    (locLabMap, labMap) <- uses label_map (resetLabMap curLocalLabs)
     label_map .= labMap
     res <- act
-    label_map %= mergeLocalLabMap curLocalLabs shLabMap
+    label_map %= restoreLocalLabMap curLocalLabs locLabMap
     return res
 
 withExtendedLocalLabels :: (Monad m, MonadState CCfgState m) => LocalLabels -> m a -> m a
@@ -80,16 +80,26 @@ withExtendedLocalLabels lls act = do
   ccs_local_goto_labs .= prevLocalLabs
   return res
 
-splitLocalLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
-splitLocalLabMap lls lm = Map.partitionWithKey go lm
+-- NOTE: A Local label map is a label map which has
+--       local labels as it's keys.
+
+-- | Reset label map, returning (shadowed) local label map and rest.
+resetLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
+resetLabMap = splitLabMap
+
+-- | Restores the (shadowed) local label map as it was previously.
+restoreLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0 -> LabelMap0
+restoreLocalLabMap lls rlm lm = deleteLocalLabMap lls lm <> rlm
+
+splitLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
+splitLabMap lls lm = Map.partitionWithKey go lm
   where go k _ = k `Set.member` lls
 
-mergeLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0 -> LabelMap0
-mergeLocalLabMap lls ovlm lm = foldr go lm lls <> ovlm
-  where go = Map.delete
-
 getLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0
-getLocalLabMap lls lm = fst (splitLocalLabMap lls lm)
+getLocalLabMap lls lm = fst (splitLabMap lls lm)
+
+deleteLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0
+deleteLocalLabMap lls lm = snd (splitLabMap lls lm)
 
 functionDefLabelMap ::
   ( Monad m
@@ -102,8 +112,9 @@ functionDefLabelMap act = do
   --       be seen inside the function.
   label_map %= getLocalLabMap localLabs
   res <- act
-  shLabMap <- uses label_map (getLocalLabMap localLabs)
-  label_map .= oldLabMap <> shLabMap
+  -- NOTE: Propogate the local labels outwards
+  --       while the restoring old map.
+  label_map %= mappend oldLabMap . getLocalLabMap localLabs
   pure res
 
 emptyLocalLabels :: LocalLabels

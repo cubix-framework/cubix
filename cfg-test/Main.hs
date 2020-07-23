@@ -49,6 +49,7 @@ tests = do
       , ("integration_c_cfg_go_to", integration_c_cfg "integration-test-input-files/c/go_to.c")
       , ("integration_c_cfg_goto_nested", integration_c_cfg "integration-test-input-files/c/goto_nested.c")
       , ("integration_c_cfg_goto_nested_local_label", integration_c_cfg "integration-test-input-files/c/goto_nested_local_label.c")
+      , ("integration_c_cfg_goto_nested_mixed", integration_c_cfg "integration-test-input-files/c/goto_nested_mixed.c")
       , ("integration_c_cfg_iffy", integration_c_cfg "integration-test-input-files/c/iffy.c")
       , ("integration_c_cfg_mix_1", integration_c_cfg "integration-test-input-files/c/mix_1.c")
       , ("integration_c_cfg_mix_2", integration_c_cfg "integration-test-input-files/c/mix_2.c")
