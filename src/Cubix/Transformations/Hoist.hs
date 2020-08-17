@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 module Cubix.Transformations.Hoist (
    elementaryHoist
  , hoistDeclarations

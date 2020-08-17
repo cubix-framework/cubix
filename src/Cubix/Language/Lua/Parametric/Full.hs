@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 module Cubix.Language.Lua.Parametric.Full
   (
     module Cubix.Language.Lua.Parametric.Full.Types

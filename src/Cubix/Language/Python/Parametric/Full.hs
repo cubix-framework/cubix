@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE CPP #-}
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Python.Parametric.Full () where

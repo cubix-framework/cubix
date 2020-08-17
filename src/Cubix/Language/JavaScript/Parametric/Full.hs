@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE CPP #-}
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.JavaScript.Parametric.Full () where
