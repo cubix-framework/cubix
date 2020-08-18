@@ -14,12 +14,16 @@
 module Cubix.Language.C.Parametric.Common.Cfg () where
 
 #ifndef ONLY_ONE_LANGUAGE
-import Control.Monad ( liftM, liftM2 )
-import Control.Monad.State ( State )
+import Control.Monad ( liftM, liftM2, forM_ )
+import Control.Monad.State ( State, MonadState )
 
-import Control.Lens ( makeLenses )
+import Control.Lens ( makeLenses, (%=), (.=), use, uses )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst )
+import Data.List as List ( (\\) )
+import Data.Map as Map ( Map, partitionWithKey, delete )
+import Data.Set as Set ( Set, member, empty, fromList )
+
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, fsnd, project, proj, E(..), (:&:)(..), subterms, (:-<:), Cxt (..) )
 
 import Cubix.Language.Info
 
@@ -34,9 +38,93 @@ data CCfgState = CCfgState {
                  , _ccs_labeler   :: LabelGen
                  , _ccs_stack     :: LoopStack
                  , _ccs_goto_labs :: LabelMap
+                 , _ccs_local_goto_labs :: LocalLabels
                  }
 
+type LocalLabels = Set String
+
 makeLenses ''CCfgState
+
+-----------------------------------------------------------------------------------
+---------------           Labelling mechanism              ------------------------
+-----------------------------------------------------------------------------------
+
+-- With a GNU C extension it is possible to have nested function definitions.
+-- From GCC docs:
+-- GCC allows you to declare local labels in any nested block scope.
+-- A local label is just like an ordinary label, but you can only reference it
+-- (with a goto statement, or by taking its address) within the block in which it is declared.
+-- Local label declarations also make the labels they declare visible to nested functions.
+
+type LabelMap0 = Map.Map String (Label, [Label])
+
+cLabeledBlockLabMap ::
+  ( Monad m
+  , MonadState CCfgState m
+  ) => [String] -> m a -> m a
+cLabeledBlockLabMap lls act = do
+  let curLocalLabs = Set.fromList lls
+  withExtendedLocalLabels curLocalLabs $ do
+    -- NOTE: resets outer labels which shadows local labels in this block
+    --       and after the work is done, restores it.
+    (locLabMap, labMap) <- uses label_map (resetLabMap curLocalLabs)
+    label_map .= labMap
+    res <- act
+    label_map %= restoreLocalLabMap curLocalLabs locLabMap
+    return res
+
+withExtendedLocalLabels :: (Monad m, MonadState CCfgState m) => LocalLabels -> m a -> m a
+withExtendedLocalLabels lls act = do
+  prevLocalLabs <- use ccs_local_goto_labs
+  ccs_local_goto_labs .= prevLocalLabs <> lls
+  res <- act
+  ccs_local_goto_labs .= prevLocalLabs
+  return res
+
+-- NOTE: A Local label map is a label map which has
+--       local labels as it's keys.
+
+-- | Reset label map, returning (shadowed) local label map and rest.
+resetLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
+resetLabMap = splitLabMap
+
+-- | Restores the (shadowed) local label map as it was previously.
+restoreLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0 -> LabelMap0
+restoreLocalLabMap lls rlm lm = deleteLocalLabMap lls lm <> rlm
+
+splitLabMap :: LocalLabels -> LabelMap0 -> (LabelMap0, LabelMap0)
+splitLabMap lls lm = Map.partitionWithKey go lm
+  where go k _ = k `Set.member` lls
+
+getLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0
+getLocalLabMap lls lm = fst (splitLabMap lls lm)
+
+deleteLocalLabMap :: LocalLabels -> LabelMap0 -> LabelMap0
+deleteLocalLabMap lls lm = snd (splitLabMap lls lm)
+
+functionDefLabelMap ::
+  ( Monad m
+  , MonadState CCfgState m
+  ) => m a -> m a
+functionDefLabelMap act = do
+  oldLabMap <- use label_map
+  localLabs <- use ccs_local_goto_labs
+  -- NOTE: Let the (outer) local labels alone
+  --       be seen inside the function.
+  label_map %= getLocalLabMap localLabs
+  res <- act
+  -- NOTE: Propogate the local labels outwards
+  --       while the restoring old map.
+  label_map %= mappend oldLabMap . getLocalLabMap localLabs
+  pure res
+
+emptyLocalLabels :: LocalLabels
+emptyLocalLabels = Set.empty
+
+-----------------------------------------------------------------------------------
+---------------           CfgConstruction Instances        ------------------------
+-----------------------------------------------------------------------------------
+
 
 instance HasCurCfg CCfgState MCSig where cur_cfg = ccs_cfg
 instance HasLabelGen CCfgState where labelGen = ccs_labeler
@@ -84,8 +172,6 @@ instance ConstructCfg MCSig CCfgState CStatement where
 
   constructCfg (collapseFProd' -> (t :*: (CFor init cond step body _))) = HState $ constructCfgFor t (extractForInit init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
 
-  -- TODO: Stopgap to get tests to pass while we're waiting for the revamped break/continue support
-  -- Doesn't handle fall-through properly
   constructCfg (collapseFProd' -> (t :*: (CSwitch exp body _))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -96,20 +182,101 @@ instance ConstructCfg MCSig CCfgState CStatement where
     bodyEE <- unHState body
     popBreakNode
 
-    r1 <- combineEnterExit (identEnterExit enterNode) expEE
-    r2 <- combineEnterExit r1 bodyEE
-    combineEnterExit r2 (identEnterExit exitNode)
+    cur_cfg %= addEdge enterNode (enter expEE)
+    cur_cfg %= addEdge (exit expEE) (enter bodyEE)
+    cur_cfg %= addEdge (exit bodyEE) exitNode
 
+    forM_ cases $ \(E case0) -> do
+      ccfg <- use cur_cfg
+      let Just enCase = cfgNodeForTerm ccfg EnterNode case0
+      cur_cfg %= addEdge (exit expEE) enCase
 
-  -- Making a conscious choice to skip switch's
+    return $ EnterExitPair enterNode exitNode
+
+      where cases = case project0 t of
+              Just (remA -> CSwitch _ b0 _) -> extractCases b0
+
+            extractCases t0 =
+              let subs = subterms t0
+                  cases0 = filter isCase subs
+                  switches = filter isSwitch subs
+                  subcases = filter isCase (concatMap (\(E e0) -> subterms e0) switches)
+              in  cases0 List.\\ subcases
+
+            isCase :: E MCTermLab -> Bool
+            isCase (E (project0 -> Just (remA -> CCase {}))) = True
+            isCase (E (project0 -> Just (remA -> CDefault {}))) = True
+            isCase _ = False
+
+            isSwitch :: E MCTermLab -> Bool
+            isSwitch (E (project0 -> Just (remA -> CSwitch {}))) = True
+            isSwitch _ = False
+
+            project0 :: (f :-<: MCSig) => MCTermLab l -> Maybe ((f :&: Label) MCTermLab l)
+            project0 (Term (s :&: l)) = fmap (:&: l) (proj s)
 
   constructCfg t = constructCfgDefault t
 
+instance ConstructCfg MCSig CCfgState CExpression where
+  constructCfg t'@(remA -> (CBinary (op :*: _) _ _ _)) = do
+    let (t :*: (CBinary _ el er _)) = collapseFProd' t'
+    case extractOp op of
+      CLndOp -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      CLorOp  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MCTermLab CBinaryOpL -> CBinaryOp MCTerm CBinaryOpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> CCond {}) = HState $ do
+    let (t :*: (CCond test succ fail _)) = collapseFProd' t'
+    constructCfgCCondOp t (unHState test) (extractEEPMaybe (unHState succ)) (unHState fail)
+
+  constructCfg t = constructCfgDefault t
+
+-- NOTE: because of gcc extension which allows things like x ? : y
+constructCfgCCondOp ::
+  ( MonadState s m
+  , CfgComponent MCSig s
+  ) => TermLab MCSig l -> m (EnterExitPair MCSig ls) -> m (Maybe (EnterExitPair MCSig rs)) -> m (EnterExitPair MCSig es) -> m (EnterExitPair MCSig es)
+constructCfgCCondOp t mtest msucc mfail = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+
+  test <- mtest
+  fail <- mfail
+  succ <- msucc
+
+  case succ of
+    Just succ0 -> do
+      cur_cfg %= addEdge enterNode (enter test)
+      cur_cfg %= addEdge (exit test) (enter succ0)
+      cur_cfg %= addEdge (exit test) (enter fail)
+      cur_cfg %= addEdge (exit succ0) exitNode
+      cur_cfg %= addEdge (exit fail) exitNode
+    Nothing -> do
+      cur_cfg %= addEdge enterNode (enter test)
+      cur_cfg %= addEdge (exit test) (enter fail)
+      cur_cfg %= addEdge (exit test) exitNode
+      cur_cfg %= addEdge (exit fail) exitNode
+
+  return (EnterExitPair enterNode exitNode)
 
 -- CLabelBlock's getting nodes is messing everything up
 instance ConstructCfg MCSig CCfgState CLabeledBlock where
-  constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ runSubCfgs subCfgs
+  constructCfg t@(remA -> (CLabeledBlock (idents :*: _) _)) = HState $ do
+    cLabeledBlockLabMap labels $
+      runSubCfgs (fsnd $ collapseFProd' t)
+
+      where labels = map getIdent (extractF idents)
+            getIdent (stripA -> projF -> Just (Ident' s)) = s
+
+instance ConstructCfg MCSig CCfgState P.FunctionDef where
+  constructCfg (collapseFProd' -> (_ :*: subCfgs)) = HState $ do
+    functionDefLabelMap $ do
+      runSubCfgs subCfgs
+      pure EmptyEnterExit
 
 instance CfgInitState MCSig where
-  cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
+  cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap emptyLocalLabels
 #endif

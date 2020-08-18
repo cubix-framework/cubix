@@ -20,8 +20,9 @@ import Control.Lens (  makeLenses, (%=), (^.), use )
 
 import qualified Data.Map as Map
 
-import Data.Comp.Multi ( remA, stripA )
+import Data.Comp.Multi ( remA, stripA, project )
 import Data.Comp.Multi.Ops ( (:*:)(..), fsnd )
+import Data.Foldable
 
 import Cubix.Language.Info
 
@@ -73,35 +74,7 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
   constructCfg (collapseFProd' -> (t :*: (JSIf _ _ cond _ thn))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState thn)) (return Nothing)
   constructCfg (collapseFProd' -> (t :*: (JSIfElse _ _ cond _ thn _ els))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState thn)) (liftM Just $ unHState els)
 
-  constructCfg tp@(remA -> JSLabelled ((stripA -> JSIdent' nam) :*: _) _ (s :*: mStmt)) = HState $ do
-    let t = fprodFst' tp
-
-    enterNode     <- addCfgNode t EnterNode
-    loopEntryNode <- addCfgNode t LoopEntryNode
-    exitNode      <- addCfgNode t ExitNode
-
-    -- Using a label as a continue target is not valid unless the labeled statement is a loop
-    -- We assume that this code is valid JS, and hence loopEntryNode is unused unless
-    -- stmt is a loop
-    let labMap = Map.fromList [ (LoopEntryNode, loopEntryNode ^. cfg_node_lab)
-                              , (ExitNode, exitNode ^. cfg_node_lab)
-                              ]
-
-    stmt <- withScopedLabel nam labMap $ unHState mStmt
-
-    cur_cfg %= addEdge enterNode (enter stmt)
-    cur_cfg %= addEdge (exit stmt) exitNode
-
-    -- loopEntryNode is just a temporary; contract it out
-    gr <- use cur_cfg
-    case cfgNodeForTerm gr LoopEntryNode s of
-      Nothing -> return ()
-      Just n  -> cur_cfg %= addEdge loopEntryNode n
-
-    cur_cfg %= contractNode (loopEntryNode ^. cfg_node_lab)
-
-    return (EnterExitPair enterNode exitNode)
-
+  constructCfg tp@(remA -> JSLabelled ((stripA -> JSIdent' nam) :*: _) _ (s :*: mStmt)) = HState $ constructCfgScopedLabel (fprodFst' tp) nam s (unHState mStmt)
 
   constructCfg (collapseFProd' -> (t :*: JSReturn _ e _)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
@@ -117,8 +90,6 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
 
   constructCfg (collapseFProd' -> (t :*: (JSWhile _ _ e _ s))) = HState $ constructCfgWhile t (unHState e) (unHState s)
 
-
-  -- FIXME: Slightly hackish so we can get tests passing. Doesn't handle pass-through properly
   constructCfg (collapseFProd' -> (t :*: (JSSwitch _ _ exp _ _ switchParts _ _))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -134,9 +105,12 @@ instance ConstructCfg MJSSig JSCfgState JSStatement where
                           -- EmptyEnterExit -> cur_cfg %= addEdge (exit expEE) exitNode
                            EnterExitPair bEnt bEx -> do
                              cur_cfg %= addEdge (exit expEE) bEnt
-                             cur_cfg %= addEdge bEx exitNode
 
     popBreakNode
+
+    -- NOTE: fallthrough
+    blockEE <- foldlM combineEnterExit EmptyEnterExit blocks
+    _ <- combineEnterExit blockEE (identEnterExit exitNode)
 
     return $ EnterExitPair enterNode exitNode
 
@@ -147,6 +121,20 @@ instance ConstructCfg MJSSig JSCfgState FunctionDef where
 
 instance ConstructCfg MJSSig JSCfgState JSExpression where
   constructCfg (collapseFProd' -> (t :*: (JSFunctionExpression _ _ _ _ _ body))) = HState (unHState body >> constructCfgEmpty t)
+
+  constructCfg t'@(remA -> (JSExpressionBinary _ (op :*: _) _)) = do
+    let (t :*: (JSExpressionBinary el _ er)) = collapseFProd' t'
+    case extractOp op of
+      JSBinOpAnd {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      JSBinOpOr {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MJSTermLab JSBinOpL -> JSBinOp MJSTerm JSBinOpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> JSExpressionTernary {}) = HState $ do
+    let (t :*: (JSExpressionTernary test _ succ _ fail)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
   constructCfg t = constructCfgDefault t
 
 instance ConstructCfg MJSSig JSCfgState C.JSFor where

@@ -57,7 +57,7 @@ import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Path
 import Cubix.Language.Parametric.ProgInfo
 import Cubix.Language.Parametric.Semantics.Cfg
-
+import Cubix.Language.Parametric.Syntax
 -- Input: List of functions, and consumed/produced rels
 ----- Initial version will ignore control flow.
 ---------- I don't feel keen on diving into my CFGs and seeing how good they are.

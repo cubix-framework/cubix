@@ -20,7 +20,8 @@ import Control.Monad.State ( MonadState )
 
 import Control.Lens ( makeLenses, (%=) )
 
-import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, proj, project' )
+import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, proj, project', project )
+import Data.Foldable
 
 import Cubix.Language.Info
 
@@ -33,7 +34,7 @@ data JavaCfgState = JavaCfgState {
                    _jcs_cfg       :: Cfg MJavaSig
                  , _jcs_labeler   :: LabelGen
                  , _jcs_stack     :: LoopStack
-                 , _jcs_goto_labs :: LabelMap
+                 , _jcs_scoped_labs :: ScopedLabelMap
                  }
 
 makeLenses ''JavaCfgState
@@ -41,12 +42,12 @@ makeLenses ''JavaCfgState
 instance HasCurCfg JavaCfgState MJavaSig where cur_cfg = jcs_cfg
 instance HasLabelGen JavaCfgState where labelGen = jcs_labeler
 instance HasLoopStack JavaCfgState where loopStack = jcs_stack
-instance HasLabelMap JavaCfgState where labelMap = jcs_goto_labs
+instance HasScopedLabelMap JavaCfgState where scopedLabelMap = jcs_scoped_labs
 
 type instance ComputationSorts MJavaSig = '[StmtL, ExpL, BlockStmtL, [BlockItemL]]
 
 -- Putting catch's here is a hack
-type instance SuspendedComputationSorts MJavaSig = '[MethodBodyL, ConstructorBodyL, LambdaExpressionL, CatchL]
+type instance SuspendedComputationSorts MJavaSig = '[MethodBodyL, ConstructorBodyL, LambdaExpressionL, CatchL, FunctionDefL]
 type instance ContainerFunctors MJavaSig = '[PairF, ListF, MaybeF, SwitchBlock]
 type instance CfgState MJavaSig = JavaCfgState
 
@@ -81,7 +82,7 @@ constructCfgWhileJava t mExp mBody = do
   exitNode      <- addCfgNode t ExitNode
 
   exp <- mExp >>= collapseEnterExit
-  pushLoopNode enterNode exitNode
+  pushLoopNode loopEntryNode exitNode
   body <- mBody
   popLoopNode
 
@@ -104,6 +105,13 @@ extractAndRunSwitchBlocks switchBlocks = mapM collapseEnterExit =<< (map extract
     extractBlock :: EnterExitPair MJavaSig SwitchBlockL -> EnterExitPair MJavaSig [BlockStmtL]
     extractBlock (SubPairs (proj -> Just (SwitchBlock _ body))) = body
 
+nameString' :: MJavaTermLab F.IdentL -> String
+nameString' = nameString . stripA
+
+nameString :: MJavaTerm F.IdentL -> String
+nameString (project -> Just (IdentIsIdent (Ident' s))) = s
+
+
 instance ConstructCfg MJavaSig JavaCfgState Stmt where
   constructCfg (collapseFProd' -> (_ :*: subCfgs@(StmtBlock _))) = HState $ runSubCfgs subCfgs
 
@@ -113,7 +121,6 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
   constructCfg (collapseFProd' -> (t :*: (BasicFor init cond step body))) = HState $ constructCfgFor t (extractEEPMaybe $ unHState init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
   constructCfg (collapseFProd' -> (t :*: (EnhancedFor _ _ _ e s))) = HState $ constructCfgWhile t (unHState e) (unHState s)
 
-  -- FIXME: Slightly hackish so we can get tests passing. Doesn't handle pass-through properly
   constructCfg (collapseFProd' -> (t :*: (Switch exp switchBlocks))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -130,7 +137,10 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
                            EmptyEnterExit -> cur_cfg %= addEdge (exit expEE) exitNode
                            EnterExitPair bEnt bEx -> do
                              cur_cfg %= addEdge (exit expEE) bEnt
-                             cur_cfg %= addEdge bEx exitNode
+
+    -- NOTE: fallthrough
+    blockEE <- foldlM combineEnterExit EmptyEnterExit blocks
+    _ <- combineEnterExit blockEE (identEnterExit exitNode)
 
     return $ EnterExitPair enterNode exitNode
 
@@ -139,7 +149,8 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
 
   constructCfg t@(remA -> Break ((stripA -> Nothing') :*: _)) = HState $ constructCfgBreak (ffst $ collapseFProd' t)
   constructCfg t@(remA -> Continue ((stripA -> Nothing') :*: _)) = HState $ constructCfgContinue (ffst $ collapseFProd' t)
-  -- Skippping labeled variants
+  constructCfg t@(remA -> Break ((stripA -> Just' targ) :*: _)) = HState $ constructCfgScopedLabeledBreak (fprodFst' t) (nameString targ)
+  constructCfg t@(remA -> Continue ((stripA -> Just' targ) :*: _)) = HState $ constructCfgScopedLabeledContinue (fprodFst' t) (nameString targ)
 
   constructCfg (collapseFProd' -> (t :*: Return e)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
@@ -152,11 +163,27 @@ instance ConstructCfg MJavaSig JavaCfgState Stmt where
     unHState finally
     constructCfgEmpty t
 
+  constructCfg tp@(remA -> Labeled (name :*: _) (s :*: mStmt)) = HState $  constructCfgScopedLabel (fprodFst' tp) (nameString' name) s (unHState mStmt)
 
-  -- Skipping labels
+  constructCfg t = constructCfgDefault t
+
+instance ConstructCfg MJavaSig JavaCfgState Exp where
+  constructCfg t'@(remA -> (BinOp _ (op :*: _) _)) = do
+    let (t :*: (BinOp el _ er)) = collapseFProd' t'
+    case extractOp op of
+      CAnd -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      COr  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
+
+    where extractOp :: MJavaTermLab OpL -> Op MJavaTerm OpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg t'@(remA -> Cond {}) = HState $ do
+    let (t :*: (Cond test succ fail)) = collapseFProd' t'
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
 
   constructCfg t = constructCfgDefault t
 
 instance CfgInitState MJavaSig where
-  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
+  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyScopedLabelMap
 #endif

@@ -35,6 +35,10 @@ module Cubix.Language.Parametric.Semantics.Cfg.CommonNodes (
   , edgeToScopedLabel
   , constructCfgScopedLabeledBreak
   , constructCfgScopedLabeledContinue
+  , constructCfgScopedLabel
+
+  , constructCfgShortCircuitingBinOp
+  , constructCfgCondOp
 
 ) where
 
@@ -46,7 +50,7 @@ import qualified Data.Map as Map
 import Data.Proxy ( Proxy(..) )
 import Data.Traversable ( for )
 
-import Control.Lens ( (^.), (%~), (%=), (.=), _2, at, use, makeClassy )
+import Control.Lens ( (^.), (%~), (%=), (.=), (.~), _2, at, use, makeClassy )
 
 import Data.Comp.Multi ( HTraversable(..), All, HFunctor, HFoldable )
 
@@ -297,7 +301,6 @@ emptyLabelMap = LabelMap Map.empty
 
 makeClassy ''LabelMap
 
--- FIXME: This will probably break in Java when there's reuse of a labeled block name
 speculativeGetLabel :: (MonadState s m, HasLabelMap s, HasLabelGen s) => String -> m Label
 speculativeGetLabel s = do
   lm <- use label_map
@@ -331,10 +334,16 @@ constructCfgLabel t name = do
   lm <- use label_map
 
   enterNode <- case Map.lookup name lm of
-    Nothing -> addCfgNode t EnterNode
+    Nothing -> do
+      l <- nextLabel
+      n <- addCfgNodeWithLabel t l EnterNode
+      label_map %= Map.insert name (l, [])
+      pure n
+
     Just (l, prevs) -> do
       n <- addCfgNodeWithLabel t l EnterNode
       for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy gs) p l
+      label_map . at name %= fmap (_2 .~ [])
       return n
 
 
@@ -401,3 +410,67 @@ constructCfgScopedLabeledContinue t labStr = do
   -- do not connect enter to exit
 
   return $ EnterExitPair enterNode exitNode
+
+constructCfgScopedLabel ::
+  ( HasScopedLabelMap s
+  , MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> String -> TermLab fs s0 -> m (EnterExitPair fs s0) -> m (EnterExitPair fs i)
+constructCfgScopedLabel t labName s mStmt = do
+  enterNode     <- addCfgNode t EnterNode
+  loopEntryNode <- addCfgNode t LoopEntryNode
+  exitNode      <- addCfgNode t ExitNode
+
+  -- Using a label as a continue target is not valid unless the labeled statement is a loop
+  -- We assume that this code is valid JS / Java, and hence loopEntryNode is unused unless
+  -- stmt is a loop
+  let labMap = Map.fromList [ (LoopEntryNode, loopEntryNode ^. cfg_node_lab)
+                            , (ExitNode, exitNode ^. cfg_node_lab)
+                            ]
+
+  stmt <- withScopedLabel labName labMap mStmt
+  cur_cfg %= addEdge enterNode (enter stmt)
+  cur_cfg %= addEdge (exit stmt) exitNode
+
+  -- loopEntryNode is just a temporary; contract it out
+  gr <- use cur_cfg
+  case cfgNodeForTerm gr LoopEntryNode s of
+    Nothing -> return ()
+    Just n  -> cur_cfg %= addEdge loopEntryNode n
+
+  cur_cfg %= contractNode (loopEntryNode ^. cfg_node_lab)
+
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgShortCircuitingBinOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es)
+constructCfgShortCircuitingBinOp t mlArg mrArg = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  lArg <- mlArg
+  rArg <- mrArg
+  cur_cfg %= addEdge enterNode (enter lArg)
+  cur_cfg %= addEdge (exit lArg) (enter rArg)
+  -- NOTE: short circuit edge.
+  cur_cfg %= addEdge (exit lArg) exitNode
+  cur_cfg %= addEdge (exit rArg) exitNode
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgCondOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es) -> m (EnterExitPair fs es)
+constructCfgCondOp t mtest msucc mfail = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  test <- mtest
+  succ <- msucc
+  fail <- mfail
+  cur_cfg %= addEdge enterNode (enter test)
+  cur_cfg %= addEdge (exit test) (enter succ)
+  cur_cfg %= addEdge (exit test) (enter fail)
+  cur_cfg %= addEdge (exit succ) exitNode
+  cur_cfg %= addEdge (exit fail) exitNode
+  return (EnterExitPair enterNode exitNode)

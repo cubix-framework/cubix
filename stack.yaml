@@ -1,7 +1,7 @@
         # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-15.9
+resolver: lts-16.3
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -21,7 +21,6 @@ extra-deps:
 - git: git@github.com:jkoppel/language-java.git
   commit: a41ba850a1e2b3e233cc8e5132433921b6a6dca0
 - language-python-0.5.8
-- concurrent-supply-0.1.8@sha256:9373f4868ad28936a7b93781b214ef4afdeacf377ef4ac729583073491c9f9fb,1627
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
 - alex-tools-0.4@sha256:7f24cb60ba88b04196965e78d7944d638b1a6034f0c9284bdf7d95e05c7be7c3,995
 

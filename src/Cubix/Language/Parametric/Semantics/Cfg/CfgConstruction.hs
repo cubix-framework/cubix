@@ -28,6 +28,11 @@ module Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction (
   , ComputationSorts
   , SuspendedComputationSorts
   , ContainerFunctors
+
+  , labeledIsComputationSort
+  , labeledIsSuspendedComputationSort
+  , labeledIsContainer
+
   , PreRAlg
   , ConstructCfg(..)
   , HState(..)

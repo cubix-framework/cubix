@@ -14,14 +14,14 @@
 module Cubix.Language.Python.Parametric.Common.Cfg () where
 
 #ifndef ONLY_ONE_LANGUAGE
-import Control.Monad ( liftM )
+import Control.Monad ( liftM, liftM2 )
 import Control.Monad.State ( MonadState )
 
 import Control.Lens ( (%=), makeLenses )
 
 import Data.Traversable ( for )
 
-import Data.Comp.Multi ( (:*:)(..) )
+import Data.Comp.Multi ( (:*:)(..), remA, stripA, project )
 
 import Cubix.Language.Info
 
@@ -67,7 +67,7 @@ constructCfgWhileElse t mExp mBody mElse = do
   exitNode      <- addCfgNode t ExitNode
 
   exp <- mExp >>= collapseEnterExit
-  pushLoopNode enterNode exitNode
+  pushLoopNode loopEntryNode exitNode
   body <- mBody
   popLoopNode
 
@@ -78,11 +78,17 @@ constructCfgWhileElse t mExp mBody mElse = do
   cur_cfg %= addEdge enterNode loopEntryNode
   cur_cfg %= addEdge loopEntryNode (enter exp)
   cur_cfg %= addEdge (exit exp) (enter body)
-  cur_cfg %= addEdge (exit exp) (exit end)
+  cur_cfg %= addEdge (exit exp) (enter end)
   cur_cfg %= addEdge (exit body) loopEntryNode
 
   return $ EnterExitPair enterNode exitNode
 
+-- Excludes evaluating default arguments from the CFG. I don't remember why I did this.
+constructCfgFunctionDef ::
+  ( CfgComponent gs s
+  , MonadState s m
+  ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs l)
+constructCfgFunctionDef t body = body >> constructCfgEmpty t
 
 -- When developing this, I ran afoul of a GHC bug that resulted in my program segfaulting (and changed when
 -- I swapped the order of my instance declarations). Luckily, a "stack clean" fixed the problem
@@ -109,14 +115,14 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement wh
     combineEnterExit p (identEnterExit exitNode)
 
   constructCfg (collapseFProd' -> (t :*: Raise e _)) = HState $ constructCfgReturn t (liftM Just $ unHState e)
-  constructCfg (collapseFProd' -> (t :*: Break _)) = HState $ constructCfgContinue t
+  constructCfg (collapseFProd' -> (t :*: Break _)) = HState $ constructCfgBreak t
   constructCfg (collapseFProd' -> (t :*: Continue _)) = HState $ constructCfgContinue t
 
   constructCfg t = constructCfgDefault t
 
--- Excludes evaluating default arguments from the CFG. I don't remember why I did this.
 instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState FunctionDef where
-  constructCfg a@(collapseFProd' -> t :*: FunctionDef _ _ _ body) = HState (unHState body >> (constructCfgEmpty t))
+  constructCfg (collapseFProd' -> t :*: FunctionDef _ _ _ body) = HState $
+    constructCfgFunctionDef t (unHState body)
 
 -- | Control flow actually does flow through for classes; it's not a suspended computation.
 -- This is a bit of a hack, used to prevent "del" statements in TAC from crossing a scope boundary,
@@ -156,7 +162,32 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyWith where
 
     return $ EnterExitPair enterNode exitNode
 
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
+  constructCfg t'@(remA -> (BinaryOp (op :*: _) _ _ _)) = do
+    let (t :*: (BinaryOp _ el er _)) = collapseFProd' t'
+    case extractOp op of
+      And {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      Or {}  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
+      _   -> constructCfgDefault t'
 
+    where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
+          extractOp (stripA -> project -> Just bp) = bp
+
+  constructCfg (collapseFProd' -> (t :*: (Lambda _ e _))) = HState $ do
+    constructCfgFunctionDef t (unHState e)
+
+  constructCfg t = constructCfgDefault t
+
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyCondExpr where
+  constructCfg (collapseFProd' -> (t :*: (PyCondExpr test succ fail))) = HState $ do
+    constructCfgCondOp t (unHState test) (unHState succ) (unHState fail)
+
+instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyComprehension where
+  constructCfg (collapseFProd' -> (t :*: (PyComprehensionFor _ _ e body))) = HState $ do
+    constructCfgWhile t (unHState e) (unHState body)
+  constructCfg (collapseFProd' -> (t :*: (PyComprehensionIf cond body))) = HState $ do
+     constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState cond) (unHState body)) (return Nothing)
+  constructCfg t = constructCfgDefault t
 
 instance CfgInitState MPythonSig where
   cfgInitState _ = PythonCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap

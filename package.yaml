@@ -205,3 +205,24 @@ benchmarks:
      - language-lua
      - language-python
      - lens
+tests:
+  cfg-test:
+    main: Main.hs
+    source-dirs: cfg-test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -fcontext-stack=300
+    dependencies:
+     - cubix
+     - hedgehog
+     - cubix-compdata
+     - compstrat
+     - containers
+     - lens
+     - mtl
+     - base
+     - deepseq
+     - directory
+     - filepath

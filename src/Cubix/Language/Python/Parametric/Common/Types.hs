@@ -112,7 +112,6 @@ data PyComp e l where
 -- We want the invariant that expressions something on the left of an expression may not
 -- depend on something to the right. The "x if y else z" notation violates this; we're reordering.
 --
--- Strictly speaking, we should switcharoo for loops too, but....maybe when it's needed
 --
 -- TODO: Python assignments violate this. In fact, they don't meet the spec of generic assignments
 data PyCondExpr e l where
@@ -121,8 +120,19 @@ data PyCondExpr e l where
              -> e Py.ExprL -- else
              -> PyCondExpr e Py.ExprL
 
-deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr]
+data PyComprehensionExpr e l where
+  PyListComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
+  PyDictComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
+  PySetComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
 
+data PyComprehensionL
+
+data PyComprehension e l where
+  PyComprehensionFor :: Bool -> e [Py.ExprL] -> e Py.ExprL -> e PyComprehensionL -> PyComprehension e PyComprehensionL
+  PyComprehensionIf  :: e Py.ExprL -> e PyComprehensionL -> PyComprehension e PyComprehensionL
+  PyComprehensionBody :: e Py.ComprehensionExprL -> PyComprehension e PyComprehensionL
+
+deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr, ''PyComprehensionExpr, ''PyComprehension]
 
 pattern PyBlock' :: (PyBlock :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe PyStringLitL) -> CxtS h fs a BlockL -> CxtS h fs a PyBlockL
 pattern PyBlock' docStr body <- (project -> Just (PyBlock docStr body)) where
@@ -213,7 +223,8 @@ do let pythonSortInjections = [ ''IdentIsIdent, ''AssignIsStatement, ''ExprIsRhs
                     ++ [ ''PyLhs, ''TupleLValue, ''ListLValue, ''DotLValue, ''StarLValue, ''SubscriptLValue, ''SliceLValue, ''ParenLValue]
                     ++ [ ''PyWith, ''PyWithBinder
                        , ''PythonArg, ''PyFunDefAttrs, ''PyParamAttrs, ''PythonParam
-                       , ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr]
+                       , ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr
+                       , ''PyComprehensionExpr, ''PyComprehension]
                     ++ [ ''P.Ident, ''AssignOpEquals, ''Assign, ''P.Block, ''EmptyBlockEnd
                        , ''P.FunctionCall, ''P.EmptyFunctionCallAttrs, ''FunctionIdent, ''FunctionArgumentList, ''PositionalArgument, ''ReceiverArg
                        , ''FunctionDef, ''PositionalParameter]
