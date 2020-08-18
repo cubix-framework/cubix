@@ -12,7 +12,7 @@ import Language.JavaScript.Parser ( parseFile )
 import Language.JavaScript.Pretty.Printer.Extended ( prettyPrint )
 
 import Data.Comp.Multi ( project )
-import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, (+>), tryR, allbuR, promoteRF, addFail )
+import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, (<+), tryR, allbuR, promoteRF, addFail )
 
 import Cubix.Language.JavaScript.Parametric.Full
 
@@ -32,7 +32,7 @@ vandalize' (project -> (Just (JSIdentifier a n))) = return $ iJSIdentifier a (n 
 vandalize' x                                      = return x
 
 vandalize :: GRewrite JSTerm
-vandalize = allbuR $ tryR $ (promoteRF $ addFail vandalize') +> (promoteRF $ addFail vandalizeIdent)
+vandalize = allbuR $ tryR $ (promoteRF $ addFail vandalize') <+ (promoteRF $ addFail vandalizeIdent)
 
 main = do
   Just tree <- parse "Foo.js"

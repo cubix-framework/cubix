@@ -37,7 +37,7 @@ import Data.Constraint ( Dict(..) )
 
 import Data.Comp.Multi ( Cxt(..), project', EqHF, E(..), stripA, (:&:)(..), HTraversable, ShowHF, inject', (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, allbuR, allStateR, dynamicR,
-           tryR, (+>), idR, guardedT, failR )
+           tryR, (<+), idR, guardedT, failR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms, caseE )
 
 import Cubix.Language.Info
@@ -272,8 +272,8 @@ subexpToTmp sn hc prevs t = if hc == StopHoisting then
                               return t
                             else
                               (   dynamicR (extractNonValue sn hc prevs)
-                                  +> tacSpecial
-                                  +> allStateR hoistChild (HoistExpState subsns subhcs []))
+                                  <+ tacSpecial
+                                  <+ allStateR hoistChild (HoistExpState subsns subhcs []))
                                 t
   where
     subsns = getStrictness $ stripA t

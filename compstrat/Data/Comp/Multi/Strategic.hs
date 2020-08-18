@@ -60,7 +60,7 @@ module Data.Comp.Multi.Strategic
 
   -- ** Sequential combination of rewrites
   , (>+>)
-  , (+>)
+  , (<+)
 
   -- ** One-level traversal combinators
   , allR
@@ -270,10 +270,9 @@ allIdxR f = allStateR (\n x -> (,) <$> f n x <*> pure (n + 1)) 0
 (>+>) :: (MonadPlus m) => GRewriteM m f -> GRewriteM m f -> GRewriteM m f
 f >+> g = unwrapAnyR (wrapAnyR f >=> wrapAnyR g)
 
--- | Left-biased choice -- (f +> g) runs f, and, if it fails, then runs g
--- This naming is questionable. I believe KURE used +> for this, but Stratego uses <+
-(+>) :: (Alternative m) => RewriteM m f l -> RewriteM m f l -> RewriteM m f l
-(+>) f g x = f x <|> g x
+-- | Left-biased choice -- (f <+ g) runs f, and, if it fails, then runs g
+(<+) :: (Alternative m) => RewriteM m f l -> RewriteM m f l -> RewriteM m f l
+(<+) f g x = f x <|> g x
 
 -- | Applies a rewrite to all immediate subterms of the current term, succeeding if any succeed
 anyR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> RewriteM m (Cxt h f a) l
@@ -318,10 +317,10 @@ anytdR f = f >+> anyR (anytdR f)
 
 -- | Runs a rewrite in a top-down traversal, succeeding if any succeed, and pruning below successes. Defined:
 --    @
---       prunetdRF f = f +> anyR (prunetdRF f)
+--       prunetdRF f = f <+ anyR (prunetdRF f)
 --    @
 prunetdRF :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
-prunetdRF f = f +> anyR (prunetdRF f)
+prunetdRF f = f <+ anyR (prunetdRF f)
 
 -- | Like `prunetdRF`, but the outer level always succeeds. Defined @`tryR` . `prunetdRF`@
 prunetdR :: (Monad m, HTraversable f) => GRewriteM (MaybeT m) (Cxt h f a) -> GRewriteM m (Cxt h f a)
@@ -329,17 +328,17 @@ prunetdR f = tryR (prunetdRF f)
 
 -- | Applies a rewrite to the first node where it can succeed in a bottom-up traversal. Defined:
 --    @
---      onebuR f = oneR (onebuR f) +> f
+--      onebuR f = oneR (onebuR f) <+ f
 --    @
 onebuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
-onebuR f = oneR (onebuR f) +> f
+onebuR f = oneR (onebuR f) <+ f
 
 -- | Applies a rewrite to the first node where it can succeed in a top-down traversal. Defined:
 --    @
---      onetdR f = f +> oneR (onetdR f)
+--      onetdR f = f <+ oneR (onetdR f)
 --    @
 onetdR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
-onetdR f = f +> oneR (onetdR f)
+onetdR f = f <+ oneR (onetdR f)
 
 -- | The identity rewrite
 idR :: (Applicative m) => RewriteM m f l
@@ -369,7 +368,7 @@ type TranslateM m f l t = f l -> m t
 -- | A monadic translation for all sorts
 type GTranslateM m f t = forall l. TranslateM m f l t
 
--- | @f +>> g@ runs @f@ and @g@ in sequence, ignoring the output of @f@, and returning the output of @g@.
+-- | @f <+> g@ runs @f@ and @g@ in sequence, ignoring the output of @f@, and returning the output of @g@.
 (+>>) :: (Monad m) => TranslateM m f l t -> TranslateM m f l u -> TranslateM m f l u
 (+>>) f g t = f t *> g t
 
