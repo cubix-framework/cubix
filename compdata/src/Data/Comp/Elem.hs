@@ -29,7 +29,6 @@ module Data.Comp.Elem
        ( Elem
        , pattern Elem
        , Mem
-       , RMem
        , witness
        , elemEq
        , comparePos
@@ -61,10 +60,6 @@ type family Position (f :: k) (fs :: [k]) where
 -- | `Mem f fs` holds if the typechecker can statically deduce that `f` is contained in `fs`
 class (KnownNat (Position f fs)) => Mem (f :: k) (fs :: [k])
 instance (KnownNat (Position f fs)) => Mem f fs
-
--- | Flipped version of `Mem`
-class (KnownNat (Position f fs)) => RMem (fs :: [k]) (f :: k)
-instance (KnownNat (Position f fs)) => RMem fs f
 
 -- | Safe constructor for `Elem`. If the typechecker can deduce that @f@ is in @fs@,
 --   then `witness` creates an `Elem f fs` witnessing that inclusion.

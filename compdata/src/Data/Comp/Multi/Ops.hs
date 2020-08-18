@@ -58,7 +58,6 @@ module Data.Comp.Multi.Ops
     , Elem
     , pattern Elem
     , Mem
-    , RMem
     , at
     , witness
     , extend
