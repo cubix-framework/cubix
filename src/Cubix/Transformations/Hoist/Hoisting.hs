@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}

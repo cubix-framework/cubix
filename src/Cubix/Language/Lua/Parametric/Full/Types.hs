@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 {-# LANGUAGE DataKinds             #-}

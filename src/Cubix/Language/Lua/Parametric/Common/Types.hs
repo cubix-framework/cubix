@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}

@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}

@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 -- | A simplified version of hoist for use in examples
 
 {-# LANGUAGE ConstraintKinds     #-}
