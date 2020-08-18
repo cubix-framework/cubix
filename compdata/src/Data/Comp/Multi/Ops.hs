@@ -8,6 +8,7 @@
 {-# LANGUAGE MagicHash               #-}
 {-# LANGUAGE MultiParamTypeClasses   #-}
 {-# LANGUAGE PartialTypeSignatures   #-}
+{-# LANGUAGE PatternSynonyms         #-}
 {-# LANGUAGE PolyKinds               #-}
 {-# LANGUAGE RankNTypes              #-}
 {-# LANGUAGE ScopedTypeVariables     #-}
@@ -57,7 +58,8 @@ module Data.Comp.Multi.Ops
     , (<|)
     , cons
     , nil
-    , Elem (..)
+    , Elem
+    , pattern Elem
     , Mem
     , RMem
     , at
@@ -203,7 +205,7 @@ instance RemA (f :&: p) f where
 -- NOTE: Invariant => Length fs == Length gs
 -- TODO: write gs as a function of fs.    
 unsafeMapSum :: Elem f fs -> f a e -> (f a :-> g a) -> Sum gs a e
-unsafeMapSum (Elem wit) v f = Sum (Elem wit) (f v)
+unsafeMapSum wit v f = Sum (unsafeElem wit) (f v)
 
 class (f :<: Sum fs) => f :-<: fs
 instance (f :<: Sum fs) => f :-<: fs

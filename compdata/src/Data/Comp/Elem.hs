@@ -4,7 +4,9 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MagicHash              #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TypeFamilies           #-}
@@ -12,7 +14,8 @@
 {-# LANGUAGE UndecidableInstances   #-}
 
 module Data.Comp.Elem
-       ( Elem (..)
+       ( Elem
+       , pattern Elem
        , Mem
        , RMem
        , witness
@@ -28,8 +31,13 @@ import GHC.TypeLits
 import Data.Type.Equality
 import qualified Unsafe.Coerce as U
 
+-- |  @Elem f fs@ is type-level evidence that @f@ is a member of the list of types @fs@.
 data Elem (f :: k) (fs :: [k]) where
-  Elem :: Int -> Elem f fs
+  Elem# :: Int -> Elem f fs
+
+pattern Elem :: Int -> Elem f fs
+pattern Elem n <- Elem# n
+
 
 type family Position (f :: k) (fs :: [k]) where
   Position (f :: k) ((f :: k) ': fs) = 0
@@ -43,7 +51,7 @@ instance (KnownNat (Position f fs)) => RMem fs f
 
 {-# INLINE witness #-}
 witness :: forall f fs. (Mem f fs) => Elem f fs
-witness = Elem pos
+witness = Elem# pos
   where pos = fromInteger (natVal (Proxy :: Proxy (Position f fs)))
 
 {-# INLINE elemEq #-}
@@ -58,15 +66,15 @@ comparePos (Elem v1) (Elem v2) = compare v1 v2
 
 {-# INLINE extend #-}
 extend :: Elem f fs -> Elem f (g ': fs)
-extend (Elem i) = Elem (i + 1)
+extend (Elem i) = Elem# (i + 1)
 
 {-# INLINE contract #-}
 contract :: Elem f (g ': fs) -> Either (f :~: g) (Elem f fs)
 contract (Elem i)
-  | i > 0     = Right (Elem (i - 1))
+  | i > 0     = Right (Elem# (i - 1))
   | otherwise = Left (U.unsafeCoerce Refl)
 
 -- NOTE: Completely unsafe. USE WITH CARE.
 {-# INLINE unsafeElem #-}
 unsafeElem :: Elem f fs -> Elem g gs
-unsafeElem (Elem e) = Elem e
+unsafeElem (Elem e) = Elem# e
