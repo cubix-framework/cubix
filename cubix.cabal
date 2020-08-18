@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 26f50a599a9ffe2d4713f7f7f537c2e1e14bdaf35cc06df6e6a1ce2ece0f64e6
+-- hash: 20faa5c5181ff0cb1a64d6fa3f6aad864ec57437693d45bdc151353b19316b39
 
 name:           cubix
 version:        0.1.0.0
@@ -175,6 +175,38 @@ executable examples-multi
     , mtl
     , temporary
     , text
+    , transformers
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+  default-language: Haskell2010
+
+test-suite cfg-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Cubix.Language.C.Cfg.Test
+      Cubix.Language.Java.Cfg.Test
+      Cubix.Language.JavaScript.Cfg.Test
+      Cubix.Language.Lua.Cfg.Test
+      Cubix.Language.Parametric.Cfg.Test
+      Cubix.Language.Python.Cfg.Test
+      Paths_cubix
+  hs-source-dirs:
+      cfg-test
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -fcontext-stack=300
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , directory
+    , filepath
+    , hedgehog
+    , lens
+    , mtl
     , transformers
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
