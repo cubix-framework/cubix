@@ -22,11 +22,8 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Ops
--- Copyright   :  (c) 2011 Patrick Bahr
+-- Copyright   :  Original (c) 2011 Patrick Bahr; modifications (c) 2020 James Koppel
 -- License     :  BSD3
--- Maintainer  :  Patrick Bahr <paba@diku.dk>
--- Stability   :  experimental
--- Portability :  non-portable (GHC Extensions)
 --
 -- This module provides operators on higher-order functors. All definitions are
 -- generalised versions of those in "Data.Comp.Ops".
@@ -81,7 +78,20 @@ import Data.Comp.Elem
 import Data.Comp.Dict
 
 
--- |Data type defining a coproduct family.
+-- | Data type defining a coproduct family.
+--
+--   It is inspired by modular reifiable matching, as described in
+--
+--   * Oliveira, Bruno C. D. S., Shin-Cheng Mu, and Shu-Hung You.
+--     \"Modular reifiable matching: a list-of-functors approach to two-level types.\"
+--     In Haskell Symposium, 2015.
+--
+--   except that this definition uses value-level integers (in the `Elem` datatype) in place
+--   of type-level naturals. It hence uses `unsafeCoerce` under the hood, but is type-safe if used
+--   through the public API. The result is that values of this type take constant memory with respect to the number
+--   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
+--   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
+--   and pointer to the value.
 data Sum (fs :: [(* -> *) -> * -> *]) h e where
   Sum :: Elem f fs -> f h e -> Sum fs h e
 

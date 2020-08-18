@@ -1,12 +1,20 @@
--- | Mutable CDTs
--- Author: James Koppel
--- Written for cubix-compdata
-
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE TypeOperators       #-}
+
+
+
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Comp.Multi.Mutable
+-- Copyright   :  (c) 2020 James Koppel
+-- License     :  BSD3
+--
+-- Experimental module for mutable terms.
+--
+--------------------------------------------------------------------------------
 
 module Data.Comp.Multi.Mutable (
     Label

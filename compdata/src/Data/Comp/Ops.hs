@@ -17,13 +17,12 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Ops
--- Copyright   :  (c) 2010-2011 Patrick Bahr, Tom Hvitved
+-- Copyright   :  Original (c) 2010-2011 Patrick Bahr, Tom Hvitved; modifications (c) 2020 James Koppel
 -- License     :  BSD3
--- Maintainer  :  Patrick Bahr <paba@diku.dk>
--- Stability   :  experimental
--- Portability :  non-portable (GHC Extensions)
 --
--- This module provides operators on functors.
+-- This module provides sum and product operators on functors.
+--
+-- The main item of interest is the `Sum` datatype, a constant-memory implementation of type-level sums.
 --
 --------------------------------------------------------------------------------
 
@@ -58,7 +57,20 @@ data (f :+: g) (a :: *) = Inl (f a)
                        | Inr (g a)
 
 
--- |Formal sum of signatures (functors).
+-- | Formal sum of signatures (functors).
+--
+--   It is inspired by modular reifiable matching, as described in
+--
+--   * Oliveira, Bruno C. D. S., Shin-Cheng Mu, and Shu-Hung You.
+--     \"Modular reifiable matching: a list-of-functors approach to two-level types.\"
+--     In Haskell Symposium, 2015.
+--
+--   except that this definition uses value-level integers (in the `Elem` datatype) in place
+--   of type-level naturals. It hence uses `unsafeCoerce` under the hood, but is type-safe if used
+--   through the public API. The result is that values of this type take constant memory with respect to the number
+--   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
+--   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
+--   and pointer to the value.
 data Sum (fs :: [* -> *]) e where
   Sum :: Elem f fs -> f e -> Sum fs e
 
