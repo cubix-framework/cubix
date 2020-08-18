@@ -11,7 +11,7 @@ import GHC.Generics ( Generic(..), (:*:)(..), (:+:)(..), K1(..), V1, Rec0, U1(..
 
 import Language.Haskell.TH hiding ( Lit )
 
-import Tarski.Data.Comp.Derive.Generic
+import Data.Comp.Derive.Generic
 
 data ArithL
 data AtomL

@@ -1,6 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE CPP             #-}
 
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Comp.Multi.Strategy.Derive
+-- Copyright   :  James Koppel, 2013
+-- License     :  BSD-style (see the LICENSE file in the distribution)
+--
+-- This file gives a Template-Haskell generator for `DynCase`
+-----------------------------------------------------------------------------
+
+
 module Data.Comp.Multi.Strategy.Derive (
     makeDynCase
   ) where
@@ -17,6 +28,8 @@ import Language.Haskell.TH hiding ( Cxt )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase, kdyncase )
 
 
+-- | @makeDynCase ''T@ takes a datatype @T@ of kind @(* -> *) -> * -> *@ (i.e.: a signature in the
+--   @compdata@ or @cubix-compdata@ library) and generates a `DynCase` instance for @T@.
 makeDynCase :: Name -> Q [Dec]
 makeDynCase fname = do
 #if __GLASGOW_HASKELL__ < 800

@@ -1,17 +1,19 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi
--- Copyright   :  (c) 2011 Patrick Bahr
+-- Copyright   :  Originals (c) 2011 Patrick Bahr; modifications (c) 2017 Jmase koppel
 -- License     :  BSD3
--- Maintainer  :  Patrick Bahr <paba@diku.dk>, Tom Hvitved <hvitved@diku.dk>
--- Stability   :  experimental
--- Portability :  non-portable (GHC Extensions)
 --
 -- This module defines the infrastructure necessary to use
 -- /Generalised Compositional Data Types/. Generalised Compositional Data Types
 -- is an extension of Compositional Data Types with mutually recursive
 -- data types, and more generally GADTs. Examples of usage are bundled with the
 -- package in the library @examples\/Examples\/Multi@.
+--
+-- This is a fork of Patrick Bahrs @compdata@ package. The chief differences
+-- are that the representation of sums has been replaced with a version that uses constant memory,
+-- and the portions of the library for single-sorted terms have been removed to speed compilation times.
+-- There are several minor changes and additions to the utility functions of this library.
 --
 --------------------------------------------------------------------------------
 module Data.Comp.Multi (

@@ -3,6 +3,18 @@
 {-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE TypeOperators          #-}
 
+
+
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Comp.Elem
+-- Copyright   :  (c) 2020 James Koppel
+-- License     :  BSD3
+--
+-- Defines the `Alts` type, needed to define functions on `Sum` types that dispatch in constant-time.
+--
+--------------------------------------------------------------------------------
+
 module Data.Comp.Alt
        ( Alts
        , Alt
@@ -20,8 +32,13 @@ import GHC.Types
 
 import Data.Comp.Elem
 
+------------------------------------------------------------------------
+
+-- | Element of an `Alts` value
 newtype Alt f e b = Alt (f e -> b)
 
+-- | A value of type @Alts [f1, f2, ...] e b@ is a vector of functions,
+--   of type @f1 e -> b@, @f2 e -> b@, etc.
 newtype Alts (fs :: [(* -> *)]) e b =
   Alts (Vector (Alt Any e b))
 
