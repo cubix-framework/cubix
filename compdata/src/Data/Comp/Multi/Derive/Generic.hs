@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyDataDecls       #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
@@ -16,24 +17,22 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-missing-methods #-} -- It warns for the instance declarations in TH which are never directly compiled -- GAH
 
-module Data.Comp.Derive.Generic
+module Data.Comp.Multi.Derive.Generic
   (
     makeGeneric
   , makeInstancesLike
   , GenericExample
   ) where
 
-import Control.Lens ( (%~), (&), traversed )
 import Control.Monad ( liftM, filterM, mplus, msum )
 
-import qualified Data.Comp.Multi as M
+import qualified Data.Comp.Multi.Term as M
+import qualified Data.Comp.Multi.Ops  as M
 
 import GHC.Generics ( Generic(..), (:*:)(..), (:+:)(..), K1(..), V1, Rec0, U1(..) )
 
 import Language.Haskell.TH
 import Data.Type.Equality
-
-import Data.Comp.Trans.Util
 
 --------------------------------------------------------------------------------
 -- Generic instances for general CDTs
@@ -113,8 +112,8 @@ makeGenericInstance typNm lab = do
 
                let gPat = addSumPat $ map makeGPat $ vars1
                let gExp = addSumExp $ map makeGExp $ vars2
-               let ePat = map makeEPat $ zip xs vars2 & traversed %~ (\((n,_),ns) -> (n, ns))
-               let eExp = map makeEExp $ zip xs vars1 & traversed %~ (\((n,_),ns) -> (n, ns))
+               let ePat = map makeEPat $ zip (map fst xs) vars2
+               let eExp = map makeEExp $ zip (map fst xs) vars1
 
                inst' <- one [d| instance Generic ($mTyp $e $mLab) where
                                   type Rep ($mTyp $e $mLab) = $rep
@@ -202,3 +201,20 @@ cxtlessUnifiable _ (VarT _)   = True
 cxtlessUnifiable (AppT t1 u1)
                  (AppT t2 u2) = (cxtlessUnifiable t1 t2) && (cxtlessUnifiable u1 u2)
 cxtlessUnifiable _ _          = False
+
+--------------------------------------------------------------------------------
+-- Template Haskell utilities
+--------------------------------------------------------------------------------
+
+------------ These are copy/pasted from an internal module of comptrans
+
+extractCon :: Con -> (Name, [Type])
+extractCon (NormalC nm sts) = (nm, map snd sts)
+extractCon (RecC nm vsts)   = (nm, map (\(_,_,x) -> x) vsts)
+extractCon (ForallC _ _ c)  = extractCon c
+extractCon _                = error "Unsupported constructor type encountered"
+
+simplifyDataInf :: Info -> [(Name, [Type])]
+simplifyDataInf (TyConI (DataD _ _ _ _ cons _))   = map extractCon cons
+simplifyDataInf (TyConI (NewtypeD _ _ _ _ con _)) = [extractCon con]
+simplifyDataInf _                                 = error "Attempted to run derive on non-nullary datatype"

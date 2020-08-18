@@ -48,6 +48,7 @@ library
 
   Other-Modules:        Data.Comp.SubsumeCommon
 
+                        Data.Comp.Multi.Derive.Generic
                         Data.Comp.Multi.Derive.HFunctor
                         Data.Comp.Multi.Derive.HFoldable
                         Data.Comp.Multi.Derive.HTraversable
