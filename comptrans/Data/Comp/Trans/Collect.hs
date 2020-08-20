@@ -46,7 +46,7 @@ collectTypes' n = view excludedNames >>= run
     run :: Set Name -> CompTrans (Set Name)
     run exclNms | member n exclNms = return empty
     run _                          = do
-      inf <- lift $ reify n
+      inf <- CompTrans $ lift $ reify n
       let cons = case inf of
             TyConI (DataD _ _ _ _ cns _)    -> cns
             TyConI (NewtypeD _ _ _ _ con _) -> [con]
@@ -71,7 +71,7 @@ instance ExtractNames VarStrictType where
   extractNames (_, _, t) = extractNames t
 
 instance ExtractNames Type where
-  extractNames tSyn = do t <- lift $ expandSyns tSyn
+  extractNames tSyn = do t <- CompTrans $ lift $ expandSyns tSyn
                          case t of 
                            AppT a b -> liftM2 (++) (extractNames a) (extractNames b)
                            ConT n   -> return [n]

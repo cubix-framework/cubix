@@ -49,7 +49,7 @@ import Data.Comp.Trans.Util
 deriveTrans :: [Name] -> Type -> CompTrans [Dec]
 deriveTrans names term = do
   let classNm = mkName "Trans"
-  funNm <- lift $ newName "trans"
+  funNm <- CompTrans $ lift $ newName "trans"
 
   classDec <- mkClass classNm funNm term
 
@@ -99,8 +99,8 @@ mkFunc typ funNm term = do
 --   trans a -> JavaTerm l
 -- @
 mkClass :: Name -> Name -> Type -> CompTrans Dec
-mkClass classNm funNm term = do a <- lift $ newName "a"
-                                i <- lift $ newName "i"
+mkClass classNm funNm term = do a <- CompTrans $ lift $ newName "a"
+                                i <- CompTrans $ lift $ newName "i"
                                 let transDec = SigD funNm (foldl AppT ArrowT [VarT a, AppT term (VarT i)])
                                 return $ ClassD [] classNm [PlainTV a, PlainTV i] [] [transDec]
 
@@ -113,7 +113,7 @@ mkClass classNm funNm term = do a <- lift $ newName "a"
 -- @
 mkInstance :: TransAlts -> Name -> Name -> Name -> CompTrans Dec
 mkInstance transAlts classNm funNm typNm = do
-  inf <- lift $ reify typNm
+  inf <- CompTrans $ lift $ reify typNm
   srcTyp <- getFullyAppliedType typNm
   let nmTyps = simplifyDataInf inf
   clauses <- mapM (uncurry $ mkClause transAlts funNm) nmTyps
@@ -146,7 +146,7 @@ makeTransRhsNormal :: Name -> Name -> [(Name, Type)] -> Body
 makeTransRhsNormal funNm con nmTps = NormalB $ foldl AppE (VarE (smartConstrName con)) (map (atom funNm) nmTps)
 
 mkClause :: TransAlts -> Name -> Name -> [Type] -> CompTrans Clause
-mkClause transAlts funNm con tps = do nms <- lift $ mapM (const $ newName "x") tps
+mkClause transAlts funNm con tps = do nms <- CompTrans $ lift $ mapM (const $ newName "x") tps
                                       return $ Clause [pat nms] (makeTransRhs transAlts funNm con $ zip nms tps) []
   where
     pat nms = ConP con (map VarP nms)
