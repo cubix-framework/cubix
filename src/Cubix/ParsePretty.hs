@@ -68,9 +68,15 @@ import qualified Data.Text as T (unpack)
 type family RootSort (fs :: [(* -> *) -> * -> *])
 
 class ParseFile fs where
+  -- | Parses a file with the appropriate parser for the language with signature @fs@.
+  --
+  -- Recommended to use with the @TypeApplications@ extension,
+  -- e.g.: @parseFile \@MCSig "my_file.c"@.
   parseFile :: FilePath -> IO (Maybe (Term fs (RootSort fs)))
 
 class Pretty fs where
+  -- | Pretty-prints a term, using the appropriate pretty-printer for the language with
+  -- signature @fs@.
   pretty :: Term fs (RootSort fs) -> String
 
   -- FIXME: The only reason this is needed is because Project forgets

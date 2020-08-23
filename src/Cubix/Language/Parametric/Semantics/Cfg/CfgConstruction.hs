@@ -312,6 +312,7 @@ class CfgInitState fs where
 class    (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
 instance (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
 
+-- | Constructs a CFG for the given labelled term
 makeCfg :: forall fs l. (CfgBuilder fs) => TermLab fs l -> Cfg fs
 makeCfg t = (execState (unHState $ para constructCfg t) initState) ^. cur_cfg
   where

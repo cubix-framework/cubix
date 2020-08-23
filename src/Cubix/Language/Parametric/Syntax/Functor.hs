@@ -350,6 +350,10 @@ $(derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
 -- Dealing with functorial syntax
 --------------------------------------------------------------------------------
 
+-- We should be able to make this safe using OrderedOverlappingTypeFamilies.
+--
+-- This is an instance of a distributive law, and likely can (and should)
+-- be replaced with such.
 class ExtractF f e where
   -- | Pulls a functor out of a label.
   -- 
@@ -358,14 +362,12 @@ class ExtractF f e where
   -- @
   -- 'extractF' :: 'JavaProj' ['SourceFileL'] -> ['JavaProj' 'SourceFileL']
   -- @
-  -- 
-  -- This function is unsafe, as the type system cannot detect when the label
-  -- on a higher-order functorial sum guarantees which class the term lies in.
-  -- 
-  -- We should be able to make this safe using OrderedOverlappingTypeFamilies.
-  -- 
-  -- This is an instance of a distributive law, and likely can (and should)
-  -- be replaced with such.
+  --
+  -- Beware that this function unsafely assumes that e.g.: a term of sort
+  -- @[l]@ is a `ListF` node (and similar for Maybe, etc).
+  -- If you define a custom node that has sort @[l]@ for any @l@, and
+  -- do not define a corresponding `ExtractF` instance, then `extractF`
+  -- may give an error.
   extractF :: e (f l) -> f (e l)
 
 -- | Inductive form of ExtractF.
