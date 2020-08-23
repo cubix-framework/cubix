@@ -318,6 +318,10 @@ putSubtree t cfg = do
   else
    return ()
 
+-- | Prints a large amount of debug information about a CFG,
+--   including a node list, an edge list, and a record of which nodes begin basic blocks.
+--
+-- For an actual graph visualization, see "Cubix.Language.Parametric.Semantics.CfgDot"
 debugCfg :: (All ShowHF fs, All HFoldable fs, All HFunctor fs) => TermLab fs l -> Cfg fs -> IO ()
 debugCfg t cfg = do
   putStrLn $ prettyCfg cfg

@@ -25,7 +25,7 @@
 
 module Data.Comp.Dict
        ( Dict (..)
-       , All (..)
+       , All
        , withDict
        , (\\)
        , dictFor
@@ -58,8 +58,21 @@ infixl 1 \\
 (\\) :: (c a => r) -> Dict c a -> r
 (\\) x Dict = x
 
--- | An instance of @All c fs@ holds if @c f@ holds for all @f@ in @fs@.
---   `dictFor` is the main way to use
+-- |
+-- An instance of @All c fs@ holds if @c f@ holds for all @f@ in @fs@.
+--
+-- Example: @All `HFunctor` '[Add, Mul]@ holds if there are `HFunctor` instances for signatures
+-- @Add@ and @Mul@.
+--
+-- The primary way to consume an `All` instance is with the `caseCxt` function. E.g.:
+--
+-- @
+-- class Pretty f where
+--   pretty :: f e l -> String
+--
+-- instance (All Pretty fs) => Pretty (Sum fs) where
+--   pretty x = caseCxt (Proxy @Pretty) pretty x
+-- @
 class All (c :: k -> Constraint) (fs :: [k]) where
   -- | Primitive which returns list of dictionaries for each @f@ in @fs@
   dicts :: Proxy# fs -> [E (Dict c)]

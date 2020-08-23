@@ -26,6 +26,7 @@ library:
   source-dirs: src
   exposed-modules:
   - Cubix.Analysis.Call.Trivial
+  - Cubix.Essentials
   - Cubix.Language.Info
   - Cubix.Language.C.Parametric.Common
   - Cubix.Language.C.Parametric.Full

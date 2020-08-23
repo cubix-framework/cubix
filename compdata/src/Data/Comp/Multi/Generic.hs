@@ -51,9 +51,13 @@ subterms' (Term t) = build (f t)
                               Just t' -> E t' `cons` rest
                               Nothing -> rest
 
--- | This function transforms every subterm according to the given
--- function in a bottom-up manner. This function is similar to
--- Uniplate's @transform@ function.
+-- |
+-- @
+-- transform :: (forall i. Term fs i -> Term fs i) -> Term f l -> Term f l
+-- @
+--
+-- If @f :: Term fs i -> Term fs i@ rewrites a single node, then @transform f t@
+-- is the result of running @f@ on all nodes within @t@ in a bottom-up fashion.
 transform :: forall f . (HFunctor f) => (HFix f :-> HFix f) -> HFix f :-> HFix f
 transform f = run
     where run :: HFix f :-> HFix f
@@ -67,6 +71,20 @@ transformM  f = run
     where run :: NatM m (HFix f) (HFix f)
           run t = f =<< liftM Term (hmapM run $ unTerm t)
 
+-- |
+-- @
+-- query :: (forall i. Term fs i -> r) -> (r -> r -> r) -> Term fs l -> r
+-- @
+--
+-- Example usage: let @getConsts :: (IntConst :-<: fs) => Term fs l -> [Int]@ be
+-- a function where @getConsts (iIntConst n) = [n]@, and @getConsts t = []@
+-- for everything that is not an @IntConst@. Then
+--
+-- @
+-- query getConsts (++) term
+-- @
+--
+-- returns a list of all integer constants in @term@.
 query :: HFoldable f => (HFix f :=>  r) -> (r -> r -> r) -> HFix f :=> r
 -- query q c = run
 --     where run i@(Term t) = foldl (\s x -> s `c` run x) (q i) t

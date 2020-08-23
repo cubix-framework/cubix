@@ -77,7 +77,7 @@ import Data.Comp.Elem
 import Data.Comp.Dict
 
 
--- | Data type defining a coproduct family.
+-- | Data type defining a sum of signatures.
 --
 --   It is inspired by modular reifiable matching, as described in
 --
