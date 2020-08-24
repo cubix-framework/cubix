@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 20faa5c5181ff0cb1a64d6fa3f6aad864ec57437693d45bdc151353b19316b39
+-- hash: c096290c5720b069494cf50cbcc8bae1edfea7a48aa8f78f6655a50417ffc762
 
 name:           cubix
 version:        0.1.0.0
@@ -25,6 +25,7 @@ flag only-one-language
 library
   exposed-modules:
       Cubix.Analysis.Call.Trivial
+      Cubix.Essentials
       Cubix.Language.Info
       Cubix.Language.C.Parametric.Common
       Cubix.Language.C.Parametric.Full
