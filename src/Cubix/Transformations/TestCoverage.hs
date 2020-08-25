@@ -205,7 +205,7 @@ type CanInstrument fs = ( ListF :-<: fs
                         , All HFoldable fs
                         )
 
-type MonadTestCov fs m = (MonadState TestCovState m, MonadCfgInsertion m fs (StatSort fs))
+type MonadTestCov fs m = (MonadState TestCovState m, MonadAnnotater Label m, MonadCfgInsertion m fs (StatSort fs))
 
 -- This prevents marking the space after return's, but does have the effect of not marking empty catch blocks because of the ways our CFGs currently work.
 -- Pick your poison.
