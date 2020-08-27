@@ -69,7 +69,6 @@ createSortInclusionInfers [ ''VarInitL,       ''MultiLocalVarDeclL, ''P.IdentL, 
 -- | NOTE: You can call a static method on an instance; then a primary receiver is substituting for
 -- a type receiver
 data JavaReceiver e l where
-  ImplicitReceiver   ::              JavaReceiver e P.ReceiverL
   PrimaryReceiver    :: e J.ExpL  -> JavaReceiver e P.ReceiverL
   SuperReceiver      ::              JavaReceiver e P.ReceiverL
   ClassSuperReceiver :: e J.NameL -> JavaReceiver e P.ReceiverL

@@ -114,8 +114,7 @@ instance {-# OVERLAPPING #-} Trans F.Exp where
 instance {-# OVERLAPPING #-} Trans F.MethodInvocation where
   trans (F.MethodCall nam args) = iFunctionCall (iJavaTypeArgs riNilF)
                                                 f
-                                                (FunctionArgumentList' $ ConsF' (ReceiverArg' iImplicitReceiver)
-                                                                                (mapF (injF . translate) args))
+                                                (FunctionArgumentList' $ mapF (injF . translate) args)
     where
       f = case nam of
             (project -> Just (F.Name (SingletonF' n))) -> injF $ transIdent n
@@ -251,18 +250,22 @@ instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsMethodInvocation where
   untrans (FunctionCallIsMethodInvocation (FunctionCall' (project -> Just (JavaTypeArgs targs))
                                                          (FunctionIdent' n)
-                                                         (FunctionArgumentList' (ConsF' (ReceiverArg' rec) args)))) =
-      case project rec of
-        Just ImplicitReceiver -> case targs of
-          NilF' -> F.iMethodCall (F.iName $ SingletonF' n') args'
-          _     -> error "Illegal Java term constructed: type args passed to implicit receiver"
-        Just (PrimaryReceiver e)    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
-        Just SuperReceiver          -> F.iSuperMethodCall                   (untranslate targs) n' args'
-        Just (ClassSuperReceiver c) -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
-        Just (TypeReceiver c)       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
+                                                         (FunctionArgumentList' args))) =
+      case args of
+        ConsF' (ReceiverArg' receiver) nonReceiverArgs ->
+            let args' = mapF (untranslate.fromProjF) nonReceiverArgs in
+            case project receiver of
+                Just (PrimaryReceiver e)    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
+                Just SuperReceiver          -> F.iSuperMethodCall                   (untranslate targs) n' args'
+                Just (ClassSuperReceiver c) -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
+                Just (TypeReceiver c)       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
+
+        _ -> case targs of
+                 NilF' -> F.iMethodCall (F.iName $ SingletonF' n') (mapF (untranslate . fromProjF) args)
+                 _     -> error "Illegal Java term constructed: type args passed to implicit receiver"
     where
       n' = untransIdent n
-      args' = mapF (untranslate.fromProjF) args
+
 
 untransParamDecl :: MJavaTerm FunctionParameterDeclL -> F.JavaTerm F.FormalParamL
 untransParamDecl (projF -> Just (JavaVarargsParam'               (JavaParamAttrs' mods tp dim) n)) = F.iFormalParam (untranslate mods) (untranslate tp) True  (combineVarDeclId dim n)
