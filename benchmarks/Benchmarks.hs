@@ -82,7 +82,7 @@ getC :: FilePath -> IO ( CLib.CTranslUnit, CFull.CTerm CTranslationUnitL
                        , Cfg MCSig)
 getC path = do
   raw <- fromRight <$> CParse.parse path
-  gen <- mkCSLabelGen -- OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = CFull.translate $ fmap (const ()) raw
   let commTree = CCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -95,7 +95,7 @@ getJava :: FilePath -> IO ( JLib.CompilationUnit, JFull.JavaTerm CompilationUnit
                          , Cfg MJavaSig)
 getJava path = do
   raw <- fromRight <$> JParse.parse path
-  gen <- mkCSLabelGen -- OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = JFull.translate raw
   let commTree = JCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -107,7 +107,7 @@ getJS :: FilePath -> IO ( JSLib.JSAST, JSFull.JSTerm JSASTL
                         , Cfg MJSSig)
 getJS path = do
   raw <- JSLib.parseFile path
-  gen <- mkCSLabelGen -- OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = JSFull.translate raw
   let commTree = JSCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -121,7 +121,7 @@ getPython path = do
   contents <- readFile path
   let rawAnnot = fst $ fromRight $ PLib.parseModule contents path
   let raw = fmap (const ()) rawAnnot
-  gen <- mkCSLabelGen -- OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = PFull.translate raw
   let commTree = PCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -133,7 +133,7 @@ getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTerm LBlock
                          , Cfg MLuaSig)
 getLua path = do
   raw <- fromRight <$> LuaLib.parseFile path
-  gen <- mkCSLabelGen -- OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = LFull.translate (fmap toSourceSpan raw)
   let commTree = LCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -159,10 +159,10 @@ dummyNodeInfo :: CLib.NodeInfo
 dummyNodeInfo = CLib.mkNodeInfoOnlyPos CLib.nopos
 
 --labelProgIO :: Term f l -> IO (TermLab f l)
---labelProgIO x = labelProg <$> mkCSLabelGen <$> pure x
+--labelProgIO x = labelProg <$> mkConcurrentSupplyLabelGen <$> pure x
 
 main = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   defaultMain [
 #ifndef ONLY_ONE_LANGUAGE
       env (getC "input-files/c/Foo.c") $

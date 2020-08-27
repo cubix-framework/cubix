@@ -15,11 +15,14 @@
 -- though we explain many things in both places.
 --
 -- __Guide to using this file__
---   * __Strongly recommend__: Click "Collapse All Instances" in the top-right corner
---   * For newcomers: Look at the examples given, not at the types
---   * This file is not the authoritative source for any of its exports. Some
---     typeclasses have methods hidden here. Some functions are exported
---     with more-specific type signatures that are easier to understand.
+-- * __Strongly recommend__: Click "Collapse All Instances" in the top-right corner
+-- * For newcomers: Look at the examples given, not at the types
+-- * This file is not the authoritative source for any of its exports. Some
+--   typeclasses have methods hidden here. Some functions are exported
+--   with more-specific type signatures that are easier to understand. An
+--   unfortunate consequence of this is that __some definitions in this file
+--   conflict with the original Cubix definitions__.
+--
 --
 --------------------------------------------------------------------------------
 
@@ -78,8 +81,15 @@ module Cubix.Essentials (
 
   , project
 
-    -- ** Dealing with annotations
+    -- ** Dealing with annotations/labeled nodes
+    -- *** Adding labels
+  , MonadAnnotater
+  , annotateLabel
+  , runConcurrentSupplyLabeler
+
+    -- *** Removing labels
   , project'
+  , stripA
 
     -- ** Dealing with containers
   , InsertF(..)
@@ -99,11 +109,14 @@ module Cubix.Essentials (
 
   , RewriteM
   , (>+>)
+  , alltdR
+  , prunetdR
+
+    -- **** Things used for generalizing sort-specific functions
+  , DynCase
   , addFail
   , promoteRF
   , promoteR
-  , alltdR
-  , prunetdR
 
     -- * Languages
 
@@ -149,9 +162,18 @@ module Cubix.Essentials (
   , cfgNodeForTerm
 
     -- ** Construction
+  , CfgBuilder
   , makeCfg
 
-    -- CFG-based inserter
+    -- ** CFG-based inserter
+    -- *** Other relevant data types and operations
+  , ProgInfo
+  , makeProgInfo
+  , containingCfgNode
+  , withContainingCfgNode
+
+    -- ** CFG-based inserter proper
+  , InsertAt
   , MonadCfgInsertion(dominatingPrependFirst)
   , CfgInserterT
   , performCfgInsertions
@@ -165,6 +187,9 @@ module Cubix.Essentials (
 
 import qualified Data.Comp.Multi as O
 import Data.Comp.Multi.Strategic
+import Data.Comp.Multi.Strategy.Classification
+
+import Cubix.Sin.Compdata.Annotation
 
 import Cubix.Language.Info
 import Cubix.ParsePretty
@@ -182,9 +207,10 @@ import Cubix.Language.Python.Parametric.Common hiding ( MPythonSig )
 
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
+import Cubix.Language.Parametric.ProgInfo
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Semantics.CfgInserter
-import Cubix.Language.Parametric.Syntax
+import Cubix.Language.Parametric.Semantics.SemanticProperties
 
 ---------------------------------------------------
 ----- For references
@@ -293,8 +319,13 @@ import Data.Proxy ( Proxy )
 
 type Term fs = O.HFix (O.Sum fs)
 
+-- | For full documentaton, see original declaration: `Data.Comp.Multi.Annotation.project`
 project' :: (O.RemA f f', s O.:<: f') => O.HFix f i -> Maybe (s (O.HFix f) i)
 project' = O.project'
+
+-- | For full documentaton, see original declaration: `Data.Comp.Multi.Annotation.stripA`
+stripA :: (O.RemA f f', O.HFunctor f) => O.HFix f i -> O.HFix f' i
+stripA = O.stripA
 
 -- | For full documentaton, see original declaration: `Data.Comp.Multi.Sum.project`
 --

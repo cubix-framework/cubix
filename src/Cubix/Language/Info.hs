@@ -33,12 +33,12 @@ module Cubix.Language.Info
   , Label -- opaque!
   , HasLabel(..)
   , TermLab
-  , MonadLabeler(..)
   , ppLabel
   , LabelGen -- opaque!
   , HasLabelGen(..)
-  , mkCSLabelGen
-  , unsafeMkCSLabelGen
+  , mkConcurrentSupplyLabelGen
+  , runConcurrentSupplyLabeler
+  , unsafeMkConcurrentSupplyLabelGen
   , debugMakeLabel
   , nextLabel
 
@@ -65,7 +65,7 @@ import Control.Lens ( Lens', (&), (.~), (^.), use, (.=) )
 import Control.Lens.TH ( makeClassy, makeLenses )
 import Control.Monad ( liftM, forM_ )
 import Control.Monad.IO.Class ( MonadIO(..) )
-import Control.Monad.State ( MonadState, StateT(..), state, runState )
+import Control.Monad.State ( MonadState, StateT(..), state, runState, evalStateT )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
 
 import Data.Data ( Data )
@@ -139,10 +139,7 @@ class HasLabelGen s where
 instance HasLabelGen LabelGen where
   labelGen = id
 
-class (MonadState s m, HasLabelGen s) => MonadLabeler s m | m -> s
-instance (MonadState s m, HasLabelGen s) => MonadLabeler s m
-
-instance (Monad m, MonadLabeler s m) => MonadAnnotater Label m where
+instance {-# OVERLAPS #-} (Monad m, HasLabelGen s) => MonadAnnotater Label (StateT s m) where
   annM t = (:&:) t <$> nextLabel
 
 -- | Allows embedding a smaller state inside a larger one
@@ -158,7 +155,7 @@ zoom f m = do s <- use f
               f .= s'
               return a
 
-nextLabel :: (MonadLabeler s m) => m Label
+nextLabel :: (MonadState s m, HasLabelGen s) => m Label
 nextLabel = zoom labelGen $ state (\(LabelGen g) -> genLabel g)
 
 --------------------------------------------------------------------------------
@@ -170,13 +167,17 @@ data ConcurrentSupplyLabelGen = ConcurrentSupplyLabelGen
 
 makeLenses ''ConcurrentSupplyLabelGen
 
-mkCSLabelGen :: MonadIO m => m LabelGen
-mkCSLabelGen = do s <- liftIO newSupply
-                  return $ LabelGen $ ConcurrentSupplyLabelGen { _supply = s }
+mkConcurrentSupplyLabelGen :: MonadIO m => m LabelGen
+mkConcurrentSupplyLabelGen = do s <- liftIO newSupply
+                                return $ LabelGen $ ConcurrentSupplyLabelGen { _supply = s }
 
-unsafeMkCSLabelGen :: () -> LabelGen
-unsafeMkCSLabelGen () = unsafePerformIO mkCSLabelGen
-{-# NOINLINE unsafeMkCSLabelGen #-}
+runConcurrentSupplyLabeler :: (MonadIO m) => StateT LabelGen m a -> m a
+runConcurrentSupplyLabeler m = do s <- mkConcurrentSupplyLabelGen
+                                  evalStateT m s
+
+unsafeMkConcurrentSupplyLabelGen :: () -> LabelGen
+unsafeMkConcurrentSupplyLabelGen () = unsafePerformIO mkConcurrentSupplyLabelGen
+{-# NOINLINE unsafeMkConcurrentSupplyLabelGen #-}
 
 debugMakeLabel :: Int -> Label
 debugMakeLabel = Label

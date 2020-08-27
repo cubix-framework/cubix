@@ -350,7 +350,7 @@ trackModSet f t = runReaderT (f t) (makeLocalTACState (modifiedVariables t))
 
 toTAC :: forall fs m l. (CanTransTAC fs) => TermLab fs l -> IO (TermLab fs l)
 toTAC t = do
-   gen <- mkCSLabelGen
+   gen <- mkConcurrentSupplyLabelGen
    let progInf = makeProgInfo t
    randGen <- getStdGen
 

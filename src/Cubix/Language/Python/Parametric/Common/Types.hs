@@ -289,4 +289,12 @@ instance InjF MPythonSig P.IdentL PositionalArgExpL where
    | Just (ExprIsPositionalArgExp e) <- project' t = projF' e
   projF' _ = Nothing
 
+instance InjF MPythonSig FunctionCallL RhsL where
+  injF = iFunctionCallIsExpr
+  projF' f
+   | Just (ExprIsRhs e) <- project' f
+   , Just (FunctionCallIsExpr d) <- project' e
+   = Just d
+  projF' _ = Nothing
+
 #endif

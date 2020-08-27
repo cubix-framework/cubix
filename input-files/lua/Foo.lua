@@ -23,7 +23,7 @@ function main()
     local w = {{1,2}, {3}}
     w[f()][1+1]  = g(h(y+z))
   
-    for a,b in f(),g() do
+    for a,b in f(),g(u) do
       print(a)
       print(b)
     end

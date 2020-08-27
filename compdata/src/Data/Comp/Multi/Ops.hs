@@ -195,7 +195,7 @@ instance (HTraversable f) => HTraversable (f :&: a) where
 class RemA (s :: (* -> *) -> * -> *) s' | s -> s'  where
     remA :: s a :-> s' a
 
--- NOTE: This is linear
+-- TODO: This is linear
 --       Is there a way to make this constant time?
 instance ( RemA f g
          , RemA (Sum fs) (Sum gs)

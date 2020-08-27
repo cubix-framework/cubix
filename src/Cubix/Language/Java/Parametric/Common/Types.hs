@@ -69,7 +69,6 @@ createSortInclusionInfers [ ''VarInitL,       ''MultiLocalVarDeclL, ''P.IdentL, 
 -- | NOTE: You can call a static method on an instance; then a primary receiver is substituting for
 -- a type receiver
 data JavaReceiver e l where
-  ImplicitReceiver   ::              JavaReceiver e P.ReceiverL
   PrimaryReceiver    :: e J.ExpL  -> JavaReceiver e P.ReceiverL
   SuperReceiver      ::              JavaReceiver e P.ReceiverL
   ClassSuperReceiver :: e J.NameL -> JavaReceiver e P.ReceiverL
@@ -263,6 +262,15 @@ instance InjF MJavaSig P.IdentL PositionalArgExpL where
    | Just (ExpIsPositionalArgExp e) <- project' a
    , Just (ExpName n) <- project' e
    , Just (Name (SingletonFA' i)) <- project' n = projF' i
+  projF' _ = Nothing
+
+instance InjF MJavaSig FunctionCallL RhsL where
+  injF = iMethodInv . injF
+  projF' f
+   | Just (ExpIsRhs e) <- project' f
+   , Just (MethodInv c) <- project' e
+   , Just (FunctionCallIsMethodInvocation b) <- project' c
+   = Just b
   projF' _ = Nothing
 
 

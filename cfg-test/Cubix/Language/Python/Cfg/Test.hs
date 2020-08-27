@@ -55,7 +55,7 @@ unit_python_cfg fp =
 
 makePyEnv :: (MonadIO m) => MPythonTerm ModuleL -> m (MPythonTermLab ModuleL, Cfg MPythonSig)
 makePyEnv t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
   pure (tLab, cfg)

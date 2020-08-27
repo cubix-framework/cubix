@@ -38,6 +38,8 @@ import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.CfgInserter
 import Cubix.Language.Parametric.Syntax
 
+import Cubix.Sin.Compdata.Annotation
+
 import Cubix.Transformations.TAC.Custom
 import Cubix.Transformations.TAC.Gensym
 
@@ -115,4 +117,6 @@ doOptionalAppend targ e = do
     dominatingAppendFirstOpts targ e EmptyInsertOkay
 
 
-type MonadTAC fs m = (MonadState (TACState fs) m, MonadReader (LocalTACState fs) m, MonadCfgInsertion m fs BlockItemL, MonadRandom m, MonadPlus m, MonadFail m)
+type MonadTAC fs m = ( MonadState (TACState fs) m, MonadAnnotater Label m
+                     , MonadReader (LocalTACState fs) m, MonadCfgInsertion m fs BlockItemL
+                     , MonadRandom m, MonadPlus m, MonadFail m)

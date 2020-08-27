@@ -53,7 +53,7 @@ unit_js_cfg fp =
 
 makeJavascriptEnv :: (MonadIO m) => MJSTerm JSASTL -> m (MJSTermLab JSASTL, Cfg MJSSig)
 makeJavascriptEnv t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
   pure (tLab, cfg)

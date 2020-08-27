@@ -144,5 +144,5 @@ instance ConstructCfg MJSSig JSCfgState C.JSFor where
   constructCfg (collapseFProd' -> (t :*: C.JSForVarIn _ _ exp body)) = HState $ constructCfgWhile t (unHState exp) (unHState body)
 
 instance CfgInitState MJSSig where
-  cfgInitState _ = JSCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyScopedLabelMap
+  cfgInitState _ = JSCfgState emptyCfg (unsafeMkConcurrentSupplyLabelGen ()) emptyLoopStack emptyScopedLabelMap
 #endif

@@ -1,5 +1,5 @@
 name: cubix
-version: '0.1.0.0'
+version: '0.5.0.0'
 synopsis: A framework for multi-language transformation
 description: Please see README.md
 category: language
@@ -206,6 +206,7 @@ benchmarks:
      - language-lua
      - language-python
      - lens
+     - text
 tests:
   cfg-test:
     main: Main.hs
@@ -216,14 +217,14 @@ tests:
       - -with-rtsopts=-N
       - -fcontext-stack=300
     dependencies:
-     - cubix
-     - hedgehog
-     - cubix-compdata
-     - compstrat
-     - containers
-     - lens
-     - mtl
      - base
+     - compstrat
+     - containers     
+     - cubix
+     - cubix-compdata
      - deepseq
      - directory
      - filepath
+     - hedgehog
+     - lens
+     - mtl

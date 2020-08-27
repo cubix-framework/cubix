@@ -160,13 +160,12 @@ instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsFunCall where
   untrans (FunctionCallIsFunCall (FunctionCall' EmptyFunctionCallAttrs' f args)) =
       case receiver of
-        Nothing -> F.iNormalFunCall (fromJust fun) fa
+        Nothing -> F.iNormalFunCall (getFunPE f) fa
         Just r  -> F.iMethodCall (fromJust receiver) (fromJust funNm) fa
     where
-      fun :: Maybe (F.LuaTerm F.PrefixExpL)
-      fun = case project f of
-              Just (PrefixExpIsFunctionExp x) -> Just (untranslate x)
-              _                               -> Nothing
+      getFunPE :: MLuaTerm FunctionExpL -> F.LuaTerm F.PrefixExpL
+      getFunPE (project -> Just (PrefixExpIsFunctionExp x)) = untranslate x
+      getFunPE (project -> Just (FunctionIdent n))          = F.iPEVar $ F.iVarName $ injF $ untransIdent n
 
       funNm :: Maybe (F.LuaTerm F.NameL)
       funNm = case project f of

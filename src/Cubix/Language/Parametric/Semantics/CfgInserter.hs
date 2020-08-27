@@ -151,7 +151,11 @@ class (Monad m) => MonadCfgInsertion m fs l where
   firstPredPrependLastOpts   :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
   restPredPrependLastOpts    :: TermLab fs i -> TermLab fs l -> EmptyInsertOkay -> m ()
 
-  dominatingPrependFirst :: TermLab fs i -> TermLab fs l -> m ()
+
+  -- | Insert a node in places that dominate all control paths to some other node
+  dominatingPrependFirst :: TermLab fs i -- location to perform insertion
+                         -> TermLab fs l -- node to insert
+                         -> m ()
   dominatingPrependFirst t x = dominatingPrependFirstOpts t x EmptyInsertNotOkay
 
   dominatingPrependLast :: TermLab fs i -> TermLab fs l -> m ()

@@ -24,6 +24,7 @@ module Cubix.Sin.Compdata.Annotation (
   ) where
 
 import Control.Monad.Identity ( Identity(..) )
+import Control.Monad.Trans ( MonadTrans(..) )
 import Data.Default ( Default(..) )
 import Data.Comp.Multi ( Cxt(..), (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
@@ -70,6 +71,9 @@ runAnnotateDefault = runIdentity . runAnnotateDefault'
 -- | Specializing annotation to Maybe a to aid instance selection
 instance MonadAnnotater (Maybe a) (AnnotateDefault a) where
   annM x = return (x :&: def)
+
+instance (MonadAnnotater a m, MonadTrans t, Monad (t m)) => MonadAnnotater a (t m) where
+  annM = lift . annM
 
 annotateM :: (HTraversable f, MonadAnnotater a m) => CxtFunM m f (f :&: a)
 annotateM = appSigFunM annM

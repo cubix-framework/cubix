@@ -190,6 +190,6 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyComprehens
   constructCfg t = constructCfgDefault t
 
 instance CfgInitState MPythonSig where
-  cfgInitState _ = PythonCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap
+  cfgInitState _ = PythonCfgState emptyCfg (unsafeMkConcurrentSupplyLabelGen ()) emptyLoopStack emptyLabelMap
 #endif
 

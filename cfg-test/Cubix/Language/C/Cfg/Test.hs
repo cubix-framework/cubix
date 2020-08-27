@@ -54,7 +54,7 @@ unit_c_cfg fp =
 
 makeCEnv :: (MonadIO m) => MCTerm CTranslationUnitL -> m (MCTermLab CTranslationUnitL, Cfg MCSig)
 makeCEnv t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
   pure (tLab, cfg)

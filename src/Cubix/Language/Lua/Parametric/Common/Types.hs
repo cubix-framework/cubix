@@ -238,13 +238,27 @@ instance InjF MLuaSig IdentL PositionalArgExpL where
    | Just (ExpIsPositionalArgExp e) <- project' x
    , Just (PrefixExp p) <- project' e
    , Just (PEVar v) <- project' p
-   , Just (VarName n) <- project' v = projF' n
+   , Just (VarName n) <- project' v
+   = projF' n
   projF' _ = Nothing
 
--- FIXME: Replace with real thing that handles normal function call syntax
 instance InjF MLuaSig IdentL FunctionExpL where
   injF = iFunctionIdent
 
   projF' (project' -> Just (FunctionIdent n)) = Just n
+  projF' x
+    | Just (PrefixExpIsFunctionExp p) <- project' x
+    , Just (PEVar v) <- project' p
+    , Just (VarName n) <- project' v
+    = projF' n
   projF' _                                    = Nothing
 
+instance InjF MLuaSig FunctionCallL RhsL where
+  injF x = iLuaRhs $ insertF [iPrefixExp $ iPEFunCall $ iFunctionCallIsFunCall x]
+  projF' f
+   | Just (LuaRhs (SingletonFA' e)) <- project' f
+   , Just (PrefixExp c) <- project' e
+   , Just (PEFunCall b) <- project' c
+   , Just (FunctionCallIsFunCall a) <- project' b
+   = Just a
+  projF' _ = Nothing

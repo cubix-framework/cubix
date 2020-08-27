@@ -58,6 +58,7 @@ import Cubix.Language.Parametric.Path
 import Cubix.Language.Parametric.ProgInfo
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax
+import Cubix.Sin.Compdata.Annotation
 -- Input: List of functions, and consumed/produced rels
 ----- Initial version will ignore control flow.
 ---------- I don't feel keen on diving into my CFGs and seeing how good they are.
@@ -114,8 +115,8 @@ type HasFunctionDecls fs = (FunctionDecl :-<: fs)
 instance HasLabelGen (IPTState fs) where
   labelGen = ipt_gen
 
-class (MonadState (IPTState fs) m) => MonadIPT fs m | m -> fs
-instance (MonadState (IPTState fs) m) => MonadIPT fs m
+class (MonadState (IPTState fs) m, MonadAnnotater Label m) => MonadIPT fs m | m -> fs
+instance (MonadState (IPTState fs) m, MonadAnnotater Label m) => MonadIPT fs m
 class (MonadIPT fs m, MonadIO m) => MonadIPTIO fs m | m -> fs
 instance (MonadIPT fs m, MonadIO m) => MonadIPTIO fs m
 
