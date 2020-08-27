@@ -493,6 +493,7 @@ instance KExtractF3' (,,) TripleF where
 
 --------------------------------------------------------------------------------
 
+-- This is an instance of a distributive law, and can probably be replaced with such.
 class (Functor f) => InsertF f e where
   -- | Inverse of extractF. Pushes a functor into a label.
   -- 
@@ -504,8 +505,6 @@ class (Functor f) => InsertF f e where
   -- 
   -- Note that this cannot be used on a labeled tree, as the insertion operation will
   -- require generating additional labels.
-  -- 
-  -- This is an instance of a distributive law, and can probably be replaced with such.
   insertF :: (Typeable l) => f (e l) -> e (f l)
 
 
