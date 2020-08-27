@@ -217,14 +217,14 @@ tests:
       - -with-rtsopts=-N
       - -fcontext-stack=300
     dependencies:
-     - cubix
-     - hedgehog
-     - cubix-compdata
-     - compstrat
-     - containers
-     - lens
-     - mtl
      - base
+     - compstrat
+     - containers     
+     - cubix
+     - cubix-compdata
      - deepseq
      - directory
      - filepath
+     - hedgehog
+     - lens
+     - mtl
