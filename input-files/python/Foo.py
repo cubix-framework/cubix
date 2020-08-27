@@ -16,6 +16,8 @@ def main():
     if false:
       y = y - 1 - 1
       u = 5
+    elif something(y):
+      pass
 
 
   w = [[1,2], 3]
