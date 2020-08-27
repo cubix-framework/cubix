@@ -206,6 +206,7 @@ benchmarks:
      - language-lua
      - language-python
      - lens
+     - text
 tests:
   cfg-test:
     main: Main.hs
