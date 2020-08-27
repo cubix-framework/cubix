@@ -248,3 +248,12 @@ instance InjF MLuaSig IdentL FunctionExpL where
   projF' (project' -> Just (FunctionIdent n)) = Just n
   projF' _                                    = Nothing
 
+instance InjF MLuaSig FunctionCallL RhsL where
+  injF x = iLuaRhs $ insertF [iPrefixExp $ iPEFunCall $ iFunctionCallIsFunCall x]
+  projF' f
+   | Just (LuaRhs (SingletonFA' e)) <- project' f
+   , Just (PrefixExp c) <- project' e
+   , Just (PEFunCall b) <- project' c
+   , Just (FunctionCallIsFunCall a) <- project' b
+   = Just a
+  projF' _ = Nothing

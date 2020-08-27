@@ -265,5 +265,14 @@ instance InjF MJavaSig P.IdentL PositionalArgExpL where
    , Just (Name (SingletonFA' i)) <- project' n = projF' i
   projF' _ = Nothing
 
+instance InjF MJavaSig FunctionCallL RhsL where
+  injF = iMethodInv . injF
+  projF' f
+   | Just (ExpIsRhs e) <- project' f
+   , Just (MethodInv c) <- project' e
+   , Just (FunctionCallIsMethodInvocation b) <- project' c
+   = Just b
+  projF' _ = Nothing
+
 
 #endif

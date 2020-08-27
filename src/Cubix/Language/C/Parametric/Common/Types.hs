@@ -365,4 +365,12 @@ instance InjF MCSig P.IdentL PositionalArgExpL where
    , Just (CVar n _) <- project' e = projF' n
   projF' _ = Nothing
 
+instance InjF MCSig FunctionCallL RhsL where
+  injF = iFunctionCallIsCExpression
+  projF' f
+   | Just (CExpressionIsRhs e) <- project' f
+   , Just (FunctionCallIsCExpression c) <- project' e
+   = Just c
+  projF' _ = Nothing
+
 #endif

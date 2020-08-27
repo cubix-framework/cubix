@@ -206,4 +206,12 @@ instance InjF MJSSig IdentL PositionalArgExpL where
    | Just (JSExpressionIsPositionalArgExp e) <- project' x = projF' e
   projF' _ = Nothing
 
+instance InjF MJSSig FunctionCallL RhsL where
+  injF = iFunctionCallIsJSExpression
+  projF' f
+   | Just (JSExpressionIsRhs e) <- project' f
+   , Just (FunctionCallIsJSExpression c) <- project' e
+   = Just c
+  projF' _ = Nothing
+
 #endif
