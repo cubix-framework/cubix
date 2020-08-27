@@ -99,7 +99,7 @@ doubleAssign t@(project' -> Just (Assign lhs _ _)) = do
 
 main = do
   Just tree <- parse "Foo.lua"
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let (treeLab :: MLuaTermLab _) = evalState (annotateLabel tree) gen
   putStrLn $ "\n\n"
   let progInfo = makeProgInfo treeLab

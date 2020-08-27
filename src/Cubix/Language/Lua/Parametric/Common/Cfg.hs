@@ -241,4 +241,4 @@ instance ConstructCfg MLuaSig LuaCfgState Exp where
   constructCfg t = constructCfgDefault t
 
 instance CfgInitState MLuaSig where
-  cfgInitState _ = LuaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMapStack
+  cfgInitState _ = LuaCfgState emptyCfg (unsafeMkConcurrentSupplyLabelGen ()) emptyLoopStack emptyLabelMapStack

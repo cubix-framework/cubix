@@ -36,8 +36,9 @@ module Cubix.Language.Info
   , ppLabel
   , LabelGen -- opaque!
   , HasLabelGen(..)
-  , mkCSLabelGen
-  , unsafeMkCSLabelGen
+  , mkConcurrentSupplyLabelGen
+  , runConcurrentSupplyLabeler
+  , unsafeMkConcurrentSupplyLabelGen
   , debugMakeLabel
   , nextLabel
 
@@ -64,7 +65,7 @@ import Control.Lens ( Lens', (&), (.~), (^.), use, (.=) )
 import Control.Lens.TH ( makeClassy, makeLenses )
 import Control.Monad ( liftM, forM_ )
 import Control.Monad.IO.Class ( MonadIO(..) )
-import Control.Monad.State ( MonadState, StateT(..), state, runState )
+import Control.Monad.State ( MonadState, StateT(..), state, runState, evalStateT )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
 
 import Data.Data ( Data )
@@ -166,13 +167,17 @@ data ConcurrentSupplyLabelGen = ConcurrentSupplyLabelGen
 
 makeLenses ''ConcurrentSupplyLabelGen
 
-mkCSLabelGen :: MonadIO m => m LabelGen
-mkCSLabelGen = do s <- liftIO newSupply
-                  return $ LabelGen $ ConcurrentSupplyLabelGen { _supply = s }
+mkConcurrentSupplyLabelGen :: MonadIO m => m LabelGen
+mkConcurrentSupplyLabelGen = do s <- liftIO newSupply
+                                return $ LabelGen $ ConcurrentSupplyLabelGen { _supply = s }
 
-unsafeMkCSLabelGen :: () -> LabelGen
-unsafeMkCSLabelGen () = unsafePerformIO mkCSLabelGen
-{-# NOINLINE unsafeMkCSLabelGen #-}
+runConcurrentSupplyLabeler :: (MonadIO m) => StateT LabelGen m a -> m a
+runConcurrentSupplyLabeler m = do s <- mkConcurrentSupplyLabelGen
+                                  evalStateT m s
+
+unsafeMkConcurrentSupplyLabelGen :: () -> LabelGen
+unsafeMkConcurrentSupplyLabelGen () = unsafePerformIO mkConcurrentSupplyLabelGen
+{-# NOINLINE unsafeMkConcurrentSupplyLabelGen #-}
 
 debugMakeLabel :: Int -> Label
 debugMakeLabel = Label

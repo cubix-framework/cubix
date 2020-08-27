@@ -110,7 +110,7 @@ putProj (LuaProj    p) = putProject (prettyLua        . fromJust . dynProj . str
 
 debugTree' :: (All ShowHF fs, All HFoldable fs, CfgBuilder fs) => Term fs l -> IO ()
 debugTree' t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
   debugCfg tLab (makeCfg tLab)
   print t
@@ -141,7 +141,7 @@ checkRoundTrip lang p = withSystemTempFile "roundtrip" $ \tmp h -> do
 
 printCfgDot :: LangProg -> IO LangProg
 printCfgDot t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     CProg      p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
@@ -171,7 +171,7 @@ runElementaryHoist _            = error "Cannot run elementary hoist on that pro
 
 runTAC :: LangProg -> IO LangProg
 runTAC t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     JSProg     p -> liftM (JSProg     . stripA) $ toTAC (labelProg gen p)
@@ -182,7 +182,7 @@ runTAC t = do
 
 runTestCov :: LangProg -> IO LangProg
 runTestCov t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     CProg      p -> liftM (CProg      . stripA) $ instrumentTestCoverage (labelProg gen p)
@@ -240,7 +240,7 @@ isAnalysis a = elem a analsList
 
 doAnal :: String -> String -> [FilePath] -> IO ()
 doAnal lang anal fils = do
-     gen <- mkCSLabelGen
+     gen <- mkConcurrentSupplyLabelGen
      projRes <- parseProj gen (downcase lang) fils
      case projRes of
        Nothing   -> error "Parse failed"
@@ -251,7 +251,7 @@ doAnal lang anal fils = do
 
 doIpt :: String -> [FilePath] -> IO ()
 doIpt lang fils = do
-    gen <- mkCSLabelGen
+    gen <- mkConcurrentSupplyLabelGen
     projRes <- parseProj gen (downcase lang) fils
     case projRes of
       Nothing   -> error "Parse failed"

@@ -185,5 +185,5 @@ instance ConstructCfg MJavaSig JavaCfgState Exp where
   constructCfg t = constructCfgDefault t
 
 instance CfgInitState MJavaSig where
-  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyScopedLabelMap
+  cfgInitState _ = JavaCfgState emptyCfg (unsafeMkConcurrentSupplyLabelGen ()) emptyLoopStack emptyScopedLabelMap
 #endif

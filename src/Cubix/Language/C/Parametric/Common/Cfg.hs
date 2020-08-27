@@ -278,5 +278,5 @@ instance ConstructCfg MCSig CCfgState P.FunctionDef where
       pure EmptyEnterExit
 
 instance CfgInitState MCSig where
-  cfgInitState _ = CCfgState emptyCfg (unsafeMkCSLabelGen ()) emptyLoopStack emptyLabelMap emptyLocalLabels
+  cfgInitState _ = CCfgState emptyCfg (unsafeMkConcurrentSupplyLabelGen ()) emptyLoopStack emptyLabelMap emptyLocalLabels
 #endif

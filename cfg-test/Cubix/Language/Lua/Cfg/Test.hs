@@ -49,7 +49,7 @@ unit_lua_cfg fp =
 
 makeLuaEnv :: (MonadIO m) => MLuaTerm LBlockL -> m (MLuaTermLab LBlockL, Cfg MLuaSig)
 makeLuaEnv t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
       cfg = makeCfg tLab
   pure (tLab, cfg)

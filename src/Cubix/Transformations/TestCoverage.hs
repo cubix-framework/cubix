@@ -246,7 +246,7 @@ addCoverageStatement cfg t = case cfgNodeForTerm cfg EnterNode t of
 
 instrumentTestCoverage :: forall fs l. (CanInstrument fs) => TermLab fs l -> IO (TermLab fs l)
 instrumentTestCoverage t = do
-    gen <- mkCSLabelGen
+    gen <- mkConcurrentSupplyLabelGen
     let progInfo = makeProgInfo t
 
     let labelsNeeded = (^. bb_counter) $ execState (trans progInfo t) (TestCovState 0 gen)
