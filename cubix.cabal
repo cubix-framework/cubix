@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c096290c5720b069494cf50cbcc8bae1edfea7a48aa8f78f6655a50417ffc762
+-- hash: 27eeb7b0dccc9a7bd77b7f2e796cde485a92cf2e1ebc4132dc8ba2a6b150fcc0
 
 name:           cubix
-version:        0.1.0.0
+version:        0.5.0.0
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
@@ -237,6 +237,7 @@ benchmark mainbench
     , language-python
     , lens
     , mtl
+    , text
     , transformers
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
