@@ -17,9 +17,16 @@
 -- |
 
 module Cubix.Language.Parametric.Syntax.VarDecl (
+    -- * Identifiers
     IdentL
   , Ident(..)
 
+  -- ** Constructors and Patterns
+
+  , pattern Ident'
+  ,        iIdent
+
+    -- * Variable declarations
   , MultiLocalVarDeclCommonAttrsL
   , LocalVarInitL
   , IsOptional(..)
@@ -36,23 +43,7 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   , MultiLocalVarDeclL
   , MultiLocalVarDecl(..)
 
-  , AssignOpL
-  , AssignOpEquals(..)
-  , LhsL
-  , RhsL
-  , AssignL
-  , Assign(..)
-
-  , BlockItemL
-  , BlockEndL
-  , EmptyBlockEnd(..)
-  , BlockL
-  , Block(..)
-  , EmptyBlockItem(..)
-
-
-  , pattern Ident'
-  ,        iIdent
+  -- ** Constructors and Patterns
 
   , pattern JustLocalVarInit'
   ,        iJustLocalVarInit
@@ -75,10 +66,31 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   , pattern MultiLocalVarDecl'
   ,        iMultiLocalVarDecl
 
+    -- * Assignment
+  , AssignOpL
+  , AssignOpEquals(..)
+  , LhsL
+  , RhsL
+  , AssignL
+  , Assign(..)
+
+  -- ** Constructors and Patterns
+
   , pattern AssignOpEquals'
   ,        iAssignOpEquals
   , pattern Assign'
   ,        iAssign
+
+    -- * Blocks
+  , BlockItemL
+  , BlockEndL
+  , EmptyBlockEnd(..)
+  , BlockL
+  , Block(..)
+  , EmptyBlockItem(..)
+
+  -- ** Constructors and Patterns
+
   , pattern EmptyBlockEnd'
   ,        iEmptyBlockEnd
   , pattern Block'

@@ -1,6 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE CPP #-}
 
+
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Cubix.Language.C.Parametric.Common
+-- Copyright   :  (c) 2016-2020 James Koppel
+-- License     :  BSD3
+--
+--
+-- Language definition is auto-generated from that of @language-c@, and modified
+-- to replace some language-specific nodes with generic nodes.
+-- See https://hackage.haskell.org/package/language-c-0.5.0/docs/Language-C-Syntax-AST.html
+--
+--------------------------------------------------------------------------------
+
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.C.Parametric.Common () where
 #else

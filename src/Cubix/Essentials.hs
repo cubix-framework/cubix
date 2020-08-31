@@ -15,13 +15,14 @@
 -- though we explain many things in both places.
 --
 -- __Guide to using this file__
--- * __Strongly recommend__: Click "Collapse All Instances" in the top-right corner
--- * For newcomers: Look at the examples given, not at the types
--- * This file is not the authoritative source for any of its exports. Some
---   typeclasses have methods hidden here. Some functions are exported
---   with more-specific type signatures that are easier to understand. An
---   unfortunate consequence of this is that __some definitions in this file
---   conflict with the original Cubix definitions__.
+--
+--       * __Strongly recommend__: Click "Collapse All Instances" in the top-right corner
+--       * For newcomers: Look at the examples given, not at the types
+--       * This file is not the authoritative source for any of its exports. Some
+--         typeclasses have methods hidden here. Some functions are exported
+--         with more-specific type signatures that are easier to understand. An
+--         unfortunate consequence of this is that __some definitions in this file
+--         conflict with the original Cubix definitions__.
 --
 --
 --------------------------------------------------------------------------------
@@ -33,7 +34,6 @@ module Cubix.Essentials (
     --
     -- ** Language fragments
     -- $fragments
-    --   TODO (**TODO**): Discuss smart constructors somewhere
 
     deriveAll
 
@@ -41,15 +41,18 @@ module Cubix.Essentials (
     -- $sums
 
   , O.Sum
+  , (O.:-<:)
 
     -- ** Terms
 
-    -- | Terms are how we put stuff together
+    -- $terms
   , Term
   , inject
 
+    -- ** Smart constructors
+    -- $smart_constructors
+
     -- ** Dealing with sums
-  , (O.:-<:)
   , O.All
   , caseCxt
 
@@ -241,12 +244,12 @@ import Data.Proxy ( Proxy )
     Seq    :: e StatementL -> e StatementL -> Statement e StatementL
   @
 
-   This definition of @Statement@ is called a *language fragment*. It defines
-   the nodes @Assign@ and @Seq@ without any reference to the larger language
-   they are embedded in. The *labels* @StatementL@ and @ExpL@ are *sorts*, categories of terms.
-   Popular languages commonly have a sort for top-level definitions, a sort for lvalues, a sort for
-   import statements, etc. Specifying the sort separately from the language fragment makes it possible
-   to modularly add new statements and expressions to a language definition, which we will demonstrate shortly.
+  This definition of @Statement@ is called a *language fragment*. It defines
+  the nodes @Assign@ and @Seq@ without any reference to the larger language
+  they are embedded in. The *labels* @StatementL@ and @ExpL@ are *sorts*, categories of terms.
+  Popular languages commonly have a sort for top-level definitions, a sort for lvalues, a sort for
+  import statements, etc. Specifying the sort separately from the language fragment makes it possible
+  to modularly add new statements and expressions to a language definition, which we will demonstrate shortly.
 
   Expect to see the kind @(* -> *) -> * -> *@ a lot, the kind of language fragments.
 
@@ -302,14 +305,121 @@ import Data.Proxy ( Proxy )
  The `Sum` constructor is important to Cubix, but you may not use it directly.
  More often, you'll use something like @Term LangSig@ --- but note that `Term` is defined using
  `Sum`.
+
+
+ Signatures also appear with the `(:-<:)` "signature membership" constraint
+ For the @LangSig@ definition above, the constraints @(Statement :-<: LangSig),
+ @(Conditional :-<: LangSig)@, and @(Exp :-<: LangSig)@ all hold. In some type signatures,
+ you'll also see the sibling constraint `(:<:)`: If @f :-<: fs@, then @f :<: (Sum fs)@. This
+ makes it possible to write functions that run on any language that have a certain kind of node.
+ E.g.: @(Statement :-<: fs) => Term fs l -> Term fs l@ is a rewrite on terms of any
+ language that has the @@Statement@ language fragment.
+-}
+
+{- $terms
+
+ Signatures define nodes of a language, but are agnostic to what the children
+ of those nodes can be. Terms are what "tye the recursive knot" and turn
+ a signature into the final type for a language. They do this by taking a signature,
+ and specifying what the children of each node may be: other nodes from the same signature.
+
+ In the slides for the accompanying tutorial, we give a decent pictoral explanation
+ of this topic. Here's a textual version:
+
+ It is easier to first present the type-level fixpoint for single-sorted terms.
+ This is the classic example
+
+ @
+ data ListF e a = ConsF a e | NilF
+ data Fix f = Fix (f (Fix f))
+ type List = Fix ListF
+ @
+
+ The @ListF@ type was constructed by taking the normal recursive list type,
+ and replacing the sublist in @Cons@ with a type parameter, @e@. This
+ is called "unfixing" the type. Taking @Fix ListF@ undoes this;
+ the result is isomorphic to the built-in list type (@[]@).
+
+ Since Cubix terms have different sorts, Cubix uses a generalization
+ of the @Fix@ constructor. Cubix's definition is equivalent to the following:
+
+ @
+ data Term fs l = Term (Sum fs (Term fs) l)
+ @
+
+ This recursively defines @Term fs@ to be
+ terms of signature @fs@. It can be thought of as a product
+ of the types for terms of each sort, so that, for each sort @l@,
+ @Term fs l@ is the type of terms of signature @fs@ of sort @l@.
+ For example, since @MJavaSig@ is Cubix's signature for Java,
+ @Term MJavaSig@ denotes all terms in @Java@, and @Term MJavaSig StmtL@
+ denotes Java statements.
+
+ Breaking down the definition: @Sum fs e l@ denotes nodes drawn from
+ any of the language fragments in signature @fs@, where the children of those
+ nodes are given by @e@, and the top node has sort @l@. Here, @e@ is set to @Term fs@,
+ meaning the children are other terms of this signature. These children have their
+ own sorts. @l@ is then the sort of the root node.
+
+ @cubix-compdata@ has a generalization of `Term` for terms-with-holes, called contexts.
+ That is outside the scope of this document (see the original "Compositional Data Types"
+ paper), but, know that, if you see the type @Cxt h f a l@, it specializes to @Term fs l@.
+-}
+
+
+{- $smart_constructors
+
+  Consider the following language definition:
+
+  @
+  data ExpL
+  data StatementL
+
+  data Statement e l where
+    Assign :: String -> e ExpL             -> Statement e StatementL
+    Seq    :: e StatementL -> e StatementL -> Statement e StatementL
+
+  data Exp e l where
+     VarExp :: String           -> Exp e ExpL
+     Add    :: e ExpL -> e ExpL -> Exp e ExpL
+
+  deriveAll [''Statement, ''Exp]
+
+  type LangSig = '[Statement, Exp]
+  type Lang = Term LangSig
+  @
+
+  Using the raw constructors, here is how one would construct the tem
+  @y = x+x@ . (n.b.: `inj` creates values of a `Sum` type.)
+
+  @
+  Term $ inj $ Assign "y" $ Term (inj (Add (Term (inj (VarExp "x"))) (Term (inj (VarExp "x")))))
+  @
+
+  This is obviously quite cumbersome. Towards that end, `deriveAll` creates /smart constructors/.
+  Smart constructors look like this:
+
+  @
+  iAssign :: (Statement :-<: fs) => String -> Term fs ExpL -> Term fs StatementL
+  @
+
+  (Simplified here. The tutorial explains their real types.)
+
+  With smart constructors, that term would be constructed like this:
+
+  @
+  iAssign "y" (iAdd (iVarExp "x) (iVarExp "x"))
+  @
 -}
 
 
 ------------------------------------------------------------------------------------------
 ---- Haddock has a limitation where hideous kind signatures appear
----- in re-exported functions (at least from a different package). We thus redefine a lot
+---- in re-exported functions (at least from a different package).
+--   See https://github.com/haskell/haddock/issues/1230 . We thus redefine a lot
 ---- of things here so that the docs look prettier. Does not work for typeclasses, alas.
----- Has the side-effect of nuking the original docstring.
+---- Has the side-effect of nuking the original docstring, and creating
+---- some conflicting names when you import the original.
 ----
 ---- While we're at it, we can also simplify some type signatures.
 ------------------------------------------------------------------------------------------

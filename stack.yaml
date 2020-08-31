@@ -13,12 +13,12 @@ packages:
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - language-lua-0.11.0.1
-- git: git@github.com:jkoppel/language-javascript.git
+- git: https://github.com/jkoppel/language-javascript.git
   commit: 3b2026cf9c443bc798683c12206de439354283ce
 - language-dot-0.1.1
-- git: git@github.com:jkoppel/language-c.git
+- git: https://github.com/jkoppel/language-c.git
   commit: 49c340419e9ea6395c1915f9de7aedf903483c95
-- git: git@github.com:jkoppel/language-java.git
+- git: https://github.com/jkoppel/language-java.git
   commit: a41ba850a1e2b3e233cc8e5132433921b6a6dca0
 - language-python-0.5.8
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734

@@ -44,7 +44,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   , pattern Left'
   , pattern Right'
 
-    -- * Smart constructors
+    -- ** Smart constructors
   , riNothingF
   , iJustF
   , riNilF
@@ -54,7 +54,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   , riLeftF
   , riRightF
 
-    -- * Converting functorial syntax
+    -- ** Converting functorial syntax
   , ExtractF(..)
   , KExtractF(..)
   , KExtractF'(..)
