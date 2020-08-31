@@ -1,5 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE CPP #-}
+
+
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Cubix.Language.Java.Parametric.Common
+-- Copyright   :  (c) 2016-2020 James Koppel
+-- License     :  BSD3
+--
+--
+-- Language definition is auto-generated from that of @language-java@, and modified
+-- to replace some language-specific nodes with generic nodes.
+-- See https://hackage.haskell.org/package/language-java-0.2.8/docs/Language-Java-Syntax.html
+--
+--------------------------------------------------------------------------------
+
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Java.Parametric.Common () where
 #else
