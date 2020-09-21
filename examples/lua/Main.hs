@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- |
@@ -109,7 +110,7 @@ main = do
   --putStrLn "\nBasic blocks: "
   --print $ map (^. cfg_node_lab) $ filter (startsBasicBlock cfg) $ cfgNodes cfg
 
-  let t' = evalState (performCfgInsertions (Proxy :: Proxy BlockItemL) progInfo (allbuR $ promoteR doubleAssign) treeLab) gen
+  let t' = evalState (performCfgInsertions @BlockItemL progInfo (allbuR $ promoteR doubleAssign) treeLab) gen
 
   putStrLn $ prettyLua $ stripA t'
 

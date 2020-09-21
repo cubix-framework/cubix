@@ -9,6 +9,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -244,6 +245,7 @@ addCoverageStatement cfg t = case cfgNodeForTerm cfg EnterNode t of
 
                                  return t
 
+
 instrumentTestCoverage :: forall fs l. (CanInstrument fs) => TermLab fs l -> IO (TermLab fs l)
 instrumentTestCoverage t = do
     gen <- mkConcurrentSupplyLabelGen
@@ -253,4 +255,30 @@ instrumentTestCoverage t = do
     let counterStart = (-labelsNeeded) - 1 + (blockCounterStart (Proxy :: Proxy fs))
     return $ evalState (trans progInfo t) (TestCovState counterStart gen)
   where
-    trans progInfo = performCfgInsertions (Proxy :: Proxy (StatSort fs)) progInfo $ (revAllbuR $ addCoverageStatement (progInfo ^. proginf_cfg))
+    trans progInfo = performCfgInsertions @(StatSort fs) progInfo $ (revAllbuR $ addCoverageStatement (progInfo ^. proginf_cfg))
+
+
+-- |
+-- Following is a simplified version of `instrumentTestCoverage`, use in examples:
+--
+-- ---------------------------------------------------------------------------------
+--
+-- | Inserts "blocksCovered[n] = true" printouts for test-coverage
+--   at every basic block
+--
+-- Runs on C, Java, JavaScript, Lua, and Python
+-- instrumentTestCoverage :: forall fs l. (CanInstrument fs) => ProgInfo fs -> TermLab fs l -> Annotater (TermLab fs l)
+-- instrumentTestCoverage progInfo t = performCfgInsertions @(StatSort fs) progInfo
+--                                       $ allbuR (addCoverageStatement progInfo) t
+--
+-- ---------------------------------------------------------------------------------
+--
+-- Differences between simplified and real one:
+--
+-- 1) The real one does some work to generate decent IDs for each basic block. The simplified one
+--    needs to generate its own IDs, likely by repurposing the labels on the local node
+--
+-- 2) The real one uses (StateT TestCov) as its inner monad, where TestCov is equivalent to
+--    (Int, LabelGen). The simplified one uses Annotater, presumably defined @Type Annotater = StateT LabelGen@
+--
+
