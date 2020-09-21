@@ -231,13 +231,14 @@ finalizeInsertions insertMap t = foldr (\(InsertionOp p x) r -> r >>= insertAt p
 
 
 performCfgInsertions ::
+  forall l fs m i.
   ( MonadAnnotater Label m
   , InsertAt fs l
   , All HTraversable fs
   , All HFunctor fs
   , All HFoldable fs
-  ) => Proxy l -> ProgInfo fs -> RewriteM (CfgInserterT fs l m) (TermLab fs) i -> RewriteM m (TermLab fs) i
-performCfgInsertions _ proginf f t = do
+  ) => ProgInfo fs -> RewriteM (CfgInserterT fs l m) (TermLab fs) i -> RewriteM m (TermLab fs) i
+performCfgInsertions proginf f t = do
    (t', actions) <- runWriterT (f t)
    s <- execStateT (mapM_ runAction actions) (CfgInsertState Map.empty proginf)
    allbuR (finalizeInsertions (s ^. pendingInsertions)) t'

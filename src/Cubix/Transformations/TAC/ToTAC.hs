@@ -10,6 +10,7 @@
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE TypeFamilies           #-}
@@ -354,7 +355,7 @@ toTAC t = do
    let progInf = makeProgInfo t
    randGen <- getStdGen
 
-   let inserted = performCfgInsertions (Proxy :: Proxy BlockItemL) progInf trans t
+   let inserted = performCfgInsertions @BlockItemL progInf trans t
    let evalled  = evalState (evalRandT inserted randGen) (makeTACState gen (GensymState 0 allIds Map.empty))
    return $ evalState (finalizeGensymNames evalled) (GensymState 0 allIds Map.empty)
   where
