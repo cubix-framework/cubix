@@ -90,8 +90,8 @@ Cubix has many dependencies, several of which are not on Hackage/Stackage, inclu
 # Compilation notes
 
 Because of performance problems in GHC, the full Cubix will not build
-with -O1 or -O2. We've tried on a server with 64GB RAM; the server ran
-out of memory. Instead, use this command:
+with -O1 or -O2 on most machines. We've tried on a server with 64GB RAM; the server ran
+out of memory. We eventually succeeded in building with -O2, but it took a server with over 200GB of RAM. Instead, use this command:
 
     alias stackfastbuild="stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
 
@@ -105,7 +105,7 @@ We found the following two minimal sets of compilation flags that mitigate this 
 If disable everything except CSE and specialise, blow-up still
 occurs. Remains true with -O1
 
-Adding "--flag cubix:only-one-language" to the build command will turn on a compile flag that disables building support for all languages except Lua, the smallest language. This greatly speeds compilation times, to the point where we are able to compile with -O2. Some of the performance reports in cubix/benchmarks/reports were compiled with this flag.
+Adding "--flag cubix:only-one-language" to the build command will turn on a compile flag that disables building support for all languages except Lua, the smallest language. This greatly speeds compilation times, to the point where we are able to compile with -O2 on 2015 MacBook Pro. Some of the performance reports in cubix/benchmarks/reports were compiled with this flag.
 
 # Docker Image
 
