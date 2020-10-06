@@ -15,6 +15,8 @@ module Cubix.ParsePretty(
   , parseLua
   , prettyLua
 
+  , RootSort
+
 #ifndef ONLY_ONE_LANGUAGE
   , parseC
   , parseJava
