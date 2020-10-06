@@ -269,6 +269,9 @@ untransParams params = listToCommaList $ map (untransIdent.paramToIdent) $ extra
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsJSStatement where
   untrans (FunctionDefIsJSStatement (FunctionDef' EmptyFunctionDefAttrs' n params block)) = F.iJSFunction noAnn (untransIdent n) noAnn (untransParams params) noAnn (untranslate $ fromProjF block) semi
 
+instance {-# OVERLAPPING #-} Untrans BlockIsJSBlock where
+  untrans (BlockIsJSBlock (Block' ss _)) = F.iJSBlock noAnn (mapF (untranslate.fromProjF) ss) noAnn
+
 untransError :: (HFunctor f, f :-<: MJSSig) => f MJSTerm l -> F.JSTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJSTerm _))
 
@@ -277,7 +280,7 @@ do ipsNames <- sumToNames ''MJSSig
    let targTs = map ConT $ (ipsNames \\ modNames)
                            \\ [ ''JSBlockIsJSAST, ''MaybeIdentIsJSIdent, ''JSFor, ''BlockIsJSStatement, ''BlockWithPrelude
                               , ''AssignIsJSExpression, ''MultiLocalVarDeclIsJSStatement, ''IdentIsJSExpression
-                              , ''FunctionCallIsJSExpression, ''FunctionDefIsJSStatement]
+                              , ''FunctionCallIsJSExpression, ''FunctionDefIsJSStatement, ''BlockIsJSBlock]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 #endif

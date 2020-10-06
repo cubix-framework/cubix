@@ -51,16 +51,18 @@ import Cubix.Language.Parametric.Syntax as P
 -- to the latter because that's what they should have been in the first place. (Also, strictly speaking, it's still isomorphic
 -- to the original tree; it's just that the grammar's redundant)
 --
-createSortInclusionTypes [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,    ''P.MultiLocalVarDeclL, ''JSExpressionL, ''JSExpressionL, ''JSAssignOpL, ''P.AssignL,      ''P.BlockL,      ''JSStatementL, ''JSBlockL
+createSortInclusionTypes [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,    ''P.MultiLocalVarDeclL, ''JSExpressionL, ''JSExpressionL, ''JSAssignOpL, ''P.AssignL,      ''P.BlockL,      ''JSStatementL, ''JSBlockL, ''P.BlockL
                          ] [
-                           ''JSExpressionL, ''P.LocalVarInitL, ''P.VarDeclBinderL, ''JSStatementL,         ''P.RhsL,        ''P.LhsL,        ''P.AssignOpL, ''JSExpressionL,  ''JSStatementL, ''P.BlockItemL,  ''JSASTL
+                           ''JSExpressionL, ''P.LocalVarInitL, ''P.VarDeclBinderL, ''JSStatementL,         ''P.RhsL,        ''P.LhsL,        ''P.AssignOpL, ''JSExpressionL,  ''JSStatementL, ''P.BlockItemL,  ''JSASTL,   ''JSBlockL
                          ]
 deriveAll [''IdentIsJSExpression, ''JSExpressionIsLocalVarInit, ''JSExpressionIsVarDeclBinder,
            ''MultiLocalVarDeclIsJSStatement, ''JSExpressionIsRhs, ''JSExpressionIsLhs, ''JSAssignOpIsAssignOp,
-           ''AssignIsJSExpression, ''BlockIsJSStatement, ''JSStatementIsBlockItem, ''JSBlockIsJSAST]
-createSortInclusionInfers [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,    ''P.MultiLocalVarDeclL, ''JSExpressionL, ''JSExpressionL, ''JSAssignOpL, ''P.AssignL,     ''P.BlockL,     ''JSStatementL, ''JSBlockL
+           ''AssignIsJSExpression, ''BlockIsJSStatement, ''JSStatementIsBlockItem, ''JSBlockIsJSAST,
+           ''BlockIsJSBlock
+           ]
+createSortInclusionInfers [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,    ''P.MultiLocalVarDeclL, ''JSExpressionL, ''JSExpressionL, ''JSAssignOpL, ''P.AssignL,     ''P.BlockL,     ''JSStatementL, ''JSBlockL, ''P.BlockL
                           ] [
-                            ''JSExpressionL, ''P.LocalVarInitL, ''P.VarDeclBinderL, ''JSStatementL,         ''P.RhsL,        ''P.LhsL,        ''P.AssignOpL, ''JSExpressionL, ''JSStatementL, ''P.BlockItemL, ''JSASTL
+                            ''JSExpressionL, ''P.LocalVarInitL, ''P.VarDeclBinderL, ''JSStatementL,         ''P.RhsL,        ''P.LhsL,        ''P.AssignOpL, ''JSExpressionL, ''JSStatementL, ''P.BlockItemL, ''JSASTL,   ''JSBlockL
                           ]
 
 data MaybeIdentIsJSIdent e l where
@@ -116,7 +118,8 @@ createSortInclusionInfers [ ''FunctionCallL, ''JSExpressionL,     ''JSExpression
 do let jsSortInjections = [''IdentIsJSExpression, ''JSExpressionIsLocalVarInit, ''JSExpressionIsVarDeclBinder,
                            ''MultiLocalVarDeclIsJSStatement, ''JSExpressionIsRhs, ''JSExpressionIsLhs, ''JSAssignOpIsAssignOp,
                            ''AssignIsJSExpression, ''BlockIsJSStatement, ''JSStatementIsBlockItem, ''BlockWithPrelude, ''JSBlockIsJSAST,
-                           ''FunctionCallIsJSExpression, ''JSExpressionIsPositionalArgExp, ''JSExpressionIsFunctionExp, ''FunctionDefIsJSStatement, ''JSBlockIsFunctionBody]
+                           ''FunctionCallIsJSExpression, ''JSExpressionIsPositionalArgExp, ''JSExpressionIsFunctionExp, ''FunctionDefIsJSStatement, ''JSBlockIsFunctionBody,
+                           ''BlockIsJSBlock]
    let names = (jsSigNames \\ [mkName "JSIdent", mkName "JSVarInitializer"])
                     ++ jsSortInjections
                     ++ [''MaybeIdentIsJSIdent, ''JSFor]
