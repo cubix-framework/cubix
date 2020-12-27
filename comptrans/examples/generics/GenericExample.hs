@@ -24,7 +24,7 @@ data Atom e l where
    Var :: String -> Atom e AtomL
    Const :: e LitL -> Atom e AtomL
 
-data Lit (e :: * -> *) l where
+data Lit (e :: M.Family) l where
    Lit :: Int -> Lit e LitL
 
 data MaybeF e l where
