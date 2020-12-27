@@ -19,10 +19,13 @@ import qualified Unsafe.Coerce as U
 import GHC.Types
 
 import Data.Comp.Elem
+import Data.Comp.Multi.Kinds
+
+---------------------------------------------------------------
 
 newtype Alt f (a :: * -> *) e b = Alt (f a e -> b)
 
-newtype Alts (fs :: [(* -> *) -> * -> *]) (a :: * -> *) e b =
+newtype Alts (fs :: Signature) (a :: * -> *) e b =
   Alts (Vector (Alt Any a e b))
 
 alt :: (f a e -> b) -> Alt f a e b

@@ -54,6 +54,7 @@ import Data.Comp.Dict
 import Data.Comp.Elem
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.HFunctor
+import Data.Comp.Multi.Kinds
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
@@ -129,7 +130,7 @@ caseCxt'' _ f (Sum wit v :&: a) =
         annWit = unsafeElem
 
 
-type family DistAnn (fs :: [(* -> *) -> * -> *]) (a :: *) :: [(* -> *) -> * -> *] where
+type family DistAnn (fs :: Signature) (a :: *) :: Signature where
   DistAnn (f ': fs) a = f :&: a ': DistAnn fs a
   DistAnn '[]       _ = '[]
 

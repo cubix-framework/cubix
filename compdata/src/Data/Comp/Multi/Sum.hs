@@ -60,6 +60,7 @@ import Data.Proxy ( Proxy )
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
+import Data.Comp.Multi.Kinds
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Term
 
@@ -120,7 +121,7 @@ projectConst = fmap (hfmap (const (K ()))) . project
 
 -- Used to prevent typechecker from applying the default cases when it shouldn't,
 -- i.e.: it can't use the default case when it only has a type variable for the signature
-type family IsSum (f :: (* -> *) -> * -> *) :: Bool where
+type family IsSum (f :: Node) :: Bool where
   IsSum (Sum fs) = True
   IsSum f        = False
 

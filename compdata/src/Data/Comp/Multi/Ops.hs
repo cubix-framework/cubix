@@ -68,14 +68,16 @@ import Control.Monad
 import Data.Type.Equality
 import Data.Proxy
 import Data.Functor.Identity
+import Data.Comp.Multi.Alt
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
-import Data.Comp.Multi.Alt
+import Data.Comp.Multi.Kinds
 import qualified Data.Comp.Ops as O
 import Data.Comp.Elem
 import Data.Comp.Dict
 
+-------------------------------------------------------------
 
 -- | Data type defining a sum of signatures.
 --
@@ -91,7 +93,7 @@ import Data.Comp.Dict
 --   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
 --   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
 --   and pointer to the value.
-data Sum (fs :: [(* -> *) -> * -> *]) h e where
+data Sum (fs :: Signature) h e where
   Sum :: Elem f fs -> f h e -> Sum fs h e
 
 at :: Elem f fs -> Sum fs a e -> Maybe (f a e)
@@ -142,7 +144,7 @@ instance ( All HTraversable fs
 infixl 5 :<:
 infixl 5 :=:
 
-class (f :: (* -> *) -> * -> *) :<: (g :: (* -> *) -> * -> *) where
+class (f :: Fragment) :<: (g :: Fragment) where
   inj :: f a :-> g a
   proj :: NatM Maybe (g a) (f a)
 
@@ -169,12 +171,12 @@ infixr 7 :&:
 -- signature. Alternatively, this could have also been defined as
 --
 -- @
--- data (f :&: a) (g ::  * -> *) e = f g e :&: a e
+-- data ((f :: Node) :&: a) g e = f g e :&: a e
 -- @
 --
 -- This is too general, however, for example for 'productHHom'.
 
-data (f :&: a) (g ::  * -> *) e = f g e :&: a
+data ((f :: Node) :&: a) g e = f g e :&: a
 
 instance (HFunctor f) => HFunctor (f :&: a) where
     hfmap f (v :&: c) = hfmap f v :&: c
@@ -192,7 +194,7 @@ instance (HTraversable f) => HTraversable (f :&: a) where
     htraverse f (v :&: c) =  (:&: c) <$> (htraverse f v)
     hmapM f (v :&: c) = liftM (:&: c) (hmapM f v)
 
-class RemA (s :: (* -> *) -> * -> *) s' | s -> s'  where
+class RemA (s :: Node) s' | s -> s'  where
     remA :: s a :-> s' a
 
 -- TODO: This is linear
