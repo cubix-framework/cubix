@@ -43,12 +43,12 @@ import Data.Proxy
 
 import GHC.Exts ( Constraint )
 
-import Data.Comp.Multi ( HFix, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
+import Data.Comp.Multi ( Family, Node, HFix, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
 import Data.Comp.Multi.HFoldable ( HFoldable )
 
 --------------------------------------------------------------------------------
 
-class EmptyConstraint (e :: * -> *) l
+class EmptyConstraint (e :: Family) l
 instance EmptyConstraint e l
 
 -- |
@@ -60,7 +60,7 @@ class DynCase f a where
   dyncase :: f b -> Maybe (b :~: a)
 
 -- | An instance @KDynCase f a@ defines an instance @DynCase (HFix f) a@
-class KDynCase (f :: (* -> *) -> * -> *) a where
+class KDynCase (f :: Node) a where
   kdyncase :: f e b -> Maybe (b :~: a)
 
 -- Stop typeclass resolver from using this when it shouldn't

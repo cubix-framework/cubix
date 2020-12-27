@@ -10,6 +10,7 @@
 
 module Data.Comp.Multi.Kinds
     ( Sort
+    , Family
     , Node
     , Fragment
     , Signature
