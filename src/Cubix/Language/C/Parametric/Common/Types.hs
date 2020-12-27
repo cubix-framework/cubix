@@ -25,7 +25,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
+import Data.Comp.Multi ( Node, HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.C.Parametric.Full.Names
@@ -157,7 +157,7 @@ data CDeclaration a
 -- In function decls, since we don't model that void isn't a type,
 -- this becomes just a special case of a normal param, and we don't include it
 data CSpecialParamL
-data CVoidArg (e :: * -> *) l where
+data CVoidArg :: Node where
   CVoidArg :: CVoidArg e CSpecialParamL
 
 -- NOTE: I don't derive these all on one line because GHC crashes
@@ -168,7 +168,7 @@ pattern CVoidArg' :: (CVoidArg :-<: fs, All HFunctor fs) => CxtS h fs a CSpecial
 pattern CVoidArg' <- (project -> Just CVoidArg) where
   CVoidArg' = iCVoidArg
 
-data CVarArgParam (e :: * -> *) l where
+data CVarArgParam :: Node where
   CVarArgParam :: CVarArgParam e CSpecialParamL
 
 deriveAll [''CVarArgParam]

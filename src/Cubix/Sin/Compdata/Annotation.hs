@@ -26,7 +26,7 @@ module Cubix.Sin.Compdata.Annotation (
 import Control.Monad.Identity ( Identity(..) )
 import Control.Monad.Trans ( MonadTrans(..) )
 import Data.Default ( Default(..) )
-import Data.Comp.Multi ( Cxt(..), (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
+import Data.Comp.Multi ( Node, Cxt(..), (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
 import Data.Comp.Multi.Ops ((:&:)(..), Sum (..), contract)
 
@@ -36,7 +36,7 @@ import Data.Type.Equality
 ---- This exists so you can constrain a functor to be annotated without also
 ---- naming the unannotated functor. This makes it more convenient for inclusion
 ---- in constraint synonyms
-class Annotated (f :: (* -> *) -> * -> *) a | f -> a where
+class Annotated (f :: Node) a | f -> a where
   getAnn' :: f e l -> a
 
 instance Annotated (f :&: a) a where
@@ -57,7 +57,7 @@ getAnn :: (Annotated f a) => HFix f :=> a
 getAnn (Term x) = getAnn' x
 
 class (Monad m) => MonadAnnotater a m where
-  annM :: forall f (e :: * -> *) l. f e l -> m ((f :&: a) e l)
+  annM :: forall (f :: Node) e l. f e l -> m ((f :&: a) e l)
 
 newtype AnnotateDefault a x = AnnotateDefault' { runAnnotateDefault' :: Identity x}
   deriving ( Functor, Applicative, Monad )

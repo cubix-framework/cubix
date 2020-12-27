@@ -34,7 +34,7 @@ import qualified Data.Set as Set
 
 import Control.Lens ( makeLenses, (^.), (%=) )
 
-import Data.Comp.Multi ( project, Term )
+import Data.Comp.Multi ( Signature, project, Term )
 import Data.Comp.Multi.Strategic ( Rewrite, alltdR, promoteR, addFail )
 import Data.Comp.Multi.Strategy.Classification ( subterms )
 
@@ -47,7 +47,7 @@ import Cubix.Language.Parametric.InjF
 
 import Cubix.Transformations.Variation
 
-type family SpecialHoistState (fs :: [(* -> *) -> * -> *]) :: *
+type family SpecialHoistState (fs :: Signature) :: *
 
 data HoistState fs = HoistState {
                                  _seenIdents   :: Set String
@@ -256,7 +256,7 @@ instance {-# OVERLAPPABLE #-} SpecialHoist MCSig where
 --
 -- For instance, in Lua, changing "local _ENV = x" to "local _ENV; _ENV = x" will have the effect
 -- of temporarily setting _ENV to nil, which then renders all variables (including "x") inacessible
-class BuiltinSpecialIdents (fs :: [(* -> *) -> * -> *]) where
+class BuiltinSpecialIdents (fs :: Signature) where
   builtinReferencedIdents :: Proxy fs -> Set String
 
 instance {-# OVERLAPPABLE #-} BuiltinSpecialIdents fs where

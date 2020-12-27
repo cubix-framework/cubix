@@ -22,7 +22,7 @@ module Cubix.Language.Python.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Term, project', project, HFunctor, CxtS, All, (:-<:) )
+import Data.Comp.Multi ( Node, Term, project', project, HFunctor, CxtS, All, (:-<:) )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -86,7 +86,7 @@ data PyWithBinder e l where
 -- Extracting out this sort for docstring support
 
 data PyStringLitL
-data PyStringLit (e :: * -> *) l where
+data PyStringLit :: Node where
   PyStrings :: [String] -> PyStringLit e PyStringLitL
   PyUnicodeStrings :: [String] -> PyStringLit e PyStringLitL
   PyByteStrings :: [String] -> PyStringLit e PyStringLitL

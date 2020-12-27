@@ -29,7 +29,7 @@ import qualified Data.Set as Set
 
 import Data.Text ( pack )
 
-import Data.Comp.Multi ( project', ShowHF, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( Signature, project', ShowHF, (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, revAllbuR )
 import Data.Comp.Multi.Strategy.Classification ( caseDyn )
 
@@ -70,7 +70,7 @@ nextBlockId = do
   bb_counter -= 1
   return id
 
-class BlockCounterStart (fs :: [(* -> *) -> * -> *]) where
+class BlockCounterStart (fs :: Signature) where
   blockCounterStart :: Proxy fs -> Int
 
 -- Every language but Lua
@@ -184,7 +184,7 @@ instance {-# OVERLAPPING #-} ExcludeBasicBlock MJavaSig where
       excludeWhile _                                = False
 #endif
 
-class TrustReachability (fs :: [(* -> *) -> * -> *]) where
+class TrustReachability (fs :: Signature) where
   trustReachability :: Proxy fs -> Bool
 
 instance {-# OVERLAPPABLE #-} TrustReachability fs where

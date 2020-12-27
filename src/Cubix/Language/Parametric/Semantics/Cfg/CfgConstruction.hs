@@ -54,7 +54,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (^.), (%=)  )
 
-import Data.Comp.Multi ( Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
+import Data.Comp.Multi ( Node, Signature, Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import Cubix.Language.Info
@@ -63,7 +63,7 @@ import Cubix.Language.Parametric.Syntax.Functor
 
 --------------------------------------------------------------------------------------
 
-type family ComputationSorts (fs :: [(* -> *) -> * -> *]) :: [*]
+type family ComputationSorts (fs :: Signature) :: [*]
 
 class IsComputationSort' fs (l :: [*]) where
   isComputationSort' :: Proxy l -> Term fs i -> Bool
@@ -83,7 +83,7 @@ instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' f
 labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
-type family SuspendedComputationSorts (fs :: [(* -> *) -> * -> *]) :: [*]
+type family SuspendedComputationSorts (fs :: Signature) :: [*]
 
 class IsSuspendedComputationSort' fs (l :: [*]) where
   isSuspendedComputationSort' :: Proxy l -> Term fs i -> Bool
@@ -103,9 +103,9 @@ instance (IsSuspendedComputationSort' fs ls, DynCase (Term fs) l) => IsSuspended
 labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
 
-type family ContainerFunctors (fs :: [(* -> *) -> * -> *]) :: [(* -> *) -> * -> *]
+type family ContainerFunctors (fs :: Signature) :: [Node]
 
-class IsContainer' fs (l :: [(* -> *) -> * -> *])where
+class IsContainer' fs (l :: Signature)where
   isContainer' :: Proxy l -> Term fs i -> Bool
 
 class IsContainer fs where
@@ -304,7 +304,7 @@ instance {-# OVERLAPPING #-} (All (ConstructCfg g s) fs) => ConstructCfg g s (Su
 
 ------------------------------------------------------------------------------------------------------------------------
 
-type family CfgState (f :: [(* -> *) -> * -> *]) :: *
+type family CfgState (fs :: Signature) :: *
 
 class CfgInitState fs where
    cfgInitState :: Proxy fs -> CfgState fs

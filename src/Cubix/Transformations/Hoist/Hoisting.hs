@@ -31,7 +31,7 @@ import Data.Traversable ( for )
 import Control.Lens ( (&), (.~), (%=), (.=), (^.), use, Lens' )
 
 import Data.Constraint ( Dict(..) )
-import Data.Comp.Multi ( HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( Signature, HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
 
 import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM,
                                    promoteR, addFail, tryR, allR, alltdR,
@@ -45,7 +45,7 @@ import Cubix.Language.Parametric.Syntax as P
 import Cubix.Transformations.Hoist.Custom
 import Cubix.Transformations.Variation
 
-class NoConstraint (fs :: [(* -> *) -> * -> *]) where
+class NoConstraint (fs :: Signature) where
 instance NoConstraint fs where
 
 type VarDeclFragment fs = ( SingleLocalVarDecl :-<: fs

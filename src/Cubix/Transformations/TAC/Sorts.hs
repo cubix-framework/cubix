@@ -23,6 +23,7 @@ module Cubix.Transformations.TAC.Sorts (
 import Control.Monad ( MonadPlus )
 import Data.Proxy ( Proxy(..) )
 
+import Data.Comp.Multi ( Signature, Sort )
 import Data.Comp.Multi.Strategic ( GRewriteM, guardedT, guardBoolT, isSortT, isSortR, idR, failR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 
@@ -36,8 +37,8 @@ import Cubix.Language.Python.Parametric.Common as PCommon
 
 --------------------------------------------------------------------------------------
 
-type family ExpressionSort (fs :: [(* -> *) -> * -> *]) :: *
-type family BarrierSorts  (fs :: [(* -> *) -> * -> *]) :: [*]
+type family ExpressionSort (fs :: Signature) :: Sort
+type family BarrierSorts   (fs :: Signature) :: [Sort]
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance ExpressionSort MCSig = CCommon.CExpressionL
@@ -60,7 +61,7 @@ type instance BarrierSorts   MLuaSig = '[LCommon.StatL, LCommon.FunBodyL]
 
 -- Subexp-to-tmp transform will run on all subexps of some "barrier sort" which are not contained in a sub barrier sort
 -- E.g.: Run all all exps in a statement which are not contained in a child statement
-class BarrierCheck' fs (l :: [*]) where
+class BarrierCheck' fs (l :: [Sort]) where
   barrierCheck' :: (MonadPlus m) => Proxy l -> GRewriteM m (TermLab fs)
 
 class BarrierCheck fs where

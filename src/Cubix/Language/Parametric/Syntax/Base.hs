@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -38,27 +39,27 @@ module Cubix.Language.Parametric.Syntax.Base (
   ,        iUnitF
   ) where
 
-import Data.Comp.Multi ( CxtS, All, HFunctor, (:-<:), project)
+import Data.Comp.Multi ( Node, CxtS, All, HFunctor, (:-<:), project)
 
 import Cubix.Language.Parametric.Derive
 
 data BoolL
-data BoolF (e :: * -> *) l where
+data BoolF :: Node where
   BoolF :: Bool -> BoolF e BoolL
 
 data IntL
-data IntF (e :: * -> *) l where
+data IntF :: Node where
   IntF :: Int -> IntF e IntL
 
 data IntegerL
-data IntegerF (e :: * -> *) l where
+data IntegerF :: Node where
   IntegerF :: Integer -> IntegerF e IntegerL
 
 data CharL
-data CharF (e :: * -> *) l where
+data CharF :: Node where
   CharF :: Char -> CharF e CharL
 
-data UnitF (e :: * -> *) l where
+data UnitF :: Node where
   UnitF :: UnitF e ()
 
 
