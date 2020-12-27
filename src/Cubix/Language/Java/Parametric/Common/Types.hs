@@ -25,7 +25,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
+import Data.Comp.Multi ( Node, Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -42,7 +42,7 @@ import Cubix.Language.Parametric.Syntax as P
 ---------------       Variable declarations and blocks     ------------------------
 -----------------------------------------------------------------------------------
 
-data ArrayDimVarDeclAttrs (e :: * -> *) l where
+data ArrayDimVarDeclAttrs :: Node where
   ArrayDimVarDeclAttrs :: Int -> ArrayDimVarDeclAttrs e LocalVarDeclAttrsL
 
 

@@ -99,12 +99,12 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   ,        iEmptyBlockItem
   ) where
 
-import Data.Comp.Multi ( project, project', HFunctor, (:-<:), All, CxtS)
+import Data.Comp.Multi ( Node, project, project', HFunctor, (:-<:), All, CxtS)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 
 data IdentL
-data Ident (e :: * -> *) l where
+data Ident :: Node where
   Ident :: String -> Ident e IdentL
 
 deriveAll [''Ident]
@@ -145,7 +145,7 @@ data LocalVarDeclAttrsL
 -- Needs better name because may need to distinguish part of multi-decl from a standalone decl
 ------ That's a really hypothetical thing. Why, Jimmy, why
 
-data EmptyLocalVarDeclAttrs (e :: * -> *) l where
+data EmptyLocalVarDeclAttrs :: Node where
   EmptyLocalVarDeclAttrs :: EmptyLocalVarDeclAttrs e LocalVarDeclAttrsL
 
 deriveAll [''EmptyLocalVarDeclAttrs]
@@ -218,7 +218,7 @@ pattern SingleLocalVarDecl' x y z <- (project -> (Just (SingleLocalVarDecl x y z
   SingleLocalVarDecl' x y z = iSingleLocalVarDecl x y z
 
 
-data EmptyMultiLocalVarDeclCommonAttrs (e :: * -> *) l where
+data EmptyMultiLocalVarDeclCommonAttrs :: Node where
   EmptyMultiLocalVarDeclCommonAttrs :: EmptyMultiLocalVarDeclCommonAttrs e MultiLocalVarDeclCommonAttrsL
 
 deriveAll [''EmptyMultiLocalVarDeclCommonAttrs]
@@ -266,7 +266,7 @@ pattern MultiLocalVarDecl' x y <- (project -> (Just (MultiLocalVarDecl x y))) wh
 -- where (typeof x)y denotes a type conversion from y to the type of x. We leave it unspecified what
 -- exactly that means
 data AssignOpL
-data AssignOpEquals (e :: * -> *) l where
+data AssignOpEquals :: Node where
   AssignOpEquals :: AssignOpEquals e AssignOpL
 
 deriveAll [''AssignOpEquals]
@@ -313,7 +313,7 @@ data BlockItemL
 data BlockEndL
 data BlockL
 
-data EmptyBlockEnd (e :: * -> *) l where
+data EmptyBlockEnd :: Node where
   EmptyBlockEnd :: EmptyBlockEnd e BlockEndL
 
 deriveAll [''EmptyBlockEnd]
@@ -343,7 +343,7 @@ pattern Block' xs e <- (project -> Just (Block xs e)) where
 -- and so that the sort of empty block-item lists can be correctly determined
 --
 -- This is a bit of a hack....but, it's actually kinda nice in some ways
-data EmptyBlockItem (e :: * -> *) l where
+data EmptyBlockItem :: Node where
   EmptyBlockItem :: EmptyBlockItem e BlockItemL
 
 deriveAll [''EmptyBlockItem]

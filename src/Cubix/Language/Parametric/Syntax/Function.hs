@@ -1,4 +1,4 @@
-
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -92,7 +92,7 @@ module Cubix.Language.Parametric.Syntax.Function (
 
   ) where
 
-import Data.Comp.Multi (CxtS,project, (:-<:), HFunctor, All )
+import Data.Comp.Multi (Node, CxtS,project, (:-<:), HFunctor, All )
 
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax.VarDecl
@@ -133,7 +133,7 @@ pattern FunctionCall' ::
 pattern FunctionCall' a e args <- (project -> Just (FunctionCall a e args)) where
   FunctionCall' a e args = iFunctionCall a e args
 
-data EmptyFunctionCallAttrs (e :: * -> *) l where
+data EmptyFunctionCallAttrs :: Node where
   EmptyFunctionCallAttrs :: EmptyFunctionCallAttrs e FunctionCallAttrsL
 
 deriveAll [''EmptyFunctionCallAttrs]
@@ -156,7 +156,7 @@ pattern FunctionIdent' n <- (project -> Just (FunctionIdent n)) where
 --     it's at the front of the list if exists.
 -- * Positional and receiver args are before other args
 data FunctionArgumentL
-data FunctionArgumentList e l where
+data FunctionArgumentList :: Node where
   FunctionArgumentList :: e [FunctionArgumentL] -> FunctionArgumentList e FunctionArgumentsL
 
 deriveAll [''FunctionArgumentList]
@@ -176,7 +176,7 @@ pattern ReceiverArg' x <- (project -> Just (ReceiverArg x)) where
   ReceiverArg' x = iReceiverArg x
 
 data PositionalArgExpL
-data PositionalArgument e l where
+data PositionalArgument :: Node where
   PositionalArgument :: e PositionalArgExpL -> PositionalArgument e FunctionArgumentL
 
 deriveAll [''PositionalArgument]
@@ -203,7 +203,7 @@ pattern FunctionDecl' :: (FunctionDecl :-<: fs, All HFunctor fs) => CxtS h fs a 
 pattern FunctionDecl' a n ps <- (project -> (Just (FunctionDecl a n ps))) where
   FunctionDecl' a n ps = iFunctionDecl a n ps
 
-data EmptyFunctionDeclAttrs (e :: * -> *) l where
+data EmptyFunctionDeclAttrs :: Node where
   EmptyFunctionDeclAttrs :: EmptyFunctionDeclAttrs e FunctionDeclAttrsL
 
 deriveAll [''EmptyFunctionDeclAttrs]
@@ -212,7 +212,7 @@ pattern EmptyFunctionDeclAttrs' :: (EmptyFunctionDeclAttrs :-<: fs, All HFunctor
 pattern EmptyFunctionDeclAttrs' <- (project -> Just EmptyFunctionDeclAttrs) where
   EmptyFunctionDeclAttrs' = iEmptyFunctionDeclAttrs
 
-data SelfParameterDecl (e :: * -> *) l where
+data SelfParameterDecl :: Node where
   SelfParameterDecl :: SelfParameterDecl e FunctionParameterDeclL
 
 deriveAll [''SelfParameterDecl]
@@ -276,7 +276,7 @@ pattern FunctionDef' ::
 pattern FunctionDef' attrs i args body <- (project -> Just (FunctionDef attrs i args body)) where
   FunctionDef' attrs i args body = iFunctionDef attrs i args body
 
-data EmptyFunctionDefAttrs (e :: * -> *) l where
+data EmptyFunctionDefAttrs :: Node where
   EmptyFunctionDefAttrs :: EmptyFunctionDefAttrs e FunctionDefAttrsL
 
 deriveAll [''EmptyFunctionDefAttrs]
@@ -285,7 +285,7 @@ pattern EmptyFunctionDefAttrs' :: (EmptyFunctionDefAttrs :-<: fs, All HFunctor f
 pattern EmptyFunctionDefAttrs' <- (project -> Just EmptyFunctionDefAttrs) where
   EmptyFunctionDefAttrs' = iEmptyFunctionDefAttrs
 
-data SelfParameter (e :: * -> *) l where
+data SelfParameter :: Node where
   SelfParameter :: SelfParameter e FunctionParameterL
 
 deriveAll [''SelfParameter]
@@ -305,7 +305,7 @@ pattern PositionalParameter' ::
 pattern PositionalParameter' attrs i <- (project -> Just (PositionalParameter attrs i)) where
   PositionalParameter' attrs i = iPositionalParameter attrs i
 
-data EmptyParameterAttrs (e :: * -> *) l where
+data EmptyParameterAttrs :: Node where
   EmptyParameterAttrs :: EmptyParameterAttrs e ParameterAttrsL
 
 deriveAll [''EmptyParameterAttrs]

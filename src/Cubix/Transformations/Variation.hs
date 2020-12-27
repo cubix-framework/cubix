@@ -34,7 +34,7 @@ module Cubix.Transformations.Variation (
 import Data.Proxy ( Proxy )
 import Data.Constraint ( Dict(..) )
 
-import Data.Comp.Multi ( (:-<:), CxtS, (:&:), Sum )
+import Data.Comp.Multi ( Node, Signature, Sort, (:-<:), CxtS, (:&:), Sum )
 
 import Cubix.Language.C.Parametric.Common
 import Cubix.Language.Java.Parametric.Common
@@ -44,7 +44,7 @@ import Cubix.Language.Python.Parametric.Common as P
 
 import Cubix.Language.Parametric.InjF
 
-type family StatSort (fs :: [(* -> *) -> * -> *]) :: *
+type family StatSort (fs :: Signature) :: Sort
 
 #ifndef ONLY_ONE_LANGUAGE
 type instance StatSort MCSig      = BlockItemL
@@ -76,12 +76,12 @@ instance DefaultMultiLocalVarDeclCommonAttrs MJSSig where
 type ContainsSingleDec fs = (SingleLocalVarDecl :-<: fs, OptLocalVarInit :-<: fs)
 
 -- Using this to add to MultiDecInsertion/SingleDecInsertion is an ugly hack
-type family StripAnn (f :: (* -> *) -> * -> *) :: (* -> *) -> * -> * where
+type family StripAnn (f :: Node) :: Node where
   StripAnn (f :&: a) = f
   StripAnn (Sum fs)  = Sum (StripAnnList fs)
   StripAnn x         = x
 
-type family StripAnnList (fs :: [(* -> *) -> * -> *]) :: [(* -> *) -> * -> *] where
+type family StripAnnList (fs :: [Node]) :: [Node] where
   StripAnnList (f ': fs) = StripAnn f ': StripAnnList fs
   StripAnnList '[]       = '[]
 

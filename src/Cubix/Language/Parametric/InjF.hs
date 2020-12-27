@@ -32,7 +32,7 @@ import Control.Monad ( MonadPlus(..), liftM )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
-import Data.Comp.Multi ( Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable )
+import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewriteM )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
@@ -105,13 +105,13 @@ injectFAnnDef =  injFAnnDef . inject
 --------------------------------------------------------------------------------
 
 
-type family InjectableSorts (sig :: [(* -> *) -> * -> *]) (sort :: *) :: [*]
+type family InjectableSorts (fs :: Signature) (l :: Sort) :: [Sort]
 
 -- NOTE: There should be some way to express this in terms of the Lens library
 class AInjF fs l where
   ainjF :: (MonadAnnotater Label m) => TermLab fs l' -> Maybe (TermLab fs l, TermLab fs l -> m (TermLab fs l'))
 
-class AInjF' fs l (is :: [*]) where
+class AInjF' fs l (is :: [Sort]) where
   ainjF' :: (MonadAnnotater Label m) => Proxy is -> TermLab fs l' -> Maybe (TermLab fs l, TermLab fs l -> m (TermLab fs l'))
 
 instance AInjF' fs l '[] where

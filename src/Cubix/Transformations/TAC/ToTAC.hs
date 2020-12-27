@@ -36,7 +36,7 @@ import Control.Lens ( (&), (%~), (^.), (.~), makeLenses, view)
 import Control.Monad.Random ( MonadRandom, RandT, evalRandT )
 import Data.Constraint ( Dict(..) )
 
-import Data.Comp.Multi ( Cxt(..), project', EqHF, E(..), stripA, (:&:)(..), HTraversable, ShowHF, inject', (:-<:), All, HFoldable )
+import Data.Comp.Multi ( Signature, Cxt(..), project', EqHF, E(..), stripA, (:&:)(..), HTraversable, ShowHF, inject', (:-<:), All, HFoldable )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, allbuR, allStateR, dynamicR,
            tryR, (<+), idR, guardedT, failR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms, caseE )
@@ -156,7 +156,7 @@ instance (DefaultMultiLocalVarDeclCommonAttrs fs, InjF fs (ExpressionSort fs) Lo
 class    (DefaultLocalVarDeclAttrs fs, InjF fs (ExpressionSort fs) LocalVarInitL, InjF fs IdentL VarDeclBinderL) => ExtraSingleVarDeclConstraints fs
 instance (DefaultLocalVarDeclAttrs fs, InjF fs (ExpressionSort fs) LocalVarInitL, InjF fs IdentL VarDeclBinderL) => ExtraSingleVarDeclConstraints fs
 
-type CanTransTAC (fs :: [(* -> *) -> * -> *]) =
+type CanTransTAC (fs :: Signature) =
       ( DynCase (TermLab fs) (ExpressionSort fs)
       , DynCase (TermLab fs) (StatSort fs)
       , DynCase (TermLab fs) AssignL

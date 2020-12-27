@@ -24,7 +24,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Term, project', AnnTerm, (:-<:), All, HFunctor, project, CxtS, AnnCxtS )
+import Data.Comp.Multi ( Node, Term, project', AnnTerm, (:-<:), All, HFunctor, project, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -85,7 +85,7 @@ data LuaFunctionAttrs e l where
 
 deriveAll [''LuaFunctionAttrs]
 
-data LuaVarArgsParam (e :: * -> *) l where
+data LuaVarArgsParam :: Node where
   LuaVarArgsParam :: LuaVarArgsParam e FunctionParameterL
 
 deriveAll [''LuaVarArgsParam]

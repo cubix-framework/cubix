@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 {-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE GADTs                  #-}
@@ -30,7 +31,7 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.Proxy
 
-import Data.Comp.Multi ( Cxt(..), Term, Sum, All, unTerm, ContextS, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
+import Data.Comp.Multi ( Node, Cxt(..), Term, Sum, All, unTerm, ContextS, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
 import Data.Comp.Multi.Strategic ( Translate, crushtdT, addFail, promoteTF )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms )
 
@@ -162,7 +163,7 @@ instance RenderGuard MLuaSig where -- handle the insertF
 data ShouldHoist = ShouldHoist | ShouldntHoist | StopHoisting
   deriving ( Eq, Ord, Show )
 
-class ShouldHoistSelf' gs (f :: (* -> *) -> * -> *) where
+class ShouldHoistSelf' gs (f :: Node) where
   shouldHoistSelf' :: f (Term gs) l -> Maybe ShouldHoist
 
 instance {-# OVERLAPPABLE #-} ShouldHoistSelf' gs f where
