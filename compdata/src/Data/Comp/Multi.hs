@@ -24,6 +24,7 @@ module Data.Comp.Multi (
   , module Data.Comp.Multi.HFoldable
   , module Data.Comp.Multi.HFunctor
   , module Data.Comp.Multi.HTraversable
+  , module Data.Comp.Multi.Kinds
   , module Data.Comp.Multi.Ops
   , module Data.Comp.Multi.Ordering
   , module Data.Comp.Multi.Show
@@ -39,6 +40,7 @@ import Data.Comp.Multi.Generic
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
+import Data.Comp.Multi.Kinds
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Ordering
 import Data.Comp.Multi.Show

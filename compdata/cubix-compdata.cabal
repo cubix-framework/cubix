@@ -28,6 +28,7 @@ library
                         Data.Comp.Ops
 
                         Data.Comp.Multi
+                        Data.Comp.Multi.Kinds
                         Data.Comp.Multi.Term
                         Data.Comp.Multi.Sum
                         Data.Comp.Multi.HFunctor

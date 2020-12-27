@@ -1,4 +1,5 @@
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable         #-}
 {-# LANGUAGE DeriveFoldable            #-}
 {-# LANGUAGE DeriveFunctor             #-}
@@ -14,7 +15,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.HFunctor
--- Copyright   :  (c) 2011 Patrick Bahr
+-- Copyright   :  Original (c) 2011 Patrick Bahr; modifications (c) 2020 James Koppel
 -- License     :  BSD3
 -- Maintainer  :  Patrick Bahr <paba@diku.dk>
 -- Stability   :  experimental
@@ -43,6 +44,7 @@ module Data.Comp.Multi.HFunctor
      ) where
 
 import Data.Functor.Compose
+import Data.Comp.Multi.Kinds
 
 -- | The identity Functor.
 newtype I a = I {unI :: a} deriving (Functor, Foldable, Traversable)
@@ -111,6 +113,6 @@ instance (Functor f) => HFunctor (Compose f) where hfmap f (Compose xs) = Compos
 infixl 5 :.:
 
 -- | This data type denotes the composition of two functor families.
-data (:.:) f (g :: (* -> *) -> (* -> *)) (e :: * -> *) t = Comp (f (g e) t)
+data (:.:) (f :: Node) (g :: Node) e t = Comp (f (g e) t)
 
 newtype HMonad m f i = HMonad { unHMonad :: m (f i) }

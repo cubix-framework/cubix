@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
@@ -93,6 +94,7 @@ module Data.Comp.Multi.Algebra (
 import Control.Monad
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
+import Data.Comp.Multi.Kinds
 import Data.Comp.Multi.Term
 import Data.Comp.Ops
 
@@ -164,7 +166,7 @@ cataM' f = run
 
 
 -- | This type represents uniform signature function specification.
-type SigFun f g = forall (a :: * -> *). f a :-> g a
+type SigFun f g = forall a. (f :: Fragment) a :-> g a
 
 -- | This type represents context function.
 type CxtFun f g = forall h . SigFun (Cxt h f) (Cxt h g)
