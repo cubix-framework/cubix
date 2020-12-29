@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -29,9 +30,11 @@ module Data.Comp.Dict
        , withDict
        , (\\)
        , dictFor
+       , mapAll
        ) where
 
 import GHC.Exts
+import Data.Proxy ( Proxy(..) )
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Unsafe.Coerce as U
@@ -99,4 +102,28 @@ dictFor (Elem v) =
        E d -> U.unsafeCoerce d
 {-# INLINE dictFor #-}
 
-
+-- | Lifts a mapping from type to value (k -> *) -> a into
+--   a mapping from list of types to list of values [(k -> *)] -> [a]
+--
+-- Example usage:
+--
+-- @
+-- class TypeNum f where
+--  typeNum :: Proxy f -> Int
+--
+-- instance TypeNum [] where
+--   typeNum _ = 0
+--
+-- instance TypeNum Maybe where
+--   typeNum _ = 1
+--
+-- test = mapAll @TypeNum @'[[], Maybe] typeNum
+-- @
+--
+-- For commentary no why Proxy is needed in the polymorphic argument,
+-- see https://stackoverflow.com/questions/65488453/preventing-premature-monomorphization-of-constrained-polymorphic-values
+mapAll :: forall cxt fs a. (All cxt fs) => (forall f. cxt f => Proxy f -> a) -> [a]
+mapAll v = [useDict d | E d <- dicts (proxy# :: Proxy# fs)]
+  where
+    useDict :: forall g. Dict cxt g -> a
+    useDict d = withDict d (v $ Proxy @g)
