@@ -28,7 +28,7 @@ import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, fsnd, project, proj, E(.
 import Cubix.Language.Info
 
 import Cubix.Language.C.Parametric.Common.Types as C
-import Cubix.Language.C.Parametric.Full.Types as F
+import Cubix.Language.C.Parametric.Full.Types as F hiding (CFor)
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
@@ -170,8 +170,6 @@ instance ConstructCfg MCSig CCfgState CStatement where
   constructCfg (collapseFProd' -> (t :*: (CBreak _))) = HState $ constructCfgBreak t
   constructCfg (collapseFProd' -> (t :*: (CReturn e _))) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
-  constructCfg (collapseFProd' -> (t :*: (CFor init cond step body _))) = HState $ constructCfgFor t (extractForInit init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
-
   constructCfg (collapseFProd' -> (t :*: (CSwitch exp body _))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
@@ -216,6 +214,10 @@ instance ConstructCfg MCSig CCfgState CStatement where
             project0 (Term (s :&: l)) = fmap (:&: l) (proj s)
 
   constructCfg t = constructCfgDefault t
+
+instance ConstructCfg MCSig CCfgState CFor where
+  constructCfg (collapseFProd' -> (t :*: (CFor init cond step body))) = HState $ constructCfgFor t (Just <$> unHState init) (extractEEPMaybe $ unHState cond) (extractEEPMaybe $ unHState step) (unHState body)
+
 
 instance ConstructCfg MCSig CCfgState CExpression where
   constructCfg t'@(remA -> (CBinary (op :*: _) _ _ _)) = do

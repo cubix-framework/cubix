@@ -88,6 +88,10 @@ containsStatic = getAny . runIdentity . (crushtdT $ promoteTF $ addFail isStatic
     isStatic (project -> Just (F.CStatic _)) = return $ Any True
     isStatic _                               = return $ Any False
 
+transMultiDec :: F.CTerm F.CDeclarationL -> MCTerm MultiLocalVarDeclL
+transMultiDec (project -> Just (F.CDecl specs single_decs _)) =
+        MultiLocalVarDecl' (injF $ translate specs) (mapF transSingleDec single_decs)
+
 instance {-# OVERLAPPING #-} Trans F.CCompoundBlockItem where
   trans t@(F.CBlockStmt _)    = transDefault t
   trans t@(F.CNestedFunDef _) = transDefault t
@@ -95,9 +99,7 @@ instance {-# OVERLAPPING #-} Trans F.CCompoundBlockItem where
     if containsStatic decl then
       transDefault t
     else
-      injF $ MultiLocalVarDecl' (injF $ translate specs) (mapF transSingleDec single_decs)
-    where
-      Just (F.CDecl specs single_decs _) = project decl
+      injF $ transMultiDec decl
 
 transOp :: F.CTerm F.CAssignOpL -> MCTerm AssignOpL
 transOp (project -> Just F.CAssignOp) = AssignOpEquals'
@@ -111,9 +113,15 @@ instance {-# OVERLAPPING #-} Trans F.CExpression where
   trans t@(F.CCall f args _)       = iFunctionCall EmptyFunctionCallAttrs' (injF $ translate f) (translateArgs args)
   trans t                          = transDefault t
 
+transForInit :: F.CTerm (Either (Maybe F.CExpressionL) F.CDeclarationL) -> MCTerm CForInitL
+transForInit (Left' Nothing')  = iCForInitEmpty
+transForInit (Left' (Just' e)) = iCForInitExp $ translate e
+transForInit (Right' dec)      = iCForInitDecl $ transMultiDec dec
+
 instance {-# OVERLAPPING #-} Trans F.CStatement where
-  trans t@(F.CCompound ids items _) = iCLabeledBlock (mapF transIdent ids) (Block' (mapF (injF.translate) items) EmptyBlockEnd')
-  trans t                           = transDefault t
+  trans t@(F.CCompound ids items _)        = iCLabeledBlock (mapF transIdent ids) (Block' (mapF (injF.translate) items) EmptyBlockEnd')
+  trans t@(F.CFor init cond update body _) = iCFor (transForInit init) (translate cond) (translate update) (translate body)
+  trans t                                  = transDefault t
 
 paramDeclFromId :: F.CTerm F.IdentL -> MCTerm FunctionParameterDeclL
 paramDeclFromId n = PositionalParameterDeclOptionalIdent' (iCFunParamAttrs NilF' NilF' Nothing' NilF') (Just' $ transIdent n)
@@ -199,11 +207,11 @@ untransSingleDec (SingleLocalVarDecl' attrs id init) = riTripleF (Just' declarat
       NoLocalVarInit'     -> Nothing'
       JustLocalVarInit' x -> Just' $ untranslate $ fromProjF x
 
+untransMultiDec :: MCTerm MultiLocalVarDeclL -> F.CTerm F.CDeclarationL
+untransMultiDec (MultiLocalVarDecl' attrs decls) = F.iCDecl (untranslate $ fromProjF attrs) (mapF untransSingleDec decls) iUnitF
+
 instance {-# OVERLAPPING #-} Untrans MultiLocalVarDeclIsCCompoundBlockItem where
-  untrans (MultiLocalVarDeclIsCCompoundBlockItem (MultiLocalVarDecl' attrs decls)) = decl
-    where
-      decl = F.iCBlockDecl declaration
-      declaration = F.iCDecl (untranslate $ fromProjF attrs) (mapF untransSingleDec decls) iUnitF
+  untrans (MultiLocalVarDeclIsCCompoundBlockItem dec) = F.iCBlockDecl $ untransMultiDec dec
 
 untransOp :: MCTerm AssignOpL -> F.CTerm F.CAssignOpL
 untransOp AssignOpEquals' = F.iCAssignOp
@@ -214,6 +222,14 @@ instance {-# OVERLAPPING #-} Untrans AssignIsCExpression where
 
 instance {-# OVERLAPPING #-} Untrans CLabeledBlock where
   untrans (CLabeledBlock ids (Block' items _)) = F.iCCompound (mapF untransIdent ids) (mapF (untranslate.fromProjF) items) iUnitF
+
+untransForInit :: MCTerm CForInitL -> F.CTerm (Either (Maybe F.CExpressionL) F.CDeclarationL)
+untransForInit (project -> Just CForInitEmpty)      = Left' Nothing'
+untransForInit (project -> Just (CForInitExp  e))   = Left' (Just' $ untranslate e)
+untransForInit (project -> Just (CForInitDecl dec)) = Right' $ untransMultiDec dec
+
+instance {-# OVERLAPPING #-} Untrans CFor where
+  untrans (CFor init cond update body) = F.iCFor (untransForInit init) (untranslate cond) (untranslate update) (untranslate body) iUnitF
 
 untranslateArg :: MCTerm FunctionArgumentL -> F.CTerm F.CExpressionL
 untranslateArg (PositionalArgument' a) = untranslate $ fromProjF a
@@ -271,7 +287,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :
 
 do ipsNames <- sumToNames ''MCSig
    modNames <- sumToNames ''F.CSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''CLabeledBlock, ''AssignIsCExpression, ''MultiLocalVarDeclIsCCompoundBlockItem, ''IdentIsIdent
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''CLabeledBlock, ''CFor, ''AssignIsCExpression, ''MultiLocalVarDeclIsCCompoundBlockItem, ''IdentIsIdent
                                                      , ''FunctionCallIsCExpression, ''FunctionDeclIsCDeclarator, ''FunctionDefIsCFunctionDef]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
