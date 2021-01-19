@@ -120,7 +120,7 @@ dictFor (Elem v) =
 -- test = mapAll @TypeNum @'[[], Maybe] typeNum
 -- @
 --
--- For commentary no why Proxy is needed in the polymorphic argument,
+-- For commentary on why Proxy is needed in the polymorphic argument,
 -- see https://stackoverflow.com/questions/65488453/preventing-premature-monomorphization-of-constrained-polymorphic-values
 mapAll :: forall cxt fs a. (All cxt fs) => (forall f. cxt f => Proxy f -> a) -> [a]
 mapAll v = [useDict d | E d <- dicts (proxy# :: Proxy# fs)]
