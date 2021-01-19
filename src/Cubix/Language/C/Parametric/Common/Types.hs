@@ -72,6 +72,21 @@ data CLabeledBlock e l where
 
 deriveAll [''CLabeledBlock]
 
+-----------------------------------------------------------------------------------
+------------------------       Control-flow     -----------------------------------
+-----------------------------------------------------------------------------------
+
+data CForInitL
+
+data CForInit e l where
+  CForInitEmpty ::                         CForInit e CForInitL
+  CForInitExp   :: e CExpressionL       -> CForInit e CForInitL
+  CForInitDecl  :: e MultiLocalVarDeclL -> CForInit e CForInitL
+
+data CFor e l where
+  CFor :: e CForInitL -> e (Maybe CExpressionL) -> e (Maybe CExpressionL) -> e CStatementL -> CFor e CStatementL
+
+deriveAll [''CForInit, ''CFor]
 
 -----------------------------------------------------------------------------------
 ---------------       Function calls, decls, defns         ------------------------
@@ -278,7 +293,8 @@ do let cSortInjections = [ ''CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttr
                          , ''FunctionDefIsCFunctionDef, ''CFunParamAttrsIsParameterAttrs, ''CSpecialParamIsFunctionParameter, ''COldStyleParamIsFunctionParameter
                          , ''CStatementIsFunctionBody
                          ]
-   let cNewNodes       = [''CLocalVarAttrs, ''CLabeledBlock, ''CVoidArg, ''CVarArgParam, ''COldStyleParam, ''CFunDeclAttrs, ''CFunDefAttrs, ''CFunParamAttrs]
+   let cNewNodes       = [ ''CLocalVarAttrs, ''CLabeledBlock, ''CVoidArg, ''CVarArgParam, ''COldStyleParam, ''CFunDeclAttrs
+                         , ''CFunDefAttrs, ''CFunParamAttrs, ''CForInit, ''CFor]
    let names = (cSigNames \\ [mkName "Ident", mkName "CFunctionDef"])
                           ++ cSortInjections
                           ++ cNewNodes

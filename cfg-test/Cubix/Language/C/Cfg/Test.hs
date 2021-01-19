@@ -244,14 +244,19 @@ instance AssertCfgWellFormed MCSig CStatement where
     assertCfgBreak (inject' t)
   assertCfgWellFormed t@(remA -> CReturn e _) =
     assertCfgReturn (inject' t) (S.extractF e)
-  assertCfgWellFormed t@(remA -> CFor init cond step body _) = do
-    inits0 <- inits
-    assertCfgFor (inject' t) inits0 (S.extractF cond) (S.extractF step) (extractBlock body)
-    where inits = subtermWithCfg (inject' t) init            
   assertCfgWellFormed t@(remA -> CSwitch exp body _) =
     assertCfgSwitch (inject' t) exp (extractBlock body)
   assertCfgWellFormed t@(remA -> CAsm stmt _) = assertCfgIsGenericAuto (inject' t) [E stmt]
-  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)    
+  assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
+
+instance AssertCfgWellFormed MCSig CForInit
+
+instance AssertCfgWellFormed MCSig CFor where
+  assertCfgWellFormed t@(remA -> CFor init cond step body) = do
+    inits0 <- inits
+    assertCfgFor (inject' t) inits0 (S.extractF cond) (S.extractF step) (extractBlock body)
+    where inits = subtermWithCfg (inject' t) init
+
 assertCfgSwitch ::
   ( MonadTest m
   , MonadReader (Cfg MCSig) m
