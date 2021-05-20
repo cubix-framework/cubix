@@ -275,10 +275,12 @@ f >+> g = unwrapAnyR (wrapAnyR f >=> wrapAnyR g)
 (<+) f g x = f x <|> g x
 
 -- | Applies a rewrite to all immediate subterms of the current term, succeeding if any succeed
+--   Ignores holes.
 anyR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> RewriteM m (Cxt h f a) l
 anyR f = unwrapAnyR $ allR $ wrapAnyR f -- not point-free because of type inference
 
 -- | Applies a rewrite to the first immediate subterm of the current term where it can succeed
+--   Ignores holes.
 oneR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> RewriteM m (Cxt h f a) l
 oneR f = unwrapOneR $ allR $ wrapOneR f -- not point-free because of type inference
 
@@ -286,6 +288,7 @@ oneR f = unwrapOneR $ allR $ wrapOneR f -- not point-free because of type infere
 --   @
 --       allbuR f = `allR` (allbuR f) >=> f
 --   @
+--   Ignores holes.
 allbuR :: (Monad m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 allbuR f = allR (allbuR f) >=> f
 
@@ -298,6 +301,8 @@ revAllbuR f = revAllR (revAllbuR f) >=> f
 --   @
 --       alltdR f = f >=> allR (alltdR f)
 --   @
+--
+--   Ignores holes.
 alltdR :: (Monad m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 alltdR f = f >=> allR (alltdR f)
 
@@ -305,6 +310,8 @@ alltdR f = f >=> allR (alltdR f)
 --    @
 --      anybuR f = anyR (anybuR f) >+> f
 --    @
+--
+--   Ignores holes.
 anybuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 anybuR f = anyR (anybuR f) >+> f
 
@@ -319,10 +326,13 @@ anytdR f = f >+> anyR (anytdR f)
 --    @
 --       prunetdRF f = f <+ anyR (prunetdRF f)
 --    @
+--
+--   Ignores holes.
 prunetdRF :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 prunetdRF f = f <+ anyR (prunetdRF f)
 
 -- | Like `prunetdRF`, but the outer level always succeeds. Defined @`tryR` . `prunetdRF`@
+--   Ignores holes.
 prunetdR :: (Monad m, HTraversable f) => GRewriteM (MaybeT m) (Cxt h f a) -> GRewriteM m (Cxt h f a)
 prunetdR f = tryR (prunetdRF f)
 
@@ -330,6 +340,8 @@ prunetdR f = tryR (prunetdRF f)
 --    @
 --      onebuR f = oneR (onebuR f) <+ f
 --    @
+--
+--   Ignores holes.
 onebuR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 onebuR f = oneR (onebuR f) <+ f
 
@@ -337,6 +349,8 @@ onebuR f = oneR (onebuR f) <+ f
 --    @
 --      onetdR f = f <+ oneR (onetdR f)
 --    @
+-- 
+--   Ignores holes.
 onetdR :: (MonadPlus m, HTraversable f) => GRewriteM m (Cxt h f a) -> GRewriteM m (Cxt h f a)
 onetdR f = f <+ oneR (onetdR f)
 
