@@ -1,15 +1,18 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide #-}
+
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE KindSignatures           #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE PartialTypeSignatures    #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE ViewPatterns             #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 module Cubix.Language.Lua.Parametric.Common.Trans (
     translate
@@ -19,12 +22,12 @@ module Cubix.Language.Lua.Parametric.Common.Trans (
 import Data.List( (\\) )
 import Data.Maybe ( fromJust )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
-
+import Data.Proxy
 import Data.Text ( pack, unpack )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), (:+:), caseH, HFunctor(..), (:&:) )
+import Data.Comp.Multi ( project, inject, unTerm, (:-<:), Sum, All, caseCxt
+                       , HFunctor(..) )
 
-import Cubix.Language.Info
 import Cubix.Language.Lua.Parametric.Common.Types
 import qualified Cubix.Language.Lua.Parametric.Full as F
 import Cubix.Language.Parametric.Derive
@@ -37,13 +40,13 @@ translate = trans . unTerm
 class Trans f where
   trans :: f F.LuaTerm l -> MLuaTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MLuaSig, f :<: F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
+transDefault :: (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MLuaSig, f :<: F.LuaSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => Trans f where
   trans = transDefault
 
 transIdent :: F.LuaTerm F.NameL -> MLuaTerm IdentL
@@ -120,13 +123,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MLuaTerm l -> F.LuaTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
+untransDefault :: (HFunctor f, f :-<: F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.LuaSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.LuaSig) => Untrans f where
   untrans = untransDefault
 
 untransIdent :: MLuaTerm IdentL -> F.LuaTerm F.NameL
@@ -157,13 +160,12 @@ instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsFunCall where
   untrans (FunctionCallIsFunCall (FunctionCall' EmptyFunctionCallAttrs' f args)) =
       case receiver of
-        Nothing -> F.iNormalFunCall (fromJust fun) fa
+        Nothing -> F.iNormalFunCall (getFunPE f) fa
         Just r  -> F.iMethodCall (fromJust receiver) (fromJust funNm) fa
     where
-      fun :: Maybe (F.LuaTerm F.PrefixExpL)
-      fun = case project f of
-              Just (PrefixExpIsFunctionExp x) -> Just (untranslate x)
-              _                               -> Nothing
+      getFunPE :: MLuaTerm FunctionExpL -> F.LuaTerm F.PrefixExpL
+      getFunPE (project -> Just (PrefixExpIsFunctionExp x)) = untranslate x
+      getFunPE (project -> Just (FunctionIdent n))          = F.iPEVar $ F.iVarName $ injF $ untransIdent n
 
       funNm :: Maybe (F.LuaTerm F.NameL)
       funNm = case project f of
@@ -232,7 +234,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStat where
                    | otherwise = l
 
 
-untransError :: (HFunctor f, f :<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
+untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))
 
 do ipsNames <- sumToNames ''MLuaSig

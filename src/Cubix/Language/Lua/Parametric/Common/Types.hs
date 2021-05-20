@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -22,7 +24,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:), AnnTerm, (:<:), HFunctor, project )
+import Data.Comp.Multi ( Node, Term, project', AnnTerm, (:-<:), All, HFunctor, project, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -83,22 +85,22 @@ data LuaFunctionAttrs e l where
 
 deriveAll [''LuaFunctionAttrs]
 
-data LuaVarArgsParam (e :: * -> *) l where
+data LuaVarArgsParam :: Node where
   LuaVarArgsParam :: LuaVarArgsParam e FunctionParameterL
 
 deriveAll [''LuaVarArgsParam]
 
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
-pattern LuaFunctionDefinedObj' :: () => (LuaFunctionDefinedObj :<: f, HFunctor f) => Cxt h f a [P.IdentL] -> Cxt h f a LuaFunctionDefinedObjL
+pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :-<: fs, All HFunctor fs) => CxtS h fs a [P.IdentL] -> CxtS h fs a LuaFunctionDefinedObjL
 pattern LuaFunctionDefinedObj' nms <- (project -> Just (LuaFunctionDefinedObj nms)) where
   LuaFunctionDefinedObj' nms = iLuaFunctionDefinedObj nms
 
-pattern LuaFunctionAttrs' :: () => (LuaFunctionAttrs :<: f, HFunctor f) => Cxt h f a LuaFunctionDefinedObjL -> Cxt h f a FunctionDefAttrsL
+pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :-<: fs, All HFunctor fs) => CxtS h fs a LuaFunctionDefinedObjL -> CxtS h fs a FunctionDefAttrsL
 pattern LuaFunctionAttrs' o <- (project -> Just (LuaFunctionAttrs o)) where
   LuaFunctionAttrs' o = iLuaFunctionAttrs o
 
-pattern LuaVarArgsParam' :: () => (LuaVarArgsParam :<: f, HFunctor f) => Cxt h f a FunctionParameterL
+pattern LuaVarArgsParam' :: (LuaVarArgsParam :-<: fs, All HFunctor fs) => CxtS h fs a FunctionParameterL
 pattern LuaVarArgsParam' <- (project -> Just LuaVarArgsParam) where
   LuaVarArgsParam' = iLuaVarArgsParam
 
@@ -140,8 +142,8 @@ type instance InjectableSorts MLuaSig SingleLocalVarDeclL = '[StatL]
 type MLuaTerm = Term MLuaSig
 type MLuaTermLab = TermLab MLuaSig
 
-type MLuaCxt h a = Cxt h MLuaSig a
-type MLuaCxtA h a p = Cxt h (MLuaSig :&: p) a
+type MLuaCxt h a = CxtS h MLuaSig a
+type MLuaCxtA h a p = AnnCxtS p h MLuaSig a
 
 type MLuaTermOptAnn a = AnnTerm (Maybe a) MLuaSig
 
@@ -236,13 +238,27 @@ instance InjF MLuaSig IdentL PositionalArgExpL where
    | Just (ExpIsPositionalArgExp e) <- project' x
    , Just (PrefixExp p) <- project' e
    , Just (PEVar v) <- project' p
-   , Just (VarName n) <- project' v = projF' n
+   , Just (VarName n) <- project' v
+   = projF' n
   projF' _ = Nothing
 
--- FIXME: Replace with real thing that handles normal function call syntax
 instance InjF MLuaSig IdentL FunctionExpL where
   injF = iFunctionIdent
 
   projF' (project' -> Just (FunctionIdent n)) = Just n
+  projF' x
+    | Just (PrefixExpIsFunctionExp p) <- project' x
+    , Just (PEVar v) <- project' p
+    , Just (VarName n) <- project' v
+    = projF' n
   projF' _                                    = Nothing
 
+instance InjF MLuaSig FunctionCallL RhsL where
+  injF x = iLuaRhs $ insertF [iPrefixExp $ iPEFunCall $ iFunctionCallIsFunCall x]
+  projF' f
+   | Just (LuaRhs (SingletonFA' e)) <- project' f
+   , Just (PrefixExp c) <- project' e
+   , Just (PEFunCall b) <- project' c
+   , Just (FunctionCallIsFunCall a) <- project' b
+   = Just a
+  projF' _ = Nothing

@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -18,7 +19,7 @@ import Data.Maybe ( fromJust )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
-import Data.Comp.Multi ( (:<:), project, project', inject', Cxt(..), Context, appCxt, AnnTerm )
+import Data.Comp.Multi ( project, project', inject', Cxt(..), appCxt, AnnTerm, (:-<:), ContextS )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort, dynProj )
 
 import Cubix.Language.JavaScript.Parametric.Common.Types
@@ -30,7 +31,7 @@ import Cubix.Sin.Compdata.Annotation ( annM, annotateM )
 
 import Unsafe.Coerce ( unsafeCoerce )
 
-instance {-# OVERLAPPING #-} (JSBinOp :<: g) => GetStrictness' g JSExpression where
+instance {-# OVERLAPPING #-} (JSBinOp :-<: gs) => GetStrictness' gs JSExpression where
   getStrictness' (JSExpressionTernary _ _ _ _ _) = [Strict, NoEval, GuardedBy (Place 0), NoEval, GuardedBy (NegPlace 0)]
   getStrictness' t@(JSExpressionBinary _ op _)   = case project op of
     Just (JSBinOpAnd _) -> [Strict, NoEval, GuardedBy (Place 0)]
@@ -40,7 +41,7 @@ instance {-# OVERLAPPING #-} (JSBinOp :<: g) => GetStrictness' g JSExpression wh
 
 -- We can insert statements before list of statements, *or* before lists of BlockItem's
 -- JS has both because scoping
-instance {-# OVERLAPPING #-} InsertAt' ListF MJSSig JSStatementL where
+instance {-# OVERLAPPING #-} InsertAt' MJSSig JSStatementL ListF where
   insertAt' EnterEvalPoint e t =
         case kdyncase t :: Maybe (_ :~: [JSStatementL]) of
             Just p  -> gcastWith p $ inject' <$> annM (ConsF e (inject' t))
@@ -55,17 +56,17 @@ instance {-# OVERLAPPING #-} InsertAt' ListF MJSSig JSStatementL where
   canInsertAt' _              _ _ = False
 
 -- And here's inserting a block item into a list of statements/block items
-instance {-# OVERLAPPING #-} InsertAt' ListF MJSSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MJSSig BlockItemL ListF where
   insertAt' p (project' -> Just (JSStatementIsBlockItem s)) t = insertAt' p s t
 
   canInsertAt' p  _ t = canInsertAt' p (Proxy :: Proxy JSStatementL) t
 
 
-instance {-# OVERLAPPING #-} InsertAt' JSStatement MJSSig JSStatementL where
+instance {-# OVERLAPPING #-} InsertAt' MJSSig JSStatementL JSStatement where
   insertAt' EnterEvalPoint t s = liftM convertTerm $ liftM appCxt $ annotateM e
     where
-      e :: Context MJSSig (AnnTerm _ MJSSig) JSStatementL
-      e = iJSStatementBlock iJSNoAnnot (insertF [Hole t, (Hole $ fromJust $ dynProj $ inject' s) :: Context _ _ JSStatementL]) iJSNoAnnot iJSSemiAuto
+      e :: ContextS MJSSig (AnnTerm _ MJSSig) JSStatementL
+      e = iJSStatementBlock iJSNoAnnot (insertF [Hole t, (Hole $ fromJust $ dynProj $ inject' s) :: ContextS MJSSig _ JSStatementL]) iJSNoAnnot iJSSemiAuto
 
       convertTerm :: AnnTerm a MJSSig i -> AnnTerm a MJSSig j
       convertTerm = unsafeCoerce
@@ -74,7 +75,7 @@ instance {-# OVERLAPPING #-} InsertAt' JSStatement MJSSig JSStatementL where
   canInsertAt' EnterEvalPoint _ _ = True
   canInsertAt' _              _ _ = False
 
-instance {-# OVERLAPPING #-} InsertAt' JSStatement MJSSig BlockItemL where
+instance {-# OVERLAPPING #-} InsertAt' MJSSig BlockItemL JSStatement where
   insertAt' p (project' -> Just (JSStatementIsBlockItem s)) t = insertAt' p s t
 
   canInsertAt' p  _ t = canInsertAt' p (Proxy :: Proxy JSStatementL) t

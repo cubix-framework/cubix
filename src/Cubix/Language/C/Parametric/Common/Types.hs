@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -24,7 +25,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( HFunctor, Cxt, Term, (:<:), project', project, (:&:) )
+import Data.Comp.Multi ( Node, HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.C.Parametric.Full.Names
@@ -49,7 +50,9 @@ data CLocalVarAttrs e l where
 
 deriveAll [''CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs, ''CLocalVarAttrs]
 
-instance (CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs :<: f, HFunctor f) => InjF f [CDeclarationSpecifierL] MultiLocalVarDeclCommonAttrsL where
+instance ( CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs :-<: fs
+         , All HFunctor fs
+         ) => InjF fs [CDeclarationSpecifierL] MultiLocalVarDeclCommonAttrsL where
   injF = iCDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs
 
   projF' (project' -> Just (CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs x)) = Just x
@@ -69,6 +72,21 @@ data CLabeledBlock e l where
 
 deriveAll [''CLabeledBlock]
 
+-----------------------------------------------------------------------------------
+------------------------       Control-flow     -----------------------------------
+-----------------------------------------------------------------------------------
+
+data CForInitL
+
+data CForInit e l where
+  CForInitEmpty ::                         CForInit e CForInitL
+  CForInitExp   :: e CExpressionL       -> CForInit e CForInitL
+  CForInitDecl  :: e MultiLocalVarDeclL -> CForInit e CForInitL
+
+data CFor e l where
+  CFor :: e CForInitL -> e (Maybe CExpressionL) -> e (Maybe CExpressionL) -> e CStatementL -> CFor e CStatementL
+
+deriveAll [''CForInit, ''CFor]
 
 -----------------------------------------------------------------------------------
 ---------------       Function calls, decls, defns         ------------------------
@@ -154,23 +172,23 @@ data CDeclaration a
 -- In function decls, since we don't model that void isn't a type,
 -- this becomes just a special case of a normal param, and we don't include it
 data CSpecialParamL
-data CVoidArg (e :: * -> *) l where
+data CVoidArg :: Node where
   CVoidArg :: CVoidArg e CSpecialParamL
 
 -- NOTE: I don't derive these all on one line because GHC crashes
 -- Try again after upgrading GHC?
 deriveAll [''CVoidArg]
 
-pattern CVoidArg' :: () => (CVoidArg :<: f, HFunctor f) => Cxt h f a CSpecialParamL
+pattern CVoidArg' :: (CVoidArg :-<: fs, All HFunctor fs) => CxtS h fs a CSpecialParamL
 pattern CVoidArg' <- (project -> Just CVoidArg) where
   CVoidArg' = iCVoidArg
 
-data CVarArgParam (e :: * -> *) l where
+data CVarArgParam :: Node where
   CVarArgParam :: CVarArgParam e CSpecialParamL
 
 deriveAll [''CVarArgParam]
 
-pattern CVarArgParam' :: () => (CVarArgParam :<: f, HFunctor f) => Cxt h f a CSpecialParamL
+pattern CVarArgParam' :: (CVarArgParam :-<: fs, All HFunctor fs) => CxtS h fs a CSpecialParamL
 pattern CVarArgParam' <- (project -> Just CVarArgParam) where
   CVarArgParam' = iCVarArgParam
 
@@ -181,7 +199,7 @@ data COldStyleParam e l where
 
 deriveAll [''COldStyleParam]
 
-pattern COldStyleParam' :: () => (COldStyleParam :<: f, HFunctor f) => Cxt h f a P.IdentL -> Cxt h f a COldStyleParamL
+pattern COldStyleParam' :: (COldStyleParam :-<: fs, All HFunctor fs) => CxtS h fs a P.IdentL -> CxtS h fs a COldStyleParamL
 pattern COldStyleParam' n <- (project -> Just (COldStyleParam n)) where
   COldStyleParam' n = iCOldStyleParam n
 
@@ -191,8 +209,14 @@ data CFunDeclAttrs e l where
 
 deriveAll [''CFunDeclAttrs]
 
-pattern CFunDeclAttrs' :: () => (CFunDeclAttrs :<: f, HFunctor f) => Cxt h f a [C.CDerivedDeclaratorL] -> Cxt h f a [C.CAttributeL]
-                                                                  -> Cxt h f a (Maybe (C.CStringLiteralL)) -> Cxt h f a [C.CAttributeL] -> Cxt h f a FunctionDeclAttrsL
+pattern CFunDeclAttrs' ::
+  ( CFunDeclAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [C.CDerivedDeclaratorL]
+  -> CxtS h fs a [C.CAttributeL]
+  -> CxtS h fs a (Maybe (C.CStringLiteralL))
+  -> CxtS h fs a [C.CAttributeL]
+  -> CxtS h fs a FunctionDeclAttrsL
 pattern CFunDeclAttrs' dds attrs1 asmNm attrs2 <- (project -> Just (CFunDeclAttrs dds attrs1 asmNm attrs2)) where
   CFunDeclAttrs' dds attrs1 asmNm attrs2 = iCFunDeclAttrs dds attrs1 asmNm attrs2
 
@@ -201,8 +225,13 @@ data CFunDefAttrs e l where
 
 deriveAll [''CFunDefAttrs]
 
-pattern CFunDefAttrs' :: () => (CFunDefAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a FunctionDeclAttrsL
-                                                                -> Cxt h f a [CDeclarationL] -> Cxt h f a FunctionDefAttrsL
+pattern CFunDefAttrs' ::
+  ( CFunDefAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [CDeclarationSpecifierL]
+  -> CxtS h fs a FunctionDeclAttrsL
+  -> CxtS h fs a [CDeclarationL]
+  -> CxtS h fs a FunctionDefAttrsL
 pattern CFunDefAttrs' dss fda decls <- (project -> Just (CFunDefAttrs dss fda decls)) where
   CFunDefAttrs' dss fda decls = iCFunDefAttrs dss fda decls
 
@@ -214,8 +243,14 @@ data CFunParamAttrs e l where
 
 deriveAll [''CFunParamAttrs]
 
-pattern CFunParamAttrs' :: () => (CFunParamAttrs :<: f, HFunctor f) => Cxt h f a [CDeclarationSpecifierL] -> Cxt h f a [CDerivedDeclaratorL]
-                              -> Cxt h f a (Maybe CStringLiteralL) -> Cxt h f a [CAttributeL] -> Cxt h f a CFunParamAttrsL
+pattern CFunParamAttrs' ::
+  ( CFunParamAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [CDeclarationSpecifierL]
+  -> CxtS h fs a [CDerivedDeclaratorL]
+  -> CxtS h fs a (Maybe CStringLiteralL)
+  -> CxtS h fs a [CAttributeL]
+  -> CxtS h fs a CFunParamAttrsL
 pattern CFunParamAttrs' dss dds asmNm attrs <- (project -> Just (CFunParamAttrs dss dds asmNm attrs)) where
   CFunParamAttrs' dss dds asmNm attrs = iCFunParamAttrs dss dds asmNm attrs
 
@@ -232,12 +267,17 @@ createSortInclusionInfers [  ''P.FunctionCallL, ''C.CExpressionL, ''C.CExpressio
 
 
 
-pattern CInteger' :: () => (CInteger :<: f, CIntRepr :<: f, Flags :<: f, HFunctor f) => Integer -> Cxt h f a CIntegerL
+pattern CInteger' ::
+  ( CInteger :-<: fs
+  , CIntRepr :-<: fs
+  , Flags :-<: fs
+  , All HFunctor fs
+  ) => Integer -> CxtS h fs a CIntegerL
 pattern CInteger' n <- (project -> Just (CInteger n _ _)) where
   CInteger' n = iCInteger n iDecRepr (C.iFlags 0)
 
 -- Not a wide string
-pattern CString' :: () => (CString :<: f, HFunctor f) => String -> Cxt h f a CStringL
+pattern CString' :: (CString :-<: fs, All HFunctor fs) => String -> CxtS h fs a CStringL
 pattern CString' s <- (project -> Just (CString s False)) where
   CString' s = iCString s False
 
@@ -253,7 +293,8 @@ do let cSortInjections = [ ''CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttr
                          , ''FunctionDefIsCFunctionDef, ''CFunParamAttrsIsParameterAttrs, ''CSpecialParamIsFunctionParameter, ''COldStyleParamIsFunctionParameter
                          , ''CStatementIsFunctionBody
                          ]
-   let cNewNodes       = [''CLocalVarAttrs, ''CLabeledBlock, ''CVoidArg, ''CVarArgParam, ''COldStyleParam, ''CFunDeclAttrs, ''CFunDefAttrs, ''CFunParamAttrs]
+   let cNewNodes       = [ ''CLocalVarAttrs, ''CLabeledBlock, ''CVoidArg, ''CVarArgParam, ''COldStyleParam, ''CFunDeclAttrs
+                         , ''CFunDefAttrs, ''CFunParamAttrs, ''CForInit, ''CFor]
    let names = (cSigNames \\ [mkName "Ident", mkName "CFunctionDef"])
                           ++ cSortInjections
                           ++ cNewNodes
@@ -271,8 +312,8 @@ type instance InjectableSorts MCSig MultiLocalVarDeclL = '[CCompoundBlockItemL]
 type MCTerm = Term MCSig
 type MCTermLab = TermLab MCSig
 
-type MCCxt h a = Cxt h MCSig a
-type MCCxtA h a p = Cxt h (MCSig :&: p) a
+type MCCxt h a = CxtS h MCSig a
+type MCCxtA h a p = AnnCxtS p h MCSig a
 
 
 -----------------------------------------------------------------------------------
@@ -338,6 +379,14 @@ instance InjF MCSig P.IdentL PositionalArgExpL where
   projF' a
    | Just (CExpressionIsPositionalArgExp e) <- project' a
    , Just (CVar n _) <- project' e = projF' n
+  projF' _ = Nothing
+
+instance InjF MCSig FunctionCallL RhsL where
+  injF = iFunctionCallIsCExpression
+  projF' f
+   | Just (CExpressionIsRhs e) <- project' f
+   , Just (FunctionCallIsCExpression c) <- project' e
+   = Just c
   projF' _ = Nothing
 
 #endif

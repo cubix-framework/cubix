@@ -10,16 +10,23 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- Only because can't make overlapping in TH
 {-# LANGUAGE OverlappingInstances #-}
-
 -- |
 
 module Cubix.Language.Parametric.Syntax.VarDecl (
+    -- * Identifiers
     IdentL
   , Ident(..)
 
+  -- ** Constructors and Patterns
+
+  , pattern Ident'
+  ,        iIdent
+
+    -- * Variable declarations
   , MultiLocalVarDeclCommonAttrsL
   , LocalVarInitL
   , IsOptional(..)
@@ -36,23 +43,7 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   , MultiLocalVarDeclL
   , MultiLocalVarDecl(..)
 
-  , AssignOpL
-  , AssignOpEquals(..)
-  , LhsL
-  , RhsL
-  , AssignL
-  , Assign(..)
-
-  , BlockItemL
-  , BlockEndL
-  , EmptyBlockEnd(..)
-  , BlockL
-  , Block(..)
-  , EmptyBlockItem(..)
-
-
-  , pattern Ident'
-  ,        iIdent
+  -- ** Constructors and Patterns
 
   , pattern JustLocalVarInit'
   ,        iJustLocalVarInit
@@ -75,10 +66,31 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   , pattern MultiLocalVarDecl'
   ,        iMultiLocalVarDecl
 
+    -- * Assignment
+  , AssignOpL
+  , AssignOpEquals(..)
+  , LhsL
+  , RhsL
+  , AssignL
+  , Assign(..)
+
+  -- ** Constructors and Patterns
+
   , pattern AssignOpEquals'
   ,        iAssignOpEquals
   , pattern Assign'
   ,        iAssign
+
+    -- * Blocks
+  , BlockItemL
+  , BlockEndL
+  , EmptyBlockEnd(..)
+  , BlockL
+  , Block(..)
+  , EmptyBlockItem(..)
+
+  -- ** Constructors and Patterns
+
   , pattern EmptyBlockEnd'
   ,        iEmptyBlockEnd
   , pattern Block'
@@ -87,18 +99,17 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   ,        iEmptyBlockItem
   ) where
 
-import Data.Comp.Multi ( Cxt, project, project', (:<:), HFunctor )
-
+import Data.Comp.Multi ( Node, project, project', HFunctor, (:-<:), All, CxtS)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 
 data IdentL
-data Ident (e :: * -> *) l where
+data Ident :: Node where
   Ident :: String -> Ident e IdentL
 
 deriveAll [''Ident]
 
-pattern Ident' :: () => (Ident :<: f, HFunctor f) => String -> Cxt h f a IdentL
+pattern Ident' :: (Ident :-<: fs, All HFunctor fs) => String -> CxtS h fs a IdentL
 pattern Ident' s <- (project -> (Just (Ident s))) where
   Ident' s = iIdent s
 
@@ -121,11 +132,11 @@ data OptLocalVarInit e l where
 
 deriveAll [''OptLocalVarInit]
 
-pattern JustLocalVarInit' :: () => (OptLocalVarInit :<: f, HFunctor f) => Cxt h f a LocalVarInitL -> Cxt h f a OptLocalVarInitL
+pattern JustLocalVarInit' :: (OptLocalVarInit :-<: fs, All HFunctor fs) => CxtS h fs a LocalVarInitL -> CxtS h fs a OptLocalVarInitL
 pattern JustLocalVarInit' x <- (project -> Just (JustLocalVarInit x)) where
   JustLocalVarInit' x = iJustLocalVarInit x
 
-pattern NoLocalVarInit' :: () => (OptLocalVarInit :<: f, HFunctor f) => Cxt h f a OptLocalVarInitL
+pattern NoLocalVarInit' :: (OptLocalVarInit :-<: fs, All HFunctor fs) => CxtS h fs a OptLocalVarInitL
 pattern NoLocalVarInit' <- (project -> Just NoLocalVarInit) where
   NoLocalVarInit' = iNoLocalVarInit
 
@@ -134,12 +145,12 @@ data LocalVarDeclAttrsL
 -- Needs better name because may need to distinguish part of multi-decl from a standalone decl
 ------ That's a really hypothetical thing. Why, Jimmy, why
 
-data EmptyLocalVarDeclAttrs (e :: * -> *) l where
+data EmptyLocalVarDeclAttrs :: Node where
   EmptyLocalVarDeclAttrs :: EmptyLocalVarDeclAttrs e LocalVarDeclAttrsL
 
 deriveAll [''EmptyLocalVarDeclAttrs]
 
-pattern EmptyLocalVarDeclAttrs' :: () => (EmptyLocalVarDeclAttrs :<: f, HFunctor f) => Cxt h f a LocalVarDeclAttrsL
+pattern EmptyLocalVarDeclAttrs' :: (EmptyLocalVarDeclAttrs :-<: fs, All HFunctor fs) => CxtS h fs a LocalVarDeclAttrsL
 pattern EmptyLocalVarDeclAttrs' <- (project -> Just EmptyLocalVarDeclAttrs) where
   EmptyLocalVarDeclAttrs' = iEmptyLocalVarDeclAttrs
 
@@ -154,12 +165,12 @@ data TupleBinder e l where
 
 deriveAll [''TupleBinder]
 
-pattern TupleBinder' :: () => (TupleBinder :<: f, HFunctor f) => Cxt h f a [IdentL] -> Cxt h f a VarDeclBinderL
+pattern TupleBinder' :: (TupleBinder :-<: fs, All HFunctor fs) => CxtS h fs a [IdentL] -> CxtS h fs a VarDeclBinderL
 pattern TupleBinder' xs <- (project -> Just (TupleBinder xs)) where
   TupleBinder' xs = iTupleBinder xs
 
 
-instance (TupleBinder :<: f, HFunctor f) => InjF f [IdentL] VarDeclBinderL where
+instance (TupleBinder :-<: fs, All HFunctor fs) => InjF fs [IdentL] VarDeclBinderL where
   injF = iTupleBinder
 
   projF' (project' -> Just (TupleBinder ns)) = Just ns
@@ -169,7 +180,7 @@ createSortInclusionType ''IdentL ''VarDeclBinderL
 deriveAll [''IdentIsVarDeclBinder]
 createSortInclusionInfer ''IdentL ''VarDeclBinderL
 
-pattern IdentIsVarDeclBinder' :: () => (IdentIsVarDeclBinder :<: f, HFunctor f) => Cxt h f a IdentL -> Cxt h f a VarDeclBinderL
+pattern IdentIsVarDeclBinder' :: (IdentIsVarDeclBinder :-<: fs, All HFunctor fs) => CxtS h fs a IdentL -> CxtS h fs a VarDeclBinderL
 pattern IdentIsVarDeclBinder' n <- (project -> Just (IdentIsVarDeclBinder n)) where
   IdentIsVarDeclBinder' n = iIdentIsVarDeclBinder n
 
@@ -196,20 +207,23 @@ data SingleLocalVarDecl e l where
 
 deriveAll [''SingleLocalVarDecl]
 
-pattern SingleLocalVarDecl' :: () => (SingleLocalVarDecl :<: f, HFunctor f) => Cxt h f a LocalVarDeclAttrsL
-                                                                            -> Cxt h f a VarDeclBinderL
-                                                                            -> Cxt h f a OptLocalVarInitL
-                                                                            -> Cxt h f a SingleLocalVarDeclL
+pattern SingleLocalVarDecl' ::
+  ( SingleLocalVarDecl :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a LocalVarDeclAttrsL
+  -> CxtS h fs a VarDeclBinderL
+  -> CxtS h fs a OptLocalVarInitL
+  -> CxtS h fs a SingleLocalVarDeclL
 pattern SingleLocalVarDecl' x y z <- (project -> (Just (SingleLocalVarDecl x y z))) where
   SingleLocalVarDecl' x y z = iSingleLocalVarDecl x y z
 
 
-data EmptyMultiLocalVarDeclCommonAttrs (e :: * -> *) l where
+data EmptyMultiLocalVarDeclCommonAttrs :: Node where
   EmptyMultiLocalVarDeclCommonAttrs :: EmptyMultiLocalVarDeclCommonAttrs e MultiLocalVarDeclCommonAttrsL
 
 deriveAll [''EmptyMultiLocalVarDeclCommonAttrs]
 
-pattern EmptyMultiLocalVarDeclCommonAttrs' :: () => (EmptyMultiLocalVarDeclCommonAttrs :<: f, HFunctor f) => Cxt h f a MultiLocalVarDeclCommonAttrsL
+pattern EmptyMultiLocalVarDeclCommonAttrs' :: (EmptyMultiLocalVarDeclCommonAttrs :-<: fs, All HFunctor fs) => CxtS h fs a MultiLocalVarDeclCommonAttrsL
 pattern EmptyMultiLocalVarDeclCommonAttrs' <- (project -> Just EmptyMultiLocalVarDeclCommonAttrs) where
   EmptyMultiLocalVarDeclCommonAttrs' = iEmptyMultiLocalVarDeclCommonAttrs
 
@@ -235,9 +249,12 @@ data MultiLocalVarDecl e l where
 
 deriveAll [''MultiLocalVarDecl]
 
-pattern MultiLocalVarDecl' :: () => (MultiLocalVarDecl :<: f, HFunctor f) => Cxt h f a MultiLocalVarDeclCommonAttrsL
-                                                                          -> Cxt h f a [SingleLocalVarDeclL]
-                                                                          -> Cxt h f a MultiLocalVarDeclL
+pattern MultiLocalVarDecl' ::
+  ( MultiLocalVarDecl :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a MultiLocalVarDeclCommonAttrsL
+  -> CxtS h fs a [SingleLocalVarDeclL]
+  -> CxtS h fs a MultiLocalVarDeclL
 pattern MultiLocalVarDecl' x y <- (project -> (Just (MultiLocalVarDecl x y))) where
   MultiLocalVarDecl' x y = iMultiLocalVarDecl x y
 
@@ -249,12 +266,12 @@ pattern MultiLocalVarDecl' x y <- (project -> (Just (MultiLocalVarDecl x y))) wh
 -- where (typeof x)y denotes a type conversion from y to the type of x. We leave it unspecified what
 -- exactly that means
 data AssignOpL
-data AssignOpEquals (e :: * -> *) l where
+data AssignOpEquals :: Node where
   AssignOpEquals :: AssignOpEquals e AssignOpL
 
 deriveAll [''AssignOpEquals]
 
-pattern AssignOpEquals' :: () => (AssignOpEquals :<: f, HFunctor f) => Cxt h f a AssignOpL
+pattern AssignOpEquals' :: (AssignOpEquals :-<: fs, All HFunctor fs) => CxtS h fs a AssignOpL
 pattern AssignOpEquals' <- (project -> Just AssignOpEquals) where
   AssignOpEquals' = iAssignOpEquals
 
@@ -287,7 +304,7 @@ data Assign e l where
 
 deriveAll [''Assign]
 
-pattern Assign' :: () => (Assign :<: f, HFunctor f) => Cxt h f a LhsL -> Cxt h f a AssignOpL -> Cxt h f a RhsL -> Cxt h f a AssignL
+pattern Assign' :: (Assign :-<: fs, All HFunctor fs) => CxtS h fs a LhsL -> CxtS h fs a AssignOpL -> CxtS h fs a RhsL -> CxtS h fs a AssignL
 pattern Assign' l o r <- (project -> Just (Assign l o r)) where
   Assign' l o r = iAssign l o r
 
@@ -296,12 +313,12 @@ data BlockItemL
 data BlockEndL
 data BlockL
 
-data EmptyBlockEnd (e :: * -> *) l where
+data EmptyBlockEnd :: Node where
   EmptyBlockEnd :: EmptyBlockEnd e BlockEndL
 
 deriveAll [''EmptyBlockEnd]
 
-pattern EmptyBlockEnd' :: () => (EmptyBlockEnd :<: f, HFunctor f) => Cxt h f a BlockEndL
+pattern EmptyBlockEnd' :: (EmptyBlockEnd :-<: fs, All HFunctor fs) => CxtS h fs a BlockEndL
 pattern EmptyBlockEnd' <- (project -> Just EmptyBlockEnd) where
   EmptyBlockEnd' = iEmptyBlockEnd
 
@@ -317,7 +334,7 @@ data Block e l where
 
 deriveAll [''Block]
 
-pattern Block' :: () => (Block :<: f, HFunctor f) => Cxt h f a [BlockItemL] -> Cxt h f a BlockEndL -> Cxt h f a BlockL
+pattern Block' :: (Block :-<: fs, All HFunctor fs) => CxtS h fs a [BlockItemL] -> CxtS h fs a BlockEndL -> CxtS h fs a BlockL
 pattern Block' xs e <- (project -> Just (Block xs e)) where
   Block' xs e = iBlock xs e
 
@@ -326,11 +343,11 @@ pattern Block' xs e <- (project -> Just (Block xs e)) where
 -- and so that the sort of empty block-item lists can be correctly determined
 --
 -- This is a bit of a hack....but, it's actually kinda nice in some ways
-data EmptyBlockItem (e :: * -> *) l where
+data EmptyBlockItem :: Node where
   EmptyBlockItem :: EmptyBlockItem e BlockItemL
 
 deriveAll [''EmptyBlockItem]
 
-pattern EmptyBlockItem' :: () => (EmptyBlockItem :<: f, HFunctor f) => Cxt h f a BlockItemL
+pattern EmptyBlockItem' :: (EmptyBlockItem :-<: fs, All HFunctor fs) => CxtS h fs a BlockItemL
 pattern EmptyBlockItem' <- (project -> Just EmptyBlockItem) where
   EmptyBlockItem' = iEmptyBlockItem

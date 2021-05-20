@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
 module Data.Comp.Trans.Util
   (
@@ -19,7 +20,7 @@ module Data.Comp.Trans.Util
   , withExcludedNames
   , withAnnotationProp
     
-  , CompTrans
+  , CompTrans(..)
   , runCompTrans
     
   , standardExcludedNames
@@ -45,7 +46,8 @@ module Data.Comp.Trans.Util
 
 import Control.Lens ( (^.), (.~), _3, makeClassy, view )
 import Control.Monad ( liftM2 )
-import Control.Monad.Reader ( ReaderT(..), local )
+import Control.Monad.IO.Class ( MonadIO )
+import Control.Monad.Reader ( MonadReader, ReaderT(..), local )
 import Control.Monad.Trans ( lift )
 
 import Data.Data ( Data )
@@ -54,27 +56,72 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Data.Set ( Set, fromList )
-import qualified Data.Set as Set
 
 import Language.Haskell.TH.Syntax hiding ( lift )
 
 import Data.ByteString ( ByteString )
 import Data.Text ( Text )
 
+-- | Information used to propagate annotations from terms of third party language library to terms of @cubix-compdata@
+--
+--   Most libraries associate at most one annotation with each node of a term. However, there are occasional examples
+--   where a library attaches multiple annotations to a single node (e.g.: a large construct may have multiple
+--   position annotations attached to it). Most of the complexity of this type is constructed to deal with these cases,
+--   giving the ability to combine multiple such annotations into a single value, and split a single value into
+--   multiple annotations.
+data AnnotationPropInfo =
+        AnnotationPropInfo {
+                             -- | The type of annotation to propagate
+                             _annTyp       :: Type
 
-type CompTrans = ReaderT TransCtx Q
+                             -- | A test for whether a type is an annotation to propagate. Usually @(== annType)@.
+                           , _isAnnotation :: Type -> Bool
 
-data AnnotationPropInfo = AnnotationPropInfo { _annTyp       :: Type
-                                             , _isAnnotation :: Type -> Bool
-                                             , _propAnn      :: [(Exp, Type)] -> Exp
-                                             , _unpropAnn    :: Exp -> Int -> [Exp]
-                                             }
+                             -- | Annotation propagator: takes a list of TH expressions (and their types)
+                             --   which at runtime evaluate to the annotations (as reported by isAnn) accompanying
+                             --   a term. Returns a single TH expression constructing a new annotation to
+                             --   be attached to the translated @cubix-compdata@ term.
+                             --
+                             --   `defaultPropAnn` suffices for most purposes, but users have the option to
+                             --   define an annotation propagator which combines multiple annotations into one.
+                           , _propAnn      :: [(Exp, Type)] -> Exp
 
+                             -- | Annotation unpropagator; inverts @propAnn@. Takes a TH expression
+                             --   which at runtime evaluates to the annotation accompanying a @cubix-compdata@ term,
+                             --   along with the number of distinct annotation values to be included in the target
+                             --   term. Returns a list of TH expressions which construct the annotations to be attached
+                             --   to the untranslated term.
+                             --
+                             --   `defaultUnpropAnn` usually suffices, but users have the option
+                             --   to define an annotation unpropagator which splits a single value into multiple.
+                           , _unpropAnn    :: Exp -> Int -> [Exp]
+                           }
+
+-- | Configuration parameters for @comptrans@
 data TransCtx = TransCtx {
+                           -- | For internal use only
                            _allTypes      :: [Name]
+
+                           -- | Used primarily for compatibility with libraries such as @language-c@,
+                           --   where datatypes all take a parameter, e.g.: `CStmt a`, where @a@ is an annotation
+                           --   parameter which essentially only has one value (e.g.: @SourceSpan@). This
+                           --   substitutions map will be used to replace all such type variables with concrete types,
+                           --   grounding all such datatypes to be kind @*@.
+                           --
+                           --   Other integrations that require this map for the same reason include @language-lua@
+                           --   and @language-python@
                          , _substitutions :: Map Name Type
-                         , _excludedNames :: Set Name
-                         , _annotationProp :: Maybe AnnotationPropInfo
+
+                           -- | A set of names to not generate definitions for, so that they may be handled
+                           --   manually.
+                         , _excludedNames :: Set Name                  -- ^
+
+                           -- | When this is set, `deriveTrans` and `deriveUntrans` will generate code that
+                           --   converts annotated terms in the integrated library into annotated @cubix-compdata@ terms,
+                           --   with annotations given by @`(:&:)`@.
+                           --
+                           --   See documentation of `withAnnotationProp` and `AnnotationPropInfo`.
+                         , _annotationProp :: Maybe AnnotationPropInfo -- ^
                          }
 
 makeClassy ''AnnotationPropInfo
@@ -88,27 +135,42 @@ defaultTransCtx = TransCtx {
                            , _annotationProp = Nothing
                            }
 
+
+-- | The central monad of @comptrans@, defined as the `Q` monad with
+--   additional configuration parameters
+newtype CompTrans a = CompTrans { unCompTrans :: ReaderT TransCtx Q a }
+  deriving ( Functor, Applicative, Monad, MonadFail, MonadIO, MonadReader TransCtx )
+
+-- | Runs a @comptrans@ computation, resulting in a Template Haskell command
+--   which creates some number of declarations.
+--
+--   `CompTrans` values are created by `deriveMulti`, `deriveTrans`, and `deriveUntrans`,
+--   and may be configured using functions such as `withSubstitutions`
 runCompTrans :: CompTrans a -> Q a
-runCompTrans m = runReaderT m defaultTransCtx
+runCompTrans m = runReaderT (unCompTrans m) defaultTransCtx
 
 
-withAnnotationProp :: Type -> (Type -> Bool) -> ([(Exp, Type)] -> Exp) -> (Exp -> Int -> [Exp]) -> CompTrans a -> CompTrans a
+withAnnotationProp :: Type                   -- ^ @annTyp@, the annotation type being propagated
+                   -> (Type -> Bool)         -- ^ A test for whether a type is an annotation to propagate. Usually @(== annType)@.
+                   -> ([(Exp, Type)] -> Exp) -- ^ Annotation propogater. Usually constructed with `defaultPropAnn`. See `AnnotationPropInfo`.
+                   -> (Exp -> Int -> [Exp])  -- ^ Annotation unpropater. Usuallyl `defaultUnpropAnn`.  See `AnnotationPropInfo`
+                   -> CompTrans a            -- ^ code generating @comptrans@ declarations
+                   -> CompTrans a
 withAnnotationProp annTyp isAnn propAnn unpropAnn = local (annotationProp .~ (Just $ AnnotationPropInfo annTyp isAnn propAnn unpropAnn))
 
+-- | Runs a @comptrans@ declaration with a given set of type variable substitutions
 withSubstitutions :: Map.Map Name Type -> CompTrans a -> CompTrans a
 withSubstitutions substs = local (substitutions .~ substs)
 
 withAllTypes :: [Name] -> CompTrans a -> CompTrans a
 withAllTypes names = local (allTypes .~ names)
 
+-- | Runs a @comptrans@ declaration with a given set of excluded namess
 withExcludedNames :: Set Name -> CompTrans a -> CompTrans a
 withExcludedNames names = local (excludedNames .~ names)
 
-{-
-   Names that should be excluded from an AST hierarchy.
-
-   Type synonyms need not be present.
--}
+-- | Names that should be excluded from an AST hierarchy.
+--   Includes base types, basic containers (`Maybe`, `Either`), and `Text`/`ByteString`.
 standardExcludedNames :: Set Name
 standardExcludedNames = fromList [''Maybe, ''Either, ''Int, ''Integer, ''Bool, ''Char, ''Double, ''Text, ''ByteString]
 
@@ -165,8 +227,8 @@ modNameBase :: (String -> String) -> Name -> Name
 modNameBase f = mkName . f . nameBase
 
 simplifyDataInf :: Info -> [(Name, [Type])]
-simplifyDataInf (TyConI (DataD _ _ _ cons _))   = map extractCon cons
-simplifyDataInf (TyConI (NewtypeD _ _ _ con _)) = [extractCon con]
+simplifyDataInf (TyConI (DataD _ _ _ _ cons _))   = map extractCon cons
+simplifyDataInf (TyConI (NewtypeD _ _ _ _ con _)) = [extractCon con]
 simplifyDataInf _                               = error "Attempted to derive multi-sorted compositional data type for non-nullary datatype"
 
 extractCon :: Con -> (Name, [Type])
@@ -177,10 +239,10 @@ extractCon _                = error "Unsupported constructor type encountered"
 
 getTypeArgs :: Name -> CompTrans [Name]
 getTypeArgs nm = do
-  inf <- lift $ reify nm
+  inf <- CompTrans $ lift $ reify nm
   case inf of
-    TyConI (DataD _ _ tvs _ _)    -> return $ getNames tvs
-    TyConI (NewtypeD _ _ tvs _ _) -> return $ getNames tvs
+    TyConI (DataD _ _ tvs _ _ _)    -> return $ getNames tvs
+    TyConI (NewtypeD _ _ tvs _ _ _) -> return $ getNames tvs
     _                             -> return []
 
 getNames :: [TyVarBndr] -> [Name]
@@ -209,20 +271,23 @@ getIsAnn = do
     Nothing  -> return $ const False
     Just api -> return $ api ^. isAnnotation
 
--- | A default annotation propagater: Assumes 0 or 1 annotations per constructor
-defaultPropAnn :: Exp -> [(Exp, Type)] -> Exp
+-- | A default annotation propagator: Assumes 0 or 1 annotations per constructor
+--   Returns the default annotation or copies the given annotation as appropriate.
+defaultPropAnn :: Exp -- ^ default annotation, to be used on terms that do not have an annotation
+               -> [(Exp, Type)] -> Exp
 defaultPropAnn defAnn tps = case tps of
       []       -> defAnn
       [(x, _)] -> x
       _        -> error "comptrans: Multiple annotation fields detected in constructor"
 
+-- | A default annotation unpropagator: Assumes 0 or 1 annotations per constructor. If 1 annotation given, copies it.
 defaultUnpropAnn :: Exp -> Int -> [Exp]
 defaultUnpropAnn _ 0 = []
 defaultUnpropAnn x 1 = [x]
 defaultUnpropAnn _ _ = error "comptrans: Multiple annotation fields detected in constructor"
 
 isVar :: Type -> Bool
-isVar (VarT n) = True
+isVar (VarT _) = True
 isVar _        = False
 
 applySubsts :: (Data x) => Map Name Type -> x -> x

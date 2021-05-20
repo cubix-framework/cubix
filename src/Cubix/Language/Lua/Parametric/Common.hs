@@ -1,4 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
+--------------------------------------------------------------------------------
+-- |
+-- Module      :  Cubix.Language.Lua.Parametric.Common
+-- Copyright   :  (c) 2016-2020 James Koppel
+-- License     :  BSD3
+--
+--
+-- Language definition is auto-generated from that of @language-lua@, and modified
+-- to replace some language-specific nodes with generic nodes.
+-- See https://hackage.haskell.org/package/language-lua-0.11.0.1/docs/Language-Lua-Annotated-Syntax.html
+--
+--------------------------------------------------------------------------------
+
+
 module Cubix.Language.Lua.Parametric.Common (
     module Semantics
   , module Types

@@ -28,6 +28,7 @@ library
                         Data.Comp.Ops
 
                         Data.Comp.Multi
+                        Data.Comp.Multi.Kinds
                         Data.Comp.Multi.Term
                         Data.Comp.Multi.Sum
                         Data.Comp.Multi.HFunctor
@@ -48,6 +49,7 @@ library
 
   Other-Modules:        Data.Comp.SubsumeCommon
 
+                        Data.Comp.Multi.Derive.Generic
                         Data.Comp.Multi.Derive.HFunctor
                         Data.Comp.Multi.Derive.HFoldable
                         Data.Comp.Multi.Derive.HTraversable
@@ -55,9 +57,13 @@ library
                         Data.Comp.Multi.Derive.Ordering
                         Data.Comp.Multi.Derive.Show
                         Data.Comp.Multi.Derive.SmartConstructors
+                        Data.Comp.Elem
+                        Data.Comp.Dict
+                        Data.Comp.Multi.Alt
+                        Data.Comp.Alt
 
-  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, derive,
-                        deepseq, th-expand-syns, transformers
+  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck,
+                        deepseq, th-expand-syns, transformers, vector, ghc-prim
   Extensions:           FlexibleContexts
   hs-source-dirs:       src
   ghc-options:          -W
@@ -68,5 +74,5 @@ Test-Suite test
   Main-is:                      Data_Test.hs
   hs-source-dirs:               testsuite/tests examples src
   Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
-                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2, derive,
+                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
                         th-expand-syns, deepseq, transformers

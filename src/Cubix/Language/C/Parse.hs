@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 module Cubix.Language.C.Parse (
   parse
 ) where

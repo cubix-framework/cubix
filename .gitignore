@@ -3,6 +3,4 @@
 .stack-work
 out
 a.out
-cubix.cabal
-comptrans/comptrans.cabal
 *.class

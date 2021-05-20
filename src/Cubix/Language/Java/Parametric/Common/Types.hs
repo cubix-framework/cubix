@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -23,7 +25,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH.Syntax ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', (:&:)(..), (:<:), project, HFunctor )
+import Data.Comp.Multi ( Node, Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( makeSumType, runCompTrans )
 
 import Cubix.Language.Info
@@ -40,7 +42,7 @@ import Cubix.Language.Parametric.Syntax as P
 ---------------       Variable declarations and blocks     ------------------------
 -----------------------------------------------------------------------------------
 
-data ArrayDimVarDeclAttrs (e :: * -> *) l where
+data ArrayDimVarDeclAttrs :: Node where
   ArrayDimVarDeclAttrs :: Int -> ArrayDimVarDeclAttrs e LocalVarDeclAttrsL
 
 
@@ -67,7 +69,6 @@ createSortInclusionInfers [ ''VarInitL,       ''MultiLocalVarDeclL, ''P.IdentL, 
 -- | NOTE: You can call a static method on an instance; then a primary receiver is substituting for
 -- a type receiver
 data JavaReceiver e l where
-  ImplicitReceiver   ::              JavaReceiver e P.ReceiverL
   PrimaryReceiver    :: e J.ExpL  -> JavaReceiver e P.ReceiverL
   SuperReceiver      ::              JavaReceiver e P.ReceiverL
   ClassSuperReceiver :: e J.NameL -> JavaReceiver e P.ReceiverL
@@ -92,15 +93,33 @@ data JavaVarargsParam e l where
 
 deriveAll [''JavaReceiver, ''JavaTypeArgs, ''JavaMethodDeclAttrs, ''JavaParamAttrs, ''JavaVarargsParam]
 
-pattern JavaMethodDeclAttrs' :: () => (JavaMethodDeclAttrs :<: f, HFunctor f) => Cxt h f a [J.ModifierL] -> Cxt h f a [J.TypeParamL] -> Cxt h f a (Maybe J.TypeL) -> Cxt h f a [J.RefTypeL] -> Cxt h f a JavaMethodDeclAttrsL
+pattern JavaMethodDeclAttrs' ::
+  ( JavaMethodDeclAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [J.ModifierL]
+  -> CxtS h fs a [J.TypeParamL]
+  -> CxtS h fs a (Maybe J.TypeL)
+  -> CxtS h fs a [J.RefTypeL]
+  -> CxtS h fs a JavaMethodDeclAttrsL
 pattern JavaMethodDeclAttrs' mods tparams retTp exns <- (project -> Just (JavaMethodDeclAttrs mods tparams retTp exns)) where
   JavaMethodDeclAttrs' mods tparams retTp exns = iJavaMethodDeclAttrs mods tparams retTp exns
 
-pattern JavaParamAttrs' :: () => (JavaParamAttrs :<: f, HFunctor f) => Cxt h f a [J.ModifierL] -> Cxt h f a J.TypeL -> Int -> Cxt h f a JavaParamAttrsL
+pattern JavaParamAttrs' ::
+  ( JavaParamAttrs :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a [J.ModifierL]
+  -> CxtS h fs a J.TypeL
+  -> Int
+  -> CxtS h fs a JavaParamAttrsL
 pattern JavaParamAttrs' mods tp dim <- (project -> Just (JavaParamAttrs mods tp dim)) where
   JavaParamAttrs' mods tp dim = iJavaParamAttrs mods tp dim
 
-pattern JavaVarargsParam' :: () => (JavaVarargsParam :<: f, HFunctor f) => Cxt h f a JavaParamAttrsL -> Cxt h f a P.IdentL -> Cxt h f a JavaVarargsParamL
+pattern JavaVarargsParam' ::
+  ( JavaVarargsParam :-<: fs
+  , All HFunctor fs
+  ) => CxtS h fs a JavaParamAttrsL
+  -> CxtS h fs a P.IdentL
+  -> CxtS h fs a JavaVarargsParamL
 pattern JavaVarargsParam' attrs n <- (project -> Just (JavaVarargsParam attrs n)) where
   JavaVarargsParam' attrs n = iJavaVarargsParam attrs n
 
@@ -153,8 +172,8 @@ type instance InjectableSorts MJavaSig MultiLocalVarDeclL = '[]
 type MJavaTerm = Term MJavaSig
 type MJavaTermLab = TermLab MJavaSig
 
-type MJavaCxt h a = Cxt h MJavaSig a
-type MJavaCxtA h a p = Cxt h (MJavaSig :&: p) a
+type MJavaCxt h a = CxtS h MJavaSig a
+type MJavaCxtA h a p = AnnCxtS p h MJavaSig a
 
 
 
@@ -243,6 +262,15 @@ instance InjF MJavaSig P.IdentL PositionalArgExpL where
    | Just (ExpIsPositionalArgExp e) <- project' a
    , Just (ExpName n) <- project' e
    , Just (Name (SingletonFA' i)) <- project' n = projF' i
+  projF' _ = Nothing
+
+instance InjF MJavaSig FunctionCallL RhsL where
+  injF = iMethodInv . injF
+  projF' f
+   | Just (ExpIsRhs e) <- project' f
+   , Just (MethodInv c) <- project' e
+   , Just (FunctionCallIsMethodInvocation b) <- project' c
+   = Just b
   projF' _ = Nothing
 
 

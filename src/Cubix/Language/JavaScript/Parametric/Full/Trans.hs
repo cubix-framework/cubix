@@ -1,13 +1,15 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE CPP                     #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TemplateHaskell         #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE TypeSynonymInstances    #-}
+{-# LANGUAGE UndecidableInstances    #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.JavaScript.Parametric.Full.Trans () where
@@ -17,12 +19,13 @@ module Cubix.Language.JavaScript.Parametric.Full.Trans (
   , untranslate
   ) where
 
+import Data.Proxy
 import Data.Typeable ( Typeable )
 
 import qualified Language.Haskell.TH as TH
 import qualified Language.JavaScript.Parser.AST as JS
 
-import Data.Comp.Multi ( caseH, (:+:) )
+import Data.Comp.Multi ( Sum, All, caseCxt )
 import Data.Comp.Trans ( runCompTrans, deriveTrans, deriveUntrans )
 
 import Cubix.Language.JavaScript.Parametric.Full.Names
@@ -76,6 +79,6 @@ instance Untrans MaybeF where
   untrans NothingF = T Nothing
   untrans (JustF x) = T (Just (t x))
 
-instance (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 #endif

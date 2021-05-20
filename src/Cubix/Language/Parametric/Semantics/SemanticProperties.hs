@@ -1,14 +1,15 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PartialTypeSignatures  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Cubix.Language.Parametric.Semantics.SemanticProperties (
     Place(..)
@@ -33,7 +34,7 @@ import Data.Typeable ( Typeable )
 
 import GHC.Generics ( Generic )
 
-import Data.Comp.Multi ( Term, unTerm, (:<:), (:&:)(..), caseH, caseH', HFunctor, (:+:)(..), HFoldable, htoList, AnnTerm, inject' )
+import Data.Comp.Multi ( unTerm, (:&:)(..), caseCxt, HFunctor, HFoldable, htoList, inject', All, Sum, caseCxt', AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..), kIsSort )
 
 import Cubix.Language.Parametric.Syntax.Functor
@@ -52,39 +53,39 @@ data Kleene = KTrue | KUnknown | KFalse
   deriving (Eq, Ord, Show)
 
 
-class GetStrictness' g f where
-  getStrictness' :: f (Term g) l -> [Strictness]
+class GetStrictness' gs f where
+  getStrictness' :: f (Term gs) l -> [Strictness]
 
 defaultGetStrictness :: (HFoldable f) => f e l -> [Strictness]
 defaultGetStrictness t = take (length (htoList t)) (repeat Strict)
 
-instance {-# OVERLAPPABLE #-} (HFoldable f) => GetStrictness' g f where
+instance {-# OVERLAPPABLE #-} (HFoldable f) => GetStrictness' gs f where
   getStrictness' = defaultGetStrictness
 
-instance {-# OVERLAPPING #-} (GetStrictness' g f1, GetStrictness' g f2) => GetStrictness' g (f1 :+: f2) where
-  getStrictness' = caseH getStrictness' getStrictness'
+instance {-# OVERLAPPING #-} (All (GetStrictness' gs) fs) => GetStrictness' gs (Sum fs) where
+  getStrictness' = caseCxt (Proxy @(GetStrictness' gs)) getStrictness'
 
-class GetStrictness f where
-  getStrictness :: Term f l -> [Strictness]
+class GetStrictness fs where
+  getStrictness :: Term fs l -> [Strictness]
 
-instance (GetStrictness' f f) => GetStrictness f where
+instance (GetStrictness' fs (Sum fs)) => GetStrictness fs where
   getStrictness = getStrictness' . unTerm
 
 --------------------------------------------------------------------------------------
 
-class HasSideEffects' g f where
-  hasSideEffects' :: f (Term g) l -> Kleene
+class HasSideEffects' gs f where
+  hasSideEffects' :: f (Term gs) l -> Kleene
 
-instance {-# OVERLAPPABLE #-} HasSideEffects' g f where
+instance {-# OVERLAPPABLE #-} HasSideEffects' gs f where
   hasSideEffects' = const KUnknown
 
-instance {-# OVERLAPPING #-} (HasSideEffects' g f1, HasSideEffects' g f2) => HasSideEffects' g (f1 :+: f2) where
-  hasSideEffects' = caseH hasSideEffects' hasSideEffects'
+instance {-# OVERLAPPING #-} (All (HasSideEffects' gs) fs) => HasSideEffects' gs (Sum fs) where
+  hasSideEffects' = caseCxt (Proxy @(HasSideEffects' gs)) hasSideEffects'
 
-class HasSideEffects f where
-  hasSideEffects :: Term f l -> Kleene
+class HasSideEffects fs where
+  hasSideEffects :: Term fs l -> Kleene
 
-instance (HasSideEffects' f f) => HasSideEffects f where
+instance (HasSideEffects' fs (Sum fs)) => HasSideEffects fs where
   hasSideEffects = hasSideEffects' . unTerm
 
 
@@ -100,15 +101,15 @@ data NodeEvaluationPoint = EnterEvalPoint
   deriving ( Eq, Ord, Show, Generic, NFData )
 
 -- We have to expand the type-synonym AnnTerm in a couple places because no partial application
-class (DynCase (Term g) l) => InsertAt' f g l where
-  insertAt'    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a g l -> (f :&: a) (AnnTerm a g) i -> m (AnnTerm a g i)
-  canInsertAt' :: NodeEvaluationPoint -> Proxy l -> (f :&: a) (AnnTerm a g) i -> Bool
+class (DynCase (Term gs) l) => InsertAt' gs l f where
+  insertAt'    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a gs l -> (f :&: a) (AnnTerm a gs) i -> m (AnnTerm a gs i)
+  canInsertAt' :: NodeEvaluationPoint -> Proxy l -> (f :&: a) (AnnTerm a gs) i -> Bool
 
-instance {-# OVERLAPPABLE #-} (f :<: g, DynCase (Term g) l) => InsertAt' f g l where
+instance {-# OVERLAPPABLE #-} (f :-<: gs, DynCase (Term gs) l) => InsertAt' gs l f where
   insertAt'    _ _ t = return $ inject' t
   canInsertAt' _ _ _ = False
 
-instance {-# OVERLAPPING #-} (ListF :<: g, HFunctor g, KDynCase g l, KDynCase g [l], Typeable l) => InsertAt' ListF g l where
+instance {-# OVERLAPPING #-} (ListF :-<: gs, All HFunctor gs, KDynCase (Sum gs) l, KDynCase (Sum gs) [l], Typeable l) => InsertAt' gs l ListF where
   insertAt' EnterEvalPoint e t = case kdyncase t :: Maybe (_ :~: [l]) of
                                    Nothing -> return $ inject' t
                                    Just p  -> gcastWith p $ liftM inject' $ annM $ ConsF e (inject' t)
@@ -117,24 +118,22 @@ instance {-# OVERLAPPING #-} (ListF :<: g, HFunctor g, KDynCase g l, KDynCase g 
   canInsertAt' EnterEvalPoint _ = kIsSort (Proxy :: Proxy [l])
   canInsertAt' _              _ = const False
 
-instance {-# OVERLAPPING #-} (InsertAt' f1 g l, InsertAt' f2 g l) => InsertAt' (f1 :+: f2) g l where
-  insertAt' p e = caseH' (insertAt' p e) (insertAt' p e)
+instance {-# OVERLAPPING #-} (All (InsertAt' gs l) fs, DynCase (Term gs) l) => InsertAt' gs l (Sum fs) where
+  insertAt' p e = caseCxt' (Proxy @(InsertAt' gs l)) (insertAt' p e)
+  canInsertAt' p e = caseCxt' (Proxy @(InsertAt' gs l)) (canInsertAt' p e)
 
-  canInsertAt' p _ = caseH' (canInsertAt' p (Proxy :: Proxy l)) (canInsertAt' p (Proxy :: Proxy l))
+class InsertAt gs l where
+  insertAt    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a gs l -> AnnTerm a gs i -> m (AnnTerm a gs i)
+  canInsertAt :: NodeEvaluationPoint -> Proxy l -> AnnTerm a gs i -> Bool
 
-class InsertAt g l where
-  insertAt    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a g l -> AnnTerm a g i -> m (AnnTerm a g i)
-  canInsertAt :: NodeEvaluationPoint -> Proxy l -> AnnTerm a g i -> Bool
-
-
-
-
-instance (InsertAt' g g l) => InsertAt g l where
+-- TODO: When this constraint is replace with All, it asks for a bunch of other constraints.
+instance (InsertAt' gs l (Sum gs)) => InsertAt gs l where
  insertAt p e t       = insertAt' p e (unTerm t)
  canInsertAt p prox t = canInsertAt' p prox (unTerm t)
 
-insertBefore :: (InsertAt g l, MonadAnnotater a m) => AnnTerm a g l -> AnnTerm a g i -> m (AnnTerm a g i)
+
+insertBefore :: (InsertAt gs l, MonadAnnotater a m) => AnnTerm a gs l -> AnnTerm a gs i -> m (AnnTerm a gs i)
 insertBefore = insertAt EnterEvalPoint
 
-canInsertBefore :: (InsertAt g l) => Proxy l -> AnnTerm a g i -> Bool
+canInsertBefore :: (InsertAt gs l) => Proxy l -> AnnTerm a gs i -> Bool
 canInsertBefore = canInsertAt EnterEvalPoint

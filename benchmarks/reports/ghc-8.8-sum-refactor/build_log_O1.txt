@@ -1,0 +1,5 @@
+05/22/2020
+
+stack build --flag=cubix:only-one-language   880.69s user 20.08s system 197% cpu 7:36.94 total
+
+actual command : time stack build --flag=cubix:only-one-language --ghc-options='-O1 -j +RTS -A256m -n2m -RTS -freduction-depth=300'

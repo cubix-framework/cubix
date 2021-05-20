@@ -1,5 +1,5 @@
 name: cubix
-version: '0.1.0.0'
+version: '0.5.0.0'
 synopsis: A framework for multi-language transformation
 description: Please see README.md
 category: language
@@ -26,6 +26,7 @@ library:
   source-dirs: src
   exposed-modules:
   - Cubix.Analysis.Call.Trivial
+  - Cubix.Essentials
   - Cubix.Language.Info
   - Cubix.Language.C.Parametric.Common
   - Cubix.Language.C.Parametric.Full
@@ -56,7 +57,7 @@ library:
   - Cubix.Transformations.Variation
   - Language.JavaScript.Pretty.Printer.Extended
   ghc-options:
-  - -fcontext-stack=200
+  - -freduction-depth=400
   dependencies:
   - base
   - cubix-compdata
@@ -88,7 +89,7 @@ executables:
      - -threaded
      - -rtsopts
      - -with-rtsopts=-N
-     - -fcontext-stack=200
+     - -freduction-depth=400
     dependencies:
     - base
     - cubix-compdata
@@ -125,7 +126,7 @@ executables:
   #    - -threaded
   #    - -rtsopts
   #    - -with-rtsopts=-N
-  #    - -fcontext-stack=200
+  #    - -freduction-depth=400
   #  dependencies:
   #  - base
   #  - cubix-compdata
@@ -138,7 +139,7 @@ executables:
   #  - -threaded
   #  - -rtsopts
   #  - -with-rtsopts=-N
-  #  - -fcontext-stack=200
+  #  - -freduction-depth=400
   #  dependencies:
   #  - base
   #  - cubix-compdata
@@ -151,7 +152,7 @@ executables:
   #  - -threaded
   #  - -rtsopts
   #  - -with-rtsopts=-N
-  #  - -fcontext-stack=200
+  #  - -freduction-depth=400
   #  dependencies:
   #  - base
   #  - cubix-compdata
@@ -164,7 +165,7 @@ executables:
   #    - -threaded
   #    - -rtsopts
   #    - -with-rtsopts=-N
-  #    - -fcontext-stack=200
+  #    - -freduction-depth=400
   #  dependencies:
   #  - base
   #  - cubix-compdata
@@ -179,7 +180,7 @@ executables:
   #    - -threaded
   #    - -rtsopts
   #    - -with-rtsopts=-N
-  #    - -fcontext-stack=200
+  #    - -freduction-depth=400
   #  dependencies:
   #  - base
   #  - cubix-compdata
@@ -193,7 +194,7 @@ benchmarks:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -fcontext-stack=200
+      - -freduction-depth=400
     dependencies:
      - base
      - cubix-compdata
@@ -205,3 +206,25 @@ benchmarks:
      - language-lua
      - language-python
      - lens
+     - text
+tests:
+  cfg-test:
+    main: Main.hs
+    source-dirs: cfg-test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -fcontext-stack=300
+    dependencies:
+     - base
+     - compstrat
+     - containers     
+     - cubix
+     - cubix-compdata
+     - deepseq
+     - directory
+     - filepath
+     - hedgehog
+     - lens
+     - mtl

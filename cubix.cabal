@@ -1,0 +1,244 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 27eeb7b0dccc9a7bd77b7f2e796cde485a92cf2e1ebc4132dc8ba2a6b150fcc0
+
+name:           cubix
+version:        0.5.0.0
+synopsis:       A framework for multi-language transformation
+description:    Please see README.md
+category:       language
+author:         James Koppel
+maintainer:     jkoppel@mit.edu
+copyright:      2016 James Koppel
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+
+flag only-one-language
+  manual: True
+  default: False
+
+library
+  exposed-modules:
+      Cubix.Analysis.Call.Trivial
+      Cubix.Essentials
+      Cubix.Language.Info
+      Cubix.Language.C.Parametric.Common
+      Cubix.Language.C.Parametric.Full
+      Cubix.Language.C.Parse
+      Cubix.Language.Java.Parametric.Common
+      Cubix.Language.Java.Parametric.Full
+      Cubix.Language.Java.Parse
+      Cubix.Language.JavaScript.Parametric.Common
+      Cubix.Language.JavaScript.Parametric.Full
+      Cubix.Language.Lua.Parametric.Common
+      Cubix.Language.Lua.Parametric.Full
+      Cubix.Language.Parametric.Derive
+      Cubix.Language.Parametric.InjF
+      Cubix.Language.Parametric.ProgInfo
+      Cubix.Language.Parametric.Semantics.Cfg
+      Cubix.Language.Parametric.Semantics.CfgInserter
+      Cubix.Language.Parametric.Semantics.SemanticProperties
+      Cubix.Language.Parametric.Syntax
+      Cubix.Language.Python.Parametric.Common
+      Cubix.Language.Python.Parametric.Full
+      Cubix.ParsePretty
+      Cubix.Sin.Compdata.Annotation
+      Cubix.Sin.NFData
+      Cubix.Transformations.Hoist
+      Cubix.Transformations.Plumbing.IPT
+      Cubix.Transformations.TAC
+      Cubix.Transformations.TestCoverage
+      Cubix.Transformations.Variation
+      Language.JavaScript.Pretty.Printer.Extended
+  other-modules:
+      Cubix.Language.C.Parametric.Common.Cfg
+      Cubix.Language.C.Parametric.Common.Semantics
+      Cubix.Language.C.Parametric.Common.Trans
+      Cubix.Language.C.Parametric.Common.Types
+      Cubix.Language.C.Parametric.Full.Names
+      Cubix.Language.C.Parametric.Full.Trans
+      Cubix.Language.C.Parametric.Full.Types
+      Cubix.Language.Java.Parametric.Common.Cfg
+      Cubix.Language.Java.Parametric.Common.Semantics
+      Cubix.Language.Java.Parametric.Common.Trans
+      Cubix.Language.Java.Parametric.Common.Types
+      Cubix.Language.Java.Parametric.Full.Names
+      Cubix.Language.Java.Parametric.Full.Trans
+      Cubix.Language.Java.Parametric.Full.Types
+      Cubix.Language.JavaScript.Parametric.Common.Cfg
+      Cubix.Language.JavaScript.Parametric.Common.Semantics
+      Cubix.Language.JavaScript.Parametric.Common.Trans
+      Cubix.Language.JavaScript.Parametric.Common.Types
+      Cubix.Language.JavaScript.Parametric.Full.Exclusions
+      Cubix.Language.JavaScript.Parametric.Full.Names
+      Cubix.Language.JavaScript.Parametric.Full.Trans
+      Cubix.Language.JavaScript.Parametric.Full.Types
+      Cubix.Language.Lua.Parametric.Common.Cfg
+      Cubix.Language.Lua.Parametric.Common.Semantics
+      Cubix.Language.Lua.Parametric.Common.Trans
+      Cubix.Language.Lua.Parametric.Common.Types
+      Cubix.Language.Lua.Parametric.Full.Exclusions
+      Cubix.Language.Lua.Parametric.Full.Names
+      Cubix.Language.Lua.Parametric.Full.Trans
+      Cubix.Language.Lua.Parametric.Full.Types
+      Cubix.Language.Parametric.Path
+      Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
+      Cubix.Language.Parametric.Semantics.Cfg.CfgDot
+      Cubix.Language.Parametric.Semantics.Cfg.CommonNodes
+      Cubix.Language.Parametric.Semantics.Cfg.Graph
+      Cubix.Language.Parametric.Syntax.Base
+      Cubix.Language.Parametric.Syntax.Function
+      Cubix.Language.Parametric.Syntax.Functor
+      Cubix.Language.Parametric.Syntax.VarDecl
+      Cubix.Language.Python.Parametric.Common.Cfg
+      Cubix.Language.Python.Parametric.Common.Semantics
+      Cubix.Language.Python.Parametric.Common.Trans
+      Cubix.Language.Python.Parametric.Common.Types
+      Cubix.Language.Python.Parametric.Full.Names
+      Cubix.Language.Python.Parametric.Full.Trans
+      Cubix.Language.Python.Parametric.Full.Types
+      Cubix.Sin.Compdata.Derive
+      Cubix.Sin.Compdata.Instances
+      Cubix.Transformations.Hoist.Custom
+      Cubix.Transformations.Hoist.Elementary
+      Cubix.Transformations.Hoist.Hoisting
+      Cubix.Transformations.TAC.Custom
+      Cubix.Transformations.TAC.Gensym
+      Cubix.Transformations.TAC.Sorts
+      Cubix.Transformations.TAC.State
+      Cubix.Transformations.TAC.ToTAC
+      Paths_cubix
+  hs-source-dirs:
+      src
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -freduction-depth=400
+  build-depends:
+      MonadRandom
+    , base
+    , compstrat
+    , comptrans
+    , concurrent-supply >=0.1.7
+    , constraints
+    , containers
+    , cubix-compdata
+    , data-default
+    , deepseq
+    , deepseq-generics
+    , fgl
+    , language-c
+    , language-dot
+    , language-java >=0.2.8.1
+    , language-javascript >=0.6.0.9
+    , language-lua
+    , language-python
+    , lens
+    , mtl
+    , process
+    , random
+    , template-haskell
+    , temporary
+    , text
+    , th-expand-syns
+    , transformers
+    , wl-pprint
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+  default-language: Haskell2010
+
+executable examples-multi
+  main-is: Main.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      examples/multi
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , constraints
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , fgl
+    , language-c
+    , language-dot
+    , language-java >=0.2.8.1
+    , language-javascript >=0.6.0.9
+    , language-lua
+    , language-python
+    , lens
+    , mtl
+    , temporary
+    , text
+    , transformers
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+  default-language: Haskell2010
+
+test-suite cfg-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Cubix.Language.C.Cfg.Test
+      Cubix.Language.Java.Cfg.Test
+      Cubix.Language.JavaScript.Cfg.Test
+      Cubix.Language.Lua.Cfg.Test
+      Cubix.Language.Parametric.Cfg.Test
+      Cubix.Language.Python.Cfg.Test
+      Paths_cubix
+  hs-source-dirs:
+      cfg-test
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -fcontext-stack=300
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , directory
+    , filepath
+    , hedgehog
+    , lens
+    , mtl
+    , transformers
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+  default-language: Haskell2010
+
+benchmark mainbench
+  type: exitcode-stdio-1.0
+  main-is: Benchmarks.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      benchmarks
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , criterion
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , language-c
+    , language-java >=0.2.8.1
+    , language-javascript >=0.6.0.9
+    , language-lua
+    , language-python
+    , lens
+    , mtl
+    , text
+    , transformers
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+  default-language: Haskell2010

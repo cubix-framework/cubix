@@ -7,6 +7,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -27,6 +28,11 @@ module Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction (
   , ComputationSorts
   , SuspendedComputationSorts
   , ContainerFunctors
+
+  , labeledIsComputationSort
+  , labeledIsSuspendedComputationSort
+  , labeledIsContainer
+
   , PreRAlg
   , ConstructCfg(..)
   , HState(..)
@@ -48,7 +54,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (^.), (%=)  )
 
-import Data.Comp.Multi ( Cxt(..), Term, (:->), K(..), inj, proj, project, para, stripA, inj, (:+:), (:<:), HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), AnnTerm, inj', caseH' )
+import Data.Comp.Multi ( Node, Signature, Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import Cubix.Language.Info
@@ -57,114 +63,140 @@ import Cubix.Language.Parametric.Syntax.Functor
 
 --------------------------------------------------------------------------------------
 
-type family ComputationSorts (f :: (* -> *) -> * -> *) :: [*]
+type family ComputationSorts (fs :: Signature) :: [*]
 
-class IsComputationSort' f (l :: [*]) where
-  isComputationSort' :: Proxy l -> Term f i -> Bool
+class IsComputationSort' fs (l :: [*]) where
+  isComputationSort' :: Proxy l -> Term fs i -> Bool
 
-class IsComputationSort f where
-  isComputationSort :: Term f l -> Bool
+class IsComputationSort fs where
+  isComputationSort :: Term fs i -> Bool
 
-instance (IsComputationSort' f (ComputationSorts f)) => IsComputationSort f where
-  isComputationSort = isComputationSort' (Proxy :: Proxy (ComputationSorts f))
+instance (IsComputationSort' fs (ComputationSorts fs)) => IsComputationSort fs where
+  isComputationSort = isComputationSort' (Proxy :: Proxy (ComputationSorts fs))
 
-instance IsComputationSort' f '[] where
+instance IsComputationSort' fs '[] where
   isComputationSort' _ = const False
 
-instance (IsComputationSort' f ls, DynCase (Term f) l) => IsComputationSort' f (l ': ls) where
+instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' fs (l ': ls) where
   isComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsComputationSort :: forall f f' l. (IsComputationSort f, HFunctor f) => TermLab f l -> Bool
+labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
-type family SuspendedComputationSorts (f :: (* -> *) -> * -> *) :: [*]
+type family SuspendedComputationSorts (fs :: Signature) :: [*]
 
-class IsSuspendedComputationSort' f (l :: [*]) where
-  isSuspendedComputationSort' :: Proxy l -> Term f i -> Bool
+class IsSuspendedComputationSort' fs (l :: [*]) where
+  isSuspendedComputationSort' :: Proxy l -> Term fs i -> Bool
 
-class IsSuspendedComputationSort f where
-  isSuspendedComputationSort :: Term f l -> Bool
+class IsSuspendedComputationSort fs where
+  isSuspendedComputationSort :: Term fs i -> Bool
 
-instance (IsSuspendedComputationSort' f (SuspendedComputationSorts f)) => IsSuspendedComputationSort f where
-  isSuspendedComputationSort = isSuspendedComputationSort' (Proxy :: Proxy (SuspendedComputationSorts f))
+instance (IsSuspendedComputationSort' fs (SuspendedComputationSorts fs)) => IsSuspendedComputationSort fs where
+  isSuspendedComputationSort = isSuspendedComputationSort' (Proxy :: Proxy (SuspendedComputationSorts fs))
 
-instance IsSuspendedComputationSort' f '[] where
+instance IsSuspendedComputationSort' fs '[] where
   isSuspendedComputationSort' _ = const False
 
-instance (IsSuspendedComputationSort' f ls, DynCase (Term f) l) => IsSuspendedComputationSort' f (l ': ls) where
+instance (IsSuspendedComputationSort' fs ls, DynCase (Term fs) l) => IsSuspendedComputationSort' fs (l ': ls) where
   isSuspendedComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isSuspendedComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort f, HFunctor f) => AnnTerm a f l -> Bool
+labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
 
-type family ContainerFunctors (f :: (* -> *) -> * -> *) :: [(* -> *) -> * -> *]
+type family ContainerFunctors (fs :: Signature) :: [Node]
 
-class IsContainer' f (l :: [(* -> *) -> * -> *])where
-  isContainer' :: Proxy l -> Term f i -> Bool
+class IsContainer' fs (l :: Signature)where
+  isContainer' :: Proxy l -> Term fs i -> Bool
 
-class IsContainer f where
-  isContainer :: Term f i -> Bool
+class IsContainer fs where
+  isContainer :: Term fs i -> Bool
 
-instance (IsContainer' f (ContainerFunctors f)) => IsContainer f where
-  isContainer = isContainer' (Proxy :: Proxy (ContainerFunctors f))
+instance (IsContainer' fs (ContainerFunctors fs)) => IsContainer fs where
+  isContainer = isContainer' (Proxy :: Proxy (ContainerFunctors fs))
 
-instance IsContainer' f '[] where
+instance IsContainer' fs '[] where
   isContainer' _ = const False
 
-instance (IsContainer' f ls, l :<: f) => IsContainer' f (l ': ls) where
-  isContainer' _ t = case (project t :: Maybe (l _ _)) of
+instance (IsContainer' fs ls, l :-<: fs) => IsContainer' fs (l ': ls) where
+  isContainer' _ t = case go t of
                        Just _  -> True
                        Nothing -> isContainer' (Proxy :: Proxy ls) t
 
-labeledIsContainer :: (IsContainer f, HFunctor f) => AnnTerm a f l -> Bool
+    where go :: forall lab. Term fs lab -> Maybe (l (Term fs) lab)
+          go = project
+
+labeledIsContainer :: (IsContainer fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsContainer = isContainer . stripA
 
 
-data EnterExitPair f l = EnterExitPair { enter :: CfgNode f
-                                       , exit  :: CfgNode f
-                                       }
-                       | SubPairs (f (EnterExitPair f) l) -- naming is hard
+data EnterExitPair fs l = EnterExitPair { enter :: CfgNode fs
+                                        , exit  :: CfgNode fs
+                                        }
+                       | SubPairs (Sum fs (EnterExitPair fs) l) -- naming is hard
                        | EmptyEnterExit
 
-instance (ShowHF f, HFunctor f) => Show (EnterExitPair f l) where
+instance (All ShowHF fs, All HFunctor fs) => Show (EnterExitPair fs l) where
   show (EnterExitPair ent ex) = "(EnterExitPair " ++ show ent ++ " " ++ show ex ++ ")"
   show (SubPairs t) = "(SubPairs " ++ showHF' (hfmap (K . show) t) ++ ")"
   show EmptyEnterExit = "EmptyEnterExit"
 
-mapEnterExitPair :: (HFunctor f) => (forall e i. f e i -> g e i) -> (EnterExitPair f l -> EnterExitPair g l)
+mapEnterExitPair :: (All HFunctor fs) => (forall e i. Sum fs e i -> Sum gs e i) -> (EnterExitPair fs l -> EnterExitPair gs l)
 mapEnterExitPair f EmptyEnterExit = EmptyEnterExit
 mapEnterExitPair f (EnterExitPair n x) = EnterExitPair (mapCfgNode f n) (mapCfgNode f x)
 mapEnterExitPair f (SubPairs t) = SubPairs $ f $ hfmap (mapEnterExitPair f) t
 
-iSubPairs ::  (f' :<: f) => f' (EnterExitPair f) l -> EnterExitPair f l
+iSubPairs ::  (f' :-<: fs) => f' (EnterExitPair fs) l -> EnterExitPair fs l
 iSubPairs x = SubPairs (inj x)
 
 -- Had such confusing type errors with this
-extractEEPList :: forall f l. (ListF :<: f, Typeable l) => EnterExitPair f [l] -> [EnterExitPair f l]
-extractEEPList (SubPairs ((proj :: f _ _ -> Maybe (ListF _ _)) -> Just (ConsF x xs))) = x : extractEEPList xs
-extractEEPList (SubPairs ((proj :: f _ _ -> Maybe (ListF _ _)) -> Just NilF))      = []
+extractEEPList :: forall fs l. (ListF :-<: fs, Typeable l) => EnterExitPair fs [l] -> [EnterExitPair fs l]
+extractEEPList (SubPairs ps) =
+  case go ps of
+    Just (ConsF x xs) -> x : extractEEPList xs
+    Just NilF         -> []
 
-extractEEPPair :: forall f a b. (PairF :<: f) => EnterExitPair f (a,b) -> (EnterExitPair f a, EnterExitPair f b)
-extractEEPPair (SubPairs ((proj :: f _ _ -> Maybe (PairF _ _)) -> Just (PairF x y))) = (x, y)
+  where go :: Sum fs e [l] -> Maybe (ListF e [l])
+        go = proj
+
+extractEEPPair :: forall fs a b. (PairF :-<: fs) => EnterExitPair fs (a,b) -> (EnterExitPair fs a, EnterExitPair fs b)
+extractEEPPair (SubPairs ps) =
+  case go ps of
+    Just (PairF x y) -> (x, y)
+
+  where go :: Sum fs e (a, b) -> Maybe (PairF e (a, b))
+        go = proj
 
 -- Yes, it's ugly that this has a different signature from the above. No, I don't have
 -- time to care ATM
-extractEEPMaybe :: (KExtractF' Maybe f, Monad m) => m (EnterExitPair f (Maybe l)) -> m (Maybe (EnterExitPair f l))
+extractEEPMaybe :: (All (KExtractF' Maybe) fs, Monad m) => m (EnterExitPair fs (Maybe l)) -> m (Maybe (EnterExitPair fs l))
 extractEEPMaybe m = do
-  SubPairs p <- m
+  p' <- m
+  let SubPairs p = p'
   return $ kextractF' p
 
 
-identEnterExit :: CfgNode f -> EnterExitPair f l
+identEnterExit :: CfgNode fs -> EnterExitPair fs l
 identEnterExit n = EnterExitPair n n
 
-collapseEnterExit :: (HasCurCfg s f, HTraversable f, MonadState s m) => EnterExitPair f i -> m (EnterExitPair f j)
+collapseEnterExit ::
+  ( HasCurCfg s fs
+  , All HTraversable fs
+  , All HFoldable fs
+  , All HFunctor fs
+  , MonadState s m
+  ) => EnterExitPair fs i -> m (EnterExitPair fs j)
 collapseEnterExit p@(EnterExitPair n x) = return $ EnterExitPair n x
 collapseEnterExit EmptyEnterExit = return EmptyEnterExit
 collapseEnterExit (SubPairs subCfgs) =
     hfoldr (\k t -> t >>= combineEnterExit k) (return EmptyEnterExit) subCfgs
 
-combineEnterExit :: (HasCurCfg s f, HTraversable f, MonadState s m) => EnterExitPair f i -> EnterExitPair f j -> m (EnterExitPair f k)
+combineEnterExit ::
+  ( HasCurCfg s fs
+  , All HTraversable fs
+  , All HFoldable fs
+  , All HFunctor fs  
+  , MonadState s m
+  ) => EnterExitPair fs i -> EnterExitPair fs j -> m (EnterExitPair fs k)
 combineEnterExit p1 p2 = do
   p1' <- collapseEnterExit p1
   p2' <- collapseEnterExit p2
@@ -176,14 +208,16 @@ combineEnterExit p1 p2 = do
           cur_cfg %= addEdge x1 n2
           return $ EnterExitPair n1 x2
 
+collapseFProdG :: (HFunctor f, f :-<: gs) => f (Term gs :*: t) :-> Term gs :*: f t
+collapseFProdG t = (Term $ inj $ hfmap ffst t) :*: (hfmap fsnd t)
 
-collapseFProd :: (HFunctor f, f :<: g) => f (Term g :*: t) :-> Term g :*: f t
-collapseFProd t = (Term $ inj $ hfmap ffst t) :*: (hfmap fsnd t)
+collapseFProd :: (HFunctor f, f :-<: gs) => f (Term gs :*: t) :-> Term gs :*: f t
+collapseFProd = collapseFProdG
 
-collapseFProd' :: (HFunctor f, f :<: g) => (f :&: a) (AnnTerm a g :*: t) :-> AnnTerm a g :*: f t
+collapseFProd' :: (HFunctor f, f :-<: gs) => (f :&: a) (AnnTerm a gs :*: t) :-> AnnTerm a gs :*: f t
 collapseFProd' t@(x :&: _) = (Term $ inj' $ hfmap ffst t) :*: (hfmap fsnd x)
 
-fprodFst' :: (HFunctor f, f :<: g) => (f :&: a) (AnnTerm a g :*: t) :-> AnnTerm a g
+fprodFst' :: (HFunctor f, f :-<: gs) => (f :&: a) (AnnTerm a gs :*: t) :-> AnnTerm a gs
 fprodFst' (collapseFProd' -> t :*: _) = t
 
 -- | PreRAlg's are things that can be modularly composed
@@ -202,23 +236,31 @@ fprodFst' (collapseFProd' -> t :*: _) = t
 -- In @PreRAlg f g a@, @f@ is the signature functor of
 -- the outer layer, while @g@ is the recursive signature
 -- functor, and @a@ is the carrier of the R-algebra.
-type PreRAlg f g a = f (Term g :*: a) :-> a
+type PreRAlg f g a = f (HFix g :*: a) :-> a
 
 data HState s f l = HState { unHState :: State s (f l) }
 
-class ConstructCfg f g s where
-  constructCfg :: PreRAlg (f :&: Label) (g :&: Label) (HState s (EnterExitPair g))
+class ConstructCfg gs s f where
+  constructCfg :: PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 
+type CfgComponent gs s = (HasLabelGen s, HasCurCfg s gs, All HTraversable gs, All HFoldable gs, All HFunctor gs)
+type SortChecks gs = (IsComputationSort gs, IsSuspendedComputationSort gs, IsContainer gs)
 
-type CfgComponent g s = (HasLabelGen s, HasCurCfg s g, HTraversable g)
-type SortChecks g = (IsComputationSort g, IsSuspendedComputationSort g, IsContainer g)
-
-runSubCfgs :: (f :<: g, HTraversable f, CfgComponent g s) => f (HState s (EnterExitPair g)) i -> State s (EnterExitPair g j)
+runSubCfgs ::
+  ( f :-<: gs
+  , HTraversable f
+  , CfgComponent gs s
+  ) => f (HState s (EnterExitPair gs)) i -> State s (EnterExitPair gs j)
 runSubCfgs subCfgs = do
   x <- hmapM unHState subCfgs
   collapseEnterExit $ SubPairs (inj x)
 
-constructCfgGeneric :: forall f g s. (f :<: g, HTraversable f, CfgComponent g s) => PreRAlg (f :&: Label) (g :&: Label) (HState s (EnterExitPair g))
+constructCfgGeneric ::
+  forall f gs s.
+  ( f :-<: gs
+  , HTraversable f
+  , CfgComponent gs s
+  ) => PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 constructCfgGeneric (collapseFProd' -> (t :*: subCfgs)) = HState $ do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -228,7 +270,13 @@ constructCfgGeneric (collapseFProd' -> (t :*: subCfgs)) = HState $ do
   tmpNode <- combineEnterExit (identEnterExit enterNode) body
   combineEnterExit tmpNode (identEnterExit exitNode)
 
-constructCfgDefault :: forall f g s. (f :<: g, HTraversable f, CfgComponent g s, SortChecks g) => PreRAlg (f :&: Label) (g :&: Label) (HState s (EnterExitPair g))
+constructCfgDefault ::
+  forall f gs s.
+  ( f :-<: gs
+  , HTraversable f
+  , CfgComponent gs s
+  , SortChecks gs
+  ) => PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 constructCfgDefault p@(collapseFProd' -> (t :*: subCfgs)) =
   if labeledIsComputationSort t then
     constructCfgGeneric p
@@ -242,26 +290,30 @@ constructCfgDefault p@(collapseFProd' -> (t :*: subCfgs)) =
   else
     HState $ runSubCfgs subCfgs
 
-
-
-instance {-# OVERLAPPABLE #-} (f :<: g, HTraversable f, CfgComponent g s, SortChecks g) => ConstructCfg f g s where
+instance {-# OVERLAPPABLE #-}
+  ( f :-<: gs
+  , HTraversable f
+  , CfgComponent gs s
+  , SortChecks gs
+  ) => ConstructCfg gs s f where
   constructCfg = constructCfgDefault
 
-instance {-# OVERLAPPING #-} (ConstructCfg f1 g s, ConstructCfg f2 g s) => ConstructCfg (f1 :+: f2) g s where
-  constructCfg = caseH' constructCfg constructCfg
+instance {-# OVERLAPPING #-} (All (ConstructCfg g s) fs) => ConstructCfg g s (Sum fs) where
+  constructCfg = caseCxt' (Proxy @(ConstructCfg g s)) constructCfg
 
 
 ------------------------------------------------------------------------------------------------------------------------
 
-type family CfgState (f :: (* -> *) -> * -> *) :: *
+type family CfgState (fs :: Signature) :: *
 
-class CfgInitState f where
-   cfgInitState :: Proxy f -> CfgState f
+class CfgInitState fs where
+   cfgInitState :: Proxy fs -> CfgState fs
 
-class    (CfgComponent f (CfgState f), ConstructCfg f f (CfgState f), CfgInitState f, HFunctor f) => CfgBuilder f
-instance (CfgComponent f (CfgState f), ConstructCfg f f (CfgState f), CfgInitState f, HFunctor f) => CfgBuilder f
+class    (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
+instance (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs), CfgInitState fs) => CfgBuilder fs
 
-makeCfg :: forall f l. (CfgBuilder f) => TermLab f l -> Cfg f
+-- | Constructs a CFG for the given labelled term
+makeCfg :: forall fs l. (CfgBuilder fs) => TermLab fs l -> Cfg fs
 makeCfg t = (execState (unHState $ para constructCfg t) initState) ^. cur_cfg
   where
-    initState = cfgInitState (Proxy :: Proxy f)
+    initState = cfgInitState (Proxy :: Proxy fs)

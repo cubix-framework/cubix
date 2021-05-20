@@ -1,3 +1,5 @@
+{-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -36,36 +38,37 @@ import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.CfgInserter
 import Cubix.Language.Parametric.Syntax
 
+import Cubix.Sin.Compdata.Annotation
+
 import Cubix.Transformations.TAC.Custom
 import Cubix.Transformations.TAC.Gensym
 
 --------------------------------------------------------------------------------------
 
-data TACState f = TACState { _tac_gen          :: LabelGen
-                           , _tac_gensym_state :: GensymState
-
-                           , _is_accumulating_prepends :: Bool
-                           , _to_prepend       :: [TermLab f BlockItemL]
-                           }
+data TACState fs = TACState { _tac_gen          :: LabelGen
+                            , _tac_gensym_state :: GensymState
+                            , _is_accumulating_prepends :: Bool
+                            , _to_prepend       :: [TermLab fs BlockItemL]
+                            }
 
 makeLenses ''TACState
 
-instance HasLabelGen (TACState f) where labelGen = tac_gen
-instance HasGensymState (TACState f) where gensymState = tac_gensym_state
+instance HasLabelGen (TACState fs) where labelGen = tac_gen
+instance HasGensymState (TACState fs) where gensymState = tac_gensym_state
 
-makeTACState :: LabelGen -> GensymState -> TACState f
+makeTACState :: LabelGen -> GensymState -> TACState fs
 makeTACState gen gs = TACState gen gs False []
 
-data LocalTACState f = LocalTACState { _ltac_mod_set :: ModifiedSet f}
+data LocalTACState fs = LocalTACState { _ltac_mod_set :: ModifiedSet fs}
 
 makeLenses ''LocalTACState
 
-makeLocalTACState :: ModifiedSet f -> LocalTACState f
+makeLocalTACState :: ModifiedSet fs -> LocalTACState fs
 makeLocalTACState = LocalTACState
 
 -- Simulating a sub runWriterT; we needed to switch from Writer to State
 -- to allow using the CfgInsertert
-withSubPrepends :: (MonadState (TACState f) m) => m x -> m (x, [TermLab f BlockItemL])
+withSubPrepends :: (MonadState (TACState fs) m) => m x -> m (x, [TermLab fs BlockItemL])
 withSubPrepends sub = do
   old_is_acc <- use is_accumulating_prepends
   old <- use to_prepend
@@ -77,7 +80,7 @@ withSubPrepends sub = do
   is_accumulating_prepends .= old_is_acc
   return (x, p)
 
-doPrepend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l -> TermLab f BlockItemL -> m ()
+doPrepend :: (MonadState (TACState fs) m, MonadCfgInsertion m fs BlockItemL) => TermLab fs l -> TermLab fs BlockItemL -> m ()
 doPrepend targ t = do
   is_acc <- use is_accumulating_prepends
   if is_acc then
@@ -86,13 +89,14 @@ doPrepend targ t = do
     dominatingPrependLast targ t
 
 
-data PrependPair f l = PrependPair { prepend_first :: TermLab f l
-                                   , prepend_rest  :: Maybe (TermLab f l)
-                                   }
+data PrependPair fs l = PrependPair { prepend_first :: TermLab fs l
+                                    , prepend_rest  :: Maybe (TermLab fs l)
+                                    }
 
-doPrependSplit  :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l
-                                                                                 -> PrependPair f BlockItemL
-                                                                                 -> m ()
+doPrependSplit ::
+  ( MonadState (TACState fs) m
+  , MonadCfgInsertion m fs BlockItemL
+  ) => TermLab fs l -> PrependPair fs BlockItemL -> m ()
 doPrependSplit targ p = do
   is_acc <- use is_accumulating_prepends
   if is_acc then
@@ -101,9 +105,10 @@ doPrependSplit targ p = do
     firstPredPrependLast targ (prepend_first p)
     maybe (return ()) (restPredPrependLast targ) (prepend_rest p)
 
-doOptionalAppend :: (MonadState (TACState f) m, MonadCfgInsertion m f BlockItemL) => TermLab f l
-                                                                                     -> TermLab f BlockItemL
-                                                                                     -> m ()
+doOptionalAppend ::
+  ( MonadState (TACState fs) m
+  , MonadCfgInsertion m fs BlockItemL
+  ) => TermLab fs l -> TermLab fs BlockItemL -> m ()
 doOptionalAppend targ e = do
   is_acc <- use is_accumulating_prepends
   if is_acc then
@@ -112,4 +117,6 @@ doOptionalAppend targ e = do
     dominatingAppendFirstOpts targ e EmptyInsertOkay
 
 
-type MonadTAC f m = (MonadState (TACState f) m, MonadReader (LocalTACState f) m, MonadCfgInsertion m f BlockItemL, MonadRandom m, MonadPlus m)
+type MonadTAC fs m = ( MonadState (TACState fs) m, MonadAnnotater Label m
+                     , MonadReader (LocalTACState fs) m, MonadCfgInsertion m fs BlockItemL
+                     , MonadRandom m, MonadPlus m, MonadFail m)

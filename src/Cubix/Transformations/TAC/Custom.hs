@@ -1,16 +1,20 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_HADDOCK hide #-}
+
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PatternGuards          #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ViewPatterns           #-}
 
 module Cubix.Transformations.TAC.Custom (
     IsValue(..)
@@ -25,8 +29,9 @@ import Control.Monad.Identity ( runIdentity )
 import Data.List ( (\\) )
 import Data.Set ( Set )
 import qualified Data.Set as Set
+import Data.Proxy
 
-import Data.Comp.Multi ( Cxt(..), Term, unTerm, Context, project', proj, EqHF, caseH, (:+:), project, runE, HFoldable, htoList, (:<:), stripA)
+import Data.Comp.Multi ( Node, Cxt(..), Term, Sum, All, unTerm, ContextS, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
 import Data.Comp.Multi.Strategic ( Translate, crushtdT, addFail, promoteTF )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms )
 
@@ -45,13 +50,25 @@ import Cubix.Sin.Compdata.Annotation ( MonadAnnotater )
 
 --------------------------------------------------------------------------------------
 
-isLeafExpression :: forall f. (EqHF f, HFoldable f, DynCase (TermLab f) (ExpressionSort f)) => TermLab f (ExpressionSort f) -> Bool
-isLeafExpression t = ((subterms t :: [TermLab f (ExpressionSort f)]) \\ [t]) == []
+isLeafExpression ::
+  forall fs.
+  ( All EqHF fs
+  , All HFoldable fs
+  , All HFunctor fs
+  , DynCase (TermLab fs) (ExpressionSort fs)
+  ) => TermLab fs (ExpressionSort fs) -> Bool
+isLeafExpression t = ((subterms t :: [TermLab fs (ExpressionSort fs)]) \\ [t]) == []
 
-containsAnyVar :: forall f l. (HFoldable f, Ident :<: f, DynCase (TermLab f) IdentL) => Set String -> TermLab f l -> Bool
-containsAnyVar varSet t = any inVarSet (subterms t :: [TermLab f IdentL])
+containsAnyVar ::
+  forall fs l.
+  ( All HFoldable fs
+  , All HFunctor fs
+  , Ident :-<: fs
+  , DynCase (TermLab fs) IdentL
+  ) => Set String -> TermLab fs l -> Bool
+containsAnyVar varSet t = any inVarSet (subterms t :: [TermLab fs IdentL])
   where
-    inVarSet :: TermLab f IdentL -> Bool
+    inVarSet :: TermLab fs IdentL -> Bool
     inVarSet (project' -> Just (Ident s)) = Set.member s varSet
 
 --------------------------------------------------------------------------------------
@@ -64,10 +81,10 @@ containsAnyVar varSet t = any inVarSet (subterms t :: [TermLab f IdentL])
 ----- (so we don't need a frame analysis)
 -----
 ----- And so, this caveat applies to JS, but not Lua or Python, which like inline assigns
-class IsValue f where
-  type ModifiedSet f
-  isValue :: ModifiedSet f -> TermLab f (ExpressionSort f) -> Bool
-  modifiedVariables :: TermLab f l -> ModifiedSet f
+class IsValue fs where
+  type ModifiedSet fs
+  isValue :: ModifiedSet fs -> TermLab fs (ExpressionSort fs) -> Bool
+  modifiedVariables :: TermLab fs l -> ModifiedSet fs
 
 #ifndef ONLY_ONE_LANGUAGE
 instance IsValue MJSSig where
@@ -95,14 +112,14 @@ instance IsValue MLuaSig where
 
 --------------------------------------------------------------------------------------
 
-class RenderGuard f where
-  renderGuard :: (MonadAnnotater Label m) => Bool -> TermLab f (ExpressionSort f) -> [TermLab f BlockItemL] -> m (TermLab f BlockItemL)
+class RenderGuard fs where
+  renderGuard :: (MonadAnnotater Label m) => Bool -> TermLab fs (ExpressionSort fs) -> [TermLab fs BlockItemL] -> m (TermLab fs BlockItemL)
 
 #ifndef ONLY_ONE_LANGUAGE
 instance RenderGuard MJSSig where
   renderGuard sign cond body = annotateLabelOuter $ iJSIf noAnn noAnn signedCond noAnn jsBlock
     where
-      noAnn :: Context MJSSig a JSAnnotL
+      noAnn :: ContextS MJSSig a JSAnnotL
       noAnn = iJSNoAnnot
 
       signedCond = if sign then
@@ -132,7 +149,7 @@ instance RenderGuard MPythonSig where
 instance RenderGuard MLuaSig where -- handle the insertF
   renderGuard sign cond body = annotateLabelOuter $ LCommon.iIf (insertF [riPairF signedCond block]) Nothing'
     where
-      signedCond :: Context MLuaSig MLuaTermLab LCommon.ExpL
+      signedCond :: ContextS MLuaSig MLuaTermLab LCommon.ExpL
       signedCond = if sign then
                      Hole cond
                    else
@@ -146,21 +163,21 @@ instance RenderGuard MLuaSig where -- handle the insertF
 data ShouldHoist = ShouldHoist | ShouldntHoist | StopHoisting
   deriving ( Eq, Ord, Show )
 
-class ShouldHoistSelf' (f :: (* -> *) -> * -> *) g where
-  shouldHoistSelf' :: f (Term g) l -> Maybe ShouldHoist
+class ShouldHoistSelf' gs (f :: Node) where
+  shouldHoistSelf' :: f (Term gs) l -> Maybe ShouldHoist
 
-instance {-# OVERLAPPABLE #-} ShouldHoistSelf' f g where
+instance {-# OVERLAPPABLE #-} ShouldHoistSelf' gs f where
   shouldHoistSelf' = const Nothing
 
-instance {-# OVERLAPPING #-} (ShouldHoistSelf' f1 g, ShouldHoistSelf' f2 g) => ShouldHoistSelf' (f1 :+: f2) g where
-  shouldHoistSelf' = caseH shouldHoistSelf' shouldHoistSelf'
+instance {-# OVERLAPPING #-} (All (ShouldHoistSelf' gs) fs) => ShouldHoistSelf' gs (Sum fs) where
+  shouldHoistSelf' = caseCxt (Proxy @(ShouldHoistSelf' gs)) shouldHoistSelf'
 
 #ifndef ONLY_ONE_LANGUAGE
-instance {-# OVERLAPPING #-} ShouldHoistSelf' JSExpression MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistSelf' MJSSig JSExpression where
   shouldHoistSelf' (JSCallExpressionDot _ _ _) = Just ShouldntHoist
   shouldHoistSelf' _                           = Nothing
 
-instance {-# OVERLAPPING #-} ShouldHoistSelf' PCommon.Expr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistSelf' MPythonSig PCommon.Expr where
   shouldHoistSelf' (PCommon.Starred _ _) = Just ShouldntHoist
   shouldHoistSelf' _                     = Nothing
 #endif
@@ -172,7 +189,7 @@ instance {-# OVERLAPPING #-} ShouldHoistSelf' PCommon.Expr MPythonSig where
 -- this makes the Lua test suite infinite loop.
 --
 -- So....this is a hack so that those things will be GCed so the rest of the suite can run
-instance {-# OVERLAPPING #-} ShouldHoistSelf' LCommon.Exp MLuaSig where
+instance {-# OVERLAPPING #-} ShouldHoistSelf' MLuaSig LCommon.Exp where
   shouldHoistSelf' t
     | Just (LCommon.PrefixExp p) <- proj t
     , Just (LCommon.PEFunCall fc) <- project p
@@ -187,29 +204,33 @@ instance {-# OVERLAPPING #-} ShouldHoistSelf' LCommon.Exp MLuaSig where
 
   shouldHoistSelf' t = Nothing
 
-shouldHoistSelf :: (ShouldHoistSelf' f f) => Term f l -> Maybe ShouldHoist
+shouldHoistSelf :: (All (ShouldHoistSelf' fs) fs) => Term fs l -> Maybe ShouldHoist
 shouldHoistSelf = shouldHoistSelf' . unTerm
 
-class ShouldHoistChild' f g where
-  shouldHoistChild' :: ShouldHoist -> f (Term g) l -> [ShouldHoist]
+class ShouldHoistChild' gs f where
+  shouldHoistChild' :: ShouldHoist -> f (Term gs) l -> [ShouldHoist]
 
 
-defaultShouldHoistChild :: (HFoldable f) => ShouldHoist -> f (Term g) l -> [ShouldHoist]
+defaultShouldHoistChild :: (HFoldable f) => ShouldHoist -> f (Term gs) l -> [ShouldHoist]
 defaultShouldHoistChild h t = take (length (htoList t)) (repeat h)
 
-shouldHoistAllChildren :: (HFoldable f) => f (Term g) l -> [ShouldHoist]
+shouldHoistAllChildren :: (HFoldable f) => f (Term gs) l -> [ShouldHoist]
 shouldHoistAllChildren = defaultShouldHoistChild ShouldHoist
 
-instance {-# OVERLAPPABLE #-} (HFoldable f) => ShouldHoistChild' f g where
+instance {-# OVERLAPPABLE #-} (HFoldable f) => ShouldHoistChild' gs f where
   shouldHoistChild' = defaultShouldHoistChild
 
-instance {-# OVERLAPPING #-} (ShouldHoistChild' f1 g, ShouldHoistChild' f2 g) => ShouldHoistChild' (f1 :+: f2) g where
-  shouldHoistChild' h = caseH (shouldHoistChild' h) (shouldHoistChild' h)
+instance {-# OVERLAPPING #-} (All (ShouldHoistChild' gs) fs) => ShouldHoistChild' gs (Sum fs) where
+  shouldHoistChild' h = caseCxt (Proxy @(ShouldHoistChild' gs)) (shouldHoistChild' h)
 
-class ShouldHoistChild f where
-  shouldHoistChild :: ShouldHoist -> Term f l -> [ShouldHoist]
+class ShouldHoistChild fs where
+  shouldHoistChild :: ShouldHoist -> Term fs l -> [ShouldHoist]
 
-instance (ShouldHoistChild' f f, ShouldHoistSelf' f f, HFoldable f) => ShouldHoistChild f where
+instance ( All (ShouldHoistChild' fs) fs
+         , All (ShouldHoistSelf' fs) fs
+         , All HFoldable fs
+         , All HFunctor fs
+         ) => ShouldHoistChild fs where
   shouldHoistChild h t =  map chooseShouldHoist $ zip defaultChoice override
     where
       chooseShouldHoist :: (ShouldHoist, Maybe ShouldHoist) -> ShouldHoist
@@ -220,30 +241,30 @@ instance (ShouldHoistChild' f f, ShouldHoistSelf' f f, HFoldable f) => ShouldHoi
       defaultChoice =shouldHoistChild' h $ unTerm t
       override = map (runE shouldHoistSelf) $ htoList $ unTerm t
 
-instance {-# OVERLAP #-} ShouldHoistChild' P.Assign g where
+instance {-# OVERLAP #-} ShouldHoistChild' g P.Assign where
   shouldHoistChild' _ (P.Assign _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist]
 
--- Because Python has more complicated LHSs, but we've taken care of them by changing the representation
-
-instance {-# OVERLAPPING #-} ShouldHoistChild' P.Assign MPythonSig where
-  shouldHoistChild' _ (P.Assign _ _ _) = [ShouldHoist, StopHoisting, ShouldntHoist]
-
-instance {-# OVERLAPPING #-} ShouldHoistChild' P.SingleLocalVarDecl g where
+instance {-# OVERLAPPING #-} ShouldHoistChild' gs P.SingleLocalVarDecl where
   shouldHoistChild' _ (P.SingleLocalVarDecl _ _ _) = [StopHoisting, ShouldntHoist, ShouldntHoist]
 
 #ifndef ONLY_ONE_LANGUAGE
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSStatement MJSSig where
+-- Because Python has more complicated LHSs, but we've taken care of them by changing the representation
+
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig P.Assign where
+  shouldHoistChild' _ (P.Assign _ _ _) = [ShouldHoist, StopHoisting, ShouldntHoist]
+
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSStatement where
   shouldHoistChild' _ (JSExpressionStatement _ _) = [ShouldntHoist, StopHoisting]
   shouldHoistChild' h t = defaultShouldHoistChild h t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSTryCatch MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSTryCatch where
   shouldHoistChild' _ (JSCatch _ _ arg _ body) = [StopHoisting, StopHoisting, ShouldntHoist, StopHoisting, ShouldHoist]
   shouldHoistChild' h t = defaultShouldHoistChild h t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' FunctionCall MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig FunctionCall where
   shouldHoistChild' _ (P.FunctionCall _ _ _) = [StopHoisting, ShouldntHoist, ShouldHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' JSExpression MJSSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSExpression where
   -- Quick but coarse -- only most unary operators (delete, ++, --) should result in non-hoisting
   shouldHoistChild' _ (JSUnaryExpression _ _)      = [StopHoisting, ShouldntHoist]
   shouldHoistChild' _ (JSExpressionPostfix _ _)    = [ShouldntHoist, StopHoisting]
@@ -254,7 +275,7 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' JSExpression MJSSig where
       hoistUnlessDot _                                     = ShouldHoist
 
 --  TODO: I can improve this by making augmented assign, delete, for all use our new lvalue system
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Statement MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Statement where
   shouldHoistChild' _ (PCommon.StmtExpr _ _) = [ShouldntHoist, StopHoisting]
   shouldHoistChild' _ (PCommon.AugmentedAssign _ _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist, StopHoisting]
   shouldHoistChild' _ (PCommon.Delete _ _) = [ShouldntHoist, StopHoisting]
@@ -266,7 +287,7 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Statement MPythonSig wher
   shouldHoistChild' _ (PCommon.Class _ _ _ _) = [StopHoisting, StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t = shouldHoistAllChildren t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyClass MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyClass where
   -- See the above comment for PCommon.Class. When we replaced the original Python Class constructor
   -- with PyClass when doing the docstring change, this didn't get updated. We got burned
   -- by not removing the old constructors from the representation
@@ -274,18 +295,18 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyClass MPythonSig where
   -- I am going to go ahead and say "ShouldHoist" for the class body though....we'll see what happens
   shouldHoistChild' _ (PCommon.PyClass _ _ _) = [StopHoisting, StopHoisting, ShouldHoist]
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyWithBinder MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyWithBinder where
   shouldHoistChild' _ (PyWithBinder _ _) = [ShouldHoist, ShouldHoist]
 
 -- In something like "@a.b(foo())", the lookup "a.b" can have an effect, and
 -- "a.b(x)" is different from "t = a.b; t(x)". I just plain don't see any way to hoist
 -- this, period.
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Decorator MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Decorator where
   shouldHoistChild' _ _ = [StopHoisting, StopHoisting, StopHoisting]
 
 -- | We don't support TAC in comprehensions or lambdas;
 --   must avoid hoisting outside of binders
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Expr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Expr where
   shouldHoistChild' h (PCommon.Paren     _ _) = [h, h]
   shouldHoistChild' h (PCommon.ListComp  _ _) = [StopHoisting, StopHoisting]
   shouldHoistChild' h (PCommon.DictComp  _ _) = [StopHoisting, StopHoisting]
@@ -294,33 +315,33 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Expr MPythonSig where
   shouldHoistChild' h (PCommon.Lambda _ _ _)  = [StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t                       = shouldHoistAllChildren t
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.PyCondExpr MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyCondExpr where
   shouldHoistChild' h t = shouldHoistAllChildren t
 
 -- Do not support expressions in default parameter values
-instance {-# OVERLAPPING #-} ShouldHoistChild' FunctionDef MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig FunctionDef where
   shouldHoistChild' h (FunctionDef _ _ _ _) = [StopHoisting, StopHoisting, StopHoisting, StopHoisting]
 
 -- Don't hoist the iterator
-instance {-# OVERLAPPING #-} ShouldHoistChild' PCommon.Handler MPythonSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Handler where
   shouldHoistChild' h (PCommon.Handler _ _ _) = [StopHoisting, ShouldntHoist, StopHoisting]
 #endif
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' LCommon.Exp MLuaSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MLuaSig LCommon.Exp where
   shouldHoistChild' h = shouldHoistAllChildren
 
-instance {-# OVERLAPPING #-} ShouldHoistChild' LCommon.Var MLuaSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MLuaSig LCommon.Var where
   shouldHoistChild' h = shouldHoistAllChildren
 
 -- | Although for...in loops can loop over tables, more t
-instance {-# OVERLAPPING #-} ShouldHoistChild' LCommon.Stat MLuaSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MLuaSig LCommon.Stat where
   shouldHoistChild' _ (ForIn _ _ _) = [StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t             = shouldHoistAllChildren t
 
 -- | The only place where [Exp] can occur is in assignments and function calls.
 --   For both of these, if the last thing is a function call, should not hoist
 --   because Lua will pass along multiple return values
-instance {-# OVERLAPPING #-} ShouldHoistChild' ListF MLuaSig where
+instance {-# OVERLAPPING #-} ShouldHoistChild' MLuaSig ListF where
   shouldHoistChild' _ (ConsF exp NilF')
       | Just (PrefixExp pe) <- project exp
       , Just (PEFunCall _)  <- project pe = [ShouldntHoist, ShouldntHoist] -- FIXME: Update for function calls

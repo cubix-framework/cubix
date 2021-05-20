@@ -1,0 +1,21 @@
+	Fri May 22 12:27 2020 Time and Allocation Profiling Report  (Final)
+
+	   mainbench +RTS -N -p -h -RTS
+
+	total time  =      187.44 secs   (749744 ticks @ 1000 us, 4 processors)
+	total alloc = 568,155,998,992 bytes  (excludes profiling overheads)
+
+COST CENTRE       MODULE                            SRC                                                    %time %alloc
+
+dicts             Data.Comp.Dict                    src/Data/Comp/Dict.hs:57:3-65                           38.6   30.2
+primitive         Control.Monad.Primitive           Control/Monad/Primitive.hs:205:3-16                     10.7   15.7
+>>=               Data.Vector.Fusion.Util           Data/Vector/Fusion/Util.hs:36:3-18                       9.1    7.2
+basicUnsafeFreeze Data.Vector                       Data/Vector.hs:(276,3)-(277,47)                          6.3   10.4
+basicUnsafeNew    Data.Vector.Mutable               Data/Vector/Mutable.hs:(101,3)-(104,32)                  5.9    9.7
+fmap              Data.Vector.Fusion.Stream.Monadic Data/Vector/Fusion/Stream/Monadic.hs:(133,3)-(135,20)    3.9    3.1
+basicUnsafeSlice  Data.Vector.Mutable               Data/Vector/Mutable.hs:91:3-62                           2.9    4.5
+basicUnsafeCopy   Data.Vector                       Data/Vector.hs:(293,3)-(294,29)                          2.1    2.2
+basicUnsafeWrite  Data.Vector.Mutable               Data/Vector/Mutable.hs:120:3-65                          1.8    1.9
+rnf               Main                              benchmarks/Benchmarks.hs:(67,3)-(71,18)                  1.4    1.0
+elemseq           Data.Vector.Generic.Base          Data/Vector/Generic/Base.hs:146:3-23                     1.1    0.0
++                 Data.Vector.Fusion.Bundle.Size    Data/Vector/Fusion/Bundle/Size.hs:(26,3)-(32,29)         0.4    1.5

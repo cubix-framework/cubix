@@ -1,4 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP             #-}
+
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Data.Comp.Multi.Strategy.Derive
+-- Copyright   :  James Koppel, 2013
+-- License     :  BSD-style (see the LICENSE file in the distribution)
+--
+-- This file gives a Template-Haskell generator for `DynCase`
+-----------------------------------------------------------------------------
+
 
 module Data.Comp.Multi.Strategy.Derive (
     makeDynCase
@@ -16,20 +28,34 @@ import Language.Haskell.TH hiding ( Cxt )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase, kdyncase )
 
 
+-- | @makeDynCase ''T@ takes a datatype @T@ of kind @(* -> *) -> * -> *@ (i.e.: a signature in the
+--   @compdata@ or @cubix-compdata@ library) and generates a `DynCase` instance for @T@.
 makeDynCase :: Name -> Q [Dec]
 makeDynCase fname = do
+#if __GLASGOW_HASKELL__ < 800
           TyConI (DataD _cxt tname targs constrs _deriving) <- abstractNewtypeQ $ reify fname
+#else
+          TyConI (DataD _cxt tname targs _ constrs _deriving) <- abstractNewtypeQ $ reify fname
+#endif
           let iVar = tyVarBndrName $ last targs
           let labs = nub $ catMaybes $ map (iTp iVar) constrs
           let cons = map (abstractConType &&& iTp iVar) constrs
           mapM (genDyn tname cons) labs
      where
        iTp :: Name -> Con -> Maybe Type
-       iTp iVar (ForallC _ cxt _) =
-         -- Check if the GADT phantom type is constrained
-         case [y | AppT (AppT EqualityT x) y <- cxt, x == VarT iVar] of
-           [] -> Nothing
-           tp:_ -> Just tp
+       iTp iVar (ForallC _ cxt t) =
+                  -- Check if the GADT phantom type is constrained
+                  case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
+                    [] -> iTp iVar t
+                    tp:_ -> Just tp
+       iTp _iVar (GadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
+       iTp _iVar (RecGadtC _ _ (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
        iTp _ _ = Nothing
   
        genDyn :: Name -> [((Name, Int), Maybe Type)] -> Type -> Q Dec
@@ -39,7 +65,7 @@ makeDynCase fname = do
            instTp  <- forallT []
                               (return [])
                               (foldl appT (conT ''KDynCase) [conT tname, return tp])
-           return $ InstanceD [] instTp body
+           return $ InstanceD Nothing [] instTp body
   
        mkClause :: Type -> ((Name, Int), Maybe Type) -> Q [Clause]
        mkClause tp (con, Just tp')
@@ -65,8 +91,13 @@ abstractNewtypeQ = liftM abstractNewtype
   @data@ declarations.
 -}
 abstractNewtype :: Info -> Info
+#if __GLASGOW_HASKELL__ < 800
 abstractNewtype (TyConI (NewtypeD cxt name args constr derive))
     = TyConI (DataD cxt name args [constr] derive)
+#else
+abstractNewtype (TyConI (NewtypeD cxt name args mk constr derive))
+    = TyConI (DataD cxt name args mk [constr] derive)
+#endif
 abstractNewtype owise = owise
 
 
@@ -78,6 +109,9 @@ abstractConType (NormalC constr args) = (constr, length args)
 abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
+abstractConType (GadtC [constr] args _) = (constr, length args)
+abstractConType (RecGadtC [constr] args _) = (constr, length args)
+
 
 {-|
   This function returns the name of a bound type variable

@@ -3,10 +3,9 @@ module Data.Comp.Trans.DeriveMulti (
   ) where
 
 import Control.Lens ( _1, _2, _3, (&), (%~), (%%~), (^.), view )
-import Control.Monad ( liftM, (=<<) )
+import Control.Monad ( liftM )
 import Control.Monad.Trans ( MonadTrans(lift) )
 
-import Data.Maybe ( isJust )
 
 import Language.Haskell.TH.Syntax hiding ( lift )
 import Language.Haskell.TH.ExpandSyns ( expandSyns )
@@ -15,19 +14,19 @@ import Data.Comp.Trans.Util
 
 deriveMulti :: Name -> CompTrans [Dec]
 deriveMulti n = do
-  inf <- lift $ reify n
+  inf <- CompTrans $ lift $ reify n
   substs <- view substitutions
   typeArgs <- getTypeArgs n
 
   if containsAll substs typeArgs then
     case inf of
-      TyConI (DataD _ nm _ cons _)   -> mkGADT nm (applySubsts substs cons)
-      TyConI (NewtypeD _ nm _ con _) -> mkGADT nm [(applySubsts substs con)]
-      _                              -> do lift $ reportError $ "Attempted to derive multi-sorted compositional data type for " ++ show n
+      TyConI (DataD _ nm _ _ cons _)   -> mkGADT nm (applySubsts substs cons)
+      TyConI (NewtypeD _ nm _ _ con _) -> mkGADT nm [(applySubsts substs con)]
+      _                              -> do CompTrans $ lift $ reportError $ "Attempted to derive multi-sorted compositional data type for " ++ show n
                                                               ++ ", which is not a nullary datatype (and does not have concrete values supplied for type args)"
                                            return []
    else
-    do lift $ reportError $ "Attempted to derive multi-sorted compositional data type for " ++ show n
+    do CompTrans $ lift $ reportError $ "Attempted to derive multi-sorted compositional data type for " ++ show n
                             ++ " but it has type arguments which are not substituted away"
        return []
 
@@ -45,18 +44,17 @@ checkUniqueVar con = if length (filter isVar fields) <= 1 then
 
 mkGADT :: Name -> [Con] -> CompTrans [Dec]
 mkGADT n cons = do
-  e <- lift $ newName "e"
-  i <- lift $ newName "i"
+  e <- CompTrans $ lift $ newName "e"
+  i <- CompTrans $ lift $ newName "i"
   let n' = transName n
   annProp <- view annotationProp
   case annProp of
-    Just annPropInf  -> mapM_ checkUniqueVar cons
+    Just _annPropInf  -> mapM_ checkUniqueVar cons
     Nothing          -> return ()
   cons' <- mapM (mkCon n' e i) cons
-  return $ [DataD [] n' [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] cons' []
-           ,DataD [] (nameLab n) [] [] []
+  return $ [DataD [] n' [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] Nothing cons' []
+           ,DataD [] (nameLab n) [] Nothing [] []
            ]
-
 
 mkCon :: Name -> Name -> Name -> Con -> CompTrans Con
 mkCon l e i (NormalC n sts) = view annotationProp >>= mkConNormal
@@ -87,7 +85,7 @@ mkCon _ _ _ c = fail $ "Attempted to derive multi-sorted compositional datatype 
 unfixType :: Name -> Type -> CompTrans Type
 unfixType _ t | elem t baseTypes = return t
 unfixType e t = do checkAnn <- getIsAnn
-                   t' <- lift (expandSyns t) >>= getLab checkAnn
+                   t' <- (CompTrans $ lift (expandSyns t)) >>= getLab checkAnn
                    return $ AppT (VarT e) t'
 
 

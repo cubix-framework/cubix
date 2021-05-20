@@ -8,8 +8,9 @@ module Main where
 import Control.DeepSeq ( NFData(..) )
 import Control.Monad ( (=<<) )
 import Data.Maybe ( fromJust )
-
+import qualified Data.Text as T
 import Control.Lens ( (^.) )
+import Data.Comp.Multi.Annotation (ann)
 
 import Criterion.Main
 
@@ -18,6 +19,8 @@ import qualified Language.Java.Pretty as JLib
 import qualified Language.Java.Syntax as JLib
 import qualified Language.JavaScript.Parser as JSLib
 import qualified Language.JavaScript.Pretty.Printer.Extended as JSLib
+import qualified Language.Lua as LuaLib (pprint)
+import qualified Language.Lua.Annotated.Lexer as LuaLib (SourceRange (..), SourcePos (..))
 import qualified Language.Lua.Annotated as LuaLib
 import qualified Language.Python.Common as PLib
 import qualified Language.Python.Version3.Parser as PLib
@@ -50,9 +53,6 @@ fromRight :: Either a b -> b
 fromRight (Right x) = x
 fromRight (Left x) = error "Benchmarks.fromRight passed a Left"
 
-instance (Show a) => NFData (CLib.CTranslationUnit a) where
-  rnf = rnf . show
-
 instance NFData JLib.CompilationUnit where
   rnf = rnf . show
 
@@ -82,7 +82,7 @@ getC :: FilePath -> IO ( CLib.CTranslUnit, CFull.CTerm CTranslationUnitL
                        , Cfg MCSig)
 getC path = do
   raw <- fromRight <$> CParse.parse path
-  gen <- mkCSLabelGen OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = CFull.translate $ fmap (const ()) raw
   let commTree = CCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -95,7 +95,7 @@ getJava :: FilePath -> IO ( JLib.CompilationUnit, JFull.JavaTerm CompilationUnit
                          , Cfg MJavaSig)
 getJava path = do
   raw <- fromRight <$> JParse.parse path
-  gen <- mkCSLabelGen OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = JFull.translate raw
   let commTree = JCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -107,7 +107,7 @@ getJS :: FilePath -> IO ( JSLib.JSAST, JSFull.JSTerm JSASTL
                         , Cfg MJSSig)
 getJS path = do
   raw <- JSLib.parseFile path
-  gen <- mkCSLabelGen OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = JSFull.translate raw
   let commTree = JSCommon.translate fullTree
   let labTree  = labelProg gen commTree
@@ -121,23 +121,32 @@ getPython path = do
   contents <- readFile path
   let rawAnnot = fst $ fromRight $ PLib.parseModule contents path
   let raw = fmap (const ()) rawAnnot
-  gen <- mkCSLabelGen OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = PFull.translate raw
   let commTree = PCommon.translate fullTree
   let labTree  = labelProg gen commTree
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 #endif
 
-getLua :: FilePath -> IO ( LuaLib.Block, LFull.LuaTerm LBlockL
+getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTerm LBlockL
                          , MLuaTerm LBlockL, MLuaTermLab LBlockL
                          , Cfg MLuaSig)
 getLua path = do
   raw <- fromRight <$> LuaLib.parseFile path
-  gen <- mkCSLabelGen OriginSynthetic
-  let fullTree = LFull.translate raw
+  gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
+  let fullTree = LFull.translate (fmap toSourceSpan raw)
   let commTree = LCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree, makeCfg labTree)
+  return (raw, fullTree, commTree, labTree , makeCfg labTree)
+
+-- NOTE: duplicated from Cubix.ParsePretty. Find a common home.
+toSourceSpan :: LuaLib.SourceRange -> Maybe SourceSpan
+toSourceSpan x = Just $ mkSourceSpan (T.unpack (LuaLib.sourceFile from))
+                                         (LuaLib.sourceLine from, LuaLib.sourceColumn from)
+                                         (LuaLib.sourceLine to,   LuaLib.sourceColumn to)
+  where
+    from = LuaLib.sourceFrom x
+    to   = LuaLib.sourceTo   x
 
 
 poorManNf :: (Show b) => (a -> b) -> a -> Benchmarkable
@@ -150,10 +159,10 @@ dummyNodeInfo :: CLib.NodeInfo
 dummyNodeInfo = CLib.mkNodeInfoOnlyPos CLib.nopos
 
 --labelProgIO :: Term f l -> IO (TermLab f l)
---labelProgIO x = labelProg <$> mkCSLabelGen <$> pure x
+--labelProgIO x = labelProg <$> mkConcurrentSupplyLabelGen <$> pure x
 
 main = do
-  gen <- mkCSLabelGen OriginSynthetic
+  gen <- mkConcurrentSupplyLabelGen
   defaultMain [
 #ifndef ONLY_ONE_LANGUAGE
       env (getC "input-files/c/Foo.c") $
@@ -229,17 +238,16 @@ main = do
                     , bench "untransIps"      $ nf PCommon.untranslate ips
                     , bench "untransMod"      $ nf PFull.untranslate full
                     ]
-
-    ,
+    ,                                            
 #endif
       env (getLua "input-files/lua/Foo.lua") $
             \ ~(lib, full, ips, lab, cfg) -> bgroup "lua" [
-                      bench "showOverheadMod" $ nf id full
+                     bench "showOverheadMod" $ nf id full
                     , bench "showOverheadIps" $ nf id ips
                     , bench "showOverheadCfg" $ nf id cfg
-                    , bench "pretty"          $ nf (show . LuaLib.pprint) lib
-
-                    , bench "transMod"        $ nf LFull.translate lib
+                    -- , bench "pretty"          $ nf (show . LuaLib.pprint) lib
+                    
+                    , bench "transMod"        $ nf LFull.translate (fmap toSourceSpan lib)
                     , bench "transIps"        $ nf LCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
                     , bench "cfg"             $ nf makeCfg lab
@@ -247,7 +255,9 @@ main = do
                     , bench "tac"             $ nfIO $ toTAC lab
                     , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf LCommon.untranslate ips
-                    , bench "untransMod"      $ nf LFull.untranslate full
+                    , bench "untransMod"      $ nf LFull.untranslate (ann Nothing full)
                     ]
                 ]
 
+instance NFData SourceSpan where
+  rnf = rnf . show

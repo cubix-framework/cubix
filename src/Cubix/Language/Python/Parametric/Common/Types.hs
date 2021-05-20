@@ -1,19 +1,20 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
+{-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE EmptyDataDecls        #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternGuards         #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Cubix.Language.Python.Parametric.Common.Types where
 
@@ -21,7 +22,7 @@ module Cubix.Language.Python.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Cxt, Term, project', project, HFunctor, (:<:) )
+import Data.Comp.Multi ( Node, Term, project', project, HFunctor, CxtS, All, (:-<:) )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -85,7 +86,7 @@ data PyWithBinder e l where
 -- Extracting out this sort for docstring support
 
 data PyStringLitL
-data PyStringLit (e :: * -> *) l where
+data PyStringLit :: Node where
   PyStrings :: [String] -> PyStringLit e PyStringLitL
   PyUnicodeStrings :: [String] -> PyStringLit e PyStringLitL
   PyByteStrings :: [String] -> PyStringLit e PyStringLitL
@@ -111,7 +112,6 @@ data PyComp e l where
 -- We want the invariant that expressions something on the left of an expression may not
 -- depend on something to the right. The "x if y else z" notation violates this; we're reordering.
 --
--- Strictly speaking, we should switcharoo for loops too, but....maybe when it's needed
 --
 -- TODO: Python assignments violate this. In fact, they don't meet the spec of generic assignments
 data PyCondExpr e l where
@@ -120,18 +120,29 @@ data PyCondExpr e l where
              -> e Py.ExprL -- else
              -> PyCondExpr e Py.ExprL
 
-deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr]
+data PyComprehensionExpr e l where
+  PyListComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
+  PyDictComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
+  PySetComprehension :: e PyComprehensionL -> PyComprehensionExpr e Py.ExprL
 
+data PyComprehensionL
 
-pattern PyBlock' :: () => (PyBlock :<: f, HFunctor f) => Cxt h f a (Maybe PyStringLitL) -> Cxt h f a BlockL -> Cxt h f a PyBlockL
+data PyComprehension e l where
+  PyComprehensionFor :: Bool -> e [Py.ExprL] -> e Py.ExprL -> e PyComprehensionL -> PyComprehension e PyComprehensionL
+  PyComprehensionIf  :: e Py.ExprL -> e PyComprehensionL -> PyComprehension e PyComprehensionL
+  PyComprehensionBody :: e Py.ComprehensionExprL -> PyComprehension e PyComprehensionL
+
+deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr, ''PyComprehensionExpr, ''PyComprehension]
+
+pattern PyBlock' :: (PyBlock :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe PyStringLitL) -> CxtS h fs a BlockL -> CxtS h fs a PyBlockL
 pattern PyBlock' docStr body <- (project -> Just (PyBlock docStr body)) where
   PyBlock' docStr body = iPyBlock docStr body
 
-pattern PyChainComp' :: () => (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL -> Cxt h f a PyCompL
+pattern PyChainComp' :: (PyComp :-<: fs, All HFunctor fs) => CxtS h fs a Py.OpL -> CxtS h fs a Py.ExprL -> CxtS h fs a PyCompL -> CxtS h fs a PyCompL
 pattern PyChainComp' op l r <- (project -> Just (PyChainComp op l r)) where
   PyChainComp' op l r = iPyChainComp op l r
 
-pattern PyBaseComp' :: () => (PyComp :<: f, HFunctor f) => Cxt h f a Py.OpL -> Cxt h f a Py.ExprL -> Cxt h f a Py.ExprL -> Cxt h f a PyCompL
+pattern PyBaseComp' :: (PyComp :-<: fs, All HFunctor fs) => CxtS h fs a Py.OpL -> CxtS h fs a Py.ExprL -> CxtS h fs a Py.ExprL -> CxtS h fs a PyCompL
 pattern PyBaseComp' op l r <- (project -> Just (PyBaseComp op l r)) where
   PyBaseComp' op l r = iPyBaseComp op l r
 
@@ -174,11 +185,11 @@ data PythonParam e l where
 
 deriveAll [''PyFunDefAttrs, ''PyParamAttrs, ''PythonParam]
 
-pattern PyFunDefAttrs' :: () => (PyFunDefAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a FunctionDefAttrsL
+pattern PyFunDefAttrs' :: (PyFunDefAttrs :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a FunctionDefAttrsL
 pattern PyFunDefAttrs' ann <- (project -> Just (PyFunDefAttrs ann)) where
   PyFunDefAttrs' ann = iPyFunDefAttrs ann
 
-pattern PyParamAttrs' :: () => (PyParamAttrs :<: f, HFunctor f) => Cxt h f a (Maybe Py.ExprL) -> Cxt h f a (Maybe Py.ExprL) -> Cxt h f a ParameterAttrsL
+pattern PyParamAttrs' :: (PyParamAttrs :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a ParameterAttrsL
 pattern PyParamAttrs' ann def <- (project -> Just (PyParamAttrs ann def)) where
   PyParamAttrs' ann def = iPyParamAttrs ann def
 
@@ -212,7 +223,8 @@ do let pythonSortInjections = [ ''IdentIsIdent, ''AssignIsStatement, ''ExprIsRhs
                     ++ [ ''PyLhs, ''TupleLValue, ''ListLValue, ''DotLValue, ''StarLValue, ''SubscriptLValue, ''SliceLValue, ''ParenLValue]
                     ++ [ ''PyWith, ''PyWithBinder
                        , ''PythonArg, ''PyFunDefAttrs, ''PyParamAttrs, ''PythonParam
-                       , ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr]
+                       , ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr
+                       , ''PyComprehensionExpr, ''PyComprehension]
                     ++ [ ''P.Ident, ''AssignOpEquals, ''Assign, ''P.Block, ''EmptyBlockEnd
                        , ''P.FunctionCall, ''P.EmptyFunctionCallAttrs, ''FunctionIdent, ''FunctionArgumentList, ''PositionalArgument, ''ReceiverArg
                        , ''FunctionDef, ''PositionalParameter]
@@ -225,7 +237,7 @@ type instance InjectableSorts MPythonSig AssignL = '[StatementL]
 type MPythonTerm    = Term MPythonSig
 type MPythonTermLab = TermLab MPythonSig
 
-type MPythonCxt h a = Cxt h MPythonSig a
+type MPythonCxt h a = CxtS h MPythonSig a
 
 -----------------------------------------------------------------------------------
 ----------------------         Sort injections             ------------------------
@@ -275,6 +287,14 @@ instance InjF MPythonSig P.IdentL PositionalArgExpL where
   injF = iExprIsPositionalArgExp . injF
   projF' t
    | Just (ExprIsPositionalArgExp e) <- project' t = projF' e
+  projF' _ = Nothing
+
+instance InjF MPythonSig FunctionCallL RhsL where
+  injF = iFunctionCallIsExpr
+  projF' f
+   | Just (ExprIsRhs e) <- project' f
+   , Just (FunctionCallIsExpr d) <- project' e
+   = Just d
   projF' _ = Nothing
 
 #endif

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -13,6 +14,8 @@ module Cubix.ParsePretty(
 
   , parseLua
   , prettyLua
+
+  , RootSort
 
 #ifndef ONLY_ONE_LANGUAGE
   , parseC
@@ -61,20 +64,27 @@ import Cubix.Language.Lua.Parametric.Common as LCommon
 import qualified Cubix.Language.Lua.Parametric.Full as LFull
 import Cubix.Language.Python.Parametric.Common as PCommon
 import qualified Cubix.Language.Python.Parametric.Full as PFull
+import qualified Data.Text as T (unpack)
 
 
-type family RootSort (f :: (* -> *) -> * -> *)
+type family RootSort (fs :: [(* -> *) -> * -> *])
 
-class ParseFile f where
-  parseFile :: FilePath -> IO (Maybe (Term f (RootSort f)))
+class ParseFile fs where
+  -- | Parses a file with the appropriate parser for the language with signature @fs@.
+  --
+  -- Recommended to use with the @TypeApplications@ extension,
+  -- e.g.: @parseFile \@MCSig "my_file.c"@.
+  parseFile :: FilePath -> IO (Maybe (Term fs (RootSort fs)))
 
-class Pretty f where
-  pretty :: Term f (RootSort f) -> String
+class Pretty fs where
+  -- | Pretty-prints a term, using the appropriate pretty-printer for the language with
+  -- signature @fs@.
+  pretty :: Term fs (RootSort fs) -> String
 
   -- FIXME: The only reason this is needed is because Project forgets
   -- what sort its contents are
-  prettyUnsafe :: Term f l -> String
-  default prettyUnsafe :: (DynCase (Term f) (RootSort f)) => Term f l -> String
+  prettyUnsafe :: Term fs l -> String
+  default prettyUnsafe :: (DynCase (Term fs) (RootSort fs)) => Term fs l -> String
   prettyUnsafe = pretty . fromDynProj
 
 -- | NOTE: This reflects the half-finished transition of Lua to annotated terms
@@ -83,11 +93,12 @@ parseLua path = do
     res <- Lua.parseFile path
     case res of
      Left errors -> print errors >> return Nothing
-     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
+     Right tree  -> return $ Just $ LCommon.translate $ {-stripA $-} LFull.translate $ fmap toSourceSpan tree
   where
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
-    toSourceSpan x = Just $ mkSourceSpan (Lua.sourcePosName from) (Lua.sourcePosLine from, Lua.sourcePosColumn from)
-                                                                  (Lua.sourcePosLine to,   Lua.sourcePosColumn to)
+    toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))
+                                         (Lua.sourceLine from, Lua.sourceColumn from)
+                                         (Lua.sourceLine to,   Lua.sourceColumn to)
       where
         from = Lua.sourceFrom x
         to   = Lua.sourceTo   x

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -34,6 +35,10 @@ module Cubix.Language.Parametric.Semantics.Cfg.CommonNodes (
   , edgeToScopedLabel
   , constructCfgScopedLabeledBreak
   , constructCfgScopedLabeledContinue
+  , constructCfgScopedLabel
+
+  , constructCfgShortCircuitingBinOp
+  , constructCfgCondOp
 
 ) where
 
@@ -45,9 +50,9 @@ import qualified Data.Map as Map
 import Data.Proxy ( Proxy(..) )
 import Data.Traversable ( for )
 
-import Control.Lens ( (^.), (%~), (%=), (.=), _2, at, use, makeClassy )
+import Control.Lens ( (^.), (%~), (%=), (.=), (.~), _2, at, use, makeClassy )
 
-import Data.Comp.Multi ( HTraversable(..) )
+import Data.Comp.Multi ( HTraversable(..), All, HFunctor, HFoldable )
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
@@ -56,16 +61,22 @@ import Cubix.Language.Parametric.Semantics.SemanticProperties
 
 --------------------------------------------------------------------------------------
 
-eeNonEmpty :: EnterExitPair f i -> Bool
+eeNonEmpty :: EnterExitPair fs i -> Bool
 eeNonEmpty (EnterExitPair _ _) = True
 eeNonEmpty EmptyEnterExit      = False
 eeNonEmpty _                   = error "Passed non-collapsed EnterExitPair to eeNonEmpty"
 
-collapseMaybeEnterExit :: Maybe (EnterExitPair f i) -> EnterExitPair f i
+collapseMaybeEnterExit :: Maybe (EnterExitPair fs i) -> EnterExitPair fs i
 collapseMaybeEnterExit (Just eep) = eep
 collapseMaybeEnterExit Nothing    = EmptyEnterExit
 
-mCombineEnterExit :: (HasCurCfg s f, HTraversable f, MonadState s m) => m (EnterExitPair f i) -> EnterExitPair f j -> m (EnterExitPair f k)
+mCombineEnterExit ::
+  ( HasCurCfg s fs
+  , MonadState s m
+  , All HTraversable fs
+  , All HFunctor fs
+  , All HFoldable fs
+  ) => m (EnterExitPair fs i) -> EnterExitPair fs j -> m (EnterExitPair fs k)
 mCombineEnterExit p1 p2 = p1 >>= (\r -> combineEnterExit r p2)
 
 --------------------------------------------------------------------------------------
@@ -73,7 +84,10 @@ mCombineEnterExit p1 p2 = p1 >>= (\r -> combineEnterExit r p2)
 -- Because we don't actually have function start and end nodes,
 -- for now we can model "return" as just a black hole with no outgoing edges
 -- This can also model the computed goto in GCC
-constructCfgReturn :: (MonadState s m, CfgComponent g s) => TermLab g l -> m (Maybe (EnterExitPair g i)) -> m (EnterExitPair g l)
+constructCfgReturn ::
+  ( MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l -> m (Maybe (EnterExitPair gs i)) -> m (EnterExitPair gs l)
 constructCfgReturn t exp = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -81,7 +95,7 @@ constructCfgReturn t exp = do
   combineEnterExit (identEnterExit enterNode) e
   return $ EnterExitPair enterNode exitNode
 
-constructCfgEmpty :: (MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g l)
+constructCfgEmpty :: (MonadState s m, CfgComponent gs s) => TermLab gs l -> m (EnterExitPair gs l)
 constructCfgEmpty t = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -89,7 +103,10 @@ constructCfgEmpty t = do
   return $ EnterExitPair enterNode exitNode
 
 
-constructCfgIfElseIfElse :: (MonadState s m, CfgComponent g s) => TermLab g l -> m [(EnterExitPair g i, EnterExitPair g j)] -> m (Maybe (EnterExitPair g k)) -> m (EnterExitPair g l)
+constructCfgIfElseIfElse ::
+  ( MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l -> m [(EnterExitPair gs i, EnterExitPair gs j)] -> m (Maybe (EnterExitPair gs k)) -> m (EnterExitPair gs l)
 constructCfgIfElseIfElse t clauses optElse = do
   enterNode <- addCfgNode t EnterNode
   evalledClauses <- clauses
@@ -138,25 +155,29 @@ emptyLoopStack = LoopStack [] []
 
 makeClassy ''LoopStack
 
-pushBreakNode :: (MonadState s m, HasLoopStack s) => CfgNode f -> m ()
+pushBreakNode :: (MonadState s m, HasLoopStack s) => CfgNode fs -> m ()
 pushBreakNode n = break_stack %= ((n ^. cfg_node_lab):)
 
 popBreakNode :: (MonadState s m, HasLoopStack s) => m ()
 popBreakNode = break_stack %= tail
 
-pushContinueNode :: (MonadState s m, HasLoopStack s) => CfgNode f -> m ()
+pushContinueNode :: (MonadState s m, HasLoopStack s) => CfgNode fs -> m ()
 pushContinueNode n = continue_stack %= ((n ^. cfg_node_lab):)
 
 popContinueNode :: (MonadState s m, HasLoopStack s) => m ()
 popContinueNode = continue_stack %= tail
 
-pushLoopNode :: (MonadState s m, HasLoopStack s) => CfgNode f -> CfgNode f -> m ()
+pushLoopNode :: (MonadState s m, HasLoopStack s) => CfgNode fs -> CfgNode fs -> m ()
 pushLoopNode n1 n2 = pushContinueNode n1 >> pushBreakNode n2
 
 popLoopNode :: (MonadState s m, HasLoopStack s) => m ()
 popLoopNode = popContinueNode >> popBreakNode
 
-constructCfgWhile :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g i) -> m (EnterExitPair g j) -> m (EnterExitPair g k)
+constructCfgWhile ::
+  ( HasLoopStack s
+  , MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs j) -> m (EnterExitPair gs k)
 constructCfgWhile t mExp mBody = do
   enterNode     <- addCfgNode t EnterNode
   loopEntryNode <- addCfgNode t LoopEntryNode
@@ -175,7 +196,11 @@ constructCfgWhile t mExp mBody = do
 
   return $ EnterExitPair enterNode exitNode
 
-constructCfgDoWhile :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g i) -> m (EnterExitPair g j) -> m (EnterExitPair g k)
+constructCfgDoWhile ::
+  ( HasLoopStack s
+  , MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l -> m (EnterExitPair gs i) -> m (EnterExitPair gs j) -> m (EnterExitPair gs k)
 constructCfgDoWhile t mExp mBody = do
   enterNode     <- addCfgNode t EnterNode
   loopEntryNode <- addCfgNode t LoopEntryNode
@@ -194,12 +219,16 @@ constructCfgDoWhile t mExp mBody = do
 
   return $ EnterExitPair enterNode exitNode
 
-constructCfgFor :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l
-                                                                     -> m (Maybe (EnterExitPair g h))
-                                                                     -> m (Maybe (EnterExitPair g i))
-                                                                     -> m (Maybe (EnterExitPair g j))
-                                                                     -> m (EnterExitPair g k)
-                                                                     -> m (EnterExitPair g l)
+constructCfgFor ::
+  ( HasLoopStack s
+  , MonadState s m
+  , CfgComponent gs s
+  ) => TermLab gs l
+  -> m (Maybe (EnterExitPair gs h))
+  -> m (Maybe (EnterExitPair gs i))
+  -> m (Maybe (EnterExitPair gs j))
+  -> m (EnterExitPair gs k)
+  -> m (EnterExitPair gs l)
 constructCfgFor t mInit mCond mStep mBody = do
   enterNode     <- addCfgNode t EnterNode
   loopEntryNode <- addCfgNode t LoopEntryNode
@@ -230,27 +259,28 @@ constructCfgFor t mInit mCond mStep mBody = do
 
 
 
-constructCfgBreak :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g i)
+constructCfgBreak :: (HasLoopStack s, MonadState s m, CfgComponent gs s) => TermLab gs l -> m (EnterExitPair gs i)
 constructCfgBreak t = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
 
-  (l:_) <- use break_stack
-
-  Just n <- nodeForLab l
+  l' <- use break_stack
+  let (l:_) = l'
+  n' <- nodeForLab l
+  let Just n = n'
   cur_cfg %= addEdge enterNode n -- go to end of loop
   -- do not connect enter to exit
 
   return $ EnterExitPair enterNode exitNode
 
-constructCfgContinue :: (HasLoopStack s, MonadState s m, CfgComponent g s) => TermLab g l -> m (EnterExitPair g i)
+constructCfgContinue :: (HasLoopStack s, MonadState s m, CfgComponent gs s) => TermLab gs l -> m (EnterExitPair gs i)
 constructCfgContinue t = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
-
-  (l:_) <- use continue_stack
-
-  Just n <- nodeForLab l
+  l' <- use continue_stack
+  let (l:_) = l'
+  n' <- nodeForLab l
+  let Just n = n'
   cur_cfg %= addEdge enterNode n -- go to beginning of loop
   -- do not connect enter to exit
 
@@ -271,7 +301,6 @@ emptyLabelMap = LabelMap Map.empty
 
 makeClassy ''LabelMap
 
--- FIXME: This will probably break in Java when there's reuse of a labeled block name
 speculativeGetLabel :: (MonadState s m, HasLabelMap s, HasLabelGen s) => String -> m Label
 speculativeGetLabel s = do
   lm <- use label_map
@@ -282,7 +311,7 @@ speculativeGetLabel s = do
       label_map %= Map.insert s (lab, [])
       return lab
 
-addGotoEdge :: (MonadState s m, HasLabelMap s, CfgComponent g s) => CfgNode g -> String -> m ()
+addGotoEdge :: (MonadState s m, HasLabelMap s, CfgComponent gs s) => CfgNode gs -> String -> m ()
 addGotoEdge n targName = do
   targL <- speculativeGetLabel targName
   targNode <- nodeForLab targL
@@ -290,7 +319,7 @@ addGotoEdge n targName = do
     Just n' -> cur_cfg %= addEdge n n'
     Nothing -> label_map . at targName %= fmap (_2 %~ ((n ^. cfg_node_lab):))
 
-constructCfgGoto :: (MonadState s m, HasLabelMap s, CfgComponent g s) => TermLab g l -> String -> m (EnterExitPair g i)
+constructCfgGoto :: (MonadState s m, HasLabelMap s, CfgComponent gs s) => TermLab gs l -> String -> m (EnterExitPair gs i)
 constructCfgGoto t targ = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -300,15 +329,21 @@ constructCfgGoto t targ = do
 
   return $ EnterExitPair enterNode exitNode
 
-constructCfgLabel :: forall g s m l i. (MonadState s m, HasLabelMap s, CfgComponent g s) => TermLab g l -> String -> m (EnterExitPair g i)
+constructCfgLabel :: forall gs s m l i. (MonadState s m, HasLabelMap s, CfgComponent gs s) => TermLab gs l -> String -> m (EnterExitPair gs i)
 constructCfgLabel t name = do
   lm <- use label_map
 
   enterNode <- case Map.lookup name lm of
-    Nothing -> addCfgNode t EnterNode
+    Nothing -> do
+      l <- nextLabel
+      n <- addCfgNodeWithLabel t l EnterNode
+      label_map %= Map.insert name (l, [])
+      pure n
+
     Just (l, prevs) -> do
       n <- addCfgNodeWithLabel t l EnterNode
-      for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy g) p l
+      for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy gs) p l
+      label_map . at name %= fmap (_2 .~ [])
       return n
 
 
@@ -340,13 +375,13 @@ withScopedLabel s labMap m = do
   return res
 
 
-nodeForScopedLabel :: (MonadState s m, HasScopedLabelMap s, CfgComponent f s) => String -> CfgNodeType -> m (Maybe (CfgNode f))
+nodeForScopedLabel :: (MonadState s m, HasScopedLabelMap s, CfgComponent fs s) => String -> CfgNodeType -> m (Maybe (CfgNode fs))
 nodeForScopedLabel nm tp = do
   slm <- use scoped_label_map
   gr <- use cur_cfg
   return (Map.lookup nm slm >>= Map.lookup tp >>= safeLookupCfg gr)
 
-edgeToScopedLabel :: (MonadState s m, HasScopedLabelMap s, CfgComponent f s) => CfgNode f -> String -> CfgNodeType -> m ()
+edgeToScopedLabel :: (MonadState s m, HasScopedLabelMap s, CfgComponent fs s) => CfgNode fs -> String -> CfgNodeType -> m ()
 edgeToScopedLabel n targName targTp = do
   targNode <- nodeForScopedLabel targName targTp
   case targNode of
@@ -355,7 +390,7 @@ edgeToScopedLabel n targName targTp = do
 
 
 
-constructCfgScopedLabeledBreak :: (HasScopedLabelMap s, MonadState s m, CfgComponent g s) => TermLab g l -> String -> m (EnterExitPair g i)
+constructCfgScopedLabeledBreak :: (HasScopedLabelMap s, MonadState s m, CfgComponent gs s) => TermLab gs l -> String -> m (EnterExitPair gs i)
 constructCfgScopedLabeledBreak t labStr = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -366,7 +401,7 @@ constructCfgScopedLabeledBreak t labStr = do
   return $ EnterExitPair enterNode exitNode
 
 
-constructCfgScopedLabeledContinue :: (HasScopedLabelMap s, MonadState s m, CfgComponent g s) => TermLab g l -> String -> m (EnterExitPair g i)
+constructCfgScopedLabeledContinue :: (HasScopedLabelMap s, MonadState s m, CfgComponent gs s) => TermLab gs l -> String -> m (EnterExitPair gs i)
 constructCfgScopedLabeledContinue t labStr = do
   enterNode <- addCfgNode t EnterNode
   exitNode  <- addCfgNode t ExitNode
@@ -375,3 +410,67 @@ constructCfgScopedLabeledContinue t labStr = do
   -- do not connect enter to exit
 
   return $ EnterExitPair enterNode exitNode
+
+constructCfgScopedLabel ::
+  ( HasScopedLabelMap s
+  , MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> String -> TermLab fs s0 -> m (EnterExitPair fs s0) -> m (EnterExitPair fs i)
+constructCfgScopedLabel t labName s mStmt = do
+  enterNode     <- addCfgNode t EnterNode
+  loopEntryNode <- addCfgNode t LoopEntryNode
+  exitNode      <- addCfgNode t ExitNode
+
+  -- Using a label as a continue target is not valid unless the labeled statement is a loop
+  -- We assume that this code is valid JS / Java, and hence loopEntryNode is unused unless
+  -- stmt is a loop
+  let labMap = Map.fromList [ (LoopEntryNode, loopEntryNode ^. cfg_node_lab)
+                            , (ExitNode, exitNode ^. cfg_node_lab)
+                            ]
+
+  stmt <- withScopedLabel labName labMap mStmt
+  cur_cfg %= addEdge enterNode (enter stmt)
+  cur_cfg %= addEdge (exit stmt) exitNode
+
+  -- loopEntryNode is just a temporary; contract it out
+  gr <- use cur_cfg
+  case cfgNodeForTerm gr LoopEntryNode s of
+    Nothing -> return ()
+    Just n  -> cur_cfg %= addEdge loopEntryNode n
+
+  cur_cfg %= contractNode (loopEntryNode ^. cfg_node_lab)
+
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgShortCircuitingBinOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es)
+constructCfgShortCircuitingBinOp t mlArg mrArg = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  lArg <- mlArg
+  rArg <- mrArg
+  cur_cfg %= addEdge enterNode (enter lArg)
+  cur_cfg %= addEdge (exit lArg) (enter rArg)
+  -- NOTE: short circuit edge.
+  cur_cfg %= addEdge (exit lArg) exitNode
+  cur_cfg %= addEdge (exit rArg) exitNode
+  return (EnterExitPair enterNode exitNode)
+
+constructCfgCondOp ::
+  ( MonadState s m
+  , CfgComponent fs s
+  ) => TermLab fs l -> m (EnterExitPair fs ls) -> m (EnterExitPair fs rs) -> m (EnterExitPair fs es) -> m (EnterExitPair fs es)
+constructCfgCondOp t mtest msucc mfail = do
+  enterNode <- addCfgNode t EnterNode
+  exitNode  <- addCfgNode t ExitNode
+  test <- mtest
+  succ <- msucc
+  fail <- mfail
+  cur_cfg %= addEdge enterNode (enter test)
+  cur_cfg %= addEdge (exit test) (enter succ)
+  cur_cfg %= addEdge (exit test) (enter fail)
+  cur_cfg %= addEdge (exit succ) exitNode
+  cur_cfg %= addEdge (exit fail) exitNode
+  return (EnterExitPair enterNode exitNode)

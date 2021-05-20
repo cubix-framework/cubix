@@ -1,0 +1,27 @@
+	Fri May 22 15:03 2020 Time and Allocation Profiling Report  (Final)
+
+	   mainbench +RTS -N -p -h -RTS
+
+	total time  =       17.11 secs   (68458 ticks @ 1000 us, 4 processors)
+	total alloc = 27,090,616,736 bytes  (excludes profiling overheads)
+
+COST CENTRE       MODULE                            SRC                                                    %time %alloc
+
+>>=               Data.Vector.Fusion.Util           Data/Vector/Fusion/Util.hs:36:3-18                      41.7   43.3
+\\                Data.Comp.Dict                    src/Data/Comp/Dict.hs:46:1-15                            6.0    3.4
+grnf_             Control.DeepSeq.Generics          Control/DeepSeq/Generics.hs:96:5-24                      3.1    0.0
+hfoldl            Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:119:5-56                      2.7    4.7
+basicUnsafeIndexM Data.Vector.Primitive             Data/Vector/Primitive.hs:234:3-75                        2.4    1.6
+hfmap             Data.Comp.Multi.Ops               src/Data/Comp/Multi/Ops.hs:111:5-49                      1.9    3.0
+basicUnsafeWrite  Data.Vector.Primitive.Mutable     Data/Vector/Primitive/Mutable.hs:124:3-69                1.6    1.6
+primitive         Control.Monad.Primitive           Control/Monad/Primitive.hs:93:3-16                       1.5    0.0
+kbnAdd            Numeric.Sum                       Numeric/Sum.hs:(164,1)-(167,39)                          1.4    0.6
+primitive         Control.Monad.Primitive           Control/Monad/Primitive.hs:205:3-16                      1.4    0.2
+wrapAnyR          Data.Comp.Multi.Strategic         Data/Comp/Multi/Strategic.hs:114:1-63                    1.4    3.3
+transpose         Statistics.Matrix                 src/Statistics/Matrix.hs:(263,1)-(265,22)                1.3    1.3
+fmap              Data.Vector.Fusion.Stream.Monadic Data/Vector/Fusion/Stream/Monadic.hs:(133,3)-(135,20)    1.3    1.1
+rnf               Main                              benchmarks/Benchmarks.hs:(74,3)-(76,19)                  1.2    0.0
+uniform           System.Random.MWC                 System/Random/MWC.hs:241:5-35                            1.2    0.6
+rnf               Main                              benchmarks/Benchmarks.hs:(67,3)-(71,18)                  1.2    0.0
+rnf               Cubix.Language.Info               src/Cubix/Language/Info.hs:95:29-44                      1.2    0.0
+size              Data.Comp.Multi.Generic           src/Data/Comp/Multi/Generic.hs:(85,1)-(86,47)            1.1    1.5

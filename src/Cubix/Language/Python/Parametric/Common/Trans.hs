@@ -1,16 +1,18 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE PartialTypeSignatures  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE ViewPatterns           #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Python.Parametric.Common.Trans () where
@@ -22,9 +24,10 @@ module Cubix.Language.Python.Parametric.Common.Trans
   ) where
 
 import Data.List( (\\) )
+import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:<:), (:+:), caseH, HFunctor(..) )
+import Data.Comp.Multi ( project, inject, unTerm, caseCxt, HFunctor(..), All, Sum, (:-<:) )
 
 import Cubix.Language.Python.Parametric.Common.Types
 import qualified Cubix.Language.Python.Parametric.Full as F
@@ -43,13 +46,13 @@ translate' = injF . translate
 class Trans f where
   trans :: f F.PythonTerm l -> MPythonTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MPythonSig, f :<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
+transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MPythonSig, f :<: F.PythonSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => Trans f where
   trans = transDefault
 
 
@@ -107,7 +110,29 @@ instance Trans F.Expr where
     then reassociateComp op l r
     else transDefault t
   trans (F.CondExpr t c e _) = iPyCondExpr (translate c) (translate t) (translate e)
+  trans (F.ListComp comp _) = iPyListComprehension (transComprehension comp)
+  trans (F.DictComp comp _) = iPyDictComprehension (transComprehension comp)
+  trans (F.SetComp comp _) = iPySetComprehension (transComprehension comp)
   trans x = transDefault x
+
+transComprehension :: F.PythonTerm F.ComprehensionL -> MPythonTerm PyComprehensionL
+transComprehension (project -> Just (F.Comprehension cexpr cfor _)) = transComprehensionFor cexpr cfor
+
+transComprehensionIf :: F.PythonTerm F.ComprehensionExprL -> F.PythonTerm F.CompIfL -> MPythonTerm PyComprehensionL
+transComprehensionIf cexp (project -> Just (F.CompIf e mi _)) =
+  let comp = case extractF mi of
+        Just (project -> Just (F.IterFor i _)) -> transComprehensionFor cexp i
+        Just (project -> Just (F.IterIf i _)) -> transComprehensionIf cexp i
+        Nothing -> iPyComprehensionBody (translate cexp)
+  in iPyComprehensionIf (translate e) comp
+
+transComprehensionFor :: F.PythonTerm F.ComprehensionExprL -> F.PythonTerm F.CompForL -> MPythonTerm PyComprehensionL
+transComprehensionFor cexp (project -> Just (F.CompFor b es v mi _)) =
+  let comp = case extractF mi of
+        Just (project -> Just (F.IterFor i _)) -> transComprehensionFor cexp i
+        Just (project -> Just (F.IterIf i _)) -> transComprehensionIf cexp i
+        Nothing -> iPyComprehensionBody (translate cexp)
+  in iPyComprehensionFor b (mapF translate es) (translate v) comp
 
 translateLValue :: F.PythonTerm F.ExprL -> MPythonTerm PyLValueL
 translateLValue (project -> Just (F.Tuple xs _))        = iTupleLValue (mapF translateLValue xs)
@@ -172,13 +197,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MPythonTerm l -> F.PythonTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.PythonSig) => f MPythonTerm l -> F.PythonTerm l
+untransDefault :: (HFunctor f, f :-<: F.PythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.PythonSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.PythonSig) => Untrans f where
   untrans = untransDefault
 
 untransIdent :: MPythonTerm IdentL -> F.PythonTerm F.IdentL
@@ -268,13 +293,50 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStatement where
 instance {-# OVERLAPPING #-} Untrans PyCondExpr where
   untrans (PyCondExpr c t e) = F.iCondExpr (untranslate t) (untranslate c) (untranslate e) iUnitF
 
-untransError :: (HFunctor f, f :<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
+instance {-# OVERLAPPING #-} Untrans PyComprehensionExpr where
+  untrans (PyListComprehension c) = F.iListComp (untransComprehension c) iUnitF
+  untrans (PyDictComprehension c) = F.iDictComp (untransComprehension c) iUnitF
+  untrans (PySetComprehension c) = F.iSetComp (untransComprehension c) iUnitF
+
+-- instance {-# OVERLAPPING #-} Untrans PyComprehension where
+--   untrans = untransComprehension
+
+untransComprehension :: MPythonTerm PyComprehensionL -> F.PythonTerm F.ComprehensionL
+untransComprehension t =
+  let (expr, comp) = untransComprehension0 t
+  in  F.iComprehension expr comp iUnitF
+
+  where untransComprehension0 :: MPythonTerm PyComprehensionL -> (F.PythonTerm F.ComprehensionExprL, F.PythonTerm F.CompForL)
+        untransComprehension0 (project -> Just (PyComprehensionFor b es v comp)) =
+          compFor <$> go comp
+
+          where compFor mIter = F.iCompFor b (mapF untranslate es) (untranslate v) mIter iUnitF
+
+        go :: MPythonTerm PyComprehensionL -> (F.PythonTerm F.ComprehensionExprL, F.PythonTerm (Maybe F.CompIterL))
+        go (project -> Just (PyComprehensionFor b es v comp)) =
+          iterFor <$> go comp
+          
+          where iterFor mIter =
+                  let compFor = F.iCompFor b (mapF untranslate es) (untranslate v) mIter iUnitF
+                  in  Just' (F.iIterFor compFor iUnitF)
+          
+        go (project -> Just (PyComprehensionIf e comp)) =
+          iterIf <$> go comp
+
+          where iterIf mIter =
+                  let compIf = F.iCompIf (untranslate e) mIter iUnitF
+                  in Just' (F.iIterIf compIf iUnitF)
+
+        go (project -> Just (PyComprehensionBody b)) =
+          (untranslate b, Nothing')
+
+untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))
 
 
 do ipsNames <- sumToNames ''MPythonSig
    modNames <- sumToNames ''F.PythonSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''PyWith, ''PyClassIsStatement, ''AssignIsStatement, ''IdentIsIdent, ''FunctionCallIsExpr, ''FunctionDefIsStatement, ''PyCompIsExpr, ''PyCondExpr]
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''PyWith, ''PyClassIsStatement, ''AssignIsStatement, ''IdentIsIdent, ''FunctionCallIsExpr, ''FunctionDefIsStatement, ''PyCompIsExpr, ''PyCondExpr, ''PyComprehensionExpr]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 #endif

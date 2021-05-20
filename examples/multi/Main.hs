@@ -1,14 +1,15 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP                    #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE OverlappingInstances   #-}
 
 module Main where
 
-import Control.Monad ( liftM, (<=<), (=<<) )
+import Control.Monad ( when, liftM, (<=<) )
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char  ( toLower )
@@ -18,7 +19,7 @@ import Data.Maybe ( fromJust )
 import System.Environment ( getArgs )
 import System.IO ( hClose )
 
-import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF )
+import Data.Comp.Multi ( Term, stripA, HFoldable, ShowHF, Term, All )
 import Data.Comp.Multi.Strategy.Classification ( dynProj )
 
 import qualified Language.Dot.Pretty as Dot
@@ -107,9 +108,9 @@ putProj (PythonProj p) = putProject (prettyPython     . fromJust . dynProj . str
 putProj (LuaProj    p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
 
 
-debugTree' :: (ShowHF f, HFoldable f, CfgBuilder f) => Term f l -> IO ()
+debugTree' :: (All ShowHF fs, All HFoldable fs, CfgBuilder fs) => Term fs l -> IO ()
 debugTree' t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let tLab = labelProg gen t
   debugCfg tLab (makeCfg tLab)
   print t
@@ -140,7 +141,7 @@ checkRoundTrip lang p = withSystemTempFile "roundtrip" $ \tmp h -> do
 
 printCfgDot :: LangProg -> IO LangProg
 printCfgDot t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     CProg      p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
@@ -170,7 +171,7 @@ runElementaryHoist _            = error "Cannot run elementary hoist on that pro
 
 runTAC :: LangProg -> IO LangProg
 runTAC t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     JSProg     p -> liftM (JSProg     . stripA) $ toTAC (labelProg gen p)
@@ -181,7 +182,7 @@ runTAC t = do
 
 runTestCov :: LangProg -> IO LangProg
 runTestCov t = do
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
     CProg      p -> liftM (CProg      . stripA) $ instrumentTestCoverage (labelProg gen p)
@@ -239,7 +240,7 @@ isAnalysis a = elem a analsList
 
 doAnal :: String -> String -> [FilePath] -> IO ()
 doAnal lang anal fils = do
-     gen <- mkCSLabelGen
+     gen <- mkConcurrentSupplyLabelGen
      projRes <- parseProj gen (downcase lang) fils
      case projRes of
        Nothing   -> error "Parse failed"
@@ -250,7 +251,7 @@ doAnal lang anal fils = do
 
 doIpt :: String -> [FilePath] -> IO ()
 doIpt lang fils = do
-    gen <- mkCSLabelGen
+    gen <- mkConcurrentSupplyLabelGen
     projRes <- parseProj gen (downcase lang) fils
     case projRes of
       Nothing   -> error "Parse failed"
@@ -277,7 +278,8 @@ doTransform language transform file = do
 
 main = do
   args <- getArgs
-  if length args < 3 then
+  if length args < 3 then do
+    when (length args == 0) $ putStrLn description
     putStrLn usage
    else
      let (language, cmd) = (downcase (args !! 0), downcase (args !! 1)) in
@@ -290,6 +292,12 @@ main = do
      else
        putStrLn usage
 
+
+description :: String
+description = "Cubix 0.1.0.0\n"
+           ++ "Cubix is a framework for language-parametric program "
+           ++ "transformation. It currently supports C, Java, JavaScript, "
+           ++ "Lua, and Python.\n"
 
 usage :: String
 usage =  "Usage:\n"

@@ -1,17 +1,19 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi
--- Copyright   :  (c) 2011 Patrick Bahr
+-- Copyright   :  Originals (c) 2011 Patrick Bahr; modifications (c) 2017 Jmase koppel
 -- License     :  BSD3
--- Maintainer  :  Patrick Bahr <paba@diku.dk>, Tom Hvitved <hvitved@diku.dk>
--- Stability   :  experimental
--- Portability :  non-portable (GHC Extensions)
 --
 -- This module defines the infrastructure necessary to use
 -- /Generalised Compositional Data Types/. Generalised Compositional Data Types
 -- is an extension of Compositional Data Types with mutually recursive
 -- data types, and more generally GADTs. Examples of usage are bundled with the
 -- package in the library @examples\/Examples\/Multi@.
+--
+-- This is a fork of Patrick Bahrs @compdata@ package. The chief differences
+-- are that the representation of sums has been replaced with a version that uses constant memory,
+-- and the portions of the library for single-sorted terms have been removed to speed compilation times.
+-- There are several minor changes and additions to the utility functions of this library.
 --
 --------------------------------------------------------------------------------
 module Data.Comp.Multi (
@@ -22,11 +24,13 @@ module Data.Comp.Multi (
   , module Data.Comp.Multi.HFoldable
   , module Data.Comp.Multi.HFunctor
   , module Data.Comp.Multi.HTraversable
+  , module Data.Comp.Multi.Kinds
   , module Data.Comp.Multi.Ops
   , module Data.Comp.Multi.Ordering
   , module Data.Comp.Multi.Show
   , module Data.Comp.Multi.Sum
   , module Data.Comp.Multi.Term
+  , module Data.Comp.Dict
     ) where
 
 import Data.Comp.Multi.Algebra
@@ -36,11 +40,13 @@ import Data.Comp.Multi.Generic
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
+import Data.Comp.Multi.Kinds
 import Data.Comp.Multi.Ops
 import Data.Comp.Multi.Ordering
 import Data.Comp.Multi.Show
 import Data.Comp.Multi.Sum
 import Data.Comp.Multi.Term
+import Data.Comp.Dict
 
 {- $ex1
 The example illustrates how to use generalised compositional data types

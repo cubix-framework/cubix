@@ -1,18 +1,19 @@
-{-# OPTIONS_GHC -fcontext-stack=200 #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_HADDOCK hide #-}
+{-# OPTIONS_GHC -freduction-depth=200 #-}
+{-# LANGUAGE CPP                      #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE KindSignatures           #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE PartialTypeSignatures    #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Java.Parametric.Common.Trans () where
@@ -24,10 +25,11 @@ module Cubix.Language.Java.Parametric.Common.Trans (
 
 import Data.List( (\\) )
 import Data.Maybe ( fromJust )
+import Data.Proxy
 import Data.Typeable ( Typeable )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( unTerm, (:+:), (:<:), caseH, inject, project, HFunctor, hfmap )
+import Data.Comp.Multi ( unTerm , inject, project, HFunctor, hfmap, (:-<:), All, Sum, caseCxt )
 
 import Cubix.Language.Java.Parametric.Common.Types
 import qualified Cubix.Language.Java.Parametric.Full as F
@@ -62,13 +64,13 @@ translate' = injF . translate
 class Trans f where
   trans :: f F.JavaTerm l -> MJavaTerm l
 
-instance {-# OVERLAPPING #-} (Trans f, Trans g) => Trans (f :+: g) where
-  trans = caseH trans trans
+instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
+  trans = caseCxt (Proxy @Trans) trans
 
-transDefault :: (HFunctor f, f :<: MJavaSig, f :<: F.JavaSig) => f F.JavaTerm l -> MJavaTerm l
+transDefault :: (HFunctor f, f :-<: MJavaSig, f :-<: F.JavaSig) => f F.JavaTerm l -> MJavaTerm l
 transDefault = inject . hfmap translate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: MJavaSig, f :<: F.JavaSig) => Trans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MJavaSig, f :-<: F.JavaSig) => Trans f where
   trans = transDefault
 
 transIdent :: F.JavaTerm F.IdentL -> MJavaTerm IdentL
@@ -112,8 +114,7 @@ instance {-# OVERLAPPING #-} Trans F.Exp where
 instance {-# OVERLAPPING #-} Trans F.MethodInvocation where
   trans (F.MethodCall nam args) = iFunctionCall (iJavaTypeArgs riNilF)
                                                 f
-                                                (FunctionArgumentList' $ ConsF' (ReceiverArg' iImplicitReceiver)
-                                                                                (mapF (injF . translate) args))
+                                                (FunctionArgumentList' $ mapF (injF . translate) args)
     where
       f = case nam of
             (project -> Just (F.Name (SingletonF' n))) -> injF $ transIdent n
@@ -197,13 +198,13 @@ untranslate = untrans . unTerm
 class Untrans f where
   untrans :: f MJavaTerm l -> F.JavaTerm l
 
-instance {-# OVERLAPPING #-} (Untrans f, Untrans g) => Untrans (f :+: g) where
-  untrans = caseH untrans untrans
+instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
+  untrans = caseCxt (Proxy @Untrans) untrans
 
-untransDefault :: (HFunctor f, f :<: F.JavaSig) => f MJavaTerm l -> F.JavaTerm l
+untransDefault :: (HFunctor f, f :-<: F.JavaSig) => f MJavaTerm l -> F.JavaTerm l
 untransDefault = inject . hfmap untranslate
 
-instance {-# OVERLAPPABLE #-} (HFunctor f, f :<: F.JavaSig) => Untrans f where
+instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.JavaSig) => Untrans f where
   untrans = untransDefault
 
 untransIdent :: MJavaTerm IdentL -> F.JavaTerm F.IdentL
@@ -249,18 +250,22 @@ instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsMethodInvocation where
   untrans (FunctionCallIsMethodInvocation (FunctionCall' (project -> Just (JavaTypeArgs targs))
                                                          (FunctionIdent' n)
-                                                         (FunctionArgumentList' (ConsF' (ReceiverArg' rec) args)))) =
-      case project rec of
-        Just ImplicitReceiver -> case targs of
-          NilF' -> F.iMethodCall (F.iName $ SingletonF' n') args'
-          _     -> error "Illegal Java term constructed: type args passed to implicit receiver"
-        Just (PrimaryReceiver e)    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
-        Just SuperReceiver          -> F.iSuperMethodCall                   (untranslate targs) n' args'
-        Just (ClassSuperReceiver c) -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
-        Just (TypeReceiver c)       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
+                                                         (FunctionArgumentList' args))) =
+      case args of
+        ConsF' (ReceiverArg' receiver) nonReceiverArgs ->
+            let args' = mapF (untranslate.fromProjF) nonReceiverArgs in
+            case project receiver of
+                Just (PrimaryReceiver e)    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
+                Just SuperReceiver          -> F.iSuperMethodCall                   (untranslate targs) n' args'
+                Just (ClassSuperReceiver c) -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
+                Just (TypeReceiver c)       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
+
+        _ -> case targs of
+                 NilF' -> F.iMethodCall (F.iName $ SingletonF' n') (mapF (untranslate . fromProjF) args)
+                 _     -> error "Illegal Java term constructed: type args passed to implicit receiver"
     where
       n' = untransIdent n
-      args' = mapF (untranslate.fromProjF) args
+
 
 untransParamDecl :: MJavaTerm FunctionParameterDeclL -> F.JavaTerm F.FormalParamL
 untransParamDecl (projF -> Just (JavaVarargsParam'               (JavaParamAttrs' mods tp dim) n)) = F.iFormalParam (untranslate mods) (untranslate tp) True  (combineVarDeclId dim n)
@@ -298,7 +303,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsMemberDecl where
                            Nothing'
                            (F.iMethodBody (Just' (untransBlock $ fromProjF body)))
 
-untransError :: (HFunctor f, f :<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
+untransError :: (HFunctor f, f :-<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJavaTerm _))
 
 do ipsNames <- sumToNames ''MJavaSig

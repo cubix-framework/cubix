@@ -20,11 +20,9 @@ module Cubix.Language.Parametric.Path
   , searchParent
   ) where
 
-import Control.Monad ( (=<<) )
 
-import Data.Comp.Multi ( Cxt(..), Term, Alg, cata, K(..), E(..), runE, (:&:), hfoldMap, HTraversable(..) )
+import Data.Comp.Multi ( Cxt(..), Alg, cata, K(..), E(..), runE, (:&:), hfoldMap, HTraversable(..), HFix )
 import Data.Comp.Multi.Mapping ( Numbered(..), number )
-import Data.Comp.Multi.Strategy.Classification ( DynCase, caseE )
 
 import Data.List ( find )
 import Data.Map ( Map )
@@ -68,7 +66,7 @@ revPathDistance (x:xs) (y:ys)
 pathDistance :: Path -> Path -> Int
 pathDistance p1 p2 = revPathDistance (reverse $ getPath p1) (reverse $ getPath p2)
 
-getChild :: (HTraversable f) => Term f i -> Int -> Maybe (E (Term f))
+getChild :: (HTraversable f) => HFix f i -> Int -> Maybe (E (HFix f))
 getChild (Term t) i = getFirst (hfoldMap eqP (number t))
   where
     eqP (Numbered j x)
@@ -76,33 +74,33 @@ getChild (Term t) i = getFirst (hfoldMap eqP (number t))
           | otherwise = First Nothing
 
 
-rewriteChild :: (HTraversable f, Applicative m) => Int -> Term f i -> (forall j. Term f j -> m (Term f j)) -> m (Term f i)
+rewriteChild :: (HTraversable f, Applicative m) => Int -> HFix f i -> (forall j. HFix f j -> m (HFix f j)) -> m (HFix f i)
 rewriteChild i (Term t) f = Term <$> htraverse rw (number t)
   where
     rw (Numbered j x)
           | i == j    = f x
           | otherwise = pure x
 
-followRevPath :: (HTraversable f) => [Int] -> Term f i -> Maybe (E (Term f))
+followRevPath :: (HTraversable f) => [Int] -> HFix f i -> Maybe (E (HFix f))
 followRevPath []     t = Just (E t)
 followRevPath (i:is) t = runE (followRevPath is) =<< getChild t i
 
-getAncestors :: (HTraversable f) => Path -> Term f i -> [E (Term f)]
+getAncestors :: (HTraversable f) => Path -> HFix f i -> [E (HFix f)]
 getAncestors (Path p) t = go (reverse p) t
   where
-    go :: (HTraversable f) => [Int] -> Term f i -> [E (Term f)]
+    go :: (HTraversable f) => [Int] -> HFix f i -> [E (HFix f)]
     go []     t = [E t]
     go (i:is) t = case getChild t i of
                     Just (E x) -> (E t) : go is x
                     Nothing    -> [E t]
 
-followPath :: (HTraversable f) => Path -> Term f i -> Maybe (E (Term f))
+followPath :: (HTraversable f) => Path -> HFix f i -> Maybe (E (HFix f))
 followPath p t = followRevPath (reverse $ getPath p) t
 
-rewriteAtPathM :: (HTraversable f, Applicative m) => (forall j. Term f j -> m (Term f j)) -> Term f i -> Path -> m (Term f i)
+rewriteAtPathM :: (HTraversable f, Applicative m) => (forall j. HFix f j -> m (HFix f j)) -> HFix f i -> Path -> m (HFix f i)
 rewriteAtPathM f t (Path p) = go f (reverse p) t
   where
-    go :: (HTraversable f, Applicative m) =>  (forall j. Term f j -> m (Term f j)) -> [Int] -> Term f i -> m (Term f i)
+    go :: (HTraversable f, Applicative m) =>  (forall j. HFix f j -> m (HFix f j)) -> [Int] -> HFix f i -> m (HFix f i)
     go f []     x = f x
     go f (i:is) x = rewriteChild i x (go f is)
 
@@ -113,8 +111,8 @@ pathAlg t = K $ \path -> Map.insert lab (Path path) (childPaths path)
     tInd = number t
     childPaths path = hfoldMap (\(Numbered i kf) -> (unK kf) (i:path)) tInd
 
-getPaths :: (HTraversable f) => TermLab f i -> Map Label Path
+getPaths :: (HTraversable f) => HFixLab f i -> Map Label Path
 getPaths t = unK (cata pathAlg t) []
 
-searchParent :: (HTraversable f) => (forall i. Term f i -> Bool) -> Term f l -> Path -> Maybe (E (Term f))
+searchParent :: (HTraversable f) => (forall i. HFix f i -> Bool) -> HFix f l -> Path -> Maybe (E (HFix f))
 searchParent f prog path = find (runE f) (reverse $ getAncestors path prog)

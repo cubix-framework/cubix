@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- |
@@ -99,7 +100,7 @@ doubleAssign t@(project' -> Just (Assign lhs _ _)) = do
 
 main = do
   Just tree <- parse "Foo.lua"
-  gen <- mkCSLabelGen
+  gen <- mkConcurrentSupplyLabelGen
   let (treeLab :: MLuaTermLab _) = evalState (annotateLabel tree) gen
   putStrLn $ "\n\n"
   let progInfo = makeProgInfo treeLab
@@ -109,7 +110,7 @@ main = do
   --putStrLn "\nBasic blocks: "
   --print $ map (^. cfg_node_lab) $ filter (startsBasicBlock cfg) $ cfgNodes cfg
 
-  let t' = evalState (performCfgInsertions (Proxy :: Proxy BlockItemL) progInfo (allbuR $ promoteR doubleAssign) treeLab) gen
+  let t' = evalState (performCfgInsertions @BlockItemL progInfo (allbuR $ promoteR doubleAssign) treeLab) gen
 
   putStrLn $ prettyLua $ stripA t'
 

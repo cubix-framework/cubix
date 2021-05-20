@@ -1,21 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# OPTIONS_HADDOCK hide #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -fcontext-stack=120 #-}
+{-# OPTIONS_HADDOCK hide                     #-}
+{-# LANGUAGE CPP                             #-}
+{-# LANGUAGE DataKinds                       #-}
+{-# LANGUAGE EmptyDataDecls                  #-}
+{-# LANGUAGE ExistentialQuantification       #-}
+{-# LANGUAGE FlexibleContexts                #-}
+{-# LANGUAGE FlexibleInstances               #-}
+{-# LANGUAGE GADTs                           #-}
+{-# LANGUAGE KindSignatures                  #-}
+{-# LANGUAGE MultiParamTypeClasses           #-}
+{-# LANGUAGE TemplateHaskell                 #-}
+{-# LANGUAGE TypeOperators                   #-}
+{-# LANGUAGE TypeSynonymInstances            #-}
+{-# LANGUAGE UndecidableInstances            #-}
+{-# LANGUAGE ViewPatterns                    #-}
+{-# OPTIONS_GHC -freduction-depth=120        #-}
 
 -- This is a separate file due to GHC's phase restriction
 

@@ -76,7 +76,7 @@ First, download the sub-libraries `comptrans` and `compstrat`
     
 Second, build Cubix:
 
-    stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
+    stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'
 
 You may be prompted for your Github credentials to download the
 third-party frontends.
@@ -90,8 +90,8 @@ Cubix has many dependencies, several of which are not on Hackage/Stackage, inclu
 # Compilation notes
 
 Because of performance problems in GHC, the full Cubix will not build
-with -O1 or -O2. We've tried on a server with 64GB RAM; the server ran
-out of memory. Instead, use this command:
+with -O1 or -O2 on most machines. We've tried on a server with 64GB RAM; the server ran
+out of memory. We eventually succeeded in building with -O2, but it took a server with over 200GB of RAM. Instead, use this command:
 
     alias stackfastbuild="stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
 
@@ -105,25 +105,28 @@ We found the following two minimal sets of compilation flags that mitigate this 
 If disable everything except CSE and specialise, blow-up still
 occurs. Remains true with -O1
 
-Adding "--flag cubix:only-one-language" to the build command will turn on a compile flag that disables building support for all languages except Lua, the smallest language. This greatly speeds compilation times, to the point where we are able to compile with -O2. Some of the performance reports in cubix/benchmarks/reports were compiled with this flag.
+Adding "--flag cubix:only-one-language" to the build command will turn on a compile flag that disables building support for all languages except Lua, the smallest language. This greatly speeds compilation times, to the point where we are able to compile with -O2 on 2015 MacBook Pro. Some of the performance reports in cubix/benchmarks/reports were compiled with this flag.
 
+# Docker Image
 
+A Docker image containing the version of Cubix submitted to OOPSLA 2018 along with runs of all the experiments, including the human study, is available from https://zenodo.org/record/1413855 .
 
 # Directory Overview
 
 Overview of directories (corresponding to the top-level of the zip file, and the /cubix directory on the Docker image):
-/stack.yaml         # High-level build description
-/package.yaml     # Low-level build description 
-/examples           # Example transformations built with Cubix
-/examples/multi # The main driver for the multi-language transformations
-/comptrans         # Source code for the comptrans library
-/compstrat          # Source code for compstrat, our library for Strategic Programming with Compositional Datatypes
-/input-files         # Small test inputs in each of the 5 languages
-/scripts               # Scripts for running the transformations over compiler test suites
+
+    /stack.yaml         # High-level build description
+    /package.yaml     # Low-level build description 
+    /examples           # Example transformations built with Cubix
+    /examples/multi # The main driver for the multi-language transformations
+    /comptrans         # Source code for the comptrans library
+    /compstrat          # Source code for compstrat, our library for Strategic Programming with Compositional Datatypes
+    /input-files         # Small test inputs in each of the 5 languages
+    /scripts               # Scripts for running the transformations over compiler test suites
 
 # Running the built-in transformations and analyses
 
-Use this command from the "languages" directory (the one that contains "stack.yaml"):
+Use this command from the top-level directory (the one that contains "stack.yaml"):
 
     stack exec examples-multi
     

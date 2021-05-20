@@ -49,5 +49,4 @@ library:
   ghc-options: -Wall
   source-dirs: .
   exposed-modules:
-  - Data.Comp.Derive.Generic
   - Data.Comp.Trans

@@ -8,6 +8,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -43,7 +44,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   , pattern Left'
   , pattern Right'
 
-    -- * Smart constructors
+    -- ** Smart constructors
   , riNothingF
   , iJustF
   , riNilF
@@ -53,7 +54,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   , riLeftF
   , riRightF
 
-    -- * Converting functorial syntax
+    -- ** Converting functorial syntax
   , ExtractF(..)
   , KExtractF(..)
   , KExtractF'(..)
@@ -70,12 +71,13 @@ module Cubix.Language.Parametric.Syntax.Functor
   , mapF
   ) where
 
-import Data.Comp.Multi ( HFunctor, (:<:), (:+:), (:&:), Cxt(..), Term, Context, K(..), unK, inject, project, project', caseH, RemA(..), NotSum )
+import Data.Comp.Multi ( HFunctor, (:<:), Sum, (:&:), Cxt(..), Context, K(..), unK, inject, project, project', RemA(..), NotSum, HFix, caseCxt, All, CxtS, (:-<:) )
 import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 
 import Data.Comp.Multi.Strategy.Classification
 
 import Data.Typeable ( Typeable, eqT )
+import Data.Proxy
 
 import Cubix.Language.Parametric.InjF
 
@@ -311,15 +313,21 @@ instance (Typeable l, Typeable l') => KDynCase EitherF (Either l l') where
 riNothingF :: forall h f a l. (MaybeF :<: f, Typeable l) => Cxt h f a (Maybe l)
 riNothingF = inject NothingF
 
-iJustF :: (MaybeF :<: f, InjF f (Maybe l) l', Typeable l) => Cxt h f a l -> Cxt h f a l'
-iJustF = injectF . JustF
+iJustF :: (MaybeF :-<: fs, InjF fs (Maybe l) l', Typeable l) => CxtS h fs a l -> CxtS h fs a l'
+iJustF = injF . iJust
+
+iJust :: (MaybeF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a (Maybe l)
+iJust = inject . JustF
 
 -- | Smart constructor for NilF. Restricted; cannot be lifted through a sort injection
 riNilF :: forall h f a l. (ListF :<: f, Typeable l) => Cxt h f a [l]
 riNilF = inject NilF
 
-iConsF :: (ListF :<: f, InjF f [l] l', Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a l'
-iConsF x y = injectF (ConsF x y)
+iConsF :: (ListF :-<: fs, InjF fs [l] l', Typeable l) => CxtS h fs a l -> CxtS h fs a [l] -> CxtS h fs a l'
+iConsF x y = injF (iCons x y)
+
+iCons :: (ListF :<: f, Typeable l) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
+iCons x y = inject (ConsF x y)
 
 -- | Smart constructor for PairF. Restricted; cannot be lifted through a sort injection
 riPairF :: (PairF :<: f, Typeable i, Typeable j) => Cxt h f a i -> Cxt h f a j -> Cxt h f a (i, j)
@@ -342,6 +350,10 @@ $(derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
 -- Dealing with functorial syntax
 --------------------------------------------------------------------------------
 
+-- We should be able to make this safe using OrderedOverlappingTypeFamilies.
+--
+-- This is an instance of a distributive law, and likely can (and should)
+-- be replaced with such.
 class ExtractF f e where
   -- | Pulls a functor out of a label.
   -- 
@@ -350,14 +362,12 @@ class ExtractF f e where
   -- @
   -- 'extractF' :: 'JavaProj' ['SourceFileL'] -> ['JavaProj' 'SourceFileL']
   -- @
-  -- 
-  -- This function is unsafe, as the type system cannot detect when the label
-  -- on a higher-order functorial sum guarantees which class the term lies in.
-  -- 
-  -- We should be able to make this safe using OrderedOverlappingTypeFamilies.
-  -- 
-  -- This is an instance of a distributive law, and likely can (and should)
-  -- be replaced with such.
+  --
+  -- Beware that this function unsafely assumes that e.g.: a term of sort
+  -- @[l]@ is a `ListF` node (and similar for Maybe, etc).
+  -- If you define a custom node that has sort @[l]@ for any @l@, and
+  -- do not define a corresponding `ExtractF` instance, then `extractF`
+  -- may give an error.
   extractF :: e (f l) -> f (e l)
 
 -- | Inductive form of ExtractF.
@@ -371,11 +381,11 @@ class KExtractF' f g where
 instance KExtractF' f g => KExtractF f g where
   kextractF = kextractF'
 
-instance (KExtractF f g, KExtractF f h) => KExtractF f (g :+: h) where
-  kextractF = caseH kextractF kextractF
+instance (All (KExtractF f) gs) => KExtractF f (Sum gs) where
+  kextractF = caseCxt (Proxy @(KExtractF f)) kextractF
 
-instance (KExtractF' f g, KExtractF' f h) => KExtractF' f (g :+: h) where
-  kextractF' = caseH kextractF' kextractF'
+instance (All (KExtractF' f) gs) => KExtractF' f (Sum gs) where
+  kextractF' = caseCxt (Proxy @(KExtractF' f)) kextractF'
 
 instance (KExtractF f g) => KExtractF f (g :&: a) where
   kextractF = kextractF . remA
@@ -417,11 +427,11 @@ class KExtractF2' f g where
 instance KExtractF2' f g => KExtractF2 f g where
   kextractF2 = kextractF2'
 
-instance (KExtractF2 f g, KExtractF2 f h) => KExtractF2 f (g :+: h) where
-  kextractF2 = caseH kextractF2 kextractF2
+instance (All (KExtractF2 f) gs) => KExtractF2 f (Sum gs) where
+  kextractF2 = caseCxt (Proxy @(KExtractF2 f)) kextractF2
 
-instance (KExtractF2' f g, KExtractF2' f h) => KExtractF2' f (g :+: h) where
-  kextractF2' = caseH kextractF2' kextractF2'
+instance (All (KExtractF2' f) gs) => KExtractF2' f (Sum gs) where
+  kextractF2' = caseCxt (Proxy @(KExtractF2' f)) kextractF2'
 
 instance (KExtractF2 f g) => KExtractF2 f (g :&: a) where
   kextractF2 = kextractF2 . remA
@@ -429,7 +439,7 @@ instance (KExtractF2 f g) => KExtractF2 f (g :&: a) where
 instance (KExtractF2' f g) => KExtractF2' f (g :&: a) where
   kextractF2' = kextractF2' . remA
 
-instance (KExtractF2 f g) => ExtractF2 f (Term g) where
+instance (KExtractF2 f g) => ExtractF2 f (HFix g) where
   extractF2 (Term x) = kextractF2 x
 
 instance (NotSum g) => KExtractF2' f g where
@@ -458,11 +468,11 @@ class KExtractF3' f g where
 instance KExtractF3' f g => KExtractF3 f g where
   kextractF3 = kextractF3'
 
-instance (KExtractF3 f g, KExtractF3 f h) => KExtractF3 f (g :+: h) where
-  kextractF3 = caseH kextractF3 kextractF3
+instance (All (KExtractF3 f) gs) => KExtractF3 f (Sum gs) where
+  kextractF3 = caseCxt (Proxy @(KExtractF3 f)) kextractF3
 
-instance (KExtractF3' f g, KExtractF3' f h) => KExtractF3' f (g :+: h) where
-  kextractF3' = caseH kextractF3' kextractF3'
+instance (All (KExtractF3' f) gs) => KExtractF3' f (Sum gs) where
+  kextractF3' = caseCxt (Proxy @(KExtractF3' f)) kextractF3'
 
 instance (KExtractF3 f g) => KExtractF3 f (g :&: a) where
   kextractF3 = kextractF3 . remA
@@ -470,7 +480,7 @@ instance (KExtractF3 f g) => KExtractF3 f (g :&: a) where
 instance (KExtractF3' f g) => KExtractF3' f (g :&: a) where
   kextractF3' = kextractF3' . remA
 
-instance (KExtractF3 f g) => ExtractF3 f (Term g) where
+instance (KExtractF3 f g) => ExtractF3 f (HFix g) where
   extractF3 (Term x) = kextractF3 x
 
 instance (NotSum g) => KExtractF3' f g where
@@ -483,6 +493,7 @@ instance KExtractF3' (,,) TripleF where
 
 --------------------------------------------------------------------------------
 
+-- This is an instance of a distributive law, and can probably be replaced with such.
 class (Functor f) => InsertF f e where
   -- | Inverse of extractF. Pushes a functor into a label.
   -- 
@@ -494,21 +505,19 @@ class (Functor f) => InsertF f e where
   -- 
   -- Note that this cannot be used on a labeled tree, as the insertion operation will
   -- require generating additional labels.
-  -- 
-  -- This is an instance of a distributive law, and can probably be replaced with such.
   insertF :: (Typeable l) => f (e l) -> e (f l)
 
 
-insertFHole :: (InsertF e (Context f (Term g)), Typeable l) => e (Term g l) -> Context f (Term g) (e l)
+insertFHole :: (InsertF e (Context f (HFix g)), Typeable l) => e (HFix g l) -> Context f (HFix g) (e l)
 insertFHole = insertF . fmap Hole
 
 instance (ListF :<: e, HFunctor e) => InsertF [] (Cxt h e a) where
   insertF [] = riNilF
-  insertF (x : xs) = x `iConsF` (insertF xs)
+  insertF (x : xs) = x `iCons` (insertF xs)
 
 instance (MaybeF :<: e, HFunctor e) => InsertF Maybe (Cxt h e a) where
   insertF Nothing = riNothingF
-  insertF (Just x) = iJustF x
+  insertF (Just x) = iJust x
 
 
 liftF :: (InsertF f h, ExtractF f g, Functor f, Typeable b) => (f (g a) -> f (h b)) -> g (f a) -> h (f b)
@@ -517,39 +526,39 @@ liftF f = insertF . f . extractF
 mapF :: (InsertF f h, ExtractF f g, Functor f, Typeable b) => (g a -> h b) -> g (f a) -> h (f b)
 mapF f = liftF (fmap f)
 
-pattern Just' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a (Maybe l)
+pattern Just' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a (Maybe l)
 pattern Just' x <- (project -> (Just (JustF x))) where
   Just' x = inject $ JustF x
 
-pattern Nothing' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a (Maybe l)
+pattern Nothing' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h f a (Maybe l)
 pattern Nothing' <- (project -> Just NothingF) where
   Nothing' = inject NothingF
 
 
-pattern NilF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a [l]
+pattern NilF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a [l]
 pattern NilF' <- (project -> Just NilF) where
   NilF' = inject NilF
 
-pattern ConsF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
+pattern ConsF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l] -> Cxt h f a [l]
 pattern ConsF' x xs <- (project -> (Just (ConsF x xs))) where
   ConsF' x xs = inject $ ConsF x xs
 
-pattern SingletonF' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l]
+pattern SingletonF' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h f a l -> Cxt h f a [l]
 pattern SingletonF' x = ConsF' x NilF'
 
-pattern PairF' :: () => (PairF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l -> Cxt h f a l' -> Cxt h f a (l, l')
+pattern PairF' :: (PairF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l -> Cxt h f a l' -> Cxt h f a (l, l')
 pattern PairF' x y <- (project -> (Just (PairF x y))) where
   PairF' x y = inject $ PairF x y
 
-pattern TripleF' :: () => (TripleF :<: f, Typeable i, Typeable j, Typeable k, HFunctor f) => Cxt h f a i -> Cxt h f a j -> Cxt h f a k -> Cxt h f a (i,j,k)
+pattern TripleF' :: (TripleF :<: f, Typeable i, Typeable j, Typeable k, HFunctor f) => Cxt h f a i -> Cxt h f a j -> Cxt h f a k -> Cxt h f a (i,j,k)
 pattern TripleF' x y z <- (project -> Just (TripleF x y z)) where
   TripleF' x y z = inject $ TripleF x y z
 
-pattern Left'  :: () => (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l  -> Cxt h f a (Either l l')
+pattern Left'  :: (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l  -> Cxt h f a (Either l l')
 pattern Left'  x <- (project -> (Just (LeftF x))) where
   Left'  x = inject $ LeftF x
 
-pattern Right' :: () => (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l' -> Cxt h f a (Either l l')
+pattern Right' :: (EitherF :<: f, Typeable l, Typeable l', HFunctor f) => Cxt h f a l' -> Cxt h f a (Either l l')
 pattern Right' x <- (project -> (Just (RightF x))) where
   Right' x = inject $ RightF x
 
@@ -558,14 +567,14 @@ pattern Right' x <- (project -> (Just (RightF x))) where
 -- |
 -- I really don't like having to copy variants for annotated versions, but must with current design
 
-pattern JustA' :: () => (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a (Maybe l)
+pattern JustA' :: (MaybeF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a (Maybe l)
 pattern JustA' x <- (project' -> (Just (JustF x)))
 
-pattern NilFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a [l]
+pattern NilFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a [l]
 pattern NilFA' <- (project' -> Just NilF)
 
-pattern ConsFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l] -> Cxt h (f :&: p) a [l]
+pattern ConsFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l] -> Cxt h (f :&: p) a [l]
 pattern ConsFA' x xs <- (project' -> (Just (ConsF x xs)))
 
-pattern SingletonFA' :: () => (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l]
+pattern SingletonFA' :: (ListF :<: f, Typeable l, HFunctor f) => Cxt h (f :&: p) a l -> Cxt h (f :&: p) a [l]
 pattern SingletonFA' x <- (ConsFA' x NilFA')

@@ -1,27 +1,29 @@
-{-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE KindSignatures         #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE PolyKinds              #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
-{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ConstraintKinds         #-}
+{-# LANGUAGE DataKinds               #-}
+{-# LANGUAGE FlexibleContexts        #-}
+{-# LANGUAGE FlexibleInstances       #-}
+{-# LANGUAGE FunctionalDependencies  #-}
+{-# LANGUAGE GADTs                   #-}
+{-# LANGUAGE KindSignatures          #-}
+{-# LANGUAGE MagicHash               #-}
+{-# LANGUAGE MultiParamTypeClasses   #-}
+{-# LANGUAGE PartialTypeSignatures   #-}
+{-# LANGUAGE PatternSynonyms         #-}
+{-# LANGUAGE PolyKinds               #-}
+{-# LANGUAGE RankNTypes              #-}
+{-# LANGUAGE ScopedTypeVariables     #-}
+{-# LANGUAGE TypeApplications        #-}
+{-# LANGUAGE TypeFamilies            #-}
+{-# LANGUAGE TypeOperators           #-}
+{-# LANGUAGE TypeSynonymInstances    #-}
+{-# LANGUAGE UndecidableInstances    #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Ops
--- Copyright   :  (c) 2011 Patrick Bahr
+-- Copyright   :  Original (c) 2011 Patrick Bahr; modifications (c) 2020 James Koppel
 -- License     :  BSD3
--- Maintainer  :  Patrick Bahr <paba@diku.dk>
--- Stability   :  experimental
--- Portability :  non-portable (GHC Extensions)
 --
 -- This module provides operators on higher-order functors. All definitions are
 -- generalised versions of those in "Data.Comp.Ops".
@@ -29,9 +31,10 @@
 --------------------------------------------------------------------------------
 
 module Data.Comp.Multi.Ops
-    ( (:+:)(..)
+    ( Sum (..)
     , caseH
     , (:<:)
+    , (:-<:)
     , inj
     , proj
     , (:=:)
@@ -41,122 +44,124 @@ module Data.Comp.Multi.Ops
     , (O.:*:)(..)
     , O.ffst
     , O.fsnd
+    , unsafeMapSum
+    , unsafeElem
+    , caseCxt
+    , caseSumF
+    , caseSum
+    , Alts
+    , Alt
+    , alt
+    , (<|)
+    , cons
+    , nil
+    , Elem
+    , pattern Elem
+    , Mem
+    , at
+    , witness
+    , extend
+    , contract
     ) where
 
-import Control.Applicative
 import Control.Monad
+import Data.Type.Equality
+import Data.Proxy
+import Data.Functor.Identity
+import Data.Comp.Multi.Alt
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.HTraversable
+import Data.Comp.Multi.Kinds
 import qualified Data.Comp.Ops as O
+import Data.Comp.Elem
+import Data.Comp.Dict
 
-import Data.Comp.SubsumeCommon
+-------------------------------------------------------------
 
-infixr 6 :+:
+-- | Data type defining a sum of signatures.
+--
+--   It is inspired by modular reifiable matching, as described in
+--
+--   * Oliveira, Bruno C. D. S., Shin-Cheng Mu, and Shu-Hung You.
+--     \"Modular reifiable matching: a list-of-functors approach to two-level types.\"
+--     In Haskell Symposium, 2015.
+--
+--   except that this definition uses value-level integers (in the `Elem` datatype) in place
+--   of type-level naturals. It hence uses `unsafeCoerce` under the hood, but is type-safe if used
+--   through the public API. The result is that values of this type take constant memory with respect to the number
+--   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
+--   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
+--   and pointer to the value.
+data Sum (fs :: Signature) h e where
+  Sum :: Elem f fs -> f h e -> Sum fs h e
 
-
--- |Data type defining coproducts.
-data (f :+: g) (h :: * -> *) e = Inl (f h e)
-                               | Inr (g h e)
+at :: Elem f fs -> Sum fs a e -> Maybe (f a e)
+at e (Sum wit a) =
+  case elemEq e wit of
+    Just Refl -> Just a
+    Nothing   -> Nothing
 
 {-| Utility function to case on a higher-order functor sum, without exposing the
   internal representation of sums. -}
-caseH :: (f a b -> c) -> (g a b -> c) -> (f :+: g) a b -> c
-caseH f g x = case x of
-                Inl x -> f x
-                Inr x -> g x
+{-# INLINE caseH #-}
+caseH :: Alts fs a e b -> Sum fs a e -> b
+caseH alts (Sum wit v) = extractAt wit alts v
 
-instance (HFunctor f, HFunctor g) => HFunctor (f :+: g) where
-    hfmap f (Inl v) = Inl $ hfmap f v
-    hfmap f (Inr v) = Inr $ hfmap f v
+{-# INLINE caseCxt #-}
+caseCxt :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a e -> b) -> Sum fs a e -> b
+caseCxt _ f (Sum wit v) = f v \\ dictFor @cxt wit
 
-instance (HFoldable f, HFoldable g) => HFoldable (f :+: g) where
-    hfold (Inl e) = hfold e
-    hfold (Inr e) = hfold e
-    hfoldMap f (Inl e) = hfoldMap f e
-    hfoldMap f (Inr e) = hfoldMap f e
-    hfoldr f b (Inl e) = hfoldr f b e
-    hfoldr f b (Inr e) = hfoldr f b e
-    hfoldl f b (Inl e) = hfoldl f b e
-    hfoldl f b (Inr e) = hfoldl f b e
+{-# INLINE caseSumF #-}
+caseSumF :: forall cxt f fs a e b. (All cxt fs, Functor f) => Proxy cxt -> (forall g. (cxt g) => g a e -> f (g b e)) -> Sum fs a e -> f (Sum fs b e)
+caseSumF _ f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
 
-    hfoldr1 f (Inl e) = hfoldr1 f e
-    hfoldr1 f (Inr e) = hfoldr1 f e
-    hfoldl1 f (Inl e) = hfoldl1 f e
-    hfoldl1 f (Inr e) = hfoldl1 f e
+{-# INLINE caseSum #-}
+caseSum :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall g. (cxt g) => g a e -> g b e) -> Sum fs a e -> Sum fs b e
+caseSum p f = runIdentity . caseSumF p (Identity . f) 
 
-instance (HTraversable f, HTraversable g) => HTraversable (f :+: g) where
-    htraverse f (Inl e) = Inl <$> htraverse f e
-    htraverse f (Inr e) = Inr <$> htraverse f e
-    hmapM f (Inl e) = Inl `liftM` hmapM f e
-    hmapM f (Inr e) = Inr `liftM` hmapM f e
+instance (All HFunctor fs) => HFunctor (Sum fs) where
+    hfmap f = caseSum (Proxy @HFunctor) (hfmap f)
+      
+instance ( All HFoldable fs
+         , All HFunctor fs
+         ) => HFoldable (Sum fs) where
+    hfold      = caseCxt (Proxy @HFoldable) hfold
+    hfoldMap f = caseCxt (Proxy @HFoldable) (hfoldMap f)
+    hfoldr f b = caseCxt (Proxy @HFoldable) (hfoldr f b)
+    hfoldl f b = caseCxt (Proxy @HFoldable) (hfoldl f b)
+    hfoldr1 f  = caseCxt (Proxy @HFoldable) (hfoldr1 f)
+
+instance ( All HTraversable fs
+         , All HFoldable fs
+         , All HFunctor fs
+         ) => HTraversable (Sum fs) where
+    htraverse f = caseSumF (Proxy @HTraversable) (htraverse f)
+    hmapM f     = caseSumF (Proxy @HTraversable) (hmapM f)
 
 -- The subsumption relation.
 
 infixl 5 :<:
 infixl 5 :=:
 
-type family Elem (f :: (* -> *) -> * -> *)
-                 (g :: (* -> *) -> * -> *) :: Emb where
-    Elem f f = Found Here
-    Elem (f1 :+: f2) g =  Sum' (Elem f1 g) (Elem f2 g)
-    Elem f (g1 :+: g2) = Choose (Elem f g1) (Elem f g2)
-    Elem f g = NotFound
+class (f :: Fragment) :<: (g :: Fragment) where
+  inj :: f a :-> g a
+  proj :: NatM Maybe (g a) (f a)
 
-class Subsume (e :: Emb) (f :: (* -> *) -> * -> *)
-                         (g :: (* -> *) -> * -> *) where
-  inj'  :: Proxy e -> f a :-> g a
-  prj'  :: Proxy e -> NatM Maybe (g a) (f a)
+instance ( Mem f fs
+         ) => f :<: (Sum fs) where
+  inj = Sum witness
+  proj = at witness
 
-instance Subsume (Found Here) f f where
-    inj' _ = id
-
-    prj' _ = Just
-
-instance Subsume (Found p) f g => Subsume (Found (Le p)) f (g :+: g') where
-    inj' _ = Inl . inj' (P :: Proxy (Found p))
-
-    prj' _ (Inl x) = prj' (P :: Proxy (Found p)) x
-    prj' _ _       = Nothing
-
-instance Subsume (Found p) f g => Subsume (Found (Ri p)) f (g' :+: g) where
-    inj' _ = Inr . inj' (P :: Proxy (Found p))
-
-    prj' _ (Inr x) = prj' (P :: Proxy (Found p)) x
-    prj' _ _       = Nothing
-
-instance (Subsume (Found p1) f1 g, Subsume (Found p2) f2 g)
-    => Subsume (Found (Sum p1 p2)) (f1 :+: f2) g where
-    inj' _ (Inl x) = inj' (P :: Proxy (Found p1)) x
-    inj' _ (Inr x) = inj' (P :: Proxy (Found p2)) x
-
-    prj' _ x = case prj' (P :: Proxy (Found p1)) x of
-                 Just y -> Just (Inl y)
-                 _      -> case prj' (P :: Proxy (Found p2)) x of
-                             Just y -> Just (Inr y)
-                             _      -> Nothing
-
-
-
--- | A constraint @f :<: g@ expresses that the signature @f@ is
--- subsumed by @g@, i.e. @f@ can be used to construct elements in @g@.
-type f :<: g = (Subsume (ComprEmb (Elem f g)) f g)
-
-
-inj :: forall f g a . (f :<: g) => f a :-> g a
-inj = inj' (P :: Proxy (ComprEmb (Elem f g)))
-
-proj :: forall f g a . (f :<: g) => NatM Maybe (g a) (f a)
-proj = prj' (P :: Proxy (ComprEmb (Elem f g)))
+instance f :<: f where
+  inj = id
+  proj = Just
 
 type f :=: g = (f :<: g, g :<: f)
 
-
-
-spl :: (f :=: f1 :+: f2) => (f1 a :-> b) -> (f2 a :-> b) -> f a :-> b
-spl f1 f2 x = case inj x of
-            Inl y -> f1 y
-            Inr y -> f2 y
+spl :: ( f :=: Sum fs
+      ) => (forall e l. Alts fs a e (b l)) -> f a :-> b
+spl alts = caseH alts . inj
 
 -- Constant Products
 
@@ -166,13 +171,12 @@ infixr 7 :&:
 -- signature. Alternatively, this could have also been defined as
 --
 -- @
--- data (f :&: a) (g ::  * -> *) e = f g e :&: a e
+-- data ((f :: Node) :&: a) g e = f g e :&: a e
 -- @
 --
 -- This is too general, however, for example for 'productHHom'.
 
-data (f :&: a) (g ::  * -> *) e = f g e :&: a
-
+data ((f :: Node) :&: a) g e = f g e :&: a
 
 instance (HFunctor f) => HFunctor (f :&: a) where
     hfmap f (v :&: c) = hfmap f v :&: c
@@ -190,15 +194,29 @@ instance (HTraversable f) => HTraversable (f :&: a) where
     htraverse f (v :&: c) =  (:&: c) <$> (htraverse f v)
     hmapM f (v :&: c) = liftM (:&: c) (hmapM f v)
 
-
-class RemA (s :: (* -> *) -> * -> *) s' | s -> s'  where
+class RemA (s :: Node) s' | s -> s'  where
     remA :: s a :-> s' a
 
+-- TODO: This is linear
+--       Is there a way to make this constant time?
+instance ( RemA f g
+         , RemA (Sum fs) (Sum gs)
+         ) => RemA (Sum (f ': fs)) (Sum (g ': gs)) where
+  remA (Sum w a) = case contract w of
+    Left Refl -> Sum witness (remA a)
+    Right w0  -> case go (Sum w0 a) of
+      Sum w1 a -> Sum (extend w1) a
 
-instance (RemA s s') => RemA (f :&: p :+: s) (f :+: s') where
-    remA (Inl (v :&: _)) = Inl v
-    remA (Inr v) = Inr $ remA v
-
+    where go :: (RemA (Sum fs) (Sum gs)) => Sum fs a :-> Sum gs a
+          go = remA
 
 instance RemA (f :&: p) f where
     remA (v :&: _) = v
+
+-- NOTE: Invariant => Length fs == Length gs
+-- TODO: write gs as a function of fs.    
+unsafeMapSum :: Elem f fs -> f a e -> (f a :-> g a) -> Sum gs a e
+unsafeMapSum wit v f = Sum (unsafeElem wit) (f v)
+
+class (f :<: Sum fs) => f :-<: fs
+instance (f :<: Sum fs) => f :-<: fs

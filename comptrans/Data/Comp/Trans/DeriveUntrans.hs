@@ -20,45 +20,48 @@ import Data.Comp.Trans.Util
 -- |
 -- Creates an @untranslate@ function inverting the @translate@ function
 -- created by @deriveTrans@.
--- 
+--
 -- @
 -- import qualified Foo as F
--- type ArithTerm = Term (Arith :+: Atom :+: Lit)
+-- type ArithTerm = Term (Sum '[Arith, Atom, Lit])
 -- deriveUntrans [''F.Arith, ''F.Atom, ''F.Lit] (TH.ConT ''ArithTerm)
 -- @
--- 
+--
 -- will create
--- 
+--
 -- @
 -- type family Targ l
 -- newtype T l = T {t :: Targ l}
--- 
+--
 -- class Untrans f where
 --   untrans :: Alg f t
--- 
+--
 -- untranslate :: ArithTerm l -> Targ l
 -- untranslate = t . cata untrans
--- 
+--
 -- type instance Targ ArithL = F.Arith
 -- instance Untrans Arith where
 --   untrans (Add x y) = T $ F.Add (t x) (t y)
--- 
+--
 -- type instance Targ AtomL = F.Atom
 -- instance Untrans Atom where
 --   untrans (Var s)   = T $ F.Var s
 --   untrans (Const x) = T $ F.Const (t x)
--- 
+--
 -- type instance Targ LitL = F.Lit
 -- instance Untrans Lit where
 --   untrans (Lit n) = T $ F.Lit n
 -- @
--- 
--- Note that you will need to manually provide an instance @(Untrans f, Untrans g) => Untrans (f :+: g)@
--- due to phase issues. (Or @(Untrans (f :&: p), Untrans (g :&: p)) => Untrans ((f :+: g) :&: p)@, if you
+--
+-- With annotation propagations on, it will instead produce
+-- @untranslate :: Term (Arith :&: Ann) l -> Targ l Ann@
+--
+-- where @Ann@ is the provided annotation type.
+--
+-- Note that you will need to manually provide an instance @(All Untrans fs) => Untrans (Sum fs)@
+-- due to phase issues. (Or @(All Untrans (DistAnn fs a)) => Untrans (Sum fs :&: a)@, if you
 -- are propagating annotations.)
 --
--- With annotation propagation on, it will instead produce
--- `untranslate :: Term (Arith :&: Ann) l -> Targ l Ann`
 deriveUntrans :: [Name] -> Type -> CompTrans [Dec]
 deriveUntrans names term = do targDec <- mkTarg targNm
                               wrapperDec <- mkWrapper wrapNm unwrapNm targNm
@@ -81,14 +84,16 @@ deriveUntrans names term = do targDec <- mkTarg targNm
 
 {- type family Targ l -}
 mkTarg :: Name -> CompTrans [Dec]
-mkTarg targNm = do i <- lift $ newName "i"
-                   return [FamilyD TypeFam targNm [PlainTV i] Nothing]
+mkTarg targNm = do i <- CompTrans $ lift $ newName "i"
+                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i] NoSig Nothing)]
 
 {- newtype T l = T { t :: Targ l } -}
 mkWrapper :: Name -> Name -> Name -> CompTrans [Dec]
-mkWrapper tpNm fNm targNm = do i <- lift $ newName "i"
-                               let con = RecC tpNm [(fNm, NotStrict, AppT (ConT targNm) (VarT i))]
-                               return [NewtypeD [] tpNm [PlainTV i] con []]
+mkWrapper tpNm fNm targNm = do i <- CompTrans $ lift $ newName "i"
+                               let con = RecC tpNm [(fNm, bang, AppT (ConT targNm) (VarT i))]
+                                   bang = Bang NoSourceUnpackedness NoSourceStrictness
+                                   nt   = NewtypeD [] tpNm [PlainTV i] Nothing con []
+                               return [nt]
 {-
   untranslate :: JavaTerm l -> Targ l
   untranslate = t . cata untrans
@@ -96,8 +101,8 @@ mkWrapper tpNm fNm targNm = do i <- lift $ newName "i"
 mkFn :: Name -> Type -> Name -> Name -> Name -> CompTrans [Dec]
 mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
   where
-    sig = do i <- lift $ newName "i"
-             lift $ sigD fnNm (forallT [PlainTV i] (return []) (typ $ varT i))
+    sig = do i <- CompTrans $ lift $ newName "i"
+             CompTrans $ lift $ sigD fnNm (forallT [PlainTV i] (return []) (typ $ varT i))
 
     typ :: Q Type -> Q Type
     typ i = [t| $term' $i -> $targ $i |]
@@ -105,7 +110,7 @@ mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
     term' = return term
     targ = conT targNm
 
-    def = lift $ valD (varP fnNm) (normalB body) []
+    def = CompTrans $ lift $ valD (varP fnNm) (normalB body) []
 
     body = [| $fld . cata $untrans |]
 
@@ -117,17 +122,17 @@ mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
     untrans :: Alg f T
 -}
 mkClass :: Name -> Name -> Name -> CompTrans [Dec]
-mkClass classNm funNm newtpNm = do f <- lift $ newName "f"
+mkClass classNm funNm newtpNm = do f <- CompTrans $ lift $ newName "f"
                                    let funDec = SigD funNm (AppT (AppT (ConT ''Alg) (VarT f)) (ConT newtpNm))
                                    return [ClassD [] classNm [PlainTV f] [] [funDec]]
-                      
+
 {-
   type instance Targ CompilationUnitL = J.CompilationUnit
   instance Untrans CompilationUnit where
     untrans (CompilationUnit x y z) = T $ J.CompilationUnit (t x) (t y) (t z)
 -}
 mkInstance :: Name -> Name -> Name -> Name -> Name -> Name -> CompTrans [Dec]
-mkInstance classNm funNm wrap unwrap targNm typNm = do inf <- lift $ reify typNm
+mkInstance classNm funNm wrap unwrap targNm typNm = do inf <- CompTrans $ lift $ reify typNm
                                                        targTyp <- getFullyAppliedType typNm
                                                        let nmTyps = simplifyDataInf inf
                                                        clauses <- mapM (uncurry $ mkClause wrap unwrap) nmTyps
@@ -140,9 +145,12 @@ mkInstance classNm funNm wrap unwrap targNm typNm = do inf <- lift $ reify typNm
                                                               , inst clauses instTyp
                                                               ]
   where
-    famInst targTyp = TySynInstD targNm (TySynEqn [ConT $ nameLab typNm] targTyp)
+    famInst targTyp =
+      TySynInstD (TySynEqn Nothing (AppT (ConT targNm) (ConT $ nameLab typNm)) targTyp)
 
-    inst clauses instTyp =  InstanceD []
+    inst clauses instTyp =  InstanceD
+                                      Nothing
+                                      []
                                       (AppT (ConT classNm) instTyp)
                                       [FunD funNm clauses]
 
@@ -156,8 +164,8 @@ mapConditionallyReplacing src f p reps = go src reps
 
 mkClause :: Name -> Name -> Name -> [Type] -> CompTrans Clause
 mkClause wrap unwrap con tps = do isAnn <- getIsAnn
-                                  nms <- mapM (const $ lift $ newName "x") tps
-                                  nmAnn <- lift $ newName "a"
+                                  nms <- mapM (const $ CompTrans $ lift $ newName "x") tps
+                                  nmAnn <- CompTrans $ lift $ newName "a"
                                   tps' <- applyCurSubstitutions tps
                                   let nmTps = zip nms tps'
                                   Clause <$> (sequence [pat isAnn nmTps nmAnn]) <*> (body nmTps nmAnn) <*> pure []

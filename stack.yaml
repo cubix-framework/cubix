@@ -1,7 +1,7 @@
         # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-6.12
+resolver: lts-16.3
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -12,16 +12,18 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- language-lua-0.10.0
-- language-javascript-0.6.0.9
-- language-dot-0.1.0
-- fgl-5.5.3.0
-- git: git@github.com:jkoppel/language-c.git
-  commit: e5bdaaa8cbf28d09962ccd64a50808d8e5032f85
-- git: git@github.com:jkoppel/language-java.git
-  commit: 68e71843294b233c36b3cbe52d9b1e35a5898997
-- git: git@github.com:bjpop/language-python.git
-  commit: 9269c77ca67c52280314a122cae1b3fa1a044168
+- language-lua-0.11.0.1
+- git: https://github.com/jkoppel/language-javascript.git
+  commit: 3b2026cf9c443bc798683c12206de439354283ce
+- language-dot-0.1.1
+- git: https://github.com/jkoppel/language-c.git
+  commit: 49c340419e9ea6395c1915f9de7aedf903483c95
+- git: https://github.com/jkoppel/language-java.git
+  commit: a41ba850a1e2b3e233cc8e5132433921b6a6dca0
+- language-python-0.5.8
+- wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
+- alex-tools-0.4@sha256:7f24cb60ba88b04196965e78d7944d638b1a6034f0c9284bdf7d95e05c7be7c3,995
+
 
 # Override default flag values for local packages and extra-deps
 flags: {}
@@ -46,3 +48,4 @@ extra-package-dbs: []
 
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
