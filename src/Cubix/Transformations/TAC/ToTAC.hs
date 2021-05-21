@@ -36,7 +36,7 @@ import Control.Lens ( (&), (%~), (^.), (.~), makeLenses, view)
 import Control.Monad.Random ( MonadRandom, RandT, evalRandT )
 import Data.Constraint ( Dict(..) )
 
-import Data.Comp.Multi ( Signature, Cxt(..), project', EqHF, E(..), stripA, (:&:)(..), HTraversable, ShowHF, inject', (:-<:), All, HFoldable )
+import Data.Comp.Multi ( Signature, Cxt(..), project', EqHF, E(..), stripA, (:&:)(..), TreeLike, ShowHF, inject', (:-<:), All )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, allbuR, allStateR, dynamicR,
            tryR, (<+), idR, guardedT, failR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, subterms, caseE )
@@ -140,8 +140,7 @@ instance {-# OVERLAPPING #-} SpecialTmpHoistAction MPythonSig where
 
 --------------------------------------------------------------------------------------
 
-type DecFragment fs = ( All HTraversable fs
-                      , All HFoldable fs
+type DecFragment fs = ( TreeLike fs
                       , All EqHF fs
                       , Ident :-<: fs, Assign :-<: fs, AssignOpEquals :-<: fs
                       , ListF :-<: fs, MaybeF :-<: fs

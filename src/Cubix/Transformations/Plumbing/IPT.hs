@@ -38,7 +38,7 @@ import System.IO ( hFlush, stdout )
 
 import Control.Lens ( (&), (^.), makeClassy, use, at, (%%~), (%=) )
 
-import Data.Comp.Multi ( Cxt(..), isNode', project', HTraversable, ShowHF, EqHF, stripA, E(..), All, (:-<:), Term, HFunctor, OrdHF, HFoldable )
+import Data.Comp.Multi ( Cxt(..), isNode', project', ShowHF, EqHF, stripA, E(..), All, (:-<:), Term, TreeLike, OrdHF, HFoldable )
 import Data.Comp.Multi.Strategic ( RewriteM, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, dynProj )
 
@@ -96,8 +96,7 @@ type CanIPT fs = ( ListF :-<: fs, ExtractF [] (TermLab fs)
                  , InjF fs IdentL PositionalArgExpL
 --                , IsNode ReceiverArg f
 
-                 , All HTraversable fs
-                 , All HFoldable fs
+                 , TreeLike fs
                  , All ShowHF fs
                  , All EqHF fs
 
@@ -145,7 +144,7 @@ lookupUnsafe k m = fromJust $ Map.lookup k m
 class PromptParamAttrs fs where
   promptParamAttrs :: (MonadIO m) => m (Term fs ParameterAttrsL)
 
-instance {-# OVERLAPPABLE #-} (EmptyParameterAttrs :-<: fs, All HTraversable fs, All HFunctor fs) => PromptParamAttrs fs where
+instance {-# OVERLAPPABLE #-} (EmptyParameterAttrs :-<: fs, TreeLike fs) => PromptParamAttrs fs where
   promptParamAttrs = return EmptyParameterAttrs'
 
 #ifndef ONLY_ONE_LANGUAGE
@@ -174,8 +173,8 @@ data AddParamAction fs = AddParamAction { _apa_fnName     :: String
                                         , _apa_paramAttrs :: Term fs ParameterAttrsL
                                         , _apa_funcPath   :: NodeIdx
                                         }
-deriving instance (All ShowHF fs, All HFunctor fs) => Show (AddParamAction fs)
-deriving instance (All HFunctor fs, All OrdHF fs, All EqHF fs) => Ord (AddParamAction fs)
+deriving instance (All ShowHF fs, TreeLike fs) => Show (AddParamAction fs)
+deriving instance (TreeLike fs, All OrdHF fs, All EqHF fs) => Ord (AddParamAction fs)
 deriving instance (All EqHF fs) => Eq (AddParamAction fs)
 
 makeClassy ''AddParamAction
@@ -187,11 +186,11 @@ data CorrectCallsAction fs = CorrectCallsAction { cca_fnName     :: String
                                                 , cca_callPaths  :: [NodeIdx]
                                                }
 
-deriving instance (All ShowHF fs, All HFunctor fs) => Show (CorrectCallsAction fs)
-deriving instance (All HFunctor fs, All OrdHF fs, All EqHF fs) => Ord (CorrectCallsAction fs)
+deriving instance (All ShowHF fs, TreeLike fs) => Show (CorrectCallsAction fs)
+deriving instance (TreeLike fs, All OrdHF fs, All EqHF fs) => Ord (CorrectCallsAction fs)
 deriving instance (All EqHF fs) => Eq (CorrectCallsAction fs)
 
-getName :: (All HTraversable fs, All HFunctor fs, Ident :-<: fs) => TermLab fs IdentL -> String
+getName :: (TreeLike fs, Ident :-<: fs) => TermLab fs IdentL -> String
 getName (stripA -> Ident' n) = n
 
 getRange :: (Int, Int) -> [a] -> [a]
@@ -210,9 +209,7 @@ strDiff context before after =
   (extract lines1, extract lines2)
 
 promptChange ::
-  ( All HTraversable fs
-  , All HFoldable fs
-  , All HFunctor fs
+  ( TreeLike fs
   , Pretty fs
   , MonadIO m
   ) => FilePath -> TermLab fs i -> TermLab fs j -> m Bool
@@ -231,9 +228,7 @@ promptChange fil before after = do
   return (ans == "y")
 
 promptChangePrj ::
-  ( All HTraversable fs
-  , All HFoldable fs
-  , All HFunctor fs
+  ( TreeLike fs
   , Pretty fs
   , MonadIO m
   ) => FilePath -> Project fs -> Project fs -> m Bool
@@ -241,7 +236,7 @@ promptChangePrj fil before after = case (lookupUnsafe fil before, lookupUnsafe f
                                      (E x, E y) -> promptChange fil x y
 
 
-addParam' :: (CanIPT fs, MonadIPT fs m, All HFoldable fs) => AddParamAction fs -> RewriteM m (TermLab fs) FunctionDefL
+addParam' :: (CanIPT fs, MonadIPT fs m) => AddParamAction fs -> RewriteM m (TermLab fs) FunctionDefL
 addParam' apa t@(project' -> Just (FunctionDef a n pars b)) =
     if (apa ^. apa_fnName) /= getName n then
       return t

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 27eeb7b0dccc9a7bd77b7f2e796cde485a92cf2e1ebc4132dc8ba2a6b150fcc0
+-- hash: 6aaaf88bac9887b6243702b91cadfd6245e11d2bf0b9ce30946f29aaefc18855
 
 name:           cubix
 version:        0.5.0.0
@@ -102,6 +102,8 @@ library
       Cubix.Language.Python.Parametric.Full.Names
       Cubix.Language.Python.Parametric.Full.Trans
       Cubix.Language.Python.Parametric.Full.Types
+      Cubix.Rewriting.Rules.Matchable
+      Cubix.Rewriting.Rules.Rule
       Cubix.Sin.Compdata.Derive
       Cubix.Sin.Compdata.Instances
       Cubix.Transformations.Hoist.Custom

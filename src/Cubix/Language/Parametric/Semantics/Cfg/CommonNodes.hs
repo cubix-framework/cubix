@@ -52,7 +52,7 @@ import Data.Traversable ( for )
 
 import Control.Lens ( (^.), (%~), (%=), (.=), (.~), _2, at, use, makeClassy )
 
-import Data.Comp.Multi ( HTraversable(..), All, HFunctor, HFoldable )
+import Data.Comp.Multi ( TreeLike )
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
@@ -73,9 +73,7 @@ collapseMaybeEnterExit Nothing    = EmptyEnterExit
 mCombineEnterExit ::
   ( HasCurCfg s fs
   , MonadState s m
-  , All HTraversable fs
-  , All HFunctor fs
-  , All HFoldable fs
+  , TreeLike fs
   ) => m (EnterExitPair fs i) -> EnterExitPair fs j -> m (EnterExitPair fs k)
 mCombineEnterExit p1 p2 = p1 >>= (\r -> combineEnterExit r p2)
 

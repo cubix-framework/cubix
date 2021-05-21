@@ -77,7 +77,7 @@ import GHC.Generics ( Generic )
 
 import System.IO.Unsafe ( unsafePerformIO )
 
-import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
+import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, TreeLike, E(..), rewriteEM, HFix )
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM )
 
@@ -235,13 +235,11 @@ type Project fs = Map FilePath (E (TermLab fs))
 
 parseProject ::
   forall fs l.
-  ( All HFoldable fs
-  , All HFunctor fs
-  , All HTraversable fs
+  ( TreeLike fs
   ) => LabelGen -> (FilePath -> IO (Maybe (Term fs l))) -> [FilePath] -> IO (Maybe (Project fs))
 parseProject gen parse fils = runMaybeT (go gen fils)
   where
-    go :: (All HFoldable fs, All HFunctor fs, All HTraversable fs) => LabelGen -> [FilePath] -> MaybeT IO (Project fs)
+    go :: (TreeLike fs) => LabelGen -> [FilePath] -> MaybeT IO (Project fs)
     go gen []         = return Map.empty
     go gen (fil:fils) = do t <- MaybeT $ parse fil
                            let (tLab, gen') = labelProg' gen t

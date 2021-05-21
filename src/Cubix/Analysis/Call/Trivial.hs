@@ -24,7 +24,7 @@ import qualified Data.Map as Map
 
 import Data.Foldable ( fold )
 
-import Data.Comp.Multi ( E(..), HTraversable, stripA, (:-<:), All, HFoldable, HFunctor )
+import Data.Comp.Multi ( E(..), TreeLike, stripA, (:-<:), All, HFoldable, HFunctor )
 import Data.Comp.Multi.Strategic ( TranslateM, GTranslateM, crushtdT, promoteTF, addFail )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 
@@ -57,7 +57,7 @@ class CallAnalysis fs where
 
 
 type TrivialCallAnalysisConstraints fs = ( FunctionCall :-<: fs, Ident :-<: fs
-                                        , InjF fs IdentL FunctionExpL, All HTraversable fs
+                                        , InjF fs IdentL FunctionExpL, TreeLike fs
                                         , DynCase (TermLab fs) FunctionCallL)
 type TCAC fs = TrivialCallAnalysisConstraints fs
 
@@ -85,7 +85,7 @@ instance (TCAC fs, All HFoldable fs) => CallAnalysis fs where
 
 
 type TrivialFunctionAnalysisConstraints fs = ( FunctionDef :-<: fs, Ident :-<: fs
-                                            , All HTraversable fs
+                                            , TreeLike fs
                                             , DynCase (TermLab fs) FunctionDefL)
 
 type TFAC fs = TrivialFunctionAnalysisConstraints fs

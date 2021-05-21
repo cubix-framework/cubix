@@ -49,6 +49,7 @@ module Data.Comp.Multi.Ops
     , caseCxt
     , caseSumF
     , caseSum
+    , TreeLike
     , Alts
     , Alt
     , alt
@@ -132,12 +133,13 @@ instance ( All HFoldable fs
     hfoldl f b = caseCxt (Proxy @HFoldable) (hfoldl f b)
     hfoldr1 f  = caseCxt (Proxy @HFoldable) (hfoldr1 f)
 
-instance ( All HTraversable fs
-         , All HFoldable fs
-         , All HFunctor fs
-         ) => HTraversable (Sum fs) where
+instance ( TreeLike fs ) => HTraversable (Sum fs) where
     htraverse f = caseSumF (Proxy @HTraversable) (htraverse f)
     hmapM f     = caseSumF (Proxy @HTraversable) (hmapM f)
+
+class    (All HTraversable fs, All HFoldable fs, All HFunctor fs) => TreeLike fs
+instance (All HTraversable fs, All HFoldable fs, All HFunctor fs) => TreeLike fs
+
 
 -- The subsumption relation.
 

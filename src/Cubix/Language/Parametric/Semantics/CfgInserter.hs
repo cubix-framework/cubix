@@ -31,7 +31,7 @@ import Data.Proxy ( Proxy(..) )
 
 import Control.Lens ( makeLenses, use, (%=), (%%~), (^.) )
 
-import Data.Comp.Multi ( E(..), runE, HFunctor, HTraversable, HFoldable, All )
+import Data.Comp.Multi ( E(..), runE, TreeLike )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, allbuR )
 
 import Cubix.Language.Info
@@ -82,7 +82,7 @@ collapseMaybeList = concat
 dominatingInsert ::
   forall fs l m.
   ( Monad m
-  , All HFunctor fs
+  , TreeLike fs
   , InsertAt fs l
   ) => Bool
   -> (forall a. a -> [a] -> [a])
@@ -132,7 +132,7 @@ getPath inf node = case cfgNodePath inf node of
   Just p  -> p
   Nothing -> emptyPath
 
-runAction :: (Monad m, InsertAt fs l, All HFunctor fs) => Action fs l -> StateT (CfgInsertState fs l) m ()
+runAction :: (Monad m, InsertAt fs l, TreeLike fs) => Action fs l -> StateT (CfgInsertState fs l) m ()
 runAction (DominatingPrependFirst l t emp) = dominatingInsert True  (:)    trivFilt     l t emp
 runAction (DominatingPrependLast  l t emp) = dominatingInsert True  append trivFilt     l t emp
 runAction (DominatingAppendFirst  l t emp) = dominatingInsert False (:)    trivFilt     l t emp
@@ -202,9 +202,7 @@ finalizeInsertions ::
   forall fs m l.
   ( InsertAt fs l
   , MonadAnnotater Label m
-  , All HTraversable fs
-  , All HFoldable fs
-  , All HFunctor fs
+  , TreeLike fs
   ) => Map Label [InsertionOp fs l] -> GRewriteM m (TermLab fs)
 finalizeInsertions insertMap t = foldr (\(InsertionOp p x) r -> r >>= insertAt p x) (return t) =<< insertions
   where
@@ -234,9 +232,7 @@ performCfgInsertions ::
   forall l fs m i.
   ( MonadAnnotater Label m
   , InsertAt fs l
-  , All HTraversable fs
-  , All HFunctor fs
-  , All HFoldable fs
+  , TreeLike fs
   ) => ProgInfo fs -> RewriteM (CfgInserterT fs l m) (TermLab fs) i -> RewriteM m (TermLab fs) i
 performCfgInsertions proginf f t = do
    (t', actions) <- runWriterT (f t)

@@ -30,7 +30,7 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 
-import Data.Comp.Multi ( runE, All, E(..), HFunctor, HFoldable, HTraversable )
+import Data.Comp.Multi ( runE, E(..), TreeLike )
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Path
@@ -49,7 +49,7 @@ data ProgInfo fs = ProgInfo { _proginf_program :: E (TermLab fs)
 
 makeClassy ''ProgInfo
 
-makeProgInfo :: (CfgBuilder fs, All HFoldable fs) => TermLab fs l -> ProgInfo fs
+makeProgInfo :: (CfgBuilder fs, TreeLike fs) => TermLab fs l -> ProgInfo fs
 makeProgInfo t = ProgInfo (E t) (makeCfg t) (getPaths t)
 
 cfgNodePath :: ProgInfo fs -> CfgNode fs -> Maybe Path
@@ -81,7 +81,7 @@ termToPath progInf t = labToPath (getAnn t) progInf
 --
 -- This is useful for writing code which deals with generic nodes such as @Ident@
 -- which are contained in computation nodes, but are not themselves computation nodes.
-containingCfgNode :: forall fs l. (All HTraversable fs, All HFoldable fs, All HFunctor fs)
+containingCfgNode :: forall fs l. (TreeLike fs)
                   => ProgInfo fs
                   -> TermLab fs l
                   -> Maybe (E (TermLab fs))
@@ -95,7 +95,7 @@ containingCfgNode progInf t = runE (\prog -> searchParent inCfg prog (termToPath
 
 -- | See documentation of `containingCfgNode`. Runs the passed function
 -- on the result of `containingCfgNode`, if the result is not `Nothing`.
-withContainingCfgNode :: (All HTraversable fs, All HFoldable fs, All HFunctor fs, Applicative m)
+withContainingCfgNode :: (TreeLike fs, Applicative m)
                       => ProgInfo fs
                       -> TermLab fs l
                       -> (forall i. TermLab fs i -> m ())

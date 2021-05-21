@@ -31,7 +31,7 @@ import Data.Traversable ( for )
 import Control.Lens ( (&), (.~), (%=), (.=), (^.), use, Lens' )
 
 import Data.Constraint ( Dict(..) )
-import Data.Comp.Multi ( Signature, HTraversable, HFunctor, Term, (:-<:), All, HFoldable )
+import Data.Comp.Multi ( Signature, TreeLike, Term, (:-<:) )
 
 import Data.Comp.Multi.Strategic ( Rewrite, RewriteM, GRewrite, GRewriteM,
                                    promoteR, addFail, tryR, allR, alltdR,
@@ -63,8 +63,7 @@ type CanHoist fs = ( VariableInsertionVariation fs NoConstraint NoConstraint
                    , BlockHoisting fs
                    , InjF fs AssignL (StatSort fs)
                    , InjF fs (StatSort fs) BlockItemL
-                   , All HTraversable fs, HasFunctors fs
-                   , All HFoldable fs
+                   , TreeLike fs, HasFunctors fs
                    , DynCase (Term fs) BlockL
                    , DynCase (Term fs) IdentL
                    , DynCase (Term fs) SingleLocalVarDeclL
@@ -164,7 +163,7 @@ transformMulti (projF -> Just t@(MultiLocalVarDecl' attrs sdecls)) = do
       mzero
 transformMulti _ = mzero
 
-transformListHead :: (MonadPlus m, Typeable l, All HFunctor fs, ListF :-<: fs) => (Term fs l -> m [Term fs l]) -> RewriteM m (Term fs) [l]
+transformListHead :: (MonadPlus m, Typeable l, TreeLike fs, ListF :-<: fs) => (Term fs l -> m [Term fs l]) -> RewriteM m (Term fs) [l]
 transformListHead f (ConsF' t ts) = f t >>= return . (foldr (ConsF' . injF) ts)
 transformListHead _ NilF' = mzero
 
@@ -182,7 +181,7 @@ addIdents (Ident' s) = (seenIdents %= Set.insert s) *> mzero
 updateState :: (CanHoist fs, MonadHoist fs m) => GRewriteM (MaybeT m) (Term fs)
 updateState = promoteRF addIdents >+> (\t -> updateSpecialState t *> mzero)
 
-tillFailure :: (Monad m, All HTraversable fs) => GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
+tillFailure :: (Monad m, TreeLike fs) => GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
 tillFailure f t = liftM (maybe t id) $ runMaybeT $ f t >>= lift . (tillFailure f)
 
 -- Run non-transformation f top-down on block subtrees, and apply transformation g top-down on non-block nodes

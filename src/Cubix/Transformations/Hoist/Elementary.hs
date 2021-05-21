@@ -14,7 +14,7 @@ module Cubix.Transformations.Hoist.Elementary (
     elementaryHoist
   ) where
 
-import Data.Comp.Multi ( project, transform, HTraversable, Term, (:-<:), All )
+import Data.Comp.Multi ( project, transform, TreeLike, Term, (:-<:) )
 
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
@@ -29,7 +29,7 @@ type CanHoist fs = ( VarDeclFragment fs, AssignFragment fs, Block :-<: fs
                    , VarInitToRhs (Term fs), VarDeclBinderToLhs (Term fs)
                    , InjF fs MultiLocalVarDeclL BlockItemL
                    , InjF fs AssignL BlockItemL
-                   , All HTraversable fs, HasFunctors fs
+                   , TreeLike fs, HasFunctors fs
                    )
 
 declToAssign :: (CanHoist fs) => Term fs MultiLocalVarDeclCommonAttrsL -> Term fs SingleLocalVarDeclL -> [Term fs BlockItemL]

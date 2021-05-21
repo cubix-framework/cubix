@@ -32,7 +32,7 @@ import Control.Monad ( MonadPlus(..), liftM )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
-import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable )
+import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), TreeLike, AnnTerm, Sum, All, CxtS )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewriteM )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
@@ -79,27 +79,24 @@ fromProjF x = case projF x of
   Nothing -> error "InjF.fromProjF"
 
 labeledInjF :: ( MonadAnnotater Label m
-              , InjF fs l l'
-              , All HTraversable fs
-              , All HFoldable fs
-              ) => TermLab fs l -> m (TermLab fs l')
+               , InjF fs l l'
+               , TreeLike fs
+               ) => TermLab fs l -> m (TermLab fs l')
 labeledInjF t = annotateLabelOuter $ injF $ Hole t
 
 -- This MonadAnnotater instance leaks because it's technically possible to define a MonadLabeller
 -- instance for AnnotateDefault. Gah!
 -- FIXME: Anything that can be done about this?
 injFAnnDef :: ( InjF fs l l'
-             , All HTraversable fs
-             , MonadAnnotater a (AnnotateDefault a)
-             , All HFoldable fs
-             ) => AnnTerm a fs l -> AnnTerm a fs l'
+              , TreeLike fs
+              , MonadAnnotater a (AnnotateDefault a)
+              ) => AnnTerm a fs l -> AnnTerm a fs l'
 injFAnnDef t = runAnnotateDefault $ annotateOuter $ injF $ Hole t
 
 injectFAnnDef :: ( InjF fs l l'
-                , All HTraversable fs
-                , MonadAnnotater a (AnnotateDefault a)
-                , All HFoldable fs
-                ) => (Sum fs :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
+                 , TreeLike fs
+                 , MonadAnnotater a (AnnotateDefault a)
+                 ) => (Sum fs :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
 injectFAnnDef =  injFAnnDef . inject
 
 --------------------------------------------------------------------------------
@@ -117,8 +114,7 @@ class AInjF' fs l (is :: [Sort]) where
 instance AInjF' fs l '[] where
   ainjF' _ _ = Nothing
 
-instance ( All HTraversable fs
-         , All HFoldable fs
+instance ( TreeLike fs
          , AInjF' fs l is
          , InjF fs l i
          , KDynCase (Sum fs) i

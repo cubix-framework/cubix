@@ -24,7 +24,7 @@ import qualified Data.Set as Set
 
 import Control.Lens ( (+=), (%=), use, makeClassy )
 
-import Data.Comp.Multi ( Cxt(..), (:&:)(..), (:-<:), project', inj, HTraversable, All, HFoldable, HFunctor )
+import Data.Comp.Multi ( Cxt(..), (:&:)(..), (:-<:), project', inj, All, TreeLike )
 import Data.Comp.Multi.Strategic ( GRewriteM, RewriteM, promoteRF, anytdR, tryR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase )
 
@@ -66,7 +66,7 @@ gensym = do
    else
     annotateTop' (Ident id)
 
-finalizeGensymName :: (MonadState s m, HasGensymState s, All HTraversable fs, Ident :-<: fs) => RewriteM m (TermLab fs) IdentL
+finalizeGensymName :: (MonadState s m, HasGensymState s, TreeLike fs, Ident :-<: fs) => RewriteM m (TermLab fs) IdentL
 finalizeGensymName t@(project' -> Just (Ident s)) =
                                   let lab = getAnn t in
                                   if isPrefixOf gensymPrefix s then do
@@ -90,10 +90,8 @@ finalizeGensymName t@(project' -> Just (Ident s)) =
 finalizeGensymNames ::
   ( MonadState s m
   , HasGensymState s
-  , All HTraversable fs
+  , TreeLike fs
   , DynCase (TermLab fs) IdentL
   , Ident :-<: fs
-  , All HFoldable fs
-  , All HFunctor fs
   ) => GRewriteM m (TermLab fs)
 finalizeGensymNames = tryR $ anytdR $ promoteRF finalizeGensymName

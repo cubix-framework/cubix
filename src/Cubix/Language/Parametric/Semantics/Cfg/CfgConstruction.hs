@@ -54,7 +54,7 @@ import Data.Typeable ( Typeable )
 
 import Control.Lens ( (^.), (%=)  )
 
-import Data.Comp.Multi ( Node, Signature, Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
+import Data.Comp.Multi ( Node, Signature, Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, TreeLike, HTraversable(..), HFoldable(..), HFunctor(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
 
 import Cubix.Language.Info
@@ -80,7 +80,7 @@ instance IsComputationSort' fs '[] where
 instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' fs (l ': ls) where
   isComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
+labeledIsComputationSort :: forall fs l. (IsComputationSort fs, TreeLike fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
 type family SuspendedComputationSorts (fs :: Signature) :: [*]
@@ -100,7 +100,7 @@ instance IsSuspendedComputationSort' fs '[] where
 instance (IsSuspendedComputationSort' fs ls, DynCase (Term fs) l) => IsSuspendedComputationSort' fs (l ': ls) where
   isSuspendedComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isSuspendedComputationSort' (Proxy :: Proxy ls) t)
 
-labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, All HFunctor fs) => AnnTerm a fs l -> Bool
+labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, TreeLike fs) => AnnTerm a fs l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
 
 type family ContainerFunctors (fs :: Signature) :: [Node]
@@ -125,7 +125,7 @@ instance (IsContainer' fs ls, l :-<: fs) => IsContainer' fs (l ': ls) where
     where go :: forall lab. Term fs lab -> Maybe (l (Term fs) lab)
           go = project
 
-labeledIsContainer :: (IsContainer fs, All HFunctor fs) => AnnTerm a fs l -> Bool
+labeledIsContainer :: (IsContainer fs, TreeLike fs) => AnnTerm a fs l -> Bool
 labeledIsContainer = isContainer . stripA
 
 
@@ -135,12 +135,12 @@ data EnterExitPair fs l = EnterExitPair { enter :: CfgNode fs
                        | SubPairs (Sum fs (EnterExitPair fs) l) -- naming is hard
                        | EmptyEnterExit
 
-instance (All ShowHF fs, All HFunctor fs) => Show (EnterExitPair fs l) where
+instance (All ShowHF fs, TreeLike fs) => Show (EnterExitPair fs l) where
   show (EnterExitPair ent ex) = "(EnterExitPair " ++ show ent ++ " " ++ show ex ++ ")"
   show (SubPairs t) = "(SubPairs " ++ showHF' (hfmap (K . show) t) ++ ")"
   show EmptyEnterExit = "EmptyEnterExit"
 
-mapEnterExitPair :: (All HFunctor fs) => (forall e i. Sum fs e i -> Sum gs e i) -> (EnterExitPair fs l -> EnterExitPair gs l)
+mapEnterExitPair :: (TreeLike fs) => (forall e i. Sum fs e i -> Sum gs e i) -> (EnterExitPair fs l -> EnterExitPair gs l)
 mapEnterExitPair f EmptyEnterExit = EmptyEnterExit
 mapEnterExitPair f (EnterExitPair n x) = EnterExitPair (mapCfgNode f n) (mapCfgNode f x)
 mapEnterExitPair f (SubPairs t) = SubPairs $ f $ hfmap (mapEnterExitPair f) t
@@ -180,9 +180,7 @@ identEnterExit n = EnterExitPair n n
 
 collapseEnterExit ::
   ( HasCurCfg s fs
-  , All HTraversable fs
-  , All HFoldable fs
-  , All HFunctor fs
+  , TreeLike fs
   , MonadState s m
   ) => EnterExitPair fs i -> m (EnterExitPair fs j)
 collapseEnterExit p@(EnterExitPair n x) = return $ EnterExitPair n x
@@ -192,9 +190,7 @@ collapseEnterExit (SubPairs subCfgs) =
 
 combineEnterExit ::
   ( HasCurCfg s fs
-  , All HTraversable fs
-  , All HFoldable fs
-  , All HFunctor fs  
+  , TreeLike fs
   , MonadState s m
   ) => EnterExitPair fs i -> EnterExitPair fs j -> m (EnterExitPair fs k)
 combineEnterExit p1 p2 = do
@@ -243,7 +239,7 @@ data HState s f l = HState { unHState :: State s (f l) }
 class ConstructCfg gs s f where
   constructCfg :: PreRAlg (f :&: Label) (Sum gs :&: Label) (HState s (EnterExitPair gs))
 
-type CfgComponent gs s = (HasLabelGen s, HasCurCfg s gs, All HTraversable gs, All HFoldable gs, All HFunctor gs)
+type CfgComponent gs s = (HasLabelGen s, HasCurCfg s gs, TreeLike gs)
 type SortChecks gs = (IsComputationSort gs, IsSuspendedComputationSort gs, IsContainer gs)
 
 runSubCfgs ::
