@@ -1,8 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Cubix.Language.Parametric.Path
   (
@@ -69,14 +65,16 @@ pathDistance p1 p2 = revPathDistance (reverse $ getPath p1) (reverse $ getPath p
 getChild :: (HTraversable f) => HFix f i -> Int -> Maybe (E (HFix f))
 getChild (Term t) i = getFirst (hfoldMap eqP (number t))
   where
+    eqP :: Numbered (HFix f) j -> First (E (HFix f))
     eqP (Numbered j x)
           | i == j    = First (Just (E x))
           | otherwise = First Nothing
 
 
-rewriteChild :: (HTraversable f, Applicative m) => Int -> HFix f i -> (forall j. HFix f j -> m (HFix f j)) -> m (HFix f i)
+rewriteChild :: forall f m i. (HTraversable f, Applicative m) => Int -> HFix f i -> (forall j. HFix f j -> m (HFix f j)) -> m (HFix f i)
 rewriteChild i (Term t) f = Term <$> htraverse rw (number t)
   where
+    rw :: Numbered (HFix f) j -> m (HFix f j)
     rw (Numbered j x)
           | i == j    = f x
           | otherwise = pure x

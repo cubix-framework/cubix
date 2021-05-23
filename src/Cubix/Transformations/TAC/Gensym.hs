@@ -1,10 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Cubix.Transformations.TAC.Gensym (
     GensymState(..)

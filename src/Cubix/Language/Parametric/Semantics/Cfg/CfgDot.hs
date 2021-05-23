@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Cubix.Language.Parametric.Semantics.Cfg.CfgDot (
     renderCfgDot
   ) where

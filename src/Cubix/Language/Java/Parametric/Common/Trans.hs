@@ -1,19 +1,9 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# OPTIONS_GHC -freduction-depth=200 #-}
 {-# LANGUAGE CPP                      #-}
-{-# LANGUAGE DataKinds                #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE KindSignatures           #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE PartialTypeSignatures    #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
-{-# LANGUAGE TypeApplications         #-}
-{-# LANGUAGE TypeOperators            #-}
 {-# LANGUAGE UndecidableInstances     #-}
-{-# LANGUAGE ViewPatterns             #-}
 
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Java.Parametric.Common.Trans () where
