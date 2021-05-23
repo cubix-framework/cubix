@@ -1,7 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Cubix.Transformations.TAC.State (

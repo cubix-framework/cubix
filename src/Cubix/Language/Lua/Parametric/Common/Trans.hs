@@ -1,17 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE DataKinds                #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE KindSignatures           #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE PartialTypeSignatures    #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE ViewPatterns             #-}
 {-# LANGUAGE TemplateHaskell          #-}
-{-# LANGUAGE TypeApplications         #-}
-{-# LANGUAGE TypeOperators            #-}
 {-# LANGUAGE UndecidableInstances     #-}
 
 module Cubix.Language.Lua.Parametric.Common.Trans (

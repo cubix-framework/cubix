@@ -1,14 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE CPP                     #-}
-{-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE KindSignatures          #-}
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE TypeOperators           #-}
 {-# LANGUAGE TypeSynonymInstances    #-}
 {-# LANGUAGE UndecidableInstances    #-}
 

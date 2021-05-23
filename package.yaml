@@ -15,6 +15,30 @@ dependencies:
 - mtl
 - transformers
 ghc-options: "-fno-warn-partial-type-signatures -fwarn-unused-imports -O0"
+default-extensions:
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveDataTypeable
+  - DeriveGeneric
+  - EmptyDataDecls
+  - ExistentialQuantification
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - KindSignatures
+  - MultiParamTypeClasses
+  - PatternGuards
+  - PatternSynonyms
+  - RankNTypes
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TypeApplications
+  - TypeFamilies
+  - TypeOperators
+  - ViewPatterns
 flags:
   only-one-language:
     manual: true
@@ -48,6 +72,7 @@ library:
   - Cubix.Language.Python.Parametric.Common
   - Cubix.Language.Python.Parametric.Full
   - Cubix.ParsePretty
+  - Cubix.Rewriting.Rules.Rule
   - Cubix.Sin.Compdata.Annotation
   - Cubix.Sin.NFData
   - Cubix.Transformations.Hoist

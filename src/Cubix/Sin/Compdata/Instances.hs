@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 {-|
   Provides instances of EqHF and OrdHF for 'Data.Comp.Multi.:&:'.
 
