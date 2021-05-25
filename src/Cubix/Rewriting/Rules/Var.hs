@@ -1,13 +1,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Cubix.Rewriting.Rules.Var (
-    VarHole
-  , mkVar
-
-  , RewritingTerm
+    RewritingTerm
 
   , withRawVars
-  
+
   , withUniSigVars
 
   , withVars1
@@ -25,12 +22,31 @@ import Data.Comp.Multi ( Cxt(Hole), ContextS )
 
 ---------------------------------------------------------------------
 
+data VarId = VarId { varName :: String }
+  deriving (Eq, Ord, Show)
 
-data VarHole l
-mkVar :: String -> VarHole l
-mkVar = undefined
+data TermVar l = TermVar { termVar_var :: VarId }
+  deriving ( Eq, Ord, Show )
 
-type RewritingTerm  fs = ContextS fs VarHole
+-- | A `CtxVar i j` is a context of sort `j` all of whose holes have sort `i`
+--
+--   Implementor's note: Keep this i parameter hidden; this type signature
+--   will need to change to support contexts with multiple heterogeneous holes
+data CtxVar i j = CtxVar VarId
+  deriving (Eq, Ord, Show)
+
+data Ctx i j = OneHoledCtx  (CtxVar i j)
+             | ManyHoledCtx (CtxVar i j)
+
+data VarHole fs l where
+  TermVarHole :: TermVar l                        -> VarHole fs l
+  PlugCtx     :: CtxVar k l -> RewritingTerm fs k -> VarHole fs l
+
+
+mkVar :: String -> VarHole fs l
+mkVar s = TermVarHole $ TermVar $ VarId s
+
+type RewritingTerm fs = ContextS fs (VarHole fs)
 
 ---------------------------------------------------------------------
 -------------------------- withVars ---------------------------------
@@ -73,13 +89,13 @@ class WithRawVars a x where
 withRawVars :: (WithRawVars a x) => a -> (x -> b) -> b
 withRawVars a f = f (mkRawVars a)
 
-instance {-# OVERLAPPING #-} WithRawVars String (VarHole l) where
+instance {-# OVERLAPPING #-} WithRawVars String (VarHole fs l) where
   mkRawVars a = mkVar a
 
-instance {-# OVERLAPPING #-} WithRawVars (String, String) (VarHole l1, VarHole l2) where
+instance {-# OVERLAPPING #-} WithRawVars (String, String) (VarHole fs l1, VarHole fs l2) where
   mkRawVars (a, b) = (mkVar a, mkVar b)
 
-instance {-# OVERLAPPABLE #-} (WithRawVars a x, ConsTuple String a a', ConsTuple (VarHole l) x x') => WithRawVars a' x' where
+instance {-# OVERLAPPABLE #-} (WithRawVars a x, ConsTuple String a a', ConsTuple (VarHole fs l) x x') => WithRawVars a' x' where
   mkRawVars = uncurry consTuple . (mkVar *** mkRawVars) . unconsTuple
 
 ------------------
@@ -96,11 +112,11 @@ withUniSigVars a f = f (mkUniSigVars a)
 
 instance {-# OVERLAPPING #-} WithUniSigVars String (RewritingTerm fs l) where
   mkUniSigVars a = Hole $ mkVar a
-  
+
 
 instance {-# OVERLAPPING #-} WithUniSigVars (String, String) (RewritingTerm fs l1, RewritingTerm gs l2) where
   mkUniSigVars (a, b) = (Hole $ mkVar a, Hole $ mkVar b)
-  
+
 instance {-# OVERLAPPABLE #-} (WithUniSigVars a x, ConsTuple String a a', ConsTuple (RewritingTerm fs l) x x') => WithUniSigVars a' x' where
   mkUniSigVars = uncurry consTuple . ((Hole . mkVar) *** mkUniSigVars) . unconsTuple
 
