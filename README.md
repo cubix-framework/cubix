@@ -229,7 +229,7 @@ removed several overly self-referential tests, and modified the test
 suite to report the number of passing/total assertions, rather than
 aborting the entire suite on the first failure.
 
-These tests are in the `test/lua/lua-5.3.3-tests` directory.
+These tests are in the `lua_tests/lua-5.3.3-tests` directory.
 
 ## Installing the CPython tests
 
