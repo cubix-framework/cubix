@@ -106,6 +106,7 @@ library:
   - temporary
   - text
   - th-expand-syns
+  - vector
   - wl-pprint
 executables:
   examples-multi:

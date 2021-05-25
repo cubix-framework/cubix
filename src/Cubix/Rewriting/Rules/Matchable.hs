@@ -10,7 +10,6 @@ import Data.Comp.Multi ( Cxt )
 -------------------------------------------------------------------
 
 
-
 class Matchable a
 instance Matchable (Cxt h f a i)
 

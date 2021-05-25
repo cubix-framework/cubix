@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Cubix.Rewriting.Rules.Var (
+module Cubix.Rewriting.Var (
     RewritingTerm
 
   , withRawVars

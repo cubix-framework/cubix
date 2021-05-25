@@ -22,16 +22,21 @@ module Cubix.Rewriting.Rules.Rule (
   , RuleIndex(..)
   ) where
 
-import Control.Monad ( MonadPlus(..), (<=<) )
 import Data.Map ( Map )
-import Type.Reflection ( Typeable, TypeRep, typeRep)
+import Type.Reflection ( Typeable, TypeRep, typeRep )
 
 import Data.Comp.Multi ( CxtS, TreeLike, E(..), (:-<:) )
 
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
+
+import           Cubix.Rewriting.Lenses.Associative ( AssociativeLens )
+import qualified Cubix.Rewriting.Lenses.Associative as Associative
+import           Cubix.Rewriting.Lenses.Bijective ( PartialBijection )
+import qualified Cubix.Rewriting.Lenses.Bijective as Bijective
+
 import Cubix.Rewriting.Rules.Matchable
-import Cubix.Rewriting.Rules.Var
+import Cubix.Rewriting.Var
 
 ----------------------------------------------------------------------
 
@@ -52,62 +57,10 @@ data ERelation where
 
 type TermRelation fs gs l1 l2 = Relation (RewritingTerm fs l1) (RewritingTerm gs l2)
 
+
 -----------------------------------------------------------
 -------------------------- Rules --------------------------
 -----------------------------------------------------------
-
---------------------------
--------- Lenses
---------------------------
-
-
-data PartialBijection a b = PartialBijection { putr :: a -> Maybe b
-                                             , putl :: b -> Maybe a
-                                             }
-
-invertBijection :: PartialBijection a b -> PartialBijection b a
-invertBijection (PartialBijection {putr, putl}) = PartialBijection {putr = putl, putl = putr}
-
-listTermBijection :: (ListF :-<: fs, ExtractF [] (CxtS h fs a), TreeLike fs, Typeable l)
-                  => PartialBijection (CxtS h fs a [l]) [CxtS h fs a l]
-listTermBijection = PartialBijection { putr = Just . extractF, putl = Just . insertF}
-
--- |
--- For some associative operation f, let b = f(a1, ..., aN)
--- An associative lens represents both f (recompose), and a way to
--- get all possible a1,...,aN such that the above equation holds (decompose).
---
--- Law: (decompose x >>= (return.recompose) >>= \r -> r == x) == return True
--- I.e.: For all decompositions, the recomposition is the original
---
---
--- TODO: DUDE this type signature is way too general. Impossible to implement optimized matching like this
--- TODO: Ask a lens expert if this already exists in the literature
-data AssociativeLens a b = AssociativeLens { decompose :: forall m. (MonadPlus m) => b -> m [a]
-                                           , recompose :: [a] -> b
-                                           }
-
-
-allPartitionsM :: (MonadPlus m) => [a] -> m [[a]]
-allPartitionsM []     = return []
-allPartitionsM (x:xs) = do rest <- allPartitionsM xs
-                           case rest of
-                             []     -> pure [[x]]
-                             (a:as) -> pure ([x] : rest) `mplus` pure ((x : a) : as)
-
-concatLens :: AssociativeLens [a] [a]
-concatLens = AssociativeLens { decompose = allPartitionsM, recompose = concat }
-
-
-extractFLens :: forall fs l. (ListF :-<: fs, ExtractF [] (RewritingTerm fs), TreeLike fs, Typeable l)
-             => AssociativeLens (RewritingTerm fs l) (RewritingTerm fs [l])
-extractFLens = AssociativeLens { decompose = pure . extractF, recompose = insertF }
-
-concatTermLens :: forall fs l. (ListF :-<: fs, ExtractF [] (RewritingTerm fs), TreeLike fs, Typeable l)
-               => AssociativeLens (RewritingTerm fs [l]) (RewritingTerm fs [l])
-concatTermLens = AssociativeLens { decompose = (pure . map insertF) <=< (allPartitionsM . extractF)
-                                 , recompose = insertF . concat . map extractF
-                                 }
 
 
 --------------------------
@@ -214,8 +167,8 @@ blockRule =
       iBlock body end ~> iBlock body' end
       :-
       [ EPremise $ AssociativePremise body
-                                      (extractFLens @fs) -- Why can't it infer this from body?
+                                      (Associative.extractFLens @fs) -- Why can't it infer this from body?
                                       (AssociativePremiseBody b [EPremise $ RewritePremise (b ~> bs)] bs)
-                                      (concatTermLens @gs)
+                                      (Associative.concatTermLens @gs)
                                       body'
       ]
