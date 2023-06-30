@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds  #-}
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeOperators    #-}
@@ -132,24 +133,36 @@ module Cubix.Essentials (
     --   These are all long, auto-generated definitions consisting of every language
     --   fragment in the language (often over 80). We re-export them here, but with their definitions hidden.
 
+#ifndef ONLY_ONE_LANGUAGE
   , MCSig
   , MJavaSig
   , MJSSig
+#endif
   , MLuaSig
+#ifndef ONLY_ONE_LANGUAGE
   , MPythonSig
+#endif
     -- ** Terms
+#ifndef ONLY_ONE_LANGUAGE
   , MCTerm
   , MJavaTerm
   , MJSTerm
+#endif
   , MLuaTerm
+#ifndef ONLY_ONE_LANGUAGE
   , MPythonTerm
+#endif
 
     -- ** Labeled terms
+#ifndef ONLY_ONE_LANGUAGE
   , MCTermLab
   , MJavaTermLab
   , MJSTermLab
+#endif
   , MLuaTermLab
+#ifndef ONLY_ONE_LANGUAGE
   , MPythonTermLab
+#endif
 
     -- ** Parsing / pretty-printing
   , ParseFile(..)
@@ -466,9 +479,12 @@ query = O.query
 
 ---------------- Redefinitions for Cubix --------------------------------------------------
 
-
+#ifndef ONLY_ONE_LANGUAGE
 type MCSig = C.MCSig
 type MJavaSig = Java.MJavaSig
 type MJSSig = JS.MJSSig
+#endif
 type MLuaSig = Lua.MLuaSig
+#ifndef ONLY_ONE_LANGUAGE
 type MPythonSig = Python.MPythonSig
+#endif
