@@ -1,7 +1,7 @@
-        # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
+# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-16.3
+resolver: lts-21.0
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -12,6 +12,7 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
+- concurrent-supply-0.1.8
 - language-lua-0.11.0.1
 - git: https://github.com/jkoppel/language-javascript.git
   commit: 3b2026cf9c443bc798683c12206de439354283ce
@@ -22,7 +23,7 @@ extra-deps:
   commit: a41ba850a1e2b3e233cc8e5132433921b6a6dca0
 - language-python-0.5.8
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
-- alex-tools-0.4@sha256:7f24cb60ba88b04196965e78d7944d638b1a6034f0c9284bdf7d95e05c7be7c3,995
+- alex-tools-0.6.1
 
 
 # Override default flag values for local packages and extra-deps

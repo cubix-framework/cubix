@@ -62,7 +62,7 @@ makeShowHF fname = do
             genShowFClause fArg (constr, args, ty) = do
               let n = length args
               varNs <- newNames n "x"
-              let pat = ConP constr $ map VarP varNs
+              let pat = ConP constr [] $ map VarP varNs
                   allVars = zipWith (filterFarg (getBinaryFArg fArg ty)) args varNs
                   shows = listE $ map mkShow allVars
                   conName = nameBase constr

@@ -117,14 +117,20 @@ instance Trans F.FunCall where
 instance Trans F.FunArg where
   trans _ = error "Lua FunArg found not with FunCall"
 
-untranslate :: MLuaTerm l -> F.LuaTerm l
-untranslate = untrans . unTerm
 
 class Untrans f where
   untrans :: f MLuaTerm l -> F.LuaTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
+  
+untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))
+  
+do ipsNames <- sumToNames ''MLuaSig
+   modNames <- sumToNames ''F.LuaSig
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''BlockIsBlock, ''SingleLocalVarDeclIsStat, ''AssignIsStat, ''IdentIsName, ''FunctionCallIsFunCall, ''FunctionDefIsStat]
+   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransDefault = inject . hfmap untranslate
@@ -234,10 +240,5 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStat where
                    | otherwise = l
 
 
-untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))
-
-do ipsNames <- sumToNames ''MLuaSig
-   modNames <- sumToNames ''F.LuaSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''BlockIsBlock, ''SingleLocalVarDeclIsStat, ''AssignIsStat, ''IdentIsName, ''FunctionCallIsFunCall, ''FunctionDefIsStat]
-   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+untranslate :: MLuaTerm l -> F.LuaTerm l
+untranslate = untrans . unTerm

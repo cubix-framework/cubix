@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 27eeb7b0dccc9a7bd77b7f2e796cde485a92cf2e1ebc4132dc8ba2a6b150fcc0
+-- hash: 755d1cc0f7409f2435a13d9c1a2d1bdf32201af5c5f0b4ad89371d39b143011e
 
 name:           cubix
 version:        0.5.0.0
@@ -145,9 +145,9 @@ library
     , th-expand-syns
     , transformers
     , wl-pprint
+  default-language: Haskell2010
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
-  default-language: Haskell2010
 
 executable examples-multi
   main-is: Main.hs
@@ -177,9 +177,9 @@ executable examples-multi
     , temporary
     , text
     , transformers
+  default-language: Haskell2010
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
-  default-language: Haskell2010
 
 test-suite cfg-test
   type: exitcode-stdio-1.0
@@ -209,9 +209,9 @@ test-suite cfg-test
     , lens
     , mtl
     , transformers
+  default-language: Haskell2010
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
-  default-language: Haskell2010
 
 benchmark mainbench
   type: exitcode-stdio-1.0
@@ -239,6 +239,6 @@ benchmark mainbench
     , mtl
     , text
     , transformers
+  default-language: Haskell2010
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
-  default-language: Haskell2010

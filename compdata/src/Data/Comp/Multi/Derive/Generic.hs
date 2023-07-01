@@ -141,11 +141,11 @@ genericTp ts = combine ''(:+:) $ map (combine ''(:*:)) $ map (map (AppT (ConT ''
     combine c (x:xs) = AppT (AppT (ConT c) x) (combine c xs)
 
 makeGPat :: [Name] -> Pat
-makeGPat []     = ConP 'U1 []
-makeGPat [n]    = ConP 'K1 [VarP n]
-makeGPat (n:ns) = ConP '(:*:) [ ConP 'K1 [VarP n]
-                              , makeGPat ns 
-                              ]
+makeGPat []     = ConP 'U1 [] []
+makeGPat [n]    = ConP 'K1 [] [VarP n]
+makeGPat (n:ns) = ConP '(:*:) [] [ ConP 'K1 [] [VarP n]
+                                 , makeGPat ns
+                                 ]
 
 makeGExp :: [Name] -> Exp
 makeGExp []     = ConE 'U1
@@ -153,14 +153,14 @@ makeGExp [n]    = AppE (ConE 'K1) (VarE n)
 makeGExp (n:ns) = AppE (AppE (ConE '(:*:)) (AppE (ConE 'K1) (VarE n))) (makeGExp ns) 
 
 makeEPat :: (Name, [Name]) -> Pat
-makeEPat (c, ns) = ConP c (map VarP ns)
+makeEPat (c, ns) = ConP c [] (map VarP ns)
 
 makeEExp :: (Name, [Name]) -> Exp
 makeEExp (c, ns) = foldl AppE (ConE c) (map VarE ns)
 
 addSumPat :: [Pat] -> [Pat]
 addSumPat [p]    = [p]
-addSumPat (p:ps) = [ConP 'L1 [p]] ++ map (\r -> ConP 'R1 [r]) (addSumPat ps)
+addSumPat (p:ps) = [ConP 'L1 [] [p]] ++ map (\r -> ConP 'R1 [] [r]) (addSumPat ps)
 
 addSumExp :: [Exp] -> [Exp]
 addSumExp [e]    = [e]

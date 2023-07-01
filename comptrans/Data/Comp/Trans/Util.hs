@@ -245,12 +245,12 @@ getTypeArgs nm = do
     TyConI (NewtypeD _ _ tvs _ _ _) -> return $ getNames tvs
     _                             -> return []
 
-getNames :: [TyVarBndr] -> [Name]
+getNames :: [TyVarBndr a] -> [Name]
 getNames = map getName
   where
-    getName :: TyVarBndr -> Name
-    getName (PlainTV n)    = n
-    getName (KindedTV n _) = n
+    getName :: TyVarBndr a -> Name
+    getName (PlainTV n _)    = n
+    getName (KindedTV n _ _) = n
 
 containsAll :: (Ord a) => Map a b -> [a] -> Bool
 containsAll mp = all (`Map.member` mp)

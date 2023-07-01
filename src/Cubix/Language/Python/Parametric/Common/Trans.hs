@@ -151,8 +151,8 @@ transBinder (PairF' x y) = iPyWithBinder (translate x) (mapF translateLValue y)
 
 transParam :: F.PythonTerm F.ParameterL -> MPythonTerm FunctionParameterL
 transParam (project -> Just (F.Param          n ann d _)) = PositionalParameter' (iPyParamAttrs (translate ann) (translate d)) (transIdent n)
-transParam (project -> Just (F.VarArgsPos     n ann   _)) = iPythonParamVarArgs (transIdent n) (translate ann)
-transParam (project -> Just (F.VarArgsKeyword n ann   _)) = iPythonParamVarArgsKW (transIdent n) (translate ann)
+transParam (project -> Just (F.VarArgsPos     n ann   _)) = iPythonParamVarArgs     (transIdent n) (translate ann)
+transParam (project -> Just (F.VarArgsKeyword n ann   _)) = iPythonParamVarArgsKW   (transIdent n) (translate ann)
 transParam (project -> Just (F.EndPositional _))          = iPythonEndPosParam
 transParam (project -> Just (F.UnPackTuple t    ann   _)) = iPythonParamUnpackTuple (translate t) (translate ann)
 
@@ -191,14 +191,20 @@ instance Trans F.Statement where
 
 -------------------------------------------------------------------------------
 
-untranslate :: MPythonTerm l -> F.PythonTerm l
-untranslate = untrans . unTerm
-
 class Untrans f where
   untrans :: f MPythonTerm l -> F.PythonTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
+
+untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))
+
+do ipsNames <- sumToNames ''MPythonSig
+   modNames <- sumToNames ''F.PythonSig
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''PyWith, ''PyClassIsStatement, ''AssignIsStatement, ''IdentIsIdent, ''FunctionCallIsExpr, ''FunctionDefIsStatement, ''PyCompIsExpr, ''PyCondExpr, ''PyComprehensionExpr]
+   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+
 
 untransDefault :: (HFunctor f, f :-<: F.PythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransDefault = inject . hfmap untranslate
@@ -330,13 +336,7 @@ untransComprehension t =
         go (project -> Just (PyComprehensionBody b)) =
           (untranslate b, Nothing')
 
-untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))
-
-
-do ipsNames <- sumToNames ''MPythonSig
-   modNames <- sumToNames ''F.PythonSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''PyWith, ''PyClassIsStatement, ''AssignIsStatement, ''IdentIsIdent, ''FunctionCallIsExpr, ''FunctionDefIsStatement, ''PyCompIsExpr, ''PyCondExpr, ''PyComprehensionExpr]
-   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+untranslate :: MPythonTerm l -> F.PythonTerm l
+untranslate = untrans . unTerm
 
 #endif

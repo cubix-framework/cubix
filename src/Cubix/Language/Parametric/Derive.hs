@@ -92,7 +92,7 @@ createSortInclusionType fromNm toNm = do
   let ctx = [foldl AppT EqualityT [VarT i, ConT toNm]]
   let notStrict = Bang NoSourceUnpackedness NoSourceStrictness
   let con = ForallC [] ctx $ NormalC tName [(notStrict, AppT (VarT e) (ConT fromNm))]
-  return $ [DataD [] tName [KindedTV e (AppT (AppT ArrowT StarT) StarT), PlainTV i] Nothing [con] []]
+  return $ [DataD [] tName [KindedTV e () (AppT (AppT ArrowT StarT) StarT), PlainTV i ()] Nothing [con] []]
 
   
 createSortInclusionTypes :: [Name] -> [Name] -> Q [Dec]
@@ -167,5 +167,5 @@ makeDefaultInstances :: [Type] -> Name -> Name -> Exp -> [Dec]
 makeDefaultInstances typs className methName exp =
   flip map typs $ \t -> let instSig = AppT (ConT className) t in
                         let dec = ValD (VarP methName) (NormalB exp) [] in
-                        InstanceD Nothing [] instSig [dec]
+                        InstanceD (Just Overlapping) [] instSig [dec]
 

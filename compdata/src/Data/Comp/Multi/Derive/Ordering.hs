@@ -56,8 +56,8 @@ makeOrdHF fname = do
             genEqClause coArg (constr, args,gadtTy) = do
               varXs <- newNames (length args) "x"
               varYs <- newNames (length args) "y"
-              let patX = ConP constr $ map VarP varXs
-              let patY = ConP constr $ map VarP varYs
+              let patX = ConP constr [] $ map VarP varXs
+              let patY = ConP constr [] $ map VarP varYs
               body <- eqDBody (getBinaryFArg coArg gadtTy) (zip3 varXs varYs args)
               return $ Clause [patX, patY] (NormalB body) []
             eqDBody :: Type -> [(Name, Name, Type)] -> ExpQ

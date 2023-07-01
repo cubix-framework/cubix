@@ -64,6 +64,9 @@ smartConstructors fname = do
                     ftype = foldl appT (conT tname) (map varT targs')
                     constr = classP ''(:<:) [ftype, f]
                     typ = foldl appT (conT ''Cxt) [h, f, a, maybe i return miTp]
-                    typeSig = forallT (map PlainTV vars) (sequence [constr]) typ
+
+                    -- NOTE 2023.06.29: Unsure if SpecifiedSpec is actually what we want to get
+                    --                  reasonable type application on smart constructors
+                    typeSig = forallT (map (\v -> PlainTV v SpecifiedSpec) vars) (sequence [constr]) typ
                 sigD sname typeSig
               genSig _ _ _ _ _ = []

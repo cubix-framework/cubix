@@ -9,7 +9,7 @@ def addTestCoverageArr(s)
   end
 end
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-1.22.5.0/build/examples-multi/examples-multi"
+RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
 TIMELIMIT = "45s"
 
 JS_DIR     = "/Users/jkoppel/research_large/other_frameworks/javascript-semantics/"

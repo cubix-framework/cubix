@@ -4,7 +4,7 @@ LUA_DIR     = "/Users/jkoppel/research_large/other_frameworks/lua/"
 PATH_TO_LUA = LUA_DIR + "src/lua"
 LUA_TESTS   = LUA_DIR + "lua-5.3.3-tests/"
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-1.22.5.0/build/examples-multi/examples-multi"
+RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
 
 transform = ARGV[0]
 

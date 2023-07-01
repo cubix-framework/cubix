@@ -173,14 +173,23 @@ instance Trans F.JSAST where
 
 -------------------------------------------------------------------------------
 
-untranslate :: MJSTerm l -> F.JSTerm l
-untranslate = untrans . unTerm
-
 class Untrans f where
   untrans :: f MJSTerm l -> F.JSTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
+
+untransError :: (HFunctor f, f :-<: MJSSig) => f MJSTerm l -> F.JSTerm l
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJSTerm _))
+
+do ipsNames <- sumToNames ''MJSSig
+   modNames <- sumToNames ''F.JSSig
+   let targTs = map ConT $ (ipsNames \\ modNames)
+                           \\ [ ''JSBlockIsJSAST, ''MaybeIdentIsJSIdent, ''JSFor, ''BlockIsJSStatement, ''BlockWithPrelude
+                              , ''AssignIsJSExpression, ''MultiLocalVarDeclIsJSStatement, ''IdentIsJSExpression
+                              , ''FunctionCallIsJSExpression, ''FunctionDefIsJSStatement]
+   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+
 
 untransDefault :: (HFunctor f, f :-<: F.JSSig) => f MJSTerm l -> F.JSTerm l
 untransDefault = inject . hfmap untranslate
@@ -269,15 +278,7 @@ untransParams params = listToCommaList $ map (untransIdent.paramToIdent) $ extra
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsJSStatement where
   untrans (FunctionDefIsJSStatement (FunctionDef' EmptyFunctionDefAttrs' n params block)) = F.iJSFunction noAnn (untransIdent n) noAnn (untransParams params) noAnn (untranslate $ fromProjF block) semi
 
-untransError :: (HFunctor f, f :-<: MJSSig) => f MJSTerm l -> F.JSTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJSTerm _))
-
-do ipsNames <- sumToNames ''MJSSig
-   modNames <- sumToNames ''F.JSSig
-   let targTs = map ConT $ (ipsNames \\ modNames)
-                           \\ [ ''JSBlockIsJSAST, ''MaybeIdentIsJSIdent, ''JSFor, ''BlockIsJSStatement, ''BlockWithPrelude
-                              , ''AssignIsJSExpression, ''MultiLocalVarDeclIsJSStatement, ''IdentIsJSExpression
-                              , ''FunctionCallIsJSExpression, ''FunctionDefIsJSStatement]
-   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+untranslate :: MJSTerm l -> F.JSTerm l
+untranslate = untrans . unTerm
 
 #endif

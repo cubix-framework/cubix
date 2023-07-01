@@ -172,14 +172,21 @@ instance {-# OVERLAPPING #-} Trans F.CFunctionDef where
                      Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramFromDecl $ extractF decls) ++ (if isVarArg then [iCVarArgParam] else []))
                    (injF $ translate body)
 
-untranslate :: MCTerm l -> F.CTerm l
-untranslate = untrans . unTerm
 
 class Untrans f where
   untrans :: f MCTerm l -> F.CTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
+
+untransError :: (HFunctor f, f :-<: MCSig) => f MCTerm l -> F.CTerm l
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MCTerm _))
+
+do ipsNames <- sumToNames ''MCSig
+   modNames <- sumToNames ''F.CSig
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''CLabeledBlock, ''CFor, ''AssignIsCExpression, ''MultiLocalVarDeclIsCCompoundBlockItem, ''IdentIsIdent
+                                                     , ''FunctionCallIsCExpression, ''FunctionDeclIsCDeclarator, ''FunctionDefIsCFunctionDef]
+   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.CSig) => f MCTerm l -> F.CTerm l
 untransDefault = inject . hfmap untranslate
@@ -282,13 +289,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsCFunctionDef where
           go [fromProjF -> CVarArgParam'] (l, b) = (l, True)
           go [] (l, b) = (l, b)
 
-untransError :: (HFunctor f, f :-<: MCSig) => f MCTerm l -> F.CTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MCTerm _))
-
-do ipsNames <- sumToNames ''MCSig
-   modNames <- sumToNames ''F.CSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''CLabeledBlock, ''CFor, ''AssignIsCExpression, ''MultiLocalVarDeclIsCCompoundBlockItem, ''IdentIsIdent
-                                                     , ''FunctionCallIsCExpression, ''FunctionDeclIsCDeclarator, ''FunctionDefIsCFunctionDef]
-   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+untranslate :: MCTerm l -> F.CTerm l
+untranslate = untrans . unTerm
 
 #endif

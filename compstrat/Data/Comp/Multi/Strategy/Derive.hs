@@ -77,7 +77,7 @@ makeDynCase fname = do
                                             []]
   
        conPat :: (Name, Int) -> Pat
-       conPat (con, n) = ConP con (replicate n WildP)
+       conPat (con, n) = ConP con [] (replicate n WildP)
 
 
 {-|
@@ -116,8 +116,8 @@ abstractConType (RecGadtC [constr] args _) = (constr, length args)
 {-|
   This function returns the name of a bound type variable
 -}
-tyVarBndrName (PlainTV n) = n
-tyVarBndrName (KindedTV n _) = n
+tyVarBndrName (PlainTV n _) = n
+tyVarBndrName (KindedTV n _ _) = n
 
 
 

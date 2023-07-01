@@ -192,14 +192,21 @@ instance {-# OVERLAPPING #-} Trans F.MemberDecl where
 instance {-# OVERLAPPING #-} Trans F.MethodBody where
   trans = error "MethodBody found not within MethodDecl"
 
-untranslate :: MJavaTerm l -> F.JavaTerm l
-untranslate = untrans . unTerm
-
 class Untrans f where
   untrans :: f MJavaTerm l -> F.JavaTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt (Proxy @Untrans) untrans
+  
+untransError :: (HFunctor f, f :-<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJavaTerm _))
+
+do ipsNames <- sumToNames ''MJavaSig
+   modNames <- sumToNames ''F.JavaSig
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''BlockIsBlock, ''AssignIsExp, ''MultiLocalVarDeclIsBlockStmt, ''IdentIsIdent
+                                                     , ''FunctionCallIsMethodInvocation, ''FunctionDeclIsMemberDecl, ''FunctionDefIsMemberDecl]
+   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
+
 
 untransDefault :: (HFunctor f, f :-<: F.JavaSig) => f MJavaTerm l -> F.JavaTerm l
 untransDefault = inject . hfmap untranslate
@@ -303,15 +310,7 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsMemberDecl where
                            Nothing'
                            (F.iMethodBody (Just' (untransBlock $ fromProjF body)))
 
-untransError :: (HFunctor f, f :-<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJavaTerm _))
-
-do ipsNames <- sumToNames ''MJavaSig
-   modNames <- sumToNames ''F.JavaSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''BlockIsBlock, ''AssignIsExp, ''MultiLocalVarDeclIsBlockStmt, ''IdentIsIdent
-                                                     , ''FunctionCallIsMethodInvocation, ''FunctionDeclIsMemberDecl, ''FunctionDefIsMemberDecl]
-   return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
-
-
+untranslate :: MJavaTerm l -> F.JavaTerm l
+untranslate = untrans . unTerm
 
 #endif

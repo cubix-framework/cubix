@@ -97,7 +97,7 @@ all_tests =
     test_zipfile test_zipfile64 test_zipimport test_zipimport_support
     test_zlib]
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-1.22.5.0/build/examples-multi/examples-multi"
+RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
 
 PYTHON_DIR     = "/Users/jkoppel/research_large/other_frameworks/cpython/"
 PATH_TO_PYTHON = PYTHON_DIR + "python.exe"

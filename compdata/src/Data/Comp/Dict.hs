@@ -33,7 +33,7 @@ module Data.Comp.Dict
        , mapAll
        ) where
 
-import GHC.Exts
+import GHC.Exts ( Constraint, Proxy#, proxy# )
 import Data.Proxy ( Proxy(..) )
 import Data.Vector (Vector)
 import qualified Data.Vector as V

@@ -85,14 +85,14 @@ deriveUntrans names term = do targDec <- mkTarg targNm
 {- type family Targ l -}
 mkTarg :: Name -> CompTrans [Dec]
 mkTarg targNm = do i <- CompTrans $ lift $ newName "i"
-                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i] NoSig Nothing)]
+                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i ()] NoSig Nothing)]
 
 {- newtype T l = T { t :: Targ l } -}
 mkWrapper :: Name -> Name -> Name -> CompTrans [Dec]
 mkWrapper tpNm fNm targNm = do i <- CompTrans $ lift $ newName "i"
                                let con = RecC tpNm [(fNm, bang, AppT (ConT targNm) (VarT i))]
                                    bang = Bang NoSourceUnpackedness NoSourceStrictness
-                                   nt   = NewtypeD [] tpNm [PlainTV i] Nothing con []
+                                   nt   = NewtypeD [] tpNm [PlainTV i ()] Nothing con []
                                return [nt]
 {-
   untranslate :: JavaTerm l -> Targ l
@@ -102,7 +102,7 @@ mkFn :: Name -> Type -> Name -> Name -> Name -> CompTrans [Dec]
 mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
   where
     sig = do i <- CompTrans $ lift $ newName "i"
-             CompTrans $ lift $ sigD fnNm (forallT [PlainTV i] (return []) (typ $ varT i))
+             CompTrans $ lift $ sigD fnNm (forallT [PlainTV i SpecifiedSpec] (return []) (typ $ varT i))
 
     typ :: Q Type -> Q Type
     typ i = [t| $term' $i -> $targ $i |]
@@ -124,7 +124,7 @@ mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
 mkClass :: Name -> Name -> Name -> CompTrans [Dec]
 mkClass classNm funNm newtpNm = do f <- CompTrans $ lift $ newName "f"
                                    let funDec = SigD funNm (AppT (AppT (ConT ''Alg) (VarT f)) (ConT newtpNm))
-                                   return [ClassD [] classNm [PlainTV f] [] [funDec]]
+                                   return [ClassD [] classNm [PlainTV f ()] [] [funDec]]
 
 {-
   type instance Targ CompilationUnitL = J.CompilationUnit
@@ -173,12 +173,12 @@ mkClause wrap unwrap con tps = do isAnn <- getIsAnn
     pat :: (Type -> Bool) -> [(Name, Type)] -> Name -> CompTrans Pat
     pat isAnn nmTps nmAnn = do isProp <- isPropagatingAnns
                                if isProp then
-                                 return $ ConP '(:&:) [nodeP, VarP nmAnn]
+                                 return $ ConP '(:&:) [] [nodeP, VarP nmAnn]
                                 else
                                  return nodeP
       where
         nonAnnNms = map fst $ filter (not.isAnn.snd) nmTps
-        nodeP = ConP (transName con) (map VarP nonAnnNms)
+        nodeP = ConP (transName con) [] (map VarP nonAnnNms)
 
     body :: [(Name, Type)] -> Name -> CompTrans Body
     body nmTps nmAnn = do annPropInf <- view annotationProp

@@ -36,6 +36,6 @@ makeSubsts = do
   vars <- runCompTrans $ getTypeParamVars origASTTypes
   let substs = Map.fromList (zip vars (repeat $ TupleT 0))
   inf <- reify ''Flags
-  TyConI (NewtypeD _ _ [KindedTV f StarT] _ _ _) <- reify ''Flags
+  TyConI (NewtypeD _ _ [KindedTV f () StarT] _ _ _) <- reify ''Flags
   return $ Map.insert f (ConT ''CIntFlag) substs
 #endif

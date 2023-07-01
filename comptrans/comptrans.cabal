@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: defc86a7814a401b4e1e110f16cd0ae879d47a704d6ba8f2f876844b59f2a497
+-- hash: 567f01aa9d64b3f4495f613bfd2132e186be09930af69b413a1d891186dcfe07
 
 name:           comptrans
 version:        0.1.0.6
@@ -43,7 +43,7 @@ library
       Data.Comp.Trans.Util
       Paths_comptrans
   hs-source-dirs:
-      ./.
+      ./
   ghc-options: -Wall
   build-depends:
       base

@@ -102,7 +102,7 @@ mkClass :: Name -> Name -> Type -> CompTrans Dec
 mkClass classNm funNm term = do a <- CompTrans $ lift $ newName "a"
                                 i <- CompTrans $ lift $ newName "i"
                                 let transDec = SigD funNm (foldl AppT ArrowT [VarT a, AppT term (VarT i)])
-                                return $ ClassD [] classNm [PlainTV a, PlainTV i] [] [transDec]
+                                return $ ClassD [] classNm [PlainTV a (), PlainTV i ()] [] [transDec]
 
 -- |
 -- Example:
@@ -149,4 +149,4 @@ mkClause :: TransAlts -> Name -> Name -> [Type] -> CompTrans Clause
 mkClause transAlts funNm con tps = do nms <- CompTrans $ lift $ mapM (const $ newName "x") tps
                                       return $ Clause [pat nms] (makeTransRhs transAlts funNm con $ zip nms tps) []
   where
-    pat nms = ConP con (map VarP nms)
+    pat nms = ConP con [] (map VarP nms)

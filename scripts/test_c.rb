@@ -1,12 +1,12 @@
 #!/usr/bin/ruby
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.0.1.0/build/examples-multi/examples-multi"
+RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
 
 GCC_DIR     = "/Users/jkoppel/research_large/other_frameworks/gcc/"
 #PATH_TO_GCC = GCC_DIR + "../gcc_build/gcc/xgcc"
 # Just using system GCC. GCC torture tests are meant to be portable
 # Okay, actually they're not that portable. Using Homebrew GCC
-GCC_COMMAND = "/usr/local/bin/gcc-10"
+GCC_COMMAND = "/usr/local/bin/gcc-11"
 GCC_TORTURE_TESTS   = GCC_DIR + "gcc/testsuite/gcc.c-torture/execute/"
 
 transform = ARGV[0]

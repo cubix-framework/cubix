@@ -78,7 +78,9 @@ smartFConstructors fname = do
                     typ = arrow (args ++ [appT typGen j])
                     constr = classP ''(:-<:) [ftype, fs]
                     constr' = classP ''InjF [fs, maybe j (pure . snd) miTp, j]
-                    typeSig = forallT (map PlainTV vars) (sequence [constr, constr']) typ
+
+                    -- NOTE 2023.06.29: Unsure if SpecifiedSpec is what we want here to get working type applications
+                    typeSig = forallT (map (\v -> PlainTV v SpecifiedSpec) vars) (sequence [constr, constr']) typ
                 sigD sname typeSig
 
               mkArgType h fs a (AppT (VarT _) t) =
@@ -121,8 +123,8 @@ abstractConType (RecGadtC [constr] args _) = (constr, length args)
 {-|
   This function returns the name of a bound type variable
 -}
-tyVarBndrName (PlainTV n) = n
-tyVarBndrName (KindedTV n _) = n
+tyVarBndrName (PlainTV n _) = n
+tyVarBndrName (KindedTV n _ _) = n
 
 
 
