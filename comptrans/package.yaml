@@ -30,6 +30,47 @@ author: James Koppel
 maintainer: James Koppel
 license: BSD3
 github: jkoppel/comptrans
+
+
+default-extensions:
+  - ApplicativeDo
+  - BangPatterns
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveLift
+  - DeriveTraversable
+  - DerivingStrategies
+  - EmptyCase
+  - ExistentialQuantification
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - ImportQualifiedPost
+  - InstanceSigs
+  - KindSignatures
+  - LambdaCase
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
+  - OverloadedStrings
+  - PatternSynonyms
+  - QuasiQuotes
+  - RankNTypes
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeFamilyDependencies
+  - TypeOperators
+  - ViewPatterns
+
 dependencies:
 - base
 - bytestring

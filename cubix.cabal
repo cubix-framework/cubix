@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 755d1cc0f7409f2435a13d9c1a2d1bdf32201af5c5f0b4ad89371d39b143011e
+-- hash: 62d9f873defeb6cbb67ae6a40808b3012743b436901c77d5f57228f04aba1cf8
 
 name:           cubix
-version:        0.5.0.0
+version:        0.7.0.0
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
@@ -115,6 +115,45 @@ library
       Paths_cubix
   hs-source-dirs:
       src
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -freduction-depth=400
   build-depends:
       MonadRandom
@@ -155,6 +194,45 @@ executable examples-multi
       Paths_cubix
   hs-source-dirs:
       examples/multi
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
   build-depends:
       base
@@ -194,6 +272,45 @@ test-suite cfg-test
       Paths_cubix
   hs-source-dirs:
       cfg-test
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -fcontext-stack=300
   build-depends:
       base
@@ -220,6 +337,45 @@ benchmark mainbench
       Paths_cubix
   hs-source-dirs:
       benchmarks
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
   build-depends:
       base

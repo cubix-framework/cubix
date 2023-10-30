@@ -1,16 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE ViewPatterns        #-}
-
 module Cubix.Transformations.Hoist.Hoisting (
     hoistDeclarations
   ) where

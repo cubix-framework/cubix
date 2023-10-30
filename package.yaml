@@ -22,6 +22,48 @@ flags:
 when:
     condition: flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
+
+
+default-extensions:
+  - ApplicativeDo
+  - BangPatterns
+  - ConstraintKinds
+  - DataKinds
+  - DefaultSignatures
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveLift
+  - DeriveTraversable
+  - DerivingStrategies
+  - EmptyCase
+  - ExistentialQuantification
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - ImportQualifiedPost
+  - InstanceSigs
+  - KindSignatures
+  - LambdaCase
+  - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
+  - OverloadedStrings
+  - PatternSynonyms
+  - QuasiQuotes
+  - RankNTypes
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeFamilyDependencies
+  - TypeOperators
+  - ViewPatterns
+
 library:
   source-dirs: src
   exposed-modules:

@@ -2,14 +2,7 @@
 {-# OPTIONS_HADDOCK hide                      #-}
 
 {-# LANGUAGE CPP                              #-}
-{-# LANGUAGE FlexibleContexts                 #-}
-{-# LANGUAGE GADTs                            #-}
-{-# LANGUAGE MultiParamTypeClasses            #-}
-{-# LANGUAGE ScopedTypeVariables              #-}
 {-# LANGUAGE TemplateHaskell                  #-}
-{-# LANGUAGE TypeApplications                 #-}
-{-# LANGUAGE TypeFamilies                     #-}
-{-# LANGUAGE TypeOperators                    #-}
 {-# LANGUAGE UndecidableInstances             #-}
 
 -- This is a separate file due to GHC's phase restriction.

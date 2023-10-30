@@ -1,9 +1,4 @@
-{-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE CPP              #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE TypeOperators    #-}
-
 
 --------------------------------------------------------------------------------
 -- |

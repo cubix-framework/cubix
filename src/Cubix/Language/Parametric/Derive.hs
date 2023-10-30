@@ -1,6 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns #-}
+
 -- 
 -- A utility wrapper around both Data.Comp.Multi.Derive and
 -- the comptrans library, allowing us to easily derive all desired instances

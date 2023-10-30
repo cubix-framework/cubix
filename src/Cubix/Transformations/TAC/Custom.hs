@@ -1,20 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 {-# LANGUAGE CPP                    #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE KindSignatures         #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE PatternGuards          #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ViewPatterns           #-}
 
 module Cubix.Transformations.TAC.Custom (
     IsValue(..)

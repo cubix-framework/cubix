@@ -1,15 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Cubix.Language.Lua.Parametric.Common.Cfg () where
 

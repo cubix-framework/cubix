@@ -1,15 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Cubix.Language.Parametric.Syntax.Function (
   -- Function calls
