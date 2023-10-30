@@ -1,13 +1,4 @@
-{-# LANGUAGE ConstraintKinds        #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE KindSignatures         #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverlappingInstances   #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ViewPatterns           #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Cubix.Analysis.Call.Trivial (
     NodeIdx(..)

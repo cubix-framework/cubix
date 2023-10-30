@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 

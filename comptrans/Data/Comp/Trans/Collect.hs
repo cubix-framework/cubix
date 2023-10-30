@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-
 module Data.Comp.Trans.Collect (
     collectTypes
   ) where

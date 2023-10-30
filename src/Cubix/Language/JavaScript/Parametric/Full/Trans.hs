@@ -1,14 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE CPP                     #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE GADTs                   #-}
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TemplateHaskell         #-}
-{-# LANGUAGE TypeApplications        #-}
-{-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE TypeOperators           #-}
-{-# LANGUAGE TypeSynonymInstances    #-}
 {-# LANGUAGE UndecidableInstances    #-}
 
 #ifdef ONLY_ONE_LANGUAGE

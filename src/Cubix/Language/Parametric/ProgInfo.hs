@@ -1,9 +1,3 @@
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE FunctionalDependencies   #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
-{-# LANGUAGE RankNTypes               #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
 module Cubix.Language.Parametric.ProgInfo (

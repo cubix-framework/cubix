@@ -1,5 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE CPP #-}
+
 #ifdef ONLY_ONE_LANGUAGE
 module Cubix.Language.Java.Parametric.Full () where
 #else

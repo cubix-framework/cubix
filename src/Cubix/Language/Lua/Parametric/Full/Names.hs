@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
+
 {-# LANGUAGE TemplateHaskell #-}
 
 module Cubix.Language.Lua.Parametric.Full.Names (

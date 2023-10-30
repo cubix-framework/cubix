@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+
 {-|
    This is part of an experiment in using sort-inclusions (i.e. injf) in parametric syntax.
    This file is sinful because it is a code-clone of the smartConstructors generator in the compdata library,

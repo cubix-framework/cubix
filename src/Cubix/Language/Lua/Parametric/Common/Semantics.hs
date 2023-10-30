@@ -1,13 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module Cubix.Language.Lua.Parametric.Common.Semantics () where
 
