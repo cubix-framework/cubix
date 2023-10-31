@@ -1,16 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Main where
 
 import Control.Monad ( MonadPlus(..), liftM, (<=<), (>=>) )
-import Control.Monad.Identity ( Identity(..) )
-import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
-import Control.Monad.Writer ( MonadWriter(..), Writer, runWriter, execWriterT)
+import Control.Monad.Writer ( MonadWriter(..), execWriterT)
 import Data.Typeable ( Typeable )
 
 import Language.Java.Pretty ( prettyPrint )
@@ -18,11 +12,10 @@ import Language.Java.Pretty ( prettyPrint )
 import Data.Comp.Multi
 import Data.Comp.Multi.Strategic
 
-import           Cubix.Language.Info
 import           Cubix.Language.Java.Parametric.Full
 import qualified Cubix.Language.Java.Parametric.Common as Common
 import qualified Cubix.Language.Java.Parse as Parse
-import Cubix.Language.Parametric.Syntax.Functor ( InsertF(..), ExtractF(..) )
+import           Cubix.Language.Parametric.Syntax ( InsertF(..), ExtractF(..) )
 
 parseFile :: FilePath -> IO (Maybe (JavaTerm CompilationUnitL))
 parseFile path = do

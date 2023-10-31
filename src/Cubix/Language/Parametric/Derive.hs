@@ -116,7 +116,7 @@ createSortInclusionInfer fromNm toNm = do
       let p = conP tName [varP x]
       let xe = varE x
 
-      [d| instance ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
+      [d| instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
             injF = $smartCon
 
             projF' (project' -> Just $p) = Just $xe

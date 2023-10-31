@@ -1,7 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 {-# LANGUAGE CPP                    #-}
-{-# LANGUAGE OverlappingInstances   #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE UndecidableInstances   #-}
 

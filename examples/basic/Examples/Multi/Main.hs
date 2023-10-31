@@ -1,25 +1,25 @@
-{-# LANGUAGE OverlappingInstances #-}
-
 module Main where
 
 import Data.Map ( Map )
 
+import Cubix.Language.Info
+
 import Examples.Multi.Syntax
 import Examples.Multi.Strat
 
-import Control.DeepSeq
+prog1 :: Prog ExpL
+prog1 = iPair (iConst 2) (iConst 3)
 
-prog1 :: ProgLab ExpL
-prog1 = iAPair 2 (iAConst 0 2) (iAConst 1 3)
-
-expProg :: Int -> ProgLab ExpL
+expProg :: Int -> Prog ExpL
 expProg 0 = prog1
-expProg n = iAPair 0 prev prev
+expProg n = iPair prev prev
   where
     prev = expProg (n-1)
 
 
 main = do
-  print $ (extractLabels prog1 :: Map Label (ProgLab ExpL))
-  --print (rnf $ countConsts $ expProg 25)
+  gen <- mkConcurrentSupplyLabelGen
+  let prog1Labeled = labelProg gen prog1 :: ProgLab ExpL
+  print $ (extractLabels prog1Labeled :: Map Label (ProgLab ExpL))
+  print (countConsts $ labelProg gen $ expProg 25)
   putStrLn "Done"

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 62d9f873defeb6cbb67ae6a40808b3012743b436901c77d5f57228f04aba1cf8
+-- hash: 3148359e5be739a6d2130c62457243b1bd0bc15516a3192a7d5a047c1760a399
 
 name:           cubix
 version:        0.7.0.0
@@ -188,6 +188,251 @@ library
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
 
+executable examples-basic
+  main-is: Examples/Multi/Main.hs
+  other-modules:
+      Examples.Multi.Strat
+      Examples.Multi.Syntax
+      Paths_cubix
+  hs-source-dirs:
+      examples/basic
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , mtl
+    , transformers
+  default-language: Haskell2010
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+
+executable examples-c
+  main-is: Main.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      examples/c
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , language-c
+    , mtl
+    , transformers
+  default-language: Haskell2010
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+
+executable examples-java
+  main-is: Main.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      examples/java
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , language-java
+    , mtl
+    , transformers
+  default-language: Haskell2010
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+
+executable examples-javascript
+  main-is: Main.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      examples/javascript
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , language-javascript >=0.6.0.9
+    , mtl
+    , transformers
+  default-language: Haskell2010
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+
 executable examples-multi
   main-is: Main.hs
   other-modules:
@@ -254,6 +499,67 @@ executable examples-multi
     , mtl
     , temporary
     , text
+    , transformers
+  default-language: Haskell2010
+  if flag(only-one-language)
+    cpp-options: -D ONLY_ONE_LANGUAGE
+
+executable examples-python
+  main-is: Main.hs
+  other-modules:
+      Paths_cubix
+  hs-source-dirs:
+      examples/python
+  default-extensions:
+      ApplicativeDo
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      EmptyCase
+      ExistentialQuantification
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      OverloadedStrings
+      PatternSynonyms
+      QuasiQuotes
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeFamilyDependencies
+      TypeOperators
+      ViewPatterns
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  build-depends:
+      base
+    , compstrat
+    , comptrans
+    , containers
+    , cubix
+    , cubix-compdata
+    , deepseq
+    , language-python
+    , mtl
     , transformers
   default-language: Haskell2010
   if flag(only-one-language)
