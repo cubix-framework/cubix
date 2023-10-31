@@ -3,9 +3,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# LANGUAGE OverlappingInstances #-}
--- |
-
 module Cubix.Language.Lua.Parametric.Common.Types where
 
 import Data.List ( (\\) )

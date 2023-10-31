@@ -1,8 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- Only because can't make overlapping in TH
-{-# LANGUAGE OverlappingInstances #-}
 -- |
 
 module Cubix.Language.Parametric.Syntax.VarDecl (

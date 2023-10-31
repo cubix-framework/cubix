@@ -1,7 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ViewPatterns #-}
-
 -- | 
 
 module Main where
@@ -9,7 +5,6 @@ module Main where
 import Control.Monad.Identity ( runIdentity )
 
 import Language.C ( readInputStream, parseC, pretty )
-import qualified Language.C.Syntax as Orig
 import qualified Language.C.Data.Node as Node
 import Language.C.Data.Position ( initPos, nopos )
 

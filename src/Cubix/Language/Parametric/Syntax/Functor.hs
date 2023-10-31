@@ -1,4 +1,3 @@
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -369,19 +368,19 @@ class KExtractF f g where
 class KExtractF' f g where
   kextractF' :: g e (f l) -> f (e l)
 
-instance KExtractF' f g => KExtractF f g where
+instance {-# OVERLAPPABLE #-} KExtractF' f g => KExtractF f g where
   kextractF = kextractF'
 
-instance (All (KExtractF f) gs) => KExtractF f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF f) gs) => KExtractF f (Sum gs) where
   kextractF = caseCxt (Proxy @(KExtractF f)) kextractF
 
-instance (All (KExtractF' f) gs) => KExtractF' f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF' f) gs) => KExtractF' f (Sum gs) where
   kextractF' = caseCxt (Proxy @(KExtractF' f)) kextractF'
 
-instance (KExtractF f g) => KExtractF f (g :&: a) where
+instance {-# OVERLAPPING #-}  (KExtractF f g) => KExtractF f (g :&: a) where
   kextractF = kextractF . remA
 
-instance (KExtractF' f g) => KExtractF' f (g :&: a) where
+instance {-# OVERLAPPING #-} (KExtractF' f g) => KExtractF' f (g :&: a) where
   kextractF' = kextractF' . remA
 
 instance (Applicative f) => ExtractF f (K a) where
@@ -391,16 +390,16 @@ instance (KExtractF f g, ExtractF f a, Functor f) => ExtractF f (Cxt h g a) wher
   extractF (Term x) = kextractF x
   extractF (Hole x) = fmap Hole $ extractF x
 
-instance (NotSum g) => KExtractF' f g where
+instance {-# OVERLAPPABLE #-} (NotSum g) => KExtractF' f g where
   kextractF' = error "Undefined use of extractF"
 
 --------------------------------------------------------------------------------
 
-instance KExtractF [] ListF where
+instance {-# OVERLAPPING #-} KExtractF [] ListF where
   kextractF NilF = []
   kextractF (ConsF x xs) = x : (extractF xs)
 
-instance KExtractF' Maybe MaybeF where
+instance {-# OVERLAPPING #-} KExtractF' Maybe MaybeF where
   kextractF' NothingF = Nothing
   kextractF' (JustF x) = Just x
 
@@ -415,33 +414,33 @@ class KExtractF2 f g where
 class KExtractF2' f g where
   kextractF2' :: g e (f l l') -> f (e l) (e l')
 
-instance KExtractF2' f g => KExtractF2 f g where
+instance {-# OVERLAPPABLE #-} KExtractF2' f g => KExtractF2 f g where
   kextractF2 = kextractF2'
 
-instance (All (KExtractF2 f) gs) => KExtractF2 f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF2 f) gs) => KExtractF2 f (Sum gs) where
   kextractF2 = caseCxt (Proxy @(KExtractF2 f)) kextractF2
 
-instance (All (KExtractF2' f) gs) => KExtractF2' f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF2' f) gs) => KExtractF2' f (Sum gs) where
   kextractF2' = caseCxt (Proxy @(KExtractF2' f)) kextractF2'
 
-instance (KExtractF2 f g) => KExtractF2 f (g :&: a) where
+instance {-# OVERLAPPING #-} (KExtractF2 f g) => KExtractF2 f (g :&: a) where
   kextractF2 = kextractF2 . remA
 
-instance (KExtractF2' f g) => KExtractF2' f (g :&: a) where
+instance {-# OVERLAPPING #-} (KExtractF2' f g) => KExtractF2' f (g :&: a) where
   kextractF2' = kextractF2' . remA
 
 instance (KExtractF2 f g) => ExtractF2 f (HFix g) where
   extractF2 (Term x) = kextractF2 x
 
-instance (NotSum g) => KExtractF2' f g where
+instance {-# OVERLAPPABLE #-} (NotSum g) => KExtractF2' f g where
   kextractF2' = error "Undefined use of extractF2"
 
 --------------------------------------------------------------------------------
 
-instance KExtractF2' (,) PairF where
+instance {-# OVERLAPPING #-} KExtractF2' (,) PairF where
   kextractF2' (PairF a b) = (a, b)
 
-instance KExtractF2' Either EitherF where
+instance {-# OVERLAPPING #-} KExtractF2' Either EitherF where
   kextractF2' (LeftF  a) = Left a
   kextractF2' (RightF a) = Right a
 
@@ -456,25 +455,25 @@ class KExtractF3 f g where
 class KExtractF3' f g where
   kextractF3' :: g e (f l l' l'') -> f (e l) (e l') (e l'')
 
-instance KExtractF3' f g => KExtractF3 f g where
+instance {-# OVERLAPPABLE #-} KExtractF3' f g => KExtractF3 f g where
   kextractF3 = kextractF3'
 
-instance (All (KExtractF3 f) gs) => KExtractF3 f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF3 f) gs) => KExtractF3 f (Sum gs) where
   kextractF3 = caseCxt (Proxy @(KExtractF3 f)) kextractF3
 
-instance (All (KExtractF3' f) gs) => KExtractF3' f (Sum gs) where
+instance {-# OVERLAPPING #-} (All (KExtractF3' f) gs) => KExtractF3' f (Sum gs) where
   kextractF3' = caseCxt (Proxy @(KExtractF3' f)) kextractF3'
 
-instance (KExtractF3 f g) => KExtractF3 f (g :&: a) where
+instance {-# OVERLAPPING #-} (KExtractF3 f g) => KExtractF3 f (g :&: a) where
   kextractF3 = kextractF3 . remA
 
-instance (KExtractF3' f g) => KExtractF3' f (g :&: a) where
+instance {-# OVERLAPPING #-} (KExtractF3' f g) => KExtractF3' f (g :&: a) where
   kextractF3' = kextractF3' . remA
 
 instance (KExtractF3 f g) => ExtractF3 f (HFix g) where
   extractF3 (Term x) = kextractF3 x
 
-instance (NotSum g) => KExtractF3' f g where
+instance {-# OVERLAPPABLE #-} (NotSum g) => KExtractF3' f g where
   kextractF3' = error "Undefined use of extractF3"
 
 --------------------------------------------------------------------------------

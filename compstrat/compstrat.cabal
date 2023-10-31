@@ -49,12 +49,3 @@ Library
                    , transformers
 
   Ghc-Options:     -O2 -threaded -rtsopts
-
---Executable examples
---  Hs-Source-Dirs:  examples
---  Main-Is:         Examples.Multi.Main
---  Ghc-Options:     -O2 -threaded -rtsopts -with-rtsopts=-N
---  Build-Depends:   compdata
---                 , compstrat
---                 , comptrans
-                  

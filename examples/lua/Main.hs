@@ -1,10 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
-
 -- |
 
 module Main where
@@ -19,10 +12,7 @@ import Data.Proxy ( Proxy(..) )
 import Data.Text ( Text, append, pack)
 
 
-import Language.Lua.Annotated ( parseFile, pprint )
-import Language.Lua.Annotated.PrettyPrinter ( LPretty )
-
-import Data.Comp.Multi ( Cxt(..), Term, E(..), K(..), DistAnn, project, project', inject, remA, stripA, (:&:)(..), subterms, inject' )
+import Data.Comp.Multi ( Cxt(..), Term, E(..), K(..), project, project', inject, remA, stripA, (:&:)(..), subterms, inject' )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewrite, allbuR, promoteR, addFail )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, dynProj )
 
@@ -34,17 +24,21 @@ import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.ProgInfo
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Semantics.CfgInserter
-import Cubix.Language.Parametric.Syntax.Functor
+import Cubix.Language.Parametric.Syntax
+import Cubix.ParsePretty ( parseLua, prettyLua )
 
-import Cubix.Sin.Compdata.Annotation ( DistAnn', MonadAnnotater, getAnn )
+import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, getAnn )
 
+{-
 parse :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
 parse path = do
   res <- parseFile path
   case res of
     Left  e -> print e >> return Nothing
     Right b -> return $ Just $ C.translate $ F.translate b
+-}
 
+{-
 prettyLua :: (LPretty (Targ l)) => MLuaTerm l -> String
 prettyLua = show . pprint . F.untranslate . C.untranslate
 
@@ -71,6 +65,7 @@ prettyLuaUnk = pprintDisp (p :: P LBlockL)
              $ pprintDisp (p :: P ExpL)
              $ pprintDisp (p :: P StatL)
              $ (const "some other sort\n")
+-}
 
 getCfgLab :: Cfg f -> TermLab f l -> [Label]
 getCfgLab cfg t = map (^. cfg_node_lab) $ filter cmp (cfgNodes cfg)
@@ -85,7 +80,7 @@ putSubtree t cfg = do
  if length cfgLab > 0 then do
    putStrLn ""
    putStrLn $ (show $ getAnn t) ++ "(cfg: " ++ show cfgLab ++ ")"
-   putStrLn $ prettyLuaUnk $ stripA t
+   putStrLn $ prettyLua $ stripA t
    putStrLn $ show $ stripA t
   else
    return ()
@@ -99,7 +94,7 @@ doubleAssign t@(project' -> Just (Assign lhs _ _)) = do
   return t
 
 main = do
-  Just tree <- parse "Foo.lua"
+  Just tree <- parseLua "Foo.lua"
   gen <- mkConcurrentSupplyLabelGen
   let (treeLab :: MLuaTermLab _) = evalState (annotateLabel tree) gen
   putStrLn $ "\n\n"

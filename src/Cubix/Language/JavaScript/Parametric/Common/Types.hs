@@ -166,7 +166,7 @@ instance InjF MJSSig AssignL JSStatementL where
     JSExpressionStatement e _ <- project' x
     projF' e
 
-instance InjF MJSSig IdentL VarDeclBinderL where
+instance {-# OVERLAPPING #-} InjF MJSSig IdentL VarDeclBinderL where
   injF = iIdentIsJSExpression
   projF' x = do
     (y :: MJSCxtA _ _ _ JSExpressionL) <- projF' x

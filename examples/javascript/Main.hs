@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ViewPatterns #-}
-
 -- |
 
 module Main where
