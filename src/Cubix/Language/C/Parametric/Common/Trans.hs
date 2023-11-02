@@ -30,14 +30,31 @@ import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
 
+--------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------------
+---------------- Forward translation: Modularized syntax to IPS  -------------------
+------------------------------------------------------------------------------------
+
+--------------------------------
+------------- Top-level translate
+--------------------------------
+
+------ Top-level definition
+
 translate :: F.CTerm l -> MCTerm l
 translate = trans . unTerm
 
 translate' :: (InjF MCSig l l') => F.CTerm l -> MCTerm l'
 translate' = injF . translate
 
+------ Class
+
 class Trans f where
   trans :: f F.CTerm l -> MCTerm l
+
+------ Default and standard cases
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
   trans = caseCxt @Trans trans
@@ -48,6 +65,12 @@ transDefault = inject . hfmap translate
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MCSig, f :-<: F.CSig) => Trans f where
   trans = transDefault
 
+---------------------------------
+-------------- Per-fragment Instances
+---------------------------------
+
+-------- Identifiers
+
 -- Damn language-c mixing in annotations. We drop them for the pure tree
 transIdent :: F.CTerm F.IdentL -> MCTerm IdentL
 transIdent (project -> Just (F.Ident s _ _)) = Ident' s
@@ -55,6 +78,8 @@ transIdent (project -> Just (F.Ident s _ _)) = Ident' s
 -- Clone of transIdent because type-safe pattern match
 instance Trans F.Ident where
   trans (F.Ident n _ _) = iIdent n
+
+-------- Declarations
 
 transSingleDec :: F.CTerm (Maybe F.CDeclaratorL, Maybe F.CInitializerL, Maybe F.CExpressionL) ->  MCTerm SingleLocalVarDeclL
 transSingleDec (extractF3 -> (declaratorOpt, initOpt, bitFieldOpt)) = checkBitField `seq` SingleLocalVarDecl' localOpts id init
@@ -70,6 +95,8 @@ transSingleDec (extractF3 -> (declaratorOpt, initOpt, bitFieldOpt)) = checkBitFi
     init = case initOpt of
       Nothing' -> NoLocalVarInit'
       Just' x  -> JustLocalVarInit' $ injF $ translate x
+
+-------- Labeled blocks
 
 containsStatic :: F.CTerm F.CDeclarationL -> Bool
 containsStatic = getAny . runIdentity . (crushtdT $ promoteTF $ addFail isStatic)
@@ -91,17 +118,23 @@ instance {-# OVERLAPPING #-} Trans F.CCompoundBlockItem where
     else
       injF $ transMultiDec decl
 
-transOp :: F.CTerm F.CAssignOpL -> MCTerm AssignOpL
-transOp (project -> Just F.CAssignOp) = AssignOpEquals'
-transOp x                             = injF $ translate x
+-------- Assignments
+
+transAssignOp :: F.CTerm F.CAssignOpL -> MCTerm AssignOpL
+transAssignOp (project -> Just F.CAssignOp) = AssignOpEquals'
+transAssignOp x                             = injF $ translate x
 
 translateArgs :: F.CTerm [F.CExpressionL] -> MCTerm FunctionArgumentsL
 translateArgs args = FunctionArgumentList' $ mapF (PositionalArgument' . injF . translate) args
 
+-------- (Multiple categories)
+
 instance {-# OVERLAPPING #-} Trans F.CExpression where
-  trans t@(F.CAssign op lhs rhs _) = iAssign (injF $ translate lhs) (transOp op) (injF $ translate rhs)
+  trans t@(F.CAssign op lhs rhs _) = iAssign (injF $ translate lhs) (transAssignOp op) (injF $ translate rhs)
   trans t@(F.CCall f args _)       = iFunctionCall EmptyFunctionCallAttrs' (injF $ translate f) (translateArgs args)
   trans t                          = transDefault t
+
+-------- For-loops
 
 transForInit :: F.CTerm (Either (Maybe F.CExpressionL) F.CDeclarationL) -> MCTerm CForInitL
 transForInit (Left' Nothing')  = iCForInitEmpty
@@ -112,6 +145,8 @@ instance {-# OVERLAPPING #-} Trans F.CStatement where
   trans t@(F.CCompound ids items _)        = iCLabeledBlock (mapF transIdent ids) (Block' (mapF (injF.translate) items) EmptyBlockEnd')
   trans t@(F.CFor init cond update body _) = iCFor (transForInit init) (translate cond) (translate update) (translate body)
   trans t                                  = transDefault t
+
+-------- Function calls, declarations, and definitions
 
 paramDeclFromId :: F.CTerm F.IdentL -> MCTerm FunctionParameterDeclL
 paramDeclFromId n = PositionalParameterDeclOptionalIdent' (iCFunParamAttrs NilF' NilF' Nothing' NilF') (Just' $ transIdent n)
@@ -133,6 +168,7 @@ instance {-# OVERLAPPING #-} Trans F.CDeclarator where
                     Left' ps                                -> mapF paramDeclFromId ps
                     Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramDeclFromDecl $ extractF decls) ++ (if isVarArg then [iCVarArgParam] else []))
   trans t = transDefault t
+
 
 -- Duplication is better than the wrong abstraction
 -- Problem here is that I don't really know how to abstract these overlapping trees.
@@ -163,8 +199,22 @@ instance {-# OVERLAPPING #-} Trans F.CFunctionDef where
                    (injF $ translate body)
 
 
+------------------------------------------------------------------------------------
+---------------- Reverse translation: IPS to modularized syntax  -------------------
+------------------------------------------------------------------------------------
+
+
+--------------------------------
+------------- Top-level untranslate
+--------------------------------
+
+------ Class (contains top-level function on sigs)
+
 class Untrans f where
   untrans :: f MCTerm l -> F.CTerm l
+
+
+------ Default and standard cases
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
@@ -184,14 +234,28 @@ untransDefault = inject . hfmap untranslate
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.CSig) => Untrans f where
   untrans = untransDefault
 
+------ Top level function on terms
+
+-- Must define this after template Haskell block
+untranslate :: MCTerm l -> F.CTerm l
+untranslate = untrans . unTerm
+
+--------------------------------
+------------- Per-fragment instances
+--------------------------------
+
 dummyNodeInfo :: F.CTerm F.NodeInfoL
 dummyNodeInfo = F.translateNodeInfo $ COrig.mkNodeInfoOnlyPos COrig.nopos
+
+-------- Identifiers
 
 untransIdent :: MCTerm IdentL -> F.CTerm F.IdentL
 untransIdent (Ident' s) = F.iIdent s 0 dummyNodeInfo
 
 instance {-# OVERLAPPING #-} Untrans IdentIsIdent where
   untrans (IdentIsIdent n) = untransIdent n
+
+-------- Declarations
 
 untransSingleDec :: MCTerm SingleLocalVarDeclL -> F.CTerm (Maybe F.CDeclaratorL, Maybe F.CInitializerL, Maybe F.CExpressionL)
 untransSingleDec (SingleLocalVarDecl' attrs id init) = riTripleF (Just' declarator) cinit Nothing'
@@ -210,15 +274,21 @@ untransMultiDec (MultiLocalVarDecl' attrs decls) = F.iCDecl (untranslate $ fromP
 instance {-# OVERLAPPING #-} Untrans MultiLocalVarDeclIsCCompoundBlockItem where
   untrans (MultiLocalVarDeclIsCCompoundBlockItem dec) = F.iCBlockDecl $ untransMultiDec dec
 
-untransOp :: MCTerm AssignOpL -> F.CTerm F.CAssignOpL
-untransOp AssignOpEquals' = F.iCAssignOp
-untransOp x               = untranslate $ fromProjF x
+-------- Assignment
+
+untransAssignOp :: MCTerm AssignOpL -> F.CTerm F.CAssignOpL
+untransAssignOp AssignOpEquals' = F.iCAssignOp
+untransAssignOp x               = untranslate $ fromProjF x
 
 instance {-# OVERLAPPING #-} Untrans AssignIsCExpression where
-  untrans (AssignIsCExpression (Assign' lhs op rhs)) = F.iCAssign (untransOp op) (untranslate $ fromProjF lhs)  (untranslate $ fromProjF rhs) iUnitF
+  untrans (AssignIsCExpression (Assign' lhs op rhs)) = F.iCAssign (untransAssignOp op) (untranslate $ fromProjF lhs)  (untranslate $ fromProjF rhs) iUnitF
+
+-------- Labeled blocks
 
 instance {-# OVERLAPPING #-} Untrans CLabeledBlock where
   untrans (CLabeledBlock ids (Block' items _)) = F.iCCompound (mapF untransIdent ids) (mapF (untranslate.fromProjF) items) iUnitF
+
+-------- For loops
 
 untransForInit :: MCTerm CForInitL -> F.CTerm (Either (Maybe F.CExpressionL) F.CDeclarationL)
 untransForInit (project -> Just CForInitEmpty)      = Left' Nothing'
@@ -227,6 +297,8 @@ untransForInit (project -> Just (CForInitDecl dec)) = Right' $ untransMultiDec d
 
 instance {-# OVERLAPPING #-} Untrans CFor where
   untrans (CFor init cond update body) = F.iCFor (untransForInit init) (untranslate cond) (untranslate update) (untranslate body) iUnitF
+
+-------- Function calls, declarations, and definitions
 
 untranslateArg :: MCTerm FunctionArgumentL -> F.CTerm F.CExpressionL
 untranslateArg (PositionalArgument' a) = untranslate $ fromProjF a
@@ -278,8 +350,5 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsCFunctionDef where
                go ps ((F.iCDecl (untranslate dss) (SingletonF' (TripleF' (Just' $ F.iCDeclr (Just' $ untransIdent n) (untranslate dds) (untranslate asmNm) (untranslate attrs) iUnitF) Nothing' Nothing')) iUnitF) : l, b)
           go [fromProjF -> CVarArgParam'] (l, b) = (l, True)
           go [] (l, b) = (l, b)
-
-untranslate :: MCTerm l -> F.CTerm l
-untranslate = untrans . unTerm
 
 #endif

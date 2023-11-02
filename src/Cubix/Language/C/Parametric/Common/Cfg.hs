@@ -25,6 +25,13 @@ import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P
 
+-------------------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------------
+--------------------- CFG-construction data structures ----------------------------
+-----------------------------------------------------------------------------------
+
 data CCfgState = CCfgState {
                    _ccs_cfg       :: Cfg MCSig
                  , _ccs_labeler   :: LabelGen
@@ -37,16 +44,18 @@ type LocalLabels = Set String
 
 makeLenses ''CCfgState
 
------------------------------------------------------------------------------------
----------------           Labelling mechanism              ------------------------
------------------------------------------------------------------------------------
+------------------------------------------------------------
+---------------------- Labelling mechanism -----------------
+------------------------------------------------------------
 
 -- With a GNU C extension it is possible to have nested function definitions.
+-- 
 -- From GCC docs:
--- GCC allows you to declare local labels in any nested block scope.
--- A local label is just like an ordinary label, but you can only reference it
--- (with a goto statement, or by taking its address) within the block in which it is declared.
--- Local label declarations also make the labels they declare visible to nested functions.
+--
+--   GCC allows you to declare local labels in any nested block scope.
+--   A local label is just like an ordinary label, but you can only reference it
+--   (with a goto statement, or by taking its address) within the block in which it is declared.
+--   Local label declarations also make the labels they declare visible to nested functions.
 
 type LabelMap0 = Map.Map String (Label, [Label])
 

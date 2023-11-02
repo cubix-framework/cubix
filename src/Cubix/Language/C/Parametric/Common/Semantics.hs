@@ -23,6 +23,12 @@ import Cubix.Sin.Compdata.Annotation ( annotateM )
 
 import Unsafe.Coerce ( unsafeCoerce )
 
+--------------------------------------------------------------------------
+
+----------------------------------------------------------------
+---------------------- Strictness  -----------------------------
+----------------------------------------------------------------
+
 instance {-# OVERLAPPING #-} (CBinaryOp :-<: gs) => GetStrictness' gs CExpression where
   getStrictness'   (CCond _ _ _ _)     = [Strict, GuardedBy (Place 0), GuardedBy (NegPlace 0), NoEval]
   getStrictness'   (CSizeofExpr _ _)   = [NoEval, NoEval]
@@ -31,6 +37,11 @@ instance {-# OVERLAPPING #-} (CBinaryOp :-<: gs) => GetStrictness' gs CExpressio
     Just CLorOp -> [NoEval, Strict, GuardedBy (NegPlace 1), NoEval]
     _           -> defaultGetStrictness t
   getStrictness' x                     = defaultGetStrictness x
+
+
+----------------------------------------------------------------
+---------------------- Insertion  -----------------------------
+----------------------------------------------------------------
 
 instance {-# OVERLAPPING #-} InsertAt' MCSig BlockItemL CStatement where
 
