@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE PartialTypeSignatures  #-}
 {-# LANGUAGE UndecidableInstances   #-}
@@ -54,7 +55,7 @@ instance {-# OVERLAPPABLE #-} (HFoldable f) => GetStrictness' gs f where
   getStrictness' = defaultGetStrictness
 
 instance {-# OVERLAPPING #-} (All (GetStrictness' gs) fs) => GetStrictness' gs (Sum fs) where
-  getStrictness' = caseCxt (Proxy @(GetStrictness' gs)) getStrictness'
+  getStrictness' = caseCxt @(GetStrictness' gs) getStrictness'
 
 class GetStrictness fs where
   getStrictness :: Term fs l -> [Strictness]
@@ -71,7 +72,7 @@ instance {-# OVERLAPPABLE #-} HasSideEffects' gs f where
   hasSideEffects' = const KUnknown
 
 instance {-# OVERLAPPING #-} (All (HasSideEffects' gs) fs) => HasSideEffects' gs (Sum fs) where
-  hasSideEffects' = caseCxt (Proxy @(HasSideEffects' gs)) hasSideEffects'
+  hasSideEffects' = caseCxt @(HasSideEffects' gs) hasSideEffects'
 
 class HasSideEffects fs where
   hasSideEffects :: Term fs l -> Kleene
@@ -106,12 +107,12 @@ instance {-# OVERLAPPING #-} (ListF :-<: gs, All HFunctor gs, KDynCase (Sum gs) 
                                    Just p  -> gcastWith p $ liftM inject' $ annM $ ConsF e (inject' t)
   insertAt' _              _ t = return $ inject' t
 
-  canInsertAt' EnterEvalPoint _ = kIsSort (Proxy :: Proxy [l])
+  canInsertAt' EnterEvalPoint _ = kIsSort @[l]
   canInsertAt' _              _ = const False
 
 instance {-# OVERLAPPING #-} (All (InsertAt' gs l) fs, DynCase (Term gs) l) => InsertAt' gs l (Sum fs) where
-  insertAt' p e = caseCxt' (Proxy @(InsertAt' gs l)) (insertAt' p e)
-  canInsertAt' p e = caseCxt' (Proxy @(InsertAt' gs l)) (canInsertAt' p e)
+  insertAt'    p e = caseCxt' @(InsertAt' gs l) (insertAt' p e)
+  canInsertAt' p e = caseCxt' @(InsertAt' gs l) (canInsertAt' p e)
 
 class InsertAt gs l where
   insertAt    :: (MonadAnnotater a m) => NodeEvaluationPoint -> AnnTerm a gs l -> AnnTerm a gs i -> m (AnnTerm a gs i)

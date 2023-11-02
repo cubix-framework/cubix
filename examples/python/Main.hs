@@ -46,8 +46,8 @@ main = do
   putStrLn $ prettyPython tree'
 
   let (lst :: PythonTerm [StatementL]) = ConsF' (iPass iUnitF) NilF'
-  print $ isSort (Proxy :: Proxy [StatementL]) (annUnit lst)
-  print $ canInsertBefore (Proxy :: Proxy StatementL) (annUnit lst)
+  print $ isSort @[StatementL] (annUnit lst)
+  print $ canInsertBefore (Proxy @StatementL) (annUnit lst)
 
   let (lstf :: (Sum PythonSig :&: ()) (AnnTerm () PythonSig) [StatementL]) = unTerm (annUnit lst)
-  print $ kIsSort (Proxy :: Proxy [StatementL]) lstf
+  print $ kIsSort @[StatementL] lstf

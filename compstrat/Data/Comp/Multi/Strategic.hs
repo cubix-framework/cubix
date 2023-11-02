@@ -1,6 +1,8 @@
+{-# LANGUAGE AllowAmbiguousTypes #-} -- For isSortR and isSortT
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -129,7 +131,6 @@ import Data.Comp.Multi.HFoldable ( HFoldable(..) )
 import Data.Comp.Multi.HTraversable ( HTraversable(..) )
 import Data.Comp.Multi.Show ( KShow, ShowHF )
 import Data.Monoid ( Monoid, mappend, mempty, Any(..) )
-import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:)(..), sym )
 
 import Data.Comp.Multi.Strategy.Classification
@@ -364,10 +365,10 @@ traceR x = do
   traceM $ show x
   return x
 
--- | @isSortR (Proxy :: Proxy l)@ performs the identity rewrite at terms of sort @l@,
+-- | @isSortR \@l@ performs the identity rewrite at terms of sort @l@,
 --   and fails for all other terms.
-isSortR :: (MonadPlus m, DynCase f l) => Proxy l -> RewriteM m f l'
-isSortR p = guardedT (guardBoolT (isSortT p)) idR failR
+isSortR :: forall l l' f m. (MonadPlus m, DynCase f l) => RewriteM m f l'
+isSortR = guardedT (guardBoolT (isSortT @l)) idR failR
 
 --------------------------------------------------------------------------------
 -- Translations
@@ -386,9 +387,9 @@ type GTranslateM m f t = forall l. TranslateM m f l t
 (+>>) :: (Monad m) => TranslateM m f l t -> TranslateM m f l u -> TranslateM m f l u
 (+>>) f g t = f t *> g t
 
--- | @isSortT (Proxy :: Proxy l)@ is the translate that succeeds for terms of sort @l@, and fails elsewhere
-isSortT :: (DynCase f l, Applicative m) => Proxy l -> TranslateM m f l' Bool
-isSortT p = pure . isSort p
+-- | @isSortT \@l@ is the translate that succeeds for terms of sort @l@, and fails elsewhere
+isSortT :: forall l l' f m. (DynCase f l, Applicative m) => TranslateM m f l' Bool
+isSortT = pure . isSort @l
 
 -- | Takes a boolean function of a term, and converts `False` values to failure in the monad
 guardBoolT :: (MonadPlus m) => TranslateM m f l Bool -> TranslateM m f l ()

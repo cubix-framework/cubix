@@ -23,7 +23,6 @@ import           Control.Monad.Reader (MonadReader (..), ReaderT, runReaderT)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Proxy
 import           Data.Typeable
 import qualified Data.Set as Set
 import           Hedgehog
@@ -70,7 +69,7 @@ instance AssertCfgWellFormed MCSig PairF
 
 instance AssertCfgWellFormed MCSig ListF where
   assertCfgWellFormed t
-    | isSort (Proxy :: Proxy [BlockItemL]) (stripA (inject' t)) = do
+    | isSort @[BlockItemL] (stripA (inject' t)) = do
         case t of
           (remA -> ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
           (remA -> NilF)       -> assertCfgIsGeneric (inject' t) []

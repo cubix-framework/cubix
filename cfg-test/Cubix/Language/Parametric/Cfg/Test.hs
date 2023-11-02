@@ -21,7 +21,6 @@ import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Reader (MonadReader (..), ReaderT )
 import           Data.Foldable ( traverse_, foldlM )
 import qualified Data.Map as Map
-import           Data.Proxy
 import qualified Data.Set as Set
 import qualified Debug.Trace as DT
 import           Hedgehog
@@ -52,7 +51,7 @@ class AssertCfgWellFormed fs f where
     assertCfgNoCfgNode t0
 
 instance (All (AssertCfgWellFormed gs) fs) => AssertCfgWellFormed gs (Sum fs) where
-  assertCfgWellFormed = caseCxt' (Proxy @(AssertCfgWellFormed gs)) assertCfgWellFormed
+  assertCfgWellFormed = caseCxt' @(AssertCfgWellFormed gs) assertCfgWellFormed
 
 -- NOTE: Asserts that a CFG node is not created for this AST node.
 assertCfgNoCfgNode ::
@@ -93,7 +92,10 @@ assertCfgIsSuspended' t t1 t2 = do
   when ((ex ^.cfg_node_succs) /= Set.empty) $
     H.failWith Nothing (msg "Successor" t2 ex)
 
-    where msg ord t0 node =
+    where 
+      msg :: (All ShowHF fs, All HFunctor fs)
+          => String -> TermLab fs l -> CfgNode fs -> String
+      msg ord t0 node =
             "unexpected " ++ ord ++ " edges created for AST: " ++
             show t0 ++ "\n Outer AST is: " ++ show t ++
             "\n CFG nodes are: " ++ show node

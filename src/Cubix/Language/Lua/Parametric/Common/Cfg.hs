@@ -102,7 +102,7 @@ mergeLabelMap x = do
             Nothing -> pure (Map.insert k (a, vs) b0)
             Just (a0, vs0) -> case vs0 of
               [] -> do
-                forM_ vs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy MLuaSig) p a0
+                forM_ vs $ \p -> cur_cfg %= addEdgeLab @MLuaSig p a0
                 pure b0
               _  -> do
                 pure (Map.insertWith go2 k (a, vs) b0)

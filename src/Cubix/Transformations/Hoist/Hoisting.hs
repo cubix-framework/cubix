@@ -158,7 +158,7 @@ transformListHead f (ConsF' t ts) = f t >>= return . (foldr (ConsF' . injF) ts)
 transformListHead _ NilF' = mzero
 
 transformStatSorts :: forall fs m. (CanHoist fs, MonadHoist fs m) => RewriteM (MaybeT m) (Term fs) [(StatSort fs)]
-transformStatSorts = case variableInsertionVariation (Proxy :: Proxy fs) (Proxy :: Proxy NoConstraint) (Proxy :: Proxy NoConstraint) of
+transformStatSorts = case variableInsertionVariation (Proxy @fs) (Proxy @NoConstraint) (Proxy @NoConstraint) of
   MultiDecInsertionVariation  Dict -> transformListHead transformMulti
   SingleDecInsertionVariation Dict -> transformListHead transformSingle
 
@@ -179,7 +179,7 @@ transformOuterScope ::
   ( MonadHoist fs m
   , CanHoist fs
   ) => GRewriteM m (Term fs) -> GRewriteM (MaybeT m) (Term fs) -> GRewriteM m (Term fs)
-transformOuterScope f g = tryR $ guardedT (guardBoolT (isSortT (Proxy :: Proxy BlockL)))
+transformOuterScope f g = tryR $ guardedT (guardBoolT (isSortT @BlockL))
                                           (addFail $ alltdR f) (addFail $ (tillFailure g) >=> allR (transformOuterScope f g))
 
 hoistBlock :: forall fs. (CanHoist fs) => Rewrite (Term fs) BlockL
@@ -187,7 +187,7 @@ hoistBlock (Block' items end) = return $ Block' (insertF $ decls ++ extractF ite
   where
     hoist :: HoistMonad fs (Term fs [BlockItemL])
     hoist = transformOuterScope (promoteR addIdents) (updateState >+> (promoteRF transformBlockItems) >+> (promoteRF transformStatSorts)) items
-    startState = emptyHoistState & seenIdents .~ (builtinReferencedIdents (Proxy :: Proxy fs))
+    startState = emptyHoistState & seenIdents .~ (builtinReferencedIdents (Proxy @fs))
     (items', decls) = evalState (runWriterT hoist) startState
 
 hoistDeclarations :: (CanHoist fs) => GRewrite (Term fs)

@@ -23,7 +23,6 @@ import           Control.Monad.Reader (MonadReader (..), ReaderT, runReaderT)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Proxy
 import           Data.Typeable
 import qualified Data.Set as Set
 import           Hedgehog
@@ -61,8 +60,8 @@ makeJavascriptEnv t = do
 instance AssertCfgWellFormed MJSSig S.MaybeF
 instance AssertCfgWellFormed MJSSig S.ListF where
   assertCfgWellFormed t@(inject' -> stripA -> t0)
-    | isSort (Proxy :: Proxy [BlockItemL]) t0 ||
-      isSort (Proxy :: Proxy [JSStatementL]) t0 = do
+    | isSort @[BlockItemL] t0 ||
+      isSort @[JSStatementL] t0 = do
         case t of
           (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto (inject' t) [E v, E vs]
           (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []

@@ -224,18 +224,6 @@ import Cubix.Language.Parametric.Semantics.CfgInserter
 import Cubix.Language.Parametric.Semantics.SemanticProperties
 
 ---------------------------------------------------
------ For references
----------------------------------------------------
-
-import Control.Monad ( (>=>) )
-
----------------------------------------------------
------ For re-exports
----------------------------------------------------
-
-import Data.Proxy ( Proxy )
-
----------------------------------------------------
 ----- Longer docs
 ---------------------------------------------------
 
@@ -456,8 +444,8 @@ project :: (g O.:<: f) => O.Cxt h f a l -> Maybe (g (O.Cxt h f a) l)
 project = O.project
 
 -- | For full documentaton, see original declaration: `Data.Comp.Multi.Ops.caseCxt`
-caseCxt :: (O.All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a e -> b) -> O.Sum fs a e -> b
-caseCxt = O.caseCxt
+caseCxt :: forall cxt fs a e b. (O.All cxt fs) => (forall f. (cxt f) => f a e -> b) -> O.Sum fs a e -> b
+caseCxt = O.caseCxt @cxt
 
 inject :: (g O.:-<: fs) => g (Term fs) l -> Term fs l
 inject = O.inject

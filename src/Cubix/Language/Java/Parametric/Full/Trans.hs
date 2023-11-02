@@ -16,7 +16,6 @@ module Cubix.Language.Java.Parametric.Full.Trans (
   , untranslate
   ) where
 
-import Data.Proxy
 import Data.Typeable ( Typeable )
 
 import qualified Language.Java.Syntax as J
@@ -67,5 +66,5 @@ instance Untrans PairF where
   untrans (PairF x y) = T (t x, t y)
 
 instance (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 #endif

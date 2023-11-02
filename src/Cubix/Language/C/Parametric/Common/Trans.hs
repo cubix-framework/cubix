@@ -16,7 +16,6 @@ module Cubix.Language.C.Parametric.Common.Trans (
 import Control.Monad.Identity ( Identity(..) )
 
 import Data.Monoid ( Any(..) )
-import Data.Proxy
 import Data.List( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
@@ -41,7 +40,7 @@ class Trans f where
   trans :: f F.CTerm l -> MCTerm l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt (Proxy @Trans) trans
+  trans = caseCxt @Trans trans
 
 transDefault :: (HFunctor f, f :-<: MCSig, f :-<: F.CSig) => f F.CTerm l -> MCTerm l
 transDefault = inject . hfmap translate
@@ -168,7 +167,7 @@ class Untrans f where
   untrans :: f MCTerm l -> F.CTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MCSig) => f MCTerm l -> F.CTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MCTerm _))

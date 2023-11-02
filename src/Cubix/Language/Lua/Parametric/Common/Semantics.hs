@@ -6,7 +6,6 @@
 module Cubix.Language.Lua.Parametric.Common.Semantics () where
 
 import Data.Type.Equality ( (:~:)(..), gcastWith )
-import Data.Proxy ( Proxy(..) )
 
 import Data.Comp.Multi ( (:-<:), project, inject')
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
@@ -32,5 +31,5 @@ instance {-# OVERLAPPING #-} InsertAt' MLuaSig BlockItemL ListF where
                                      Just p  -> gcastWith p $ inject' <$> annM (ConsF e (inject' t))
   insertAt' _              _ t = return $ inject' t
 
-  canInsertAt' EnterEvalPoint _ = kIsSort (Proxy :: Proxy [BlockItemL])
+  canInsertAt' EnterEvalPoint _ = kIsSort @[BlockItemL]
   canInsertAt' _              _ = const False

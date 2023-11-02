@@ -16,7 +16,6 @@ module Cubix.Language.C.Parametric.Full.Trans (
   , untranslate
   ) where
 
-import Data.Proxy
 import Data.Typeable ( Typeable )
 
 import qualified Language.C as C
@@ -114,7 +113,7 @@ instance Untrans UnitF where
   untrans UnitF = T ()
 
 instance (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 
 type instance Targ IntL = Int
 type instance Targ BoolL = Bool

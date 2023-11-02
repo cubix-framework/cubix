@@ -211,7 +211,7 @@ isUnreachableAndEmpty cfg t = isEmpty t && isUnreachable t
 -- Quick-and-dirty for rebuttal. Need to check for unreachable nodes, so we trace back the graph and look for an entry point.
 -- We don't currently have a notion of entry point, but we know that exit nodes are not entry points
 unreachableTest :: forall fs l. (CanInstrument fs) => Cfg fs -> TermLab fs l -> Bool
-unreachableTest cfg t = if not (trustReachability (Proxy :: Proxy fs)) then
+unreachableTest cfg t = if not (trustReachability (Proxy @fs)) then
                           False
                         else
                           case cfgNodeForTerm cfg EnterNode t of
@@ -240,7 +240,7 @@ instrumentTestCoverage t = do
     let progInfo = makeProgInfo t
 
     let labelsNeeded = (^. bb_counter) $ execState (trans progInfo t) (TestCovState 0 gen)
-    let counterStart = (-labelsNeeded) - 1 + (blockCounterStart (Proxy :: Proxy fs))
+    let counterStart = (-labelsNeeded) - 1 + (blockCounterStart (Proxy @fs))
     return $ evalState (trans progInfo t) (TestCovState counterStart gen)
   where
     trans progInfo = performCfgInsertions @(StatSort fs) progInfo $ (revAllbuR $ addCoverageStatement (progInfo ^. proginf_cfg))

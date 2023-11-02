@@ -45,15 +45,15 @@ instance {-# OVERLAPPING #-} InsertAt' MJSSig JSStatementL ListF where
                              gcastWith p $ liftM inject' $ annM =<< (ConsF <$> (inject' <$> (annM $ JSStatementIsBlockItem e)) <*> return (inject' t))
   insertAt' _ _ t = return $ inject' t
 
-  canInsertAt' EnterEvalPoint _ t =     kIsSort (Proxy :: Proxy [JSStatementL]) t
-                                     || kIsSort (Proxy :: Proxy [BlockItemL]) t
+  canInsertAt' EnterEvalPoint _ t =     kIsSort @[JSStatementL] t
+                                     || kIsSort @[BlockItemL]   t
   canInsertAt' _              _ _ = False
 
 -- And here's inserting a block item into a list of statements/block items
 instance {-# OVERLAPPING #-} InsertAt' MJSSig BlockItemL ListF where
   insertAt' p (project' -> Just (JSStatementIsBlockItem s)) t = insertAt' p s t
 
-  canInsertAt' p  _ t = canInsertAt' p (Proxy :: Proxy JSStatementL) t
+  canInsertAt' p  _ t = canInsertAt' p (Proxy @JSStatementL) t
 
 
 instance {-# OVERLAPPING #-} InsertAt' MJSSig JSStatementL JSStatement where
@@ -72,6 +72,6 @@ instance {-# OVERLAPPING #-} InsertAt' MJSSig JSStatementL JSStatement where
 instance {-# OVERLAPPING #-} InsertAt' MJSSig BlockItemL JSStatement where
   insertAt' p (project' -> Just (JSStatementIsBlockItem s)) t = insertAt' p s t
 
-  canInsertAt' p  _ t = canInsertAt' p (Proxy :: Proxy JSStatementL) t
+  canInsertAt' p  _ t = canInsertAt' p (Proxy @JSStatementL) t
 
 #endif

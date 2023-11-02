@@ -60,13 +60,13 @@ class IsComputationSort fs where
   isComputationSort :: Term fs i -> Bool
 
 instance (IsComputationSort' fs (ComputationSorts fs)) => IsComputationSort fs where
-  isComputationSort = isComputationSort' (Proxy :: Proxy (ComputationSorts fs))
+  isComputationSort = isComputationSort' (Proxy @(ComputationSorts fs))
 
 instance IsComputationSort' fs '[] where
   isComputationSort' _ = const False
 
 instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' fs (l ': ls) where
-  isComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isComputationSort' (Proxy :: Proxy ls) t)
+  isComputationSort' _ t = (isSort @l t) || (isComputationSort' (Proxy @ls) t)
 
 labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
@@ -80,13 +80,13 @@ class IsSuspendedComputationSort fs where
   isSuspendedComputationSort :: Term fs i -> Bool
 
 instance (IsSuspendedComputationSort' fs (SuspendedComputationSorts fs)) => IsSuspendedComputationSort fs where
-  isSuspendedComputationSort = isSuspendedComputationSort' (Proxy :: Proxy (SuspendedComputationSorts fs))
+  isSuspendedComputationSort = isSuspendedComputationSort' (Proxy @(SuspendedComputationSorts fs))
 
 instance IsSuspendedComputationSort' fs '[] where
   isSuspendedComputationSort' _ = const False
 
 instance (IsSuspendedComputationSort' fs ls, DynCase (Term fs) l) => IsSuspendedComputationSort' fs (l ': ls) where
-  isSuspendedComputationSort' _ t = (isSort (Proxy :: Proxy l) t) || (isSuspendedComputationSort' (Proxy :: Proxy ls) t)
+  isSuspendedComputationSort' _ t = (isSort @l t) || (isSuspendedComputationSort' (Proxy @ls) t)
 
 labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
@@ -100,7 +100,7 @@ class IsContainer fs where
   isContainer :: Term fs i -> Bool
 
 instance (IsContainer' fs (ContainerFunctors fs)) => IsContainer fs where
-  isContainer = isContainer' (Proxy :: Proxy (ContainerFunctors fs))
+  isContainer = isContainer' (Proxy @(ContainerFunctors fs))
 
 instance IsContainer' fs '[] where
   isContainer' _ = const False
@@ -108,7 +108,7 @@ instance IsContainer' fs '[] where
 instance (IsContainer' fs ls, l :-<: fs) => IsContainer' fs (l ': ls) where
   isContainer' _ t = case go t of
                        Just _  -> True
-                       Nothing -> isContainer' (Proxy :: Proxy ls) t
+                       Nothing -> isContainer' (Proxy @ls) t
 
     where go :: forall lab. Term fs lab -> Maybe (l (Term fs) lab)
           go = project
@@ -287,7 +287,7 @@ instance {-# OVERLAPPABLE #-}
   constructCfg = constructCfgDefault
 
 instance {-# OVERLAPPING #-} (All (ConstructCfg g s) fs) => ConstructCfg g s (Sum fs) where
-  constructCfg = caseCxt' (Proxy @(ConstructCfg g s)) constructCfg
+  constructCfg = caseCxt' @(ConstructCfg g s) constructCfg
 
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -304,4 +304,4 @@ instance (CfgComponent fs (CfgState fs), ConstructCfg fs (CfgState fs) (Sum fs),
 makeCfg :: forall fs l. (CfgBuilder fs) => TermLab fs l -> Cfg fs
 makeCfg t = (execState (unHState $ para constructCfg t) initState) ^. cur_cfg
   where
-    initState = cfgInitState (Proxy :: Proxy fs)
+    initState = cfgInitState (Proxy @fs)

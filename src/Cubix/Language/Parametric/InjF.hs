@@ -119,7 +119,7 @@ instance ( All HTraversable fs
   --       ignored.
   ainjF' _ x = case dcase x of
       Just p  -> gcastWith p spec x
-      Nothing -> ainjF' (Proxy :: Proxy is) x
+      Nothing -> ainjF' (Proxy @is) x
     where
       dcase :: forall li. (KDynCase (Sum fs) i) => TermLab fs li -> Maybe (li :~: i)
       dcase a = dyncase a :: Maybe (li :~: i)
@@ -129,7 +129,7 @@ instance ( All HTraversable fs
         Nothing -> Nothing
 
 instance {-# OVERLAPPABLE #-} (AInjF' fs l (InjectableSorts fs l)) => AInjF fs l where
-  ainjF = ainjF' (Proxy :: Proxy (InjectableSorts fs l))
+  ainjF = ainjF' (Proxy @(InjectableSorts fs l))
 
 
 promoteInjRF :: (AInjF fs l, MonadPlus m, MonadAnnotater Label m) => RewriteM m (TermLab fs) l -> GRewriteM m (TermLab fs)

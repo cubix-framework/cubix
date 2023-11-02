@@ -101,7 +101,7 @@ dominatingInsert isPrepend op filt t toInsert empOk = do
           pendingInsertions %= Map.insert lab insertions'
   where
     canInsert :: CfgNode fs -> Bool
-    canInsert n =  (runE (canInsertAt (nodeTypeToEvalPoint (n ^. cfg_node_type)) (Proxy :: Proxy l)) (n ^. cfg_node_term))
+    canInsert n =  (runE (canInsertAt (nodeTypeToEvalPoint (n ^. cfg_node_type)) (Proxy @l)) (n ^. cfg_node_term))
 
 
 append :: a -> [a] -> [a]

@@ -340,7 +340,7 @@ constructCfgLabel t name = do
 
     Just (l, prevs) -> do
       n <- addCfgNodeWithLabel t l EnterNode
-      for prevs $ \p -> cur_cfg %= addEdgeLab (Proxy :: Proxy gs) p l
+      for prevs $ \p -> cur_cfg %= addEdgeLab @gs p l
       label_map . at name %= fmap (_2 .~ [])
       return n
 

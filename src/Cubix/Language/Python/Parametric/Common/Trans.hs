@@ -15,7 +15,6 @@ module Cubix.Language.Python.Parametric.Common.Trans
   ) where
 
 import Data.List( (\\) )
-import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Data.Comp.Multi ( project, inject, unTerm, caseCxt, HFunctor(..), All, Sum, (:-<:) )
@@ -38,7 +37,7 @@ class Trans f where
   trans :: f F.PythonTerm l -> MPythonTerm l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt (Proxy @Trans) trans
+  trans = caseCxt @Trans trans
 
 transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
 transDefault = inject . hfmap translate
@@ -186,7 +185,7 @@ class Untrans f where
   untrans :: f MPythonTerm l -> F.PythonTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))

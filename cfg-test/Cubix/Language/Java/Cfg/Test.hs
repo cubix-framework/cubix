@@ -68,7 +68,7 @@ instance AssertCfgWellFormed MJavaSig BlockStmt where
 
 instance AssertCfgWellFormed MJavaSig ListF where
   assertCfgWellFormed t@(inject' -> stripA -> t0)
-    | isSort (Proxy :: Proxy [BlockItemL]) t0 =
+    | isSort @[BlockItemL] t0 =
         case t of
           (remA -> S.ConsF v vs) -> assertCfgIsGenericAuto' (inject' t) isSuspended [E v, E vs]
           (remA -> S.NilF)       -> assertCfgIsGeneric (inject' t) []
@@ -809,8 +809,8 @@ assertCfgLambda t body = do
 --       FunctionDef and ConstructorBody
 isSuspended :: TermLab MJavaSig a -> Bool
 isSuspended (stripA -> t0)
-  | isSort (Proxy :: Proxy FunctionDefL) t0 = True
-  | isSort (Proxy :: Proxy ConstructorBodyL) t0 = True
-  | isSort (Proxy :: Proxy LambdaExpressionL) t0 = True
-  | isSort (Proxy :: Proxy CatchL) t0 = True
+  | isSort @FunctionDefL t0 = True
+  | isSort @ConstructorBodyL t0 = True
+  | isSort @LambdaExpressionL t0 = True
+  | isSort @CatchL t0 = True
   | otherwise = False

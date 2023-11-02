@@ -9,6 +9,7 @@
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE UndecidableInstances   #-}
@@ -65,7 +66,7 @@ instance (KnownNat (Position f fs)) => Mem f fs
 --   then `witness` creates an `Elem f fs` witnessing that inclusion.
 witness :: forall f fs. (Mem f fs) => Elem f fs
 witness = Elem# pos
-  where pos = fromInteger (natVal (Proxy :: Proxy (Position f fs)))
+  where pos = fromInteger (natVal (Proxy @(Position f fs)))
 {-# INLINE witness #-}
 
 {-# INLINE elemEq #-}

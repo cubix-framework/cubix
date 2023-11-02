@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-} -- For isNode
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -54,8 +55,6 @@ module Data.Comp.Multi.Sum
      NotSum,
      isNode
     ) where
-
-import Data.Proxy ( Proxy )
 
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.HFunctor
@@ -128,7 +127,8 @@ type family IsSum (f :: Node) :: Bool where
 type NotSum f = (IsSum f ~ False)
 
 
-isNode :: forall f g h a l. (f :<: g) => Proxy f -> Cxt h g a l -> Bool
-isNode _ t = case project t :: Maybe (f (Cxt h g a) l) of
-               Just _  -> True
-               Nothing -> False
+-- | Call like @isNode \@f x@
+isNode :: forall f g h a l. (f :<: g) => Cxt h g a l -> Bool
+isNode t = case project t :: Maybe (f (Cxt h g a) l) of
+             Just _  -> True
+             Nothing -> False

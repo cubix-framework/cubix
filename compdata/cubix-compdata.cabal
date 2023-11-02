@@ -72,7 +72,8 @@ library
 Test-Suite test
   Type:                 exitcode-stdio-1.0
   Main-is:                      Data_Test.hs
+  Extensions:           FlexibleContexts
   hs-source-dirs:               testsuite/tests examples src
   Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
                         HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
-                        th-expand-syns, deepseq, transformers
+                        th-expand-syns, deepseq, transformers, vector, ghc-prim

@@ -5,6 +5,7 @@
 
 module Data.Comp.Subsume_Test where
 
+import Data.Comp.Multi.Ops ( Elem )
 import Data.Comp.Ops
 import Data.Comp.SubsumeCommon
 
