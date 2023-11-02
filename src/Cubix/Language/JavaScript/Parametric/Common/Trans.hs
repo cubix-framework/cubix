@@ -15,7 +15,6 @@ module Cubix.Language.JavaScript.Parametric.Common.Trans
   ) where
 
 import Data.List ( (\\) )
-import Data.Proxy
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Control.Lens ( (&), (%~), _1 )
@@ -62,7 +61,7 @@ class Trans f where
   trans :: f F.JSTerm l -> MJSTerm l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt (Proxy @Trans) trans
+  trans = caseCxt @Trans trans
 
 transDefault :: (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => f F.JSTerm l -> MJSTerm l
 transDefault = inject . hfmap translate
@@ -168,7 +167,7 @@ class Untrans f where
   untrans :: f MJSTerm l -> F.JSTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MJSSig) => f MJSTerm l -> F.JSTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJSTerm _))

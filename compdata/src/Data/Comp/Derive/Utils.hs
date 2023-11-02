@@ -240,7 +240,7 @@ liftSumGen caseName sumName allName fname = do
       reportError $ "Class " ++ show name ++ " cannot be lifted to sums!"
       return []
     False -> do
-      allCxt <- conT allName `appT` clsType `appT` varT fs
+      allCxt <- conT allName `appT` clsTypeM `appT` varT fs
       let cxt = [ allCxt ]
       let tp = ConT sumName `AppT` VarT fs
       let complType = foldl AppT (ConT name) ts `AppT` tp
@@ -251,11 +251,10 @@ liftSumGen caseName sumName allName fname = do
               decl _ = []
               clause :: Name -> ClauseQ
               clause f = do x <- newName "x"
-                            pclsName <- pclsNameM
-                            let b = NormalB (VarE caseName `AppE` pclsName `AppE` VarE f `AppE` VarE x)
+                            clsType <- clsTypeM
+                            let b = NormalB (VarE caseName `AppTypeE` clsType `AppE` VarE f `AppE` VarE x)
                             return $ Clause [VarP x] b []
-              pclsNameM = [e| Proxy :: Proxy $clsType |]
-              clsType = foldl (\acc a -> acc `appT` pure a) (conT name) ts
+              clsTypeM = foldl (\acc a -> acc `appT` pure a) (conT name) ts
 
 
 findSig :: [Name] -> [Dec] -> Q (Maybe ([Name],[Name]))

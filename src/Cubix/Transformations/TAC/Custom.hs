@@ -157,7 +157,7 @@ instance {-# OVERLAPPABLE #-} ShouldHoistSelf' gs f where
   shouldHoistSelf' = const Nothing
 
 instance {-# OVERLAPPING #-} (All (ShouldHoistSelf' gs) fs) => ShouldHoistSelf' gs (Sum fs) where
-  shouldHoistSelf' = caseCxt (Proxy @(ShouldHoistSelf' gs)) shouldHoistSelf'
+  shouldHoistSelf' = caseCxt @(ShouldHoistSelf' gs) shouldHoistSelf'
 
 #ifndef ONLY_ONE_LANGUAGE
 instance {-# OVERLAPPING #-} ShouldHoistSelf' MJSSig JSExpression where
@@ -208,7 +208,7 @@ instance {-# OVERLAPPABLE #-} (HFoldable f) => ShouldHoistChild' gs f where
   shouldHoistChild' = defaultShouldHoistChild
 
 instance {-# OVERLAPPING #-} (All (ShouldHoistChild' gs) fs) => ShouldHoistChild' gs (Sum fs) where
-  shouldHoistChild' h = caseCxt (Proxy @(ShouldHoistChild' gs)) (shouldHoistChild' h)
+  shouldHoistChild' h = caseCxt @(ShouldHoistChild' gs) (shouldHoistChild' h)
 
 class ShouldHoistChild fs where
   shouldHoistChild :: ShouldHoist -> Term fs l -> [ShouldHoist]

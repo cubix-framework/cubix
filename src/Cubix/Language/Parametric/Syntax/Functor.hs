@@ -67,7 +67,6 @@ import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFol
 import Data.Comp.Multi.Strategy.Classification
 
 import Data.Typeable ( Typeable, eqT )
-import Data.Proxy
 
 import Cubix.Language.Parametric.InjF
 
@@ -372,10 +371,10 @@ instance {-# OVERLAPPABLE #-} KExtractF' f g => KExtractF f g where
   kextractF = kextractF'
 
 instance {-# OVERLAPPING #-} (All (KExtractF f) gs) => KExtractF f (Sum gs) where
-  kextractF = caseCxt (Proxy @(KExtractF f)) kextractF
+  kextractF = caseCxt @(KExtractF f) kextractF
 
 instance {-# OVERLAPPING #-} (All (KExtractF' f) gs) => KExtractF' f (Sum gs) where
-  kextractF' = caseCxt (Proxy @(KExtractF' f)) kextractF'
+  kextractF' = caseCxt @(KExtractF' f) kextractF'
 
 instance {-# OVERLAPPING #-}  (KExtractF f g) => KExtractF f (g :&: a) where
   kextractF = kextractF . remA
@@ -418,10 +417,10 @@ instance {-# OVERLAPPABLE #-} KExtractF2' f g => KExtractF2 f g where
   kextractF2 = kextractF2'
 
 instance {-# OVERLAPPING #-} (All (KExtractF2 f) gs) => KExtractF2 f (Sum gs) where
-  kextractF2 = caseCxt (Proxy @(KExtractF2 f)) kextractF2
+  kextractF2 = caseCxt @(KExtractF2 f) kextractF2
 
 instance {-# OVERLAPPING #-} (All (KExtractF2' f) gs) => KExtractF2' f (Sum gs) where
-  kextractF2' = caseCxt (Proxy @(KExtractF2' f)) kextractF2'
+  kextractF2' = caseCxt @(KExtractF2' f) kextractF2'
 
 instance {-# OVERLAPPING #-} (KExtractF2 f g) => KExtractF2 f (g :&: a) where
   kextractF2 = kextractF2 . remA
@@ -459,10 +458,10 @@ instance {-# OVERLAPPABLE #-} KExtractF3' f g => KExtractF3 f g where
   kextractF3 = kextractF3'
 
 instance {-# OVERLAPPING #-} (All (KExtractF3 f) gs) => KExtractF3 f (Sum gs) where
-  kextractF3 = caseCxt (Proxy @(KExtractF3 f)) kextractF3
+  kextractF3 = caseCxt @(KExtractF3 f) kextractF3
 
 instance {-# OVERLAPPING #-} (All (KExtractF3' f) gs) => KExtractF3' f (Sum gs) where
-  kextractF3' = caseCxt (Proxy @(KExtractF3' f)) kextractF3'
+  kextractF3' = caseCxt @(KExtractF3' f) kextractF3'
 
 instance {-# OVERLAPPING #-} (KExtractF3 f g) => KExtractF3 f (g :&: a) where
   kextractF3 = kextractF3 . remA

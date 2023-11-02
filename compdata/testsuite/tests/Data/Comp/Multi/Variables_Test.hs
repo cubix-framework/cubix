@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeSynonymInstances, FlexibleInstances,
+{-# LANGUAGE DataKinds, TemplateHaskell, TypeSynonymInstances, FlexibleInstances,
 MultiParamTypeClasses, TypeOperators, FlexibleContexts , RankNTypes,
 GADTs, ScopedTypeVariables, EmptyDataDecls, ConstraintKinds #-}
 
@@ -31,7 +31,7 @@ data Var = X | Y | Z deriving (Eq,Ord,Show)
 data Ex
 
 type Value f = forall i . Term f i
-type Expression f = Term f Ex
+type Expression fs = Term fs Ex
 
 data Val e i where 
     Abs :: Var -> e Ex -> Val e i
@@ -50,11 +50,11 @@ data Let e i  where
 data LetRec e i  where 
              LetRec :: Var -> e Ex -> e Ex -> LetRec e Ex
 
-type Sig = Op :+: Val
+type Sig = '[Op, Val]
 
-type SigLet = Let :+: Sig
+type SigLet = '[Let, Op, Val]
 
-type SigRec = LetRec :+: Sig
+type SigRec = '[LetRec, Op, Val]
 
 $(derive [makeHFunctor, makeHTraversable, makeHFoldable,
           makeEqHF, makeShowHF, smartConstructors]

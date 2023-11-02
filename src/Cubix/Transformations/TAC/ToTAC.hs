@@ -182,9 +182,9 @@ tacDeclsVariation :: forall fs. (CanTransTAC fs) => Proxy fs
                                                            ExtraSingleVarDeclConstraints
                                                            ExtraAssignConstraints
 tacDeclsVariation p = explicitDeclsVariation p
-                                             (Proxy :: Proxy ExtraMultiVarDeclConstraints)
-                                             (Proxy :: Proxy ExtraSingleVarDeclConstraints)
-                                             (Proxy :: Proxy ExtraAssignConstraints)
+                                             (Proxy @ExtraMultiVarDeclConstraints)
+                                             (Proxy @ExtraSingleVarDeclConstraints)
+                                             (Proxy @ExtraAssignConstraints)
 
 -- | This is here because Lua functions can only have 200 local variables,
 --   and this transformation generates more
@@ -311,7 +311,7 @@ makeVarDec :: forall fs m.
   ( CanTransTAC fs
   , MonadTAC fs m
   ) => TermLab fs IdentL -> Maybe (TermLab fs (ExpressionSort fs)) -> m (Maybe (TermLab fs BlockItemL))
-makeVarDec ident x = case tacDeclsVariation (Proxy :: Proxy fs) of
+makeVarDec ident x = case tacDeclsVariation (Proxy @fs) of
   HasExplicitDeclsVariation (MultiDecInsertionVariation  Dict) -> Just <$> (labeledInjF =<< makeVarDecMulti  ident x)
   HasExplicitDeclsVariation (SingleDecInsertionVariation Dict) -> Just <$> (labeledInjF =<< makeVarDecSingle ident x)
   NoExplicitDeclsVariation  Dict                               -> mapM labeledInjF =<< makeAssignment ident x

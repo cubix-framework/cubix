@@ -12,7 +12,6 @@ module Cubix.Language.JavaScript.Parametric.Full.Trans (
   , untranslate
   ) where
 
-import Data.Proxy
 import Data.Typeable ( Typeable )
 
 import qualified Language.Haskell.TH as TH
@@ -73,5 +72,5 @@ instance Untrans MaybeF where
   untrans (JustF x) = T (Just (t x))
 
 instance (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 #endif

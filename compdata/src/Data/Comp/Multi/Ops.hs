@@ -66,7 +66,6 @@ module Data.Comp.Multi.Ops
 
 import Control.Monad
 import Data.Type.Equality
-import Data.Proxy
 import Data.Functor.Identity
 import Data.Comp.Multi.Alt
 import Data.Comp.Multi.HFoldable
@@ -89,7 +88,7 @@ import Data.Comp.Dict
 --
 --   except that this definition uses value-level integers (in the `Elem` datatype) in place
 --   of type-level naturals. It hence uses `unsafeCoerce` under the hood, but is type-safe if used
---   through the public API. The result is that values of this type take constant memory with respect to the number
+--   Tthrough the public API. The result is that values of this type take constant memory with respect to the number
 --   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
 --   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
 --   and pointer to the value.
@@ -109,35 +108,35 @@ caseH :: Alts fs a e b -> Sum fs a e -> b
 caseH alts (Sum wit v) = extractAt wit alts v
 
 {-# INLINE caseCxt #-}
-caseCxt :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a e -> b) -> Sum fs a e -> b
-caseCxt _ f (Sum wit v) = f v \\ dictFor @cxt wit
+caseCxt :: forall cxt fs a e b. (All cxt fs) => (forall f. (cxt f) => f a e -> b) -> Sum fs a e -> b
+caseCxt f (Sum wit v) = f v \\ dictFor @cxt wit
 
 {-# INLINE caseSumF #-}
-caseSumF :: forall cxt f fs a e b. (All cxt fs, Functor f) => Proxy cxt -> (forall g. (cxt g) => g a e -> f (g b e)) -> Sum fs a e -> f (Sum fs b e)
-caseSumF _ f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
+caseSumF :: forall cxt f fs a e b. (All cxt fs, Functor f) => (forall g. (cxt g) => g a e -> f (g b e)) -> Sum fs a e -> f (Sum fs b e)
+caseSumF f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
 
 {-# INLINE caseSum #-}
-caseSum :: forall cxt fs a e b. (All cxt fs) => Proxy cxt -> (forall g. (cxt g) => g a e -> g b e) -> Sum fs a e -> Sum fs b e
-caseSum p f = runIdentity . caseSumF p (Identity . f) 
+caseSum :: forall cxt fs a e b. (All cxt fs) => (forall g. (cxt g) => g a e -> g b e) -> Sum fs a e -> Sum fs b e
+caseSum f = runIdentity . caseSumF @cxt (Identity . f) 
 
 instance (All HFunctor fs) => HFunctor (Sum fs) where
-    hfmap f = caseSum (Proxy @HFunctor) (hfmap f)
+    hfmap f = caseSum @HFunctor (hfmap f)
       
 instance ( All HFoldable fs
          , All HFunctor fs
          ) => HFoldable (Sum fs) where
-    hfold      = caseCxt (Proxy @HFoldable) hfold
-    hfoldMap f = caseCxt (Proxy @HFoldable) (hfoldMap f)
-    hfoldr f b = caseCxt (Proxy @HFoldable) (hfoldr f b)
-    hfoldl f b = caseCxt (Proxy @HFoldable) (hfoldl f b)
-    hfoldr1 f  = caseCxt (Proxy @HFoldable) (hfoldr1 f)
+    hfold      = caseCxt @HFoldable hfold
+    hfoldMap f = caseCxt @HFoldable (hfoldMap f)
+    hfoldr f b = caseCxt @HFoldable (hfoldr f b)
+    hfoldl f b = caseCxt @HFoldable (hfoldl f b)
+    hfoldr1 f  = caseCxt @HFoldable (hfoldr1 f)
 
 instance ( All HTraversable fs
          , All HFoldable fs
          , All HFunctor fs
          ) => HTraversable (Sum fs) where
-    htraverse f = caseSumF (Proxy @HTraversable) (htraverse f)
-    hmapM f     = caseSumF (Proxy @HTraversable) (hmapM f)
+    htraverse f = caseSumF @HTraversable (htraverse f)
+    hmapM f     = caseSumF @HTraversable (hmapM f)
 
 -- The subsumption relation.
 

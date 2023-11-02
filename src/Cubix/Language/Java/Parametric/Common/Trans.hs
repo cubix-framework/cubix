@@ -16,7 +16,6 @@ module Cubix.Language.Java.Parametric.Common.Trans (
 
 import Data.List( (\\) )
 import Data.Maybe ( fromJust )
-import Data.Proxy
 import Data.Typeable ( Typeable )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
@@ -56,7 +55,7 @@ class Trans f where
   trans :: f F.JavaTerm l -> MJavaTerm l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt (Proxy @Trans) trans
+  trans = caseCxt @Trans trans
 
 transDefault :: (HFunctor f, f :-<: MJavaSig, f :-<: F.JavaSig) => f F.JavaTerm l -> MJavaTerm l
 transDefault = inject . hfmap translate
@@ -187,7 +186,7 @@ class Untrans f where
   untrans :: f MJavaTerm l -> F.JavaTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
   
 untransError :: (HFunctor f, f :-<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJavaTerm _))

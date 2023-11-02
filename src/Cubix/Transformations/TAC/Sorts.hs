@@ -59,15 +59,15 @@ class BarrierCheck fs where
   barrierCheck :: (MonadPlus m) => GRewriteM m (TermLab fs)
 
 instance (BarrierCheck' fs (BarrierSorts fs)) => BarrierCheck fs where
-  barrierCheck = barrierCheck' (Proxy :: Proxy (BarrierSorts fs))
+  barrierCheck = barrierCheck' (Proxy @(BarrierSorts fs))
 
 instance BarrierCheck' fs '[] where
   barrierCheck' _ = failR
 
 instance (BarrierCheck' fs ls, DynCase (TermLab fs) l) => BarrierCheck' fs (l ': ls) where
-  barrierCheck' _ = guardedT (guardBoolT $ isSortT (Proxy :: Proxy l)) idR (barrierCheck' (Proxy :: Proxy ls))
+  barrierCheck' _ = guardedT (guardBoolT $ isSortT @l) idR (barrierCheck' (Proxy @ls))
 
 --------------------------------------------------------------------------------------
 
 isExpression :: forall m fs. (MonadPlus m, DynCase (TermLab fs) (ExpressionSort fs)) => GRewriteM m (TermLab fs)
-isExpression = isSortR (Proxy :: Proxy (ExpressionSort fs))
+isExpression = isSortR @(ExpressionSort fs)

@@ -31,7 +31,7 @@ class Trans f where
   trans :: f F.LuaTerm l -> MLuaTerm l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt (Proxy @Trans) trans
+  trans = caseCxt @Trans trans
 
 transDefault :: (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
 transDefault = inject . hfmap translate
@@ -112,7 +112,7 @@ class Untrans f where
   untrans :: f MLuaTerm l -> F.LuaTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
   
 untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))

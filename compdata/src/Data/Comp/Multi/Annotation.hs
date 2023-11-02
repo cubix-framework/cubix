@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-} -- For isNode'
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -103,8 +104,8 @@ project' :: (RemA f f', s :<: f') => Cxt h f a i -> Maybe (s (Cxt h f a) i)
 project' (Term x) = proj $ remA x
 project' _ = Nothing
 
-isNode' :: (HFunctor g, RemA g g', f :<: g') => Proxy f -> Cxt h g a l -> Bool
-isNode' p t = isNode p $ stripA t
+isNode' :: forall f g g' h a l. (HFunctor g, RemA g g', f :<: g') => Cxt h g a l -> Bool
+isNode' t = isNode @f $ stripA t
 
 inj' :: (f :<: g) => (f :&: p) e l -> (g :&: p) e l
 inj' (x :&: p) = (inj x) :&: p
@@ -118,8 +119,8 @@ injectOpt t = inject' (t :&: Nothing)
 caseH' :: forall fs a e l t. Alts (DistAnn fs a) e l t -> (Sum fs :&: a) e l -> t
 caseH' alts = caseH alts . distAnn
 
-caseCxt' :: forall cxt fs a e l t. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
-caseCxt' _ f (Sum wit v :&: a) =
+caseCxt' :: forall cxt fs a e l t. (All cxt fs) => (forall f. (cxt f) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt' f (Sum wit v :&: a) =
   f (v :&: a) \\ dictFor @cxt wit
 
 caseCxt'' :: forall cxt fs a e l t. (All cxt (DistAnn fs a)) => Proxy cxt -> (forall f. (cxt (f :&: a)) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t

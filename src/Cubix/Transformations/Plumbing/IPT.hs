@@ -16,7 +16,6 @@ import Data.List ( findIndex, intercalate, nub )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( fromMaybe, fromJust )
-import Data.Proxy ( Proxy(..) )
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
@@ -149,7 +148,7 @@ instance PromptParamAttrs MJavaSig where
 #endif
 
 --isReceiverArg :: (CanIPT fs) => Term fs l -> Bool
---isReceiverArg = isNode (Proxy :: Proxy ReceiverArg)
+--isReceiverArg = isNode @ReceiverArg
 
 data Relation = Relation String [Int]
   deriving ( Eq, Ord, Show )
@@ -265,7 +264,7 @@ getFnFromFunDef _                                                           = No
 
 -- Left off: This is failing
 getParentFn :: forall fs l. (CanIPT fs) => Path -> TermLab fs l -> Maybe String
-getParentFn path t = do (E x) <- searchParent (isNode' (Proxy :: Proxy FunctionDef)) t path
+getParentFn path t = do (E x) <- searchParent (isNode' @FunctionDef) t path
                         getFnFromFunDef x
 
 

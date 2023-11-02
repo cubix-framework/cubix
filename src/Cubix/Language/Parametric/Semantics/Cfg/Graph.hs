@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-} -- For addEdgeLab
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -183,8 +184,8 @@ addEdge from to cfg = cfg''
     cfg'  = cfg  & (cfg_nodes.(at fl).traverse.cfg_node_succs) %~ (Set.insert tl)
     cfg'' = cfg' & (cfg_nodes.(at tl).traverse.cfg_node_prevs) %~ (Set.insert fl)
 
-addEdgeLab :: forall fs. Proxy fs -> Label -> Label -> Cfg fs -> Cfg fs
-addEdgeLab _ l1 l2 cfg = fromMaybe cfg cfg'
+addEdgeLab :: forall fs. Label -> Label -> Cfg fs -> Cfg fs
+addEdgeLab l1 l2 cfg = fromMaybe cfg cfg'
   where
     cfg' :: Maybe (Cfg fs)
     cfg' = do

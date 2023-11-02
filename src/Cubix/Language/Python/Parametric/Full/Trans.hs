@@ -14,7 +14,7 @@ module Cubix.Language.Python.Parametric.Full.Trans (
     translate
   , untranslate
   ) where
-import Data.Proxy
+
 import Data.Typeable (Typeable )
 
 import Data.Comp.Multi ( caseCxt, Sum, All )
@@ -80,5 +80,5 @@ instance Untrans UnitF where
   untrans UnitF = T ()
 
 instance (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt (Proxy @Untrans) untrans
+  untrans = caseCxt @Untrans untrans
 #endif

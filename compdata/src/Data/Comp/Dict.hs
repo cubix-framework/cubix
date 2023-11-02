@@ -74,7 +74,7 @@ infixl 1 \\
 --   pretty :: f e l -> String
 --
 -- instance (All Pretty fs) => Pretty (Sum fs) where
---   pretty x = caseCxt (Proxy @Pretty) pretty x
+--   pretty x = caseCxt @Pretty pretty x
 -- @
 class All (c :: k -> Constraint) (fs :: [k]) where
   -- | Primitive which returns list of dictionaries for each @f@ in @fs@

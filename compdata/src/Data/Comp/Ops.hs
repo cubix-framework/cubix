@@ -38,7 +38,6 @@ module Data.Comp.Ops
 
 import Data.Foldable
 import Data.Traversable
-import Data.Proxy
 import Data.Functor.Identity
 
 import Control.Applicative
@@ -74,37 +73,37 @@ caseF :: Alts fs a b -> Sum fs a -> b
 caseF alts (Sum wit v) = extractAt wit alts v
 
 {-# INLINE caseCxt #-}
-caseCxt :: forall cxt fs a b. (All cxt fs) => Proxy cxt -> (forall f. (cxt f) => f a -> b) -> Sum fs a -> b
-caseCxt _ f (Sum wit v) = f v \\ dictFor @cxt wit
+caseCxt :: forall cxt fs a b. (All cxt fs) => (forall f. (cxt f) => f a -> b) -> Sum fs a -> b
+caseCxt f (Sum wit v) = f v \\ dictFor @cxt wit
 
 {-# INLINE caseSumF #-}
-caseSumF :: forall cxt f fs a b. (All cxt fs, Functor f) => Proxy cxt -> (forall g. (cxt g) => g a -> f (g b)) -> Sum fs a -> f (Sum fs b)
-caseSumF _ f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
+caseSumF :: forall cxt f fs a b. (All cxt fs, Functor f) => (forall g. (cxt g) => g a -> f (g b)) -> Sum fs a -> f (Sum fs b)
+caseSumF f (Sum wit v) = Sum wit <$> f v \\ dictFor @cxt wit
 
 {-# INLINE caseSum #-}
-caseSum :: forall cxt fs a b. (All cxt fs) => Proxy cxt -> (forall g. (cxt g) => g a -> g b) -> Sum fs a -> Sum fs b
-caseSum p f = runIdentity . caseSumF p (Identity . f)
+caseSum :: forall cxt fs a b. (All cxt fs) => (forall g. (cxt g) => g a -> g b) -> Sum fs a -> Sum fs b
+caseSum f = runIdentity . caseSumF @cxt (Identity . f)
 
 instance (All Functor fs) => Functor (Sum fs) where
-    fmap f = caseSum (Proxy @Functor) (fmap f)
+    fmap f = caseSum @Functor (fmap f)
 
 instance ( All Foldable fs
          ) => Foldable (Sum fs) where
-    fold      = caseCxt (Proxy @Foldable) fold
-    foldMap f = caseCxt (Proxy @Foldable) (foldMap f)
-    foldr f b = caseCxt (Proxy @Foldable) (foldr f b)
-    foldl f b = caseCxt (Proxy @Foldable) (foldl f b)
-    foldr1 f  = caseCxt (Proxy @Foldable) (foldr1 f)
-    foldl1 f  = caseCxt (Proxy @Foldable) (foldl1 f)
+    fold      = caseCxt @Foldable fold
+    foldMap f = caseCxt @Foldable (foldMap f)
+    foldr f b = caseCxt @Foldable (foldr f b)
+    foldl f b = caseCxt @Foldable (foldl f b)
+    foldr1 f  = caseCxt @Foldable (foldr1 f)
+    foldl1 f  = caseCxt @Foldable (foldl1 f)
 
 instance ( All Traversable fs
          , All Functor fs
          , All Foldable fs
          ) => Traversable (Sum fs) where
-    traverse f = caseSumF (Proxy @Traversable) (traverse f)
-    sequenceA  = caseSumF (Proxy @Traversable) sequenceA
-    mapM f     = caseSumF (Proxy @Traversable) (mapM f)
-    sequence   = caseSumF (Proxy @Traversable) sequence
+    traverse f = caseSumF @Traversable (traverse f)
+    sequenceA  = caseSumF @Traversable sequenceA
+    mapM f     = caseSumF @Traversable (mapM f)
+    sequence   = caseSumF @Traversable sequence
 
 infixl 5 :<:
 -- infixl 5 :=:

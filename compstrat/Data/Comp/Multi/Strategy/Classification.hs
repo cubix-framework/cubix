@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-} -- For isSort and kIsSort
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -71,7 +73,7 @@ class (KDynCase f l ) => KDynCaseFlip l f
 instance (KDynCase f l) => KDynCaseFlip l f
 
 instance {-# OVERLAPPING #-} (All (KDynCaseFlip l) fs) => KDynCase (Sum fs) l where
-  kdyncase = caseCxt (Proxy :: Proxy (KDynCaseFlip l)) kdyncase
+  kdyncase = caseCxt @(KDynCaseFlip l) kdyncase
 
 instance {-# OVERLAPPING #-} (KDynCase f l) => KDynCase (f :&: a) l where
   kdyncase = kdyncase . remA
@@ -112,14 +114,15 @@ caseDyn f t r = maybe r f (dynProj t)
 subterms :: (DynCase (HFix f) l, HFoldable f) => HFix f l' -> [HFix f l]
 subterms x = [ y | Just y <- map caseE $ subs x]
 
--- | @isSort (Proxy :: Proxy l)@ returns a boolean function that tests whether a term has sort @l@
-isSort :: forall e l. (DynCase e l) => Proxy l -> forall i. e i -> Bool
-isSort _ x = case (dyncase x :: Maybe (_ :~: l)) of
+-- | @isSort \@l@ returns a boolean function that tests whether a term has sort @l@
+isSort :: forall l e. (DynCase e l) => forall i. e i -> Bool
+isSort x = case (dyncase x :: Maybe (_ :~: l)) of
   Just _  -> True
   Nothing -> False
 
 -- | Like `isSort`, but runs on (unwrapped) nodes rather than terms.
-kIsSort :: forall f l. (KDynCase f l) => Proxy l -> forall i e. f e i -> Bool
-kIsSort _ x = case (kdyncase x :: Maybe (_ :~: l)) of
+kIsSort :: forall l f. (KDynCase f l) => forall i e. f e i -> Bool
+kIsSort x = case (kdyncase x :: Maybe (_ :~: l)) of
   Just _  -> True
   Nothing -> False
+

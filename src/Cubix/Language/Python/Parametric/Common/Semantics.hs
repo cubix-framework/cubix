@@ -59,7 +59,7 @@ instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL Statement where
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL Statement where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
-  canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
+  canInsertAt' p _ t = canInsertAt' p (Proxy @StatementL) t
 
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL PyWith where
@@ -83,7 +83,7 @@ instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL PyWith where
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL PyWith where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
-  canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
+  canInsertAt' p _ t = canInsertAt' p (Proxy @StatementL) t
 
 -- We can insert statements before lists of statements, *or* before lists of BlockItem's
 -- Python has both because scoping
@@ -96,12 +96,12 @@ instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL ListF where
                                      Just p  -> gcastWith p $ liftM inject' $ annM =<< (ConsF <$> (inject' <$> (annM $ StatementIsBlockItem e)) <*> pure (inject' t))
   insertAt' _ _ t = return $ inject' t
 
-  canInsertAt' EnterEvalPoint _  t =    kIsSort (Proxy :: Proxy [StatementL]) t
-                                     || kIsSort (Proxy :: Proxy [BlockItemL]) t
+  canInsertAt' EnterEvalPoint _  t =    kIsSort @[StatementL] t
+                                     || kIsSort @[BlockItemL] t
   canInsertAt' _              _  _ = False
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL ListF where
   insertAt' p (project' -> Just (StatementIsBlockItem s)) t = insertAt' p s t
-  canInsertAt' p _ t = canInsertAt' p (Proxy :: Proxy StatementL) t
+  canInsertAt' p _ t = canInsertAt' p (Proxy @StatementL) t
 
 #endif

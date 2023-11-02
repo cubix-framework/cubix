@@ -116,3 +116,4 @@ instance {-# OVERLAPPABLE #-} (VariableInsertionVariation f g h) => ExplicitDecl
 instance {-# OVERLAPPING #-} (i MPythonSig) => ExplicitDeclsVariation MPythonSig g h i where
   explicitDeclsVariation _ _ _ _ = NoExplicitDeclsVariation Dict
 #endif
+
