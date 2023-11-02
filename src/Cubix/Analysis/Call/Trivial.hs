@@ -25,11 +25,23 @@ import Cubix.Language.Parametric.Syntax
 
 import Cubix.Sin.Compdata.Annotation ( getAnn )
 
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------
+----------------------- Code location data structure -------------
+------------------------------------------------------------------
+
+-- | A NodeIdx represents a location in a `Project`
 data NodeIdx = NodeIdx FilePath Label
   deriving ( Eq, Ord, Show )
 type FunctionId = String
 
 
+------------------------------------------------------------------
+--------------------- AccumMap data structure --------------------
+------------------------------------------------------------------
+
+-- | PRECOMMIT TODO: What's the difference between this and Map?
 newtype AccumMap k v = AccumMap { runAccumMap :: Map k v }
 
 mergeKey :: (Ord k, Semigroup v) => k -> v -> Map k v -> Map k v
@@ -41,16 +53,34 @@ instance (Ord k, Semigroup v) => Semigroup (AccumMap k v) where
 instance (Ord k, Monoid v) => Monoid (AccumMap k v) where
   mempty = AccumMap $ Map.empty
 
-----------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------
+------------------------- Call Analysis --------------------------
+------------------------------------------------------------------
+
+---------------------
+----------- Interface
+---------------------
 
 class CallAnalysis fs where
+  -- | Returns a map from function name to all locations in the code where
+  --   a function by that name is called
   callAnalysis :: Project fs -> Map FunctionId [NodeIdx]
 
+
+---------------------
+----------- Constraints
+---------------------
 
 type TrivialCallAnalysisConstraints fs = ( FunctionCall :-<: fs, Ident :-<: fs
                                         , InjF fs IdentL FunctionExpL, All HTraversable fs
                                         , DynCase (TermLab fs) FunctionCallL)
 type TCAC fs = TrivialCallAnalysisConstraints fs
+
+
+---------------------
+----------- Trivial implementation
+---------------------
 
 
 getCalls' :: (TCAC fs, Monad m) => TranslateM m (TermLab fs) FunctionCallL (AccumMap FunctionId [Label])
@@ -71,9 +101,22 @@ instance (TCAC fs, All HFoldable fs) => CallAnalysis fs where
       getCallsAnnSource (fil, E t) = case runIdentity $ getCalls t of
                                        AccumMap m -> AccumMap $ Map.map (map (NodeIdx fil)) m
 
-----------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------
+----------------------- Function Analysis ------------------------
+------------------------------------------------------------------
 
+---------------------
+----------- Interface
+---------------------
 
+class FunctionAnalysis fs where
+  -- | Returns a map from function name to 
+  --   all locations in the code where a function by that name is defined
+  functionAnalysis :: Project fs -> Map FunctionId [NodeIdx]
+
+---------------------
+----------- Constraints
+---------------------
 
 type TrivialFunctionAnalysisConstraints fs = ( FunctionDef :-<: fs, Ident :-<: fs
                                             , All HTraversable fs
@@ -81,9 +124,9 @@ type TrivialFunctionAnalysisConstraints fs = ( FunctionDef :-<: fs, Ident :-<: f
 
 type TFAC fs = TrivialFunctionAnalysisConstraints fs
 
-class FunctionAnalysis fs where
-  functionAnalysis :: Project fs -> Map FunctionId [NodeIdx]
-
+---------------------
+----------- Trivial implementation
+---------------------
 
 getFuncs' :: (TFAC fs, Monad m, All HFunctor fs) => TranslateM m (TermLab fs) FunctionDefL (AccumMap FunctionId [Label])
 getFuncs' t@(stripA -> FunctionDef' _ (Ident' n) _ _) = return $ AccumMap $ Map.singleton n [getAnn t]
