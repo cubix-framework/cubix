@@ -14,6 +14,8 @@ module Cubix.Language.Parametric.Syntax.Base (
   , IntegerL
   , CharF(..)
   , CharL
+  , TextF(..)
+  , TextL
   , UnitF(..)
 
   , pattern BoolF'
@@ -24,13 +26,24 @@ module Cubix.Language.Parametric.Syntax.Base (
   ,        iIntegerF
   , pattern CharF'
   ,        iCharF
+  , pattern TextF'
+  ,        iTextF
   , pattern UnitF'
   ,        iUnitF
   ) where
 
+import Data.Text ( Text )
+
 import Data.Comp.Multi ( Node, CxtS, All, HFunctor, (:-<:), project)
 
 import Cubix.Language.Parametric.Derive
+
+-------------------------------------------------------------------------
+
+
+-----------------------------------
+------------------ Nodes and sorts for primitives
+-----------------------------------
 
 data BoolL
 data BoolF :: Node where
@@ -48,12 +61,25 @@ data CharL
 data CharF :: Node where
   CharF :: Char -> CharF e CharL
 
+data TextL
+data TextF :: Node where
+  TextF :: Text -> TextF e TextL
+
 data UnitF :: Node where
   UnitF :: UnitF e ()
 
 
-deriveAll [''BoolF, ''IntF, ''IntegerF, ''CharF, ''UnitF]
+-----------------------------------
+------------------ Instances (via TH)
+-----------------------------------
 
+deriveAll [''BoolF, ''IntF, ''IntegerF, ''CharF, ''TextF, ''UnitF]
+
+
+
+-----------------------------------
+------------------ Pattern synonyms
+-----------------------------------
 
 pattern BoolF' :: (BoolF :-<: fs, All HFunctor fs) => Bool -> CxtS h fs a BoolL
 pattern BoolF' b <- (project -> Just (BoolF b)) where
@@ -73,6 +99,11 @@ pattern IntegerF' x <- (project -> Just (IntegerF x)) where
 pattern CharF' :: (CharF :-<: fs, All HFunctor fs) => Char -> CxtS h fs a CharL
 pattern CharF' x <- (project -> Just (CharF x)) where
   CharF' x = iCharF x
+
+
+pattern TextF' :: (TextF :-<: fs, All HFunctor fs) => Text -> CxtS h fs a TextL
+pattern TextF' x <- (project -> Just (TextF x)) where
+  TextF' x = iTextF x
 
 pattern UnitF' :: (UnitF :-<: fs, All HFunctor fs) => CxtS h fs a ()
 pattern UnitF' <- (project -> Just UnitF) where
