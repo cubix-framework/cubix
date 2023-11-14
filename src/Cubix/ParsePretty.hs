@@ -26,7 +26,7 @@ module Cubix.ParsePretty(
 import Control.Monad ( liftM, (>=>) )
 import Control.Monad.Identity ( runIdentity )
 
-import Data.Comp.Multi ( Term, stripA, ann )
+import Data.Comp.Multi ( Term, AnnTerm, stripA, ann )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 
@@ -68,6 +68,14 @@ class ParseFile fs where
   -- Recommended to use with the @TypeApplications@ extension,
   -- e.g.: @parseFile \@MCSig "my_file.c"@.
   parseFile :: FilePath -> IO (Maybe (Term fs (RootSort fs)))
+
+class (ParseFile fs) => ParseFileTrackSources fs where
+  -- | Parses a file with the appropriate parser for the language with signature @fs@,
+  --   tracking source positions of many nodes. (Which depends on the language frontend)
+  --
+  -- Recommended to use with the @TypeApplications@ extension,
+  -- e.g.: @parseFileTrackSources \@MCSig "my_file.c"@.
+  parseFileTrackSources :: FilePath -> IO (Maybe (AnnTerm (Maybe SourceSpan) fs (RootSort fs)))
 
 class Pretty fs where
   -- | Pretty-prints a term, using the appropriate pretty-printer for the language with
@@ -160,13 +168,13 @@ type instance RootSort MJSSig = JSASTL
 instance ParseFile MJSSig where parseFile = parseJavaScript
 instance Pretty MJSSig where pretty = prettyJavaScript
 
-parsePython :: FilePath -> IO (Maybe (MPythonTerm PCommon.ModuleL))
+parsePython :: FilePath -> IO (Maybe (MPythonTermAnn (Maybe SourceSpan) PCommon.ModuleL))
 parsePython path = do
     contents <- readFile path
     let res = Python.parseModule contents path
     case res of
       Left  e      -> print e >> return Nothing
-      Right (m, _) -> return $ Just $ stripA $ PCommon.translate $ PFull.translate $ fmap toSourceSpan m
+      Right (m, _) -> return $ Just $ PCommon.translate $ PFull.translate $ fmap toSourceSpan m
   where
     toSourceSpan :: Python.SrcSpan -> Maybe SourceSpan
     toSourceSpan (Python.SpanCoLinear filename row start end) = Just $ mkSourceSpan filename (row, start) (row, end)
@@ -179,7 +187,8 @@ prettyPython = show . Python.pretty . PFull.untranslate . ann Nothing . PCommon.
 
 
 type instance RootSort MPythonSig = PCommon.ModuleL
-instance ParseFile MPythonSig where parseFile = parsePython
+instance ParseFile MPythonSig where parseFile = fmap (fmap stripA) . parsePython
+instance ParseFileTrackSources MPythonSig where parseFileTrackSources = parsePython
 instance Pretty MPythonSig where pretty = prettyPython
 
 #endif
