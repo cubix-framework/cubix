@@ -33,9 +33,9 @@ import Cubix.Language.JavaScript.Parametric.Common.Semantics as Semantics
 import Cubix.Language.JavaScript.Parametric.Common.Types as Types
 import Cubix.Language.JavaScript.Parametric.Common.Trans as Trans
 import Cubix.Language.JavaScript.Parametric.Full as F
-        hiding ( translate, untranslate, JSIdent, iJSIdentName, iJSIdentNone
-               , JSVarInitializer, iJSVarInit, iJSVarInitNone
-               , JSFor, iJSFor, JSForIn, iJSForIn, JSForVar, iJSForVar, JSForVarIn, iJSForVarIn
+        hiding ( translate, untranslate, JSIdent, iJSIdentName, jJSIdentName, iJSIdentNone, jJSIdentNone
+               , JSVarInitializer, iJSVarInit, jJSVarInit, iJSVarInitNone, jJSVarInitNone
+               , JSFor, iJSFor, jJSFor, JSForIn, iJSForIn, jJSForIn, JSForVar, iJSForVar, jJSForVar, JSForVarIn, iJSForVarIn, jJSForVarIn
                )
 import Cubix.Language.Parametric.Syntax.VarDecl as VarDecl
 

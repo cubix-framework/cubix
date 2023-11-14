@@ -8,7 +8,7 @@ import Data.Proxy ( Proxy(..) )
 import Language.Python.Common ( pretty )
 import Language.Python.Version3.Parser ( parseModule )
 
-import Data.Comp.Multi ( Sum, project, (:&:)(..), HFix, unTerm, Cxt(..), HFunctor(..), AnnTerm )
+import Data.Comp.Multi ( Sum, project, (:&:)(..), HFix, unTerm, Cxt(..), HFunctor(..), AnnTerm, ann, stripA )
 import Data.Comp.Multi.Strategic ( Rewrite, GRewrite, allbuR, promoteR, addFail )
 
 import Cubix.Language.Python.Parametric.Full
@@ -24,14 +24,14 @@ parse path = do
   let res = parseModule contents path
   case res of
     Left  e     -> print e >> return Nothing
-    Right (m, _) -> return $ Just $ translate $ fmap (const ()) m
+    Right (m, _) -> return $ Just $ stripA $ translate $ fmap (const Nothing) m
 
 prettyPython :: PythonTerm ModuleL -> String
-prettyPython = show . pretty . untranslate
+prettyPython = show . pretty . untranslate . ann Nothing
 
 
 vandalize' :: Rewrite PythonTerm IdentL
-vandalize' (project -> (Just (Ident t a))) = return $ iIdent (t ++ "_foo") a
+vandalize' (project -> (Just (Ident t))) = return $ iIdent (t ++ "_foo")
 
 vandalize :: GRewrite PythonTerm
 vandalize = allbuR $ promoteR $ addFail vandalize'
@@ -45,7 +45,7 @@ main = do
   print tree'
   putStrLn $ prettyPython tree'
 
-  let (lst :: PythonTerm [StatementL]) = ConsF' (iPass iUnitF) NilF'
+  let (lst :: PythonTerm [StatementL]) = ConsF' iPass NilF'
   print $ isSort @[StatementL] (annUnit lst)
   print $ canInsertBefore (Proxy @StatementL) (annUnit lst)
 

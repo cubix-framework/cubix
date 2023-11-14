@@ -33,15 +33,23 @@ smartConstructors fname = do
     let iVar = tyVarBndrName $ last targs
     let cons = map (abstractConType &&& iTp iVar) constrs
     liftM concat $ mapM (genSmartConstr (map tyVarBndrName targs) tname) cons
-        where iTp iVar (ForallC _ cxt _) =
+        where iTp iVar (ForallC _ cxt t) =
                   -- Check if the GADT phantom type is constrained
-                  case [y | Just (x, y) <- map isEqualP cxt, x == VarT iVar] of
-                    [] -> Nothing
+                  case [y | AppT (AppT (ConT eqN) x) y <- cxt, x == VarT iVar, eqN == ''(~)] of
+                    [] -> iTp iVar t
                     tp:_ -> Just tp
+              iTp _iVar (GadtC _ vs (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
+              iTp _iVar (RecGadtC _ vs (AppT _ tp)) =
+                  case tp of
+                    VarT _ -> Nothing
+                    _      -> Just tp
               iTp _ _ = Nothing
               genSmartConstr targs tname ((name, args), miTp) = do
                 let bname = nameBase name
-                genSmartConstr' targs tname (mkName $ 'i' : bname) name args miTp
+                genSmartConstr' targs tname (mkName $ 'j' : bname) name args miTp
               genSmartConstr' targs tname sname name args miTp = do
                 varNs <- newNames args "x"
                 let pats = map varP varNs

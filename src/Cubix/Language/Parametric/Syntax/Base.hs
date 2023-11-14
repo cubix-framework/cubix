@@ -18,17 +18,22 @@ module Cubix.Language.Parametric.Syntax.Base (
 
   , pattern BoolF'
   ,        iBoolF
+  ,        jBoolF
   , pattern IntF'
   ,        iIntF
+  ,        jIntF
   , pattern IntegerF'
   ,        iIntegerF
+  ,        jIntegerF
   , pattern CharF'
   ,        iCharF
+  ,        jCharF
   , pattern UnitF'
   ,        iUnitF
+  ,        jUnitF
   ) where
 
-import Data.Comp.Multi ( Node, CxtS, All, HFunctor, (:-<:), project)
+import Data.Comp.Multi ( Node, Cxt, (:<:), project)
 
 import Cubix.Language.Parametric.Derive
 
@@ -54,26 +59,22 @@ data UnitF :: Node where
 
 deriveAll [''BoolF, ''IntF, ''IntegerF, ''CharF, ''UnitF]
 
-
-pattern BoolF' :: (BoolF :-<: fs, All HFunctor fs) => Bool -> CxtS h fs a BoolL
+pattern BoolF' :: (BoolF :<: f) => Bool -> Cxt h f a BoolL
 pattern BoolF' b <- (project -> Just (BoolF b)) where
-  BoolF' b = iBoolF b
+  BoolF' b = jBoolF b
 
-
-pattern IntF' :: (IntF :-<: fs, All HFunctor fs) => Int -> CxtS h fs a IntL
+pattern IntF' :: (IntF :<: f) => Int -> Cxt h f a IntL
 pattern IntF' x <- (project -> Just (IntF x)) where
-  IntF' x = iIntF x
+  IntF' x = jIntF x
 
-
-pattern IntegerF' :: (IntegerF :-<: fs, All HFunctor fs) => Integer -> CxtS h fs a IntegerL
+pattern IntegerF' :: (IntegerF :<: f) => Integer -> Cxt h f a IntegerL
 pattern IntegerF' x <- (project -> Just (IntegerF x)) where
-  IntegerF' x = iIntegerF x
+  IntegerF' x = jIntegerF x
 
-
-pattern CharF' :: (CharF :-<: fs, All HFunctor fs) => Char -> CxtS h fs a CharL
+pattern CharF' :: (CharF :<: f) => Char -> Cxt h f a CharL
 pattern CharF' x <- (project -> Just (CharF x)) where
-  CharF' x = iCharF x
+  CharF' x = jCharF x
 
-pattern UnitF' :: (UnitF :-<: fs, All HFunctor fs) => CxtS h fs a ()
+pattern UnitF' :: (UnitF :<: f) => Cxt h f a ()
 pattern UnitF' <- (project -> Just UnitF) where
-  UnitF' = iUnitF
+  UnitF' = jUnitF

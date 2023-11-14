@@ -12,7 +12,6 @@ module Cubix.Language.Lua.Parametric.Common.Trans (
 import Data.List( (\\) )
 import Data.Maybe ( fromJust )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
-import Data.Proxy
 import Data.Text ( pack, unpack )
 
 import Data.Comp.Multi ( project, inject, unTerm, (:-<:), Sum, All, caseCxt
@@ -115,7 +114,7 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
   
 untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MLuaTerm _))
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
   
 do ipsNames <- sumToNames ''MLuaSig
    modNames <- sumToNames ''F.LuaSig

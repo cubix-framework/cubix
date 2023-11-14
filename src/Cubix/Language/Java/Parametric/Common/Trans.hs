@@ -189,7 +189,7 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
   
 untransError :: (HFunctor f, f :-<: MJavaSig) => f MJavaTerm l -> F.JavaTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MJavaTerm _))
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
 
 do ipsNames <- sumToNames ''MJavaSig
    modNames <- sumToNames ''F.JavaSig

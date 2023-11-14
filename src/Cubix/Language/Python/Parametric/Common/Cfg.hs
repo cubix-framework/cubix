@@ -86,13 +86,13 @@ constructCfgFunctionDef t body = body >> constructCfgEmpty t
 -- I swapped the order of my instance declarations). Luckily, a "stack clean" fixed the problem
 
 instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement where
-  constructCfg (collapseFProd' -> (t :*: While cond body els _)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
-  constructCfg (collapseFProd' -> (t :*: For _ cond body els _)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
+  constructCfg (collapseFProd' -> (t :*: While cond body els)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
+  constructCfg (collapseFProd' -> (t :*: For _ cond body els)) = HState $ constructCfgWhileElse t (unHState cond) (unHState body) (unHState els)
 
-  constructCfg (collapseFProd' -> t :*: Conditional clauses els _) = HState $ constructCfgIfElseIfElse t (liftM (map extractEEPPair . extractEEPList) $ unHState clauses) (liftM Just $ unHState els)
+  constructCfg (collapseFProd' -> t :*: Conditional clauses els) = HState $ constructCfgIfElseIfElse t (liftM (map extractEEPPair . extractEEPList) $ unHState clauses) (liftM Just $ unHState els)
 
-  constructCfg (collapseFProd' -> (t :*: Return e _)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
-  constructCfg (collapseFProd' -> (t :*: Try body handlers els finally _)) = HState $ do
+  constructCfg (collapseFProd' -> (t :*: Return e)) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
+  constructCfg (collapseFProd' -> (t :*: Try body handlers els finally)) = HState $ do
     eepBody <- unHState body
     unHState handlers
     eepElse <- unHState els
@@ -106,9 +106,9 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Statement wh
     p <- combineEnterExit (identEnterExit enterNode) eeMain
     combineEnterExit p (identEnterExit exitNode)
 
-  constructCfg (collapseFProd' -> (t :*: Raise e _)) = HState $ constructCfgReturn t (liftM Just $ unHState e)
-  constructCfg (collapseFProd' -> (t :*: Break _)) = HState $ constructCfgBreak t
-  constructCfg (collapseFProd' -> (t :*: Continue _)) = HState $ constructCfgContinue t
+  constructCfg (collapseFProd' -> (t :*: Raise e)) = HState $ constructCfgReturn t (liftM Just $ unHState e)
+  constructCfg (collapseFProd' -> (t :*: Break)) = HState $ constructCfgBreak t
+  constructCfg (collapseFProd' -> (t :*: Continue)) = HState $ constructCfgContinue t
 
   constructCfg t = constructCfgDefault t
 
@@ -155,8 +155,8 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState PyWith where
     return $ EnterExitPair enterNode exitNode
 
 instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
-  constructCfg t'@(remA -> (BinaryOp (op :*: _) _ _ _)) = do
-    let (t :*: (BinaryOp _ el er _)) = collapseFProd' t'
+  constructCfg t'@(remA -> (BinaryOp (op :*: _) _ _)) = do
+    let (t :*: (BinaryOp _ el er)) = collapseFProd' t'
     case extractOp op of
       And {} -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
       Or {}  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
@@ -165,7 +165,7 @@ instance {-# OVERLAPPING #-} ConstructCfg MPythonSig PythonCfgState Expr where
     where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
           extractOp (stripA -> project -> Just bp) = bp
 
-  constructCfg (collapseFProd' -> (t :*: (Lambda _ e _))) = HState $ do
+  constructCfg (collapseFProd' -> (t :*: (Lambda _ e))) = HState $ do
     constructCfgFunctionDef t (unHState e)
 
   constructCfg t = constructCfgDefault t

@@ -60,7 +60,6 @@ import Control.Monad.Trans ( lift )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( fromJust, fromMaybe, isNothing )
-import Data.Proxy ( Proxy(..) )
 
 import Data.Set ( Set )
 import qualified Data.Set as Set

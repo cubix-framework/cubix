@@ -57,6 +57,7 @@ import qualified Cubix.Language.Lua.Parametric.Full as LFull
 import Cubix.Language.Python.Parametric.Common as PCommon
 import qualified Cubix.Language.Python.Parametric.Full as PFull
 import qualified Data.Text as T (unpack)
+import qualified Cubix.Language.Java.Parametric.Common as Python
 
 
 type family RootSort (fs :: [(* -> *) -> * -> *])
@@ -85,7 +86,7 @@ parseLua path = do
     res <- Lua.parseFile path
     case res of
      Left errors -> print errors >> return Nothing
-     Right tree  -> return $ Just $ LCommon.translate $ {-stripA $-} LFull.translate $ fmap toSourceSpan tree
+     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
   where
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
     toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))
@@ -161,14 +162,20 @@ instance Pretty MJSSig where pretty = prettyJavaScript
 
 parsePython :: FilePath -> IO (Maybe (MPythonTerm PCommon.ModuleL))
 parsePython path = do
-  contents <- readFile path
-  let res = Python.parseModule contents path
-  case res of
-    Left  e     -> print e >> return Nothing
-    Right (m, _) -> return $ Just $ PCommon.translate $ PFull.translate $ fmap (const ()) m
+    contents <- readFile path
+    let res = Python.parseModule contents path
+    case res of
+      Left  e      -> print e >> return Nothing
+      Right (m, _) -> return $ Just $ stripA $ PCommon.translate $ PFull.translate $ fmap toSourceSpan m
+  where
+    toSourceSpan :: Python.SrcSpan -> Maybe SourceSpan
+    toSourceSpan (Python.SpanCoLinear filename row start end) = Just $ mkSourceSpan filename (row, start) (row, end)
+    toSourceSpan (Python.SpanMultiLine filename startRow startCol endRow endCol) = Just $ mkSourceSpan filename (startRow, startCol) (endRow, endCol)
+    toSourceSpan (Python.SpanPoint filename row col) = Just $ mkSourceSpan filename (row, col) (row, col)
+    toSourceSpan Python.SpanEmpty = Nothing
 
 prettyPython :: MPythonTerm PCommon.ModuleL -> String
-prettyPython = show . Python.pretty . PFull.untranslate . PCommon.untranslate
+prettyPython = show . Python.pretty . PFull.untranslate . ann Nothing . PCommon.untranslate
 
 
 type instance RootSort MPythonSig = PCommon.ModuleL

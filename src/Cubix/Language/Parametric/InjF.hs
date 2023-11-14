@@ -20,6 +20,7 @@ module Cubix.Language.Parametric.InjF
 
 import Control.Monad ( MonadPlus(..), liftM )
 
+import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
@@ -29,7 +30,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
 import Cubix.Language.Info
 
-import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, AnnotateDefault, runAnnotateDefault )
+import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, AnnotateDefault, runAnnotateDefault, annotateOuter )
 
 --------------------------------------------------------------------------------
 
@@ -56,6 +57,7 @@ class (All HFunctor fs) => InjF fs l l' where
   projF = liftM stripA . projF' . ann ()
 
 instance (All HFunctor fs) => InjF fs l l where
+  injF :: All HFunctor fs => CxtS h fs a l -> CxtS h fs a l
   injF = id
   projF' = Just
 
@@ -76,21 +78,20 @@ labeledInjF :: ( MonadAnnotater Label m
               ) => TermLab fs l -> m (TermLab fs l')
 labeledInjF t = annotateLabelOuter $ injF $ Hole t
 
--- This MonadAnnotater instance leaks because it's technically possible to define a MonadLabeller
--- instance for AnnotateDefault. Gah!
--- FIXME: Anything that can be done about this?
+
 injFAnnDef :: ( InjF fs l l'
              , All HTraversable fs
-             , MonadAnnotater a (AnnotateDefault a)
+             , Default a
              , All HFoldable fs
              ) => AnnTerm a fs l -> AnnTerm a fs l'
 injFAnnDef t = runAnnotateDefault $ annotateOuter $ injF $ Hole t
 
 injectFAnnDef :: ( InjF fs l l'
-                , All HTraversable fs
-                , MonadAnnotater a (AnnotateDefault a)
-                , All HFoldable fs
-                ) => (Sum fs :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
+                 , f :-<: fs
+                 , All HTraversable fs
+                 , All HFoldable fs
+                 , Default a
+                ) => (f :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
 injectFAnnDef =  injFAnnDef . inject
 
 --------------------------------------------------------------------------------

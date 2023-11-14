@@ -117,10 +117,10 @@ instance MarkBlockCovered MPythonSig where
   markBlockCovered n = annotateLabel term
     where
       term :: MPythonTerm Py.StatementL
-      term = P.iAssign (iPyLhs $ insertF [Py.iSubscriptLValue covArr (Py.iInt (toInteger n) (show n) iUnitF)]) AssignOpEquals' (Py.iBool True iUnitF)
+      term = P.iAssign (iPyLhs $ insertF [Py.iSubscriptLValue covArr (Py.iInt (toInteger n) (show n))]) AssignOpEquals' (Py.iBool True)
 
       covArr :: MPythonTerm Py.ExprL
-      covArr = Py.iDot (Py.iVar (iIdent "TestCoverage") iUnitF) (iIdent "coverage") iUnitF
+      covArr = Py.iDot (Py.iVar (iIdent "TestCoverage")) (iIdent "coverage")
 #endif
 
 luaNumber :: Int -> MLuaTerm L.ExpL

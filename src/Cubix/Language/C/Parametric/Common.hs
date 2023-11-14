@@ -32,6 +32,6 @@ import Cubix.Language.C.Parametric.Common.Cfg ()  -- instances only
 import Cubix.Language.C.Parametric.Common.Semantics as Semantics
 import Cubix.Language.C.Parametric.Common.Types as Types
 import Cubix.Language.C.Parametric.Common.Trans as Trans
-import Cubix.Language.C.Parametric.Full as F hiding ( translate, untranslate, iIdent, Ident, IdentL, CFor, iCFor )
+import Cubix.Language.C.Parametric.Full as F hiding ( translate, untranslate, iIdent, jIdent, Ident, IdentL, CFor, iCFor, jCFor )
 import Cubix.Language.Parametric.Syntax as Para hiding ( Block, BlockL, iBlock, iAssign )
 #endif

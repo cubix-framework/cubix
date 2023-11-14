@@ -220,7 +220,7 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MCSig) => f MCTerm l -> F.CTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MCTerm _))
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
 
 do ipsNames <- sumToNames ''MCSig
    modNames <- sumToNames ''F.CSig

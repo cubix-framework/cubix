@@ -30,7 +30,7 @@ import Cubix.Language.Lua.Parametric.Common.Semantics as Semantics
 import Cubix.Language.Lua.Parametric.Common.Types as Types
 import Cubix.Language.Lua.Parametric.Common.Trans as Trans
 import Cubix.Language.Lua.Parametric.Full as F hiding ( translate, untranslate, Name, iName, NameL
-                                                       , Block, iBlock, BlockL, Assign, iAssign  )
+                                                       , Block, iBlock, jBlock, BlockL, Assign, iAssign, jAssign  )
 import Cubix.Language.Parametric.Syntax as Para
 
 
