@@ -2,6 +2,7 @@
 
 module Cubix.ParsePretty (
     ParseFile(..)
+  , ParseFileTrackSources(..)
   , Pretty(..)
 
   , parseLua
