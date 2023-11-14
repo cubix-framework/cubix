@@ -32,6 +32,7 @@ module Cubix.Language.Parametric.Syntax.Base (
   ,        jCharF
   , pattern TextF'
   ,        iTextF
+  ,        jTextF
 
   , pattern UnitF'
   ,        iUnitF
@@ -40,7 +41,7 @@ module Cubix.Language.Parametric.Syntax.Base (
 
 import Data.Text ( Text )
 
-import Data.Comp.Multi ( Node, Cxt, CxtS, All, HFunctor, (:-<:), (:<:), project)
+import Data.Comp.Multi ( Node, Cxt, (:-<:), (:<:), project)
 
 import Cubix.Language.Parametric.Derive
 
@@ -103,9 +104,9 @@ pattern CharF' :: (CharF :<: f) => Char -> Cxt h f a CharL
 pattern CharF' x <- (project -> Just (CharF x)) where
   CharF' x = jCharF x
 
-pattern TextF' :: (TextF :-<: fs, All HFunctor fs) => Text -> CxtS h fs a TextL
+pattern TextF' :: (TextF :<: f) => Text -> Cxt h f a TextL
 pattern TextF' x <- (project -> Just (TextF x)) where
-  TextF' x = iTextF x
+  TextF' x = jTextF x
 
 pattern UnitF' :: (UnitF :<: f) => Cxt h f a ()
 pattern UnitF' <- (project -> Just UnitF) where
