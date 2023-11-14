@@ -22,19 +22,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.ExpandSyns
 import Language.Haskell.TH.Syntax
 
--- reportError is introduced only from version 7.6 of GHC
-#if __GLASGOW_HASKELL__ < 706
-reportError :: String -> Q ()
-reportError = report True
-#endif
-
-#if __GLASGOW_HASKELL__ < 800
-data DataInfo = DataInfo Cxt Name [TyVarBndr ()] [Con] [Name]
-#elif __GLASGOW_HASKELL__ >= 802
 data DataInfo = DataInfo Cxt Name [TyVarBndr ()] [Con] [DerivClause]
-#else
-data DataInfo = DataInfo Cxt Name [TyVarBndr ()] [Con] Cxt
-#endif
 
 {-|
   This is the @Q@-lifted version of 'abstractNewtype.
@@ -47,17 +35,10 @@ abstractNewtypeQ = liftM abstractNewtype
   @data@ declarations.
 -}
 abstractNewtype :: Info -> Maybe DataInfo
-#if __GLASGOW_HASKELL__ < 800
-abstractNewtype (TyConI (NewtypeD cxt name args constr derive))
-    = Just (DataInfo cxt name args [constr] derive)
-abstractNewtype (TyConI (DataD cxt name args constrs derive))
-    = Just (DataInfo cxt name args constrs derive)
-#else
 abstractNewtype (TyConI (NewtypeD cxt name args _ constr derive))
     = Just (DataInfo cxt name args [constr] derive)
 abstractNewtype (TyConI (DataD cxt name args _ constrs derive))
     = Just (DataInfo cxt name args constrs derive)
-#endif
 abstractNewtype _ = Nothing
 
 {-| This function provides the name and the arity of the given data
@@ -68,9 +49,7 @@ normalCon (NormalC constr args) = (constr, args, Nothing)
 normalCon (RecC constr args) = (constr, map (\(_,s,t) -> (s,t)) args, Nothing)
 normalCon (InfixC a constr b) = (constr, [a,b], Nothing)
 normalCon (ForallC _ _ constr) = normalCon constr
-#if __GLASGOW_HASKELL__ >= 800
 normalCon (GadtC (constr:_constrs) args typ) = (constr,args,Just typ)
-#endif
 
 normalCon' :: Con -> (Name,[Type], Maybe Type)
 normalCon' con = (n, map snd ts, t)
@@ -126,9 +105,7 @@ abstractConType (NormalC constr args) = (constr, length args)
 abstractConType (RecC constr args) = (constr, length args)
 abstractConType (InfixC _ constr _) = (constr, 2)
 abstractConType (ForallC _ _ constr) = abstractConType constr
-#if __GLASGOW_HASKELL__ >= 800
 abstractConType (GadtC (constr:_) args _typ) = (constr,length args) -- Only first Name
-#endif
 
 {-|
   This function returns the name of a bound type variable
@@ -180,34 +157,21 @@ derive ders names = liftM concat $ sequence [der name | der <- ders, name <- nam
     constraint.
 -}
 
-#if __GLASGOW_HASKELL__ < 710
-mkClassP :: Name -> [Type] -> Pred
-mkClassP = ClassP
-#else
 mkClassP :: Name -> [Type] -> Type
 mkClassP name = foldl AppT (ConT name)
-#endif
 
 {-| This function checks whether the given type constraint is an
 equality constraint. If so, the types of the equality constraint are
 returned. -}
 
-#if __GLASGOW_HASKELL__ < 710
-isEqualP :: Pred -> Maybe (Type, Type)
-isEqualP (EqualP x y) = Just (x, y)
-isEqualP _ = Nothing
-#else
 isEqualP :: Type -> Maybe (Type, Type)
 isEqualP (AppT (AppT EqualityT x) y) = Just (x, y)
+isEqualP (AppT (AppT (ConT eqOp) x) y)
+  |  eqOp == ''(~)                   = Just (x, y)
 isEqualP _ = Nothing
-#endif
 
 mkInstanceD :: Cxt -> Type -> [Dec] -> Dec
-#if __GLASGOW_HASKELL__ < 800
-mkInstanceD cxt ty decs = InstanceD cxt ty decs
-#else
 mkInstanceD cxt ty decs = InstanceD Nothing cxt ty decs
-#endif
 
 
 -- | This function lifts type class instances over sums

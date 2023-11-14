@@ -96,7 +96,7 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MSoliditySig) => f MSolidityTerm l -> F.SolidityTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MSolidityTerm _))
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
 
 do ipsNames <- sumToNames ''MSoliditySig
    modNames <- sumToNames ''F.SoliditySig

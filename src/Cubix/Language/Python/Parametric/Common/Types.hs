@@ -10,7 +10,7 @@ module Cubix.Language.Python.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Node, Term, project', project, HFunctor, CxtS, All, (:-<:) )
+import Data.Comp.Multi ( Node, Term, AnnTerm, project', project, HFunctor, CxtS, All, (:-<:) )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -225,6 +225,8 @@ type instance InjectableSorts MPythonSig AssignL = '[StatementL]
 type MPythonTerm    = Term MPythonSig
 type MPythonTermLab = TermLab MPythonSig
 
+type MPythonTermAnn a = AnnTerm a MPythonSig
+
 type MPythonCxt h a = CxtS h MPythonSig a
 
 -----------------------------------------------------------------------------------
@@ -238,9 +240,9 @@ instance InjF MPythonSig [PyLValueL] LhsL where
     return ls
 
 instance InjF MPythonSig P.IdentL Py.ExprL where
-  injF x = Py.iVar (injF x) iUnitF
+  injF x = Py.iVar (injF x)
   projF' x
-    | Just (Py.Var v _) <- project' x
+    | Just (Py.Var v) <- project' x
     , Just (IdentIsIdent i) <- project' v
     = return i
   projF' _ = Nothing
@@ -263,12 +265,12 @@ instance InjF MPythonSig AssignL BlockItemL where
   projF' _ = Nothing
 
 instance InjF MPythonSig P.IdentL FunctionExpL where
-  injF x = iVar (injF x) iUnitF
+  injF x = iVar (injF x)
 
   projF' (project' -> Just (FunctionIdent n)) = Just n
   projF' f
     | Just (ExprIsFunctionExp e) <- project' f
-    , Just (Var v _) <- project' e = projF' v
+    , Just (Var v) <- project' e = projF' v
   projF' _                                    = Nothing
 
 instance InjF MPythonSig P.IdentL PositionalArgExpL where

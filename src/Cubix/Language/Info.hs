@@ -5,20 +5,24 @@
 -- program terms, especially node labeling
 module Cubix.Language.Info
   (
+    -- ** SourcePos
     SourcePos
   , sourceFile
   , sourceRow
   , sourceCol
 
+    -- ** SourceSpan
   , SourceSpan
   , sourceStart
   , sourceEnd
   , mkSourceSpan
 
+    -- ** Attrs
   , Attrs
   , attrLabel
   , attrSpan
 
+    -- **  Label
   , Label -- opaque!
   , HasLabel(..)
   , TermLab
@@ -32,19 +36,22 @@ module Cubix.Language.Info
   , nextLabel
 
   , annotateLabel
-  , annotateOuter
   , annotateLabelOuter
   , labelProg
   , annotateTop
   , annotateTop'
+  , annotateTopAttrs
+  , annotateTopAttrs'
 
+  , HFixLab
+
+    -- ** Project
   , Project
   , parseProject
   , rewriteProjectM
   , rewriteProjectWithFilM
   , putProject
 
-  , HFixLab
   ) where
 
 import Control.Concurrent.Supply ( Supply, newSupply, freshId, splitSupply )
@@ -68,10 +75,10 @@ import System.IO.Unsafe ( unsafePerformIO )
 
 import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
 
-import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM )
+import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM, annotateOuter )
 
 --------------------------------------------------------------------------------
--- Labeling
+---------------------------------- Labels --------------------------------------
 --------------------------------------------------------------------------------
                           
 -- | Provides unique labels for AST nodes
@@ -81,6 +88,11 @@ newtype Label = Label Int
 instance NFData Label where rnf = genericRnf
 
 makeClassy ''Label
+
+
+--------------------------------------------------------------------------------
+---------------------------------- SourcePos -----------------------------------
+--------------------------------------------------------------------------------
 
 data SourcePos = SourcePos { _sourceFile :: !String
                            , _sourceRow  :: !Int
@@ -92,6 +104,11 @@ instance NFData SourcePos where rnf = genericRnf
 
 makeClassy ''SourcePos
 
+
+--------------------------------------------------------------------------------
+--------------------------------- SourceSpan -----------------------------------
+--------------------------------------------------------------------------------
+
 data SourceSpan = SourceSpan { _sourceStart :: !SourcePos, _sourceEnd :: !SourcePos } deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 makeClassy ''SourceSpan
@@ -100,12 +117,22 @@ mkSourceSpan :: String -> (Int, Int ) -> (Int, Int) -> SourceSpan
 mkSourceSpan fileName (sRow, sCol) (eRow, eCol) = SourceSpan (SourcePos fileName sRow sCol)
                                                              (SourcePos fileName eRow eCol)
 
+
+--------------------------------------------------------------------------------
+------------------------------------ Attrs -------------------------------------
+--------------------------------------------------------------------------------
+
 data Attrs = Attrs { _attrLabel :: !Label
                    , _attrSpan  :: !(Maybe SourceSpan)
                    }
 
 makeClassy ''Attrs
 
+
+
+--------------------------------------------------------------------------------
+-------------------------------- Uncategorized ---------------------------------
+--------------------------------------------------------------------------------
 
 type TermLab f   = AnnTerm Label f
 type TermAttrs f = AnnTerm Attrs f
@@ -193,9 +220,6 @@ labelToAttrs (x :&: l) = x :&: Attrs l Nothing
 -- | Fully annotates a term with fresh labels
 annotateLabel :: (HTraversable f, MonadAnnotater Label m) => CxtFunM m f (f :&: Label)
 annotateLabel = annotateM
-
-annotateOuter :: (HTraversable f, MonadAnnotater a m) => Context f (AnnHFix a f) l -> m (AnnHFix a f l)
-annotateOuter = liftM appCxt . annotateM
 
 annotateLabelOuter :: (HTraversable f, MonadAnnotater Label m) => Context f (HFixLab f) l -> m (HFixLab f l)
 annotateLabelOuter = annotateOuter

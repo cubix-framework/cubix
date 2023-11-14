@@ -12,7 +12,7 @@ module Cubix.Language.Python.Parametric.Full
   , module Cubix.Language.Python.Parametric.Full.Trans
   ) where
 
-import Cubix.Language.Python.Parametric.Full.Types
+import Cubix.Language.Python.Parametric.Full.Types hiding ( annotatedTargType )
 import Cubix.Language.Python.Parametric.Full.Trans
 
 #endif

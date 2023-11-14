@@ -119,7 +119,7 @@ instance {-# OVERLAPPABLE #-} SpecialTmpHoistAction fs where
 #ifndef ONLY_ONE_LANGUAGE
 instance {-# OVERLAPPING #-} SpecialTmpHoistAction MPythonSig where
   specialTmpHoistAction n targ = do
-    let cxt = PyCommon.iDelete (SingletonF' $ injF (Hole n)) iUnitF
+    let cxt = PyCommon.iDelete (SingletonF' $ injF (Hole n))
     (e :: TermLab MPythonSig BlockItemL) <- annotateLabelOuter cxt
     doOptionalAppend targ e
 

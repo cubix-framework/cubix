@@ -6,12 +6,14 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Comp.Multi.Annotation
@@ -38,6 +40,7 @@ module Data.Comp.Multi.Annotation
      stripA,
      propAnn,
      project',
+     pattern (::&::),
      isNode',
      inj',
      inject',
@@ -50,7 +53,6 @@ module Data.Comp.Multi.Annotation
      AnnCxtS
     ) where
 
-import Data.Proxy ( Proxy )
 import Data.Comp.Dict
 import Data.Comp.Elem
 import Data.Comp.Multi.Algebra
@@ -104,6 +106,10 @@ project' :: (RemA f f', s :<: f') => Cxt h f a i -> Maybe (s (Cxt h f a) i)
 project' (Term x) = proj $ remA x
 project' _ = Nothing
 
+pattern (::&::) :: (g :-<: fs) => g (Cxt h (Sum fs :&: x) a) l -> x -> Cxt h (Sum fs :&: x) a l
+pattern (::&::) t x <- Term ((proj -> Just t) :&: x) where
+  (::&::) t x = Term (inj t :&: x)
+
 isNode' :: forall f g g' h a l. (HFunctor g, RemA g g', f :<: g') => Cxt h g a l -> Bool
 isNode' t = isNode @f $ stripA t
 
@@ -123,8 +129,8 @@ caseCxt' :: forall cxt fs a e l t. (All cxt fs) => (forall f. (cxt f) => (f :&: 
 caseCxt' f (Sum wit v :&: a) =
   f (v :&: a) \\ dictFor @cxt wit
 
-caseCxt'' :: forall cxt fs a e l t. (All cxt (DistAnn fs a)) => Proxy cxt -> (forall f. (cxt (f :&: a)) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
-caseCxt'' _ f (Sum wit v :&: a) =
+caseCxt'' :: forall cxt fs a e l t. (All cxt (DistAnn fs a)) => (forall f. (cxt (f :&: a)) => (f :&: a) e l -> t) -> (Sum fs :&: a) e l -> t
+caseCxt'' f (Sum wit v :&: a) =
   f (v :&: a) \\ dictFor @cxt (annWit wit)
 
   where annWit :: Elem f fs -> Elem (f :&: a) (DistAnn fs a)

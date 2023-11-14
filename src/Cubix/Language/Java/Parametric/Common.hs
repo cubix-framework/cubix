@@ -32,6 +32,6 @@ import Cubix.Language.Java.Parametric.Common.Cfg () -- instances only
 import Cubix.Language.Java.Parametric.Common.Semantics as Semantics
 import Cubix.Language.Java.Parametric.Common.Types as Types
 import Cubix.Language.Java.Parametric.Common.Trans as Trans
-import Cubix.Language.Java.Parametric.Full as F hiding ( translate, untranslate, Ident, iIdent, IdentL, Block, iBlock, BlockL, LhsL )
-import Cubix.Language.Parametric.Syntax as Para hiding ( Block, BlockL, iBlock, LhsL, AssignOpL, Assign, iAssign )
+import Cubix.Language.Java.Parametric.Full as F hiding ( translate, untranslate, Ident, iIdent, jIdent, IdentL, Block, iBlock, jBlock, BlockL, LhsL )
+import Cubix.Language.Parametric.Syntax as Para hiding ( Block, BlockL, iBlock, jBlock, LhsL, AssignOpL, Assign, iAssign, jAssign )
 #endif

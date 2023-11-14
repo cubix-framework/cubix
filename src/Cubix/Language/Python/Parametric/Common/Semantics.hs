@@ -15,19 +15,18 @@ import Data.Type.Equality ( (:~:)(..), gcastWith )
 import Data.Comp.Multi ( Cxt(..), project, project', inject', (:&:)(..), (:-<:) )
 import Data.Comp.Multi.Strategy.Classification ( KDynCase(..), kIsSort )
 
-import Cubix.Language.Info
 import Cubix.Language.Python.Parametric.Common.Types
 import Cubix.Language.Python.Parametric.Full
 import Cubix.Language.Parametric.Semantics.SemanticProperties
 import Cubix.Language.Parametric.Syntax
 
-import Cubix.Sin.Compdata.Annotation ( annM )
+import Cubix.Sin.Compdata.Annotation ( annM, annotateOuter )
 
 instance {-# OVERLAPPING #-} (Op :-<: gs) => GetStrictness' gs Expr where
-  getStrictness' t@(BinaryOp op _ _ _) = case project op of
-    Just (And _) -> [NoEval, Strict, GuardedBy (Place 1), NoEval]
-    Just (Or _)  -> [NoEval, Strict, GuardedBy (NegPlace 1),    NoEval]
-    _           -> defaultGetStrictness t
+  getStrictness' t@(BinaryOp op _ _) = case project op of
+    Just And -> [NoEval, Strict, GuardedBy (Place 1)]
+    Just Or  -> [NoEval, Strict, GuardedBy (NegPlace 1)]
+    _        -> defaultGetStrictness t
 
   getStrictness' x                  = defaultGetStrictness x
 
@@ -37,24 +36,24 @@ instance {-# OVERLAPPING #-} GetStrictness' g PyCondExpr where
 
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig StatementL Statement where
-  insertAt' (BeforeIntermediateEvalPoint n) e (Conditional clauses els _ :&: l)
+  insertAt' (BeforeIntermediateEvalPoint n) e (Conditional clauses els :&: l)
                 | (n > 0) && (n < length (extractF clauses)) = do
       let (former, latter) = splitAt n (extractF clauses)
-      innerCond <- annotateOuter $ iConditional (insertF $ map Hole latter) (Hole els) iUnitF
-      outerCond <- annotateOuter $ iConditional (insertF $ map Hole former) (insertF [Hole e, Hole innerCond]) iUnitF
+      innerCond <- annotateOuter $ iConditional (insertF $ map Hole latter) (Hole els)
+      outerCond <- annotateOuter $ iConditional (insertF $ map Hole former) (insertF [Hole e, Hole innerCond])
       return outerCond
 
   -- This case is hit when doing multiple inserts on the same conditional, causing some eval points to move into the else
   -- This doesn't really work because it just puts everything at the front, instead of where it's meant to go...
-  insertAt' (BeforeIntermediateEvalPoint n) e (Conditional clauses els u :&: l)
+  insertAt' (BeforeIntermediateEvalPoint n) e (Conditional clauses els :&: l)
                 | n >= length (extractF clauses)
     = do els' <- insertBefore e els
-         return $ inject' $ (Conditional clauses els' u) :&: l
+         return $ inject' $ (Conditional clauses els') :&: l
 
   insertAt' _ _ t = return $ inject' t
 
   -- If = 0, use normal insertion at the list level, not this kind which will split an if/elif
-  canInsertAt' (BeforeIntermediateEvalPoint n) _ (Conditional clauses _ _ :&: _) = (n > 0) && (n < length (extractF clauses))
+  canInsertAt' (BeforeIntermediateEvalPoint n) _ (Conditional clauses _ :&: _) = (n > 0) && (n < length (extractF clauses))
   canInsertAt' _                               _ _                               = False
 
 instance {-# OVERLAPPING #-} InsertAt' MPythonSig BlockItemL Statement where

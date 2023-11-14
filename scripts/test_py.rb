@@ -1,5 +1,17 @@
 #!/usr/bin/ruby
 
+
+#### NOTE FOR MAC USERS (2023.11.13):
+####
+#### It appears that just running any test can trigger a bug where,
+#### when the Python test-runner's setup script calls `resource.setrlimit`,
+#### it gives a ValueError, even though the parameters are within range.
+####
+#### To fix this: open CPython/lib/test/libregrtest/setup.py in the test
+#### directory and comment out
+####
+####  resource.setrlimit(resource.RLIMIT_STACK, (newsoft, hard))
+
 # Python has some way of specifying certain tests as too resource-intensive, and only runs some of the tests by default. I'm not going to figure
 # out how to determine which to include; instead, I'll just copy its list
 all_tests = 

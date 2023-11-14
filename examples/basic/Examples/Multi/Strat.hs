@@ -18,10 +18,10 @@ import Examples.Multi.Syntax
 
 -----------------------------------------------------------------------
 
-extractLabels' :: (Ord a, Annotated f a) => Translate (HFix f) i (Map a (HFix f i))
+extractLabels' :: (Ord a, Annotated a f) => Translate (HFix f) i (Map a (HFix f i))
 extractLabels' s = return $ Map.singleton (getAnn s) s
 
-extractLabels :: (Ord a, Annotated f a, DynCase (HFix f) i, HFoldable f) => HFix f :=> (Map a (HFix f i))
+extractLabels :: (Ord a, Annotated a f, DynCase (HFix f) i, HFoldable f) => HFix f :=> (Map a (HFix f i))
 extractLabels = runIdentity . (crushtdT $ promoteTF $ addFail extractLabels')
 
 consts' :: (Value :-<: fs, MonadPlus m) => TranslateM m (TermLab fs) ExpL [Int]

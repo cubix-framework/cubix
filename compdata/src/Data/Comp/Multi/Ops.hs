@@ -65,8 +65,10 @@ module Data.Comp.Multi.Ops
     ) where
 
 import Control.Monad
-import Data.Type.Equality
+import Data.Default
+import Data.Functor
 import Data.Functor.Identity
+import Data.Type.Equality
 import Data.Comp.Multi.Alt
 import Data.Comp.Multi.HFoldable
 import Data.Comp.Multi.HFunctor
@@ -152,9 +154,28 @@ instance ( Mem f fs
   inj = Sum witness
   proj = at witness
 
-instance f :<: f where
+instance {-# OVERLAPPABLE #-}
+         ( f :<: (Sum fs)
+         , Default a
+         ) => f :<: (Sum fs :&: a) where
+  inj x = inj x :&: def
+  proj (x :&: _) = proj x
+
+instance {-# OVERLAPS #-}
+         (f :<: Sum fs
+         ) => (f :&: a) :<: (Sum fs :&: a) where
+  inj  (x :&: a) = inj x :&: a
+  proj (x :&: a) = proj x <&> (:&: a)
+
+instance {-# INCOHERENT #-} f :<: f where
   inj = id
   proj = Just
+
+-- 2023.11.13: Reviewing the GHC docs on instance resolution in manual section 6.8.8.5, this
+--             seems to be
+--instance {-# INCOHERENT #-} (Sum fs :&: a) :<: (Sum fs :&: a) where
+--  inj = id
+--  proj = Just
 
 type f :=: g = (f :<: g, g :<: f)
 

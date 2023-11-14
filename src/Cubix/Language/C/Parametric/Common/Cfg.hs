@@ -12,7 +12,7 @@ import Control.Monad.State ( State, MonadState )
 import Control.Lens ( makeLenses, (%=), (.=), use, uses )
 
 import Data.List as List ( (\\) )
-import Data.Map as Map ( Map, partitionWithKey, delete )
+import Data.Map as Map ( Map, partitionWithKey )
 import Data.Set as Set ( Set, member, empty, fromList )
 
 import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, fsnd, project, proj, E(..), (:&:)(..), subterms, (:-<:), Cxt (..) )

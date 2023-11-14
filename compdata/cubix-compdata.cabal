@@ -62,7 +62,7 @@ library
                         Data.Comp.Multi.Alt
                         Data.Comp.Alt
 
-  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck,
+  Build-Depends:        base, data-default, template-haskell, containers, mtl, QuickCheck,
                         deepseq, th-expand-syns, transformers, vector, ghc-prim
   Extensions:           FlexibleContexts
   hs-source-dirs:       src

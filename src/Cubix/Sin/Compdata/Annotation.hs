@@ -9,12 +9,13 @@ module Cubix.Sin.Compdata.Annotation (
   , runAnnotateDefault
   , annotateM
   , propAnnSigFun
+  , annotateOuter
   ) where
 
 import Control.Monad.Identity ( Identity(..) )
 import Control.Monad.Trans ( MonadTrans(..) )
 import Data.Default ( Default(..) )
-import Data.Comp.Multi ( All, caseCxt, Node, Cxt(..), (:=>), CxtFunM, SigFun, appSigFunM, HFix, AnnHFix )
+import Data.Comp.Multi ( All, caseCxt, Node, Cxt(..), Context, (:=>), CxtFunM, SigFun, appSigFunM, appCxt, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
 import Data.Comp.Multi.Ops ((:&:)(..), Sum (..))
 
@@ -75,17 +76,17 @@ annotateM = appSigFunM annM
 ------------------- AnnotateDefault
 ----------------------------------
 
-newtype AnnotateDefault a x = AnnotateDefault' { runAnnotateDefault' :: Identity x}
+newtype AnnotateDefault x = AnnotateDefault' { runAnnotateDefault' :: Identity x}
   deriving ( Functor, Applicative, Monad )
 
-pattern AnnotateDefault :: x -> AnnotateDefault a x
+pattern AnnotateDefault :: x -> AnnotateDefault x
 pattern AnnotateDefault x = AnnotateDefault' (Identity x)
 
-runAnnotateDefault :: AnnotateDefault a (AnnHFix a f l) -> AnnHFix a f l
+runAnnotateDefault :: AnnotateDefault (AnnHFix a f l) -> AnnHFix a f l
 runAnnotateDefault = runIdentity . runAnnotateDefault'
 
 -- | Specializing annotation to Maybe a to aid instance selection
-instance MonadAnnotater (Maybe a) (AnnotateDefault a) where
+instance (Default a) => MonadAnnotater a AnnotateDefault where
   annM x = return (x :&: def)
 
 
@@ -96,3 +97,6 @@ instance MonadAnnotater (Maybe a) (AnnotateDefault a) where
 
 propAnnSigFun :: SigFun f g -> SigFun (f :&: a) (g :&: a)
 propAnnSigFun f (t :&: a) = (f t) :&: a
+
+annotateOuter :: (HTraversable f, MonadAnnotater a m) => Context f (AnnHFix a f) l -> m (AnnHFix a f l)
+annotateOuter = fmap appCxt . annotateM

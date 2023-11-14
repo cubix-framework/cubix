@@ -13,6 +13,12 @@ module Cubix.Language.Python.Parametric.Full.Names (
   , newASTTypes
   , pythonSigNames
   , makeSubsts
+
+    -- * Annotation-handling
+  , isAnn
+  , propAnn
+  , annType
+  , annotatedSourceType
   ) where
 
 import           Data.Map ( Map )
@@ -22,10 +28,13 @@ import           Language.Haskell.TH hiding ( Name )
 import qualified Language.Haskell.TH as TH
 import           Language.Python.Common.AST
 
-import           Data.Comp.Trans ( runCompTrans, generateNameLists, getTypeParamVars )
+import           Data.Comp.Trans ( runCompTrans, generateNameLists, getTypeParamVars, defaultPropAnn )
 
+import           Cubix.Language.Info
 import           Cubix.Language.Parametric.Syntax.Base
 import           Cubix.Language.Parametric.Syntax.Functor
+
+-----------------------------------------------------------------------
 
 runCompTrans $ generateNameLists ''Module
 
@@ -35,6 +44,24 @@ pythonSigNames = newASTTypes ++ [''PairF, ''ListF, ''MaybeF, ''UnitF, ''CharF]
 makeSubsts :: Q (Map TH.Name Type)
 makeSubsts = do
   vars <- runCompTrans $ getTypeParamVars origASTTypes
-  let substs = Map.fromList (zip vars (repeat $ TupleT 0))
+  let substs = Map.fromList (zip vars (repeat $ AppT (ConT ''Maybe) (ConT ''SourceSpan)))
   return substs
+
+
+----------------------------------
+-------- Annotation handling
+----------------------------------
+
+isAnn :: TH.Type -> Bool
+isAnn = (== (TH.AppT (TH.ConT ''Maybe) (TH.ConT ''SourceSpan)))
+
+propAnn :: [(TH.Exp, TH.Type)] -> TH.Exp
+propAnn = defaultPropAnn (TH.ConE 'Nothing)
+
+annType :: TH.Type
+annType = (TH.AppT (TH.ConT ''Maybe) (TH.ConT ''SourceSpan))
+
+annotatedSourceType :: TH.Type
+annotatedSourceType = TH.AppT (TH.ConT ''Module) annType
+
 #endif

@@ -16,7 +16,6 @@ import Control.Monad.Identity ( runIdentity )
 import Data.List ( (\\) )
 import Data.Set ( Set )
 import qualified Data.Set as Set
-import Data.Proxy
 
 import Data.Comp.Multi ( Node, Cxt(..), Term, Sum, All, unTerm, ContextS, project', proj, EqHF, project, runE, HFoldable, htoList, (:-<:), stripA, caseCxt, HFunctor)
 import Data.Comp.Multi.Strategic ( Translate, crushtdT, addFail, promoteTF )
@@ -120,12 +119,12 @@ instance RenderGuard MJSSig where
       projBlockItem (project' -> Just (JSStatementIsBlockItem x)) = x
 
 instance RenderGuard MPythonSig where
-  renderGuard sign cond body = annotateLabelOuter $ PCommon.iConditional (insertF [riPairF signedCond suite]) (insertFHole []) iUnitF
+  renderGuard sign cond body = annotateLabelOuter $ PCommon.iConditional (insertF [riPairF signedCond suite]) (insertFHole [])
     where
       signedCond = if sign then
                      Hole cond
                    else
-                     PCommon.iUnaryOp (PCommon.iNot iUnitF) (Hole cond) iUnitF
+                     PCommon.iUnaryOp PCommon.iNot (Hole cond)
 
       suite = insertFHole $ map projBlockItem body
 
@@ -165,8 +164,8 @@ instance {-# OVERLAPPING #-} ShouldHoistSelf' MJSSig JSExpression where
   shouldHoistSelf' _                           = Nothing
 
 instance {-# OVERLAPPING #-} ShouldHoistSelf' MPythonSig PCommon.Expr where
-  shouldHoistSelf' (PCommon.Starred _ _) = Just ShouldntHoist
-  shouldHoistSelf' _                     = Nothing
+  shouldHoistSelf' (PCommon.Starred _) = Just ShouldntHoist
+  shouldHoistSelf' _                   = Nothing
 #endif
 
 
@@ -228,7 +227,7 @@ instance ( All (ShouldHoistChild' fs) fs
       defaultChoice =shouldHoistChild' h $ unTerm t
       override = map (runE shouldHoistSelf) $ htoList $ unTerm t
 
-instance {-# OVERLAP #-} ShouldHoistChild' g P.Assign where
+instance {-# OVERLAPS #-} ShouldHoistChild' g P.Assign where
   shouldHoistChild' _ (P.Assign _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist]
 
 instance {-# OVERLAPPING #-} ShouldHoistChild' gs P.SingleLocalVarDecl where
@@ -263,15 +262,15 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' MJSSig JSExpression where
 
 --  TODO: I can improve this by making augmented assign, delete, for all use our new lvalue system
 instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Statement where
-  shouldHoistChild' _ (PCommon.StmtExpr _ _) = [ShouldntHoist, StopHoisting]
-  shouldHoistChild' _ (PCommon.AugmentedAssign _ _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist, StopHoisting]
-  shouldHoistChild' _ (PCommon.Delete _ _) = [ShouldntHoist, StopHoisting]
-  shouldHoistChild' _ (PCommon.For _ _ _ _ _) = [StopHoisting, ShouldntHoist, ShouldHoist, ShouldHoist, StopHoisting]
+  shouldHoistChild' _ (PCommon.StmtExpr _)            = [ShouldntHoist]
+  shouldHoistChild' _ (PCommon.AugmentedAssign _ _ _) = [ShouldntHoist, StopHoisting, ShouldntHoist]
+  shouldHoistChild' _ (PCommon.Delete _)              = [ShouldntHoist]
+  shouldHoistChild' _ (PCommon.For _ _ _ _)           = [StopHoisting, ShouldntHoist, ShouldHoist, ShouldHoist]
 
   -- "class Foo(a.b)" and "x = a.b \n class Foo(x)" can behave differently. I don't understand why. Fuck Python.
   ----- The reason is that unit tests like to do reflection to find all classes in scope...and x = a.b makes x a
   ----- class in scope. So, this is a hack that dodges that problem, but....fuck Python.
-  shouldHoistChild' _ (PCommon.Class _ _ _ _) = [StopHoisting, StopHoisting, StopHoisting, StopHoisting]
+  shouldHoistChild' _ (PCommon.Class _ _ _) = [StopHoisting, StopHoisting, StopHoisting]
   shouldHoistChild' h t = shouldHoistAllChildren t
 
 instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyClass where
@@ -294,13 +293,13 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Decorator wher
 -- | We don't support TAC in comprehensions or lambdas;
 --   must avoid hoisting outside of binders
 instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Expr where
-  shouldHoistChild' h (PCommon.Paren     _ _) = [h, h]
-  shouldHoistChild' h (PCommon.ListComp  _ _) = [StopHoisting, StopHoisting]
-  shouldHoistChild' h (PCommon.DictComp  _ _) = [StopHoisting, StopHoisting]
-  shouldHoistChild' h (PCommon.SetComp   _ _) = [StopHoisting, StopHoisting]
-  shouldHoistChild' h (PCommon.Generator _ _) = [StopHoisting, StopHoisting]
-  shouldHoistChild' h (PCommon.Lambda _ _ _)  = [StopHoisting, StopHoisting, StopHoisting]
-  shouldHoistChild' h t                       = shouldHoistAllChildren t
+  shouldHoistChild' h (PCommon.Paren     _) = [h]
+  shouldHoistChild' h (PCommon.ListComp  _) = [StopHoisting]
+  shouldHoistChild' h (PCommon.DictComp  _) = [StopHoisting]
+  shouldHoistChild' h (PCommon.SetComp   _) = [StopHoisting]
+  shouldHoistChild' h (PCommon.Generator _) = [StopHoisting]
+  shouldHoistChild' h (PCommon.Lambda _ _)  = [StopHoisting, StopHoisting]
+  shouldHoistChild' h t                     = shouldHoistAllChildren t
 
 instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.PyCondExpr where
   shouldHoistChild' h t = shouldHoistAllChildren t
@@ -311,7 +310,7 @@ instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig FunctionDef where
 
 -- Don't hoist the iterator
 instance {-# OVERLAPPING #-} ShouldHoistChild' MPythonSig PCommon.Handler where
-  shouldHoistChild' h (PCommon.Handler _ _ _) = [StopHoisting, ShouldntHoist, StopHoisting]
+  shouldHoistChild' h (PCommon.Handler _ _) = [StopHoisting, ShouldntHoist]
 #endif
 
 instance {-# OVERLAPPING #-} ShouldHoistChild' MLuaSig LCommon.Exp where

@@ -14,10 +14,11 @@ module Cubix.Language.Python.Parametric.Common.Trans
   , untranslate
   ) where
 
+import Data.Default ( Default(..) )
 import Data.List( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, caseCxt, HFunctor(..), All, Sum, (:-<:) )
+import Data.Comp.Multi ( project, stripA, pattern (::&::), inject, unTerm, caseCxt, caseCxt', HFunctor(..), All, Sum, (:-<:), (:&:)(..) )
 
 import Cubix.Language.Python.Parametric.Common.Types
 import qualified Cubix.Language.Python.Parametric.Full as F
@@ -27,157 +28,184 @@ import Cubix.Language.Parametric.Syntax
 
 -------------------------------------------------------------------------------
 
-translate :: F.PythonTerm l -> MPythonTerm l
+
+------------------------------------------------------------------------------------
+---------------- Forward translation: Modularized syntax to IPS  -------------------
+------------------------------------------------------------------------------------
+
+--------------------------------
+------------- Top-level translate
+--------------------------------
+
+------ Top-level definition
+
+translate :: (Default a) => F.PythonTermAnn a l -> MPythonTermAnn a l
 translate = trans . unTerm
 
-translate' :: (InjF MPythonSig l l') => F.PythonTerm l -> MPythonTerm l'
-translate' = injF . translate
+translate' :: (InjF MPythonSig l l', Default a) => F.PythonTermAnn a l -> MPythonTermAnn a l'
+translate' = injFAnnDef . translate
+
+------ Class
 
 class Trans f where
-  trans :: f F.PythonTerm l -> MPythonTerm l
+  trans :: (Default a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
+
+------ Default and standard cases
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt @Trans trans
+  trans = caseCxt' @Trans trans
 
-transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => f F.PythonTerm l -> MPythonTerm l
+transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig, Default a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
 transDefault = inject . hfmap translate
 
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => Trans f where
   trans = transDefault
 
 
-transIdent :: F.PythonTerm F.IdentL -> MPythonTerm IdentL
-transIdent (project -> Just (F.Ident s _)) = iIdent s
+---------------------------------
+-------------- Per-fragment Instances
+---------------------------------
+
+
+-------- Identifiers
+
+transIdent :: (Default a) => F.PythonTermAnn a F.IdentL -> MPythonTermAnn a IdentL
+transIdent (F.Ident s ::&:: a) = Ident s ::&:: a
 
 instance Trans F.Ident where
-  trans (F.Ident s _) = injF $ Ident' s
+  trans (F.Ident s :&: a) = injectFAnnDef (Ident s :&: a)
 
-transArgs :: F.PythonTerm [F.ArgumentL] -> MPythonTerm [FunctionArgumentL]
+-------- Functions
+
+transArgs :: (Default a) => F.PythonTermAnn a [F.ArgumentL] -> MPythonTermAnn a [FunctionArgumentL]
 transArgs = mapF transArg
   where
-    transArg :: F.PythonTerm F.ArgumentL -> MPythonTerm FunctionArgumentL
-    transArg (project -> Just (F.ArgExpr           e _)) = PositionalArgument' $ injF $ translate e
-    transArg (project -> Just (F.ArgVarArgsPos     e _)) = iPythonArgSplat $ translate e
-    transArg (project -> Just (F.ArgVarArgsKeyword e _)) = iPythonArgKWSplat $ translate  e
-    transArg (project -> Just (F.ArgKeyword      n e _)) = iPythonArgKeyword (transIdent n) (translate e)
+    transArg :: (Default a) => F.PythonTermAnn a F.ArgumentL -> MPythonTermAnn a FunctionArgumentL
+    transArg (F.ArgExpr           e ::&:: a) = PositionalArgument (injFAnnDef $ translate e) ::&:: a
+    transArg (F.ArgVarArgsPos     e ::&:: a) = PythonArgSplat (translate e) ::&:: a
+    transArg (F.ArgVarArgsKeyword e ::&:: a) = PythonArgKWSplat (translate e) ::&:: a
+    transArg (F.ArgKeyword      n e ::&:: a) = PythonArgKeyword (transIdent n) (translate e) ::&:: a
 
-isCompOp :: F.PythonTerm F.OpL -> Bool
-isCompOp (project -> (Just (F.LessThan _)))          = True
-isCompOp (project -> (Just (F.LessThanEquals _)))    = True
-isCompOp (project -> (Just (F.GreaterThan _)))       = True
-isCompOp (project -> (Just (F.GreaterThanEquals _))) = True
-isCompOp (project -> (Just (F.Equality _)))          = True
-isCompOp (project -> (Just (F.NotEquals _)))         = True
-isCompOp (project -> (Just (F.In _)))                = True
-isCompOp (project -> (Just (F.Is _)))                = True
-isCompOp (project -> (Just (F.IsNot _)))             = True
-isCompOp (project -> (Just (F.NotIn _)))             = True
-isCompOp _                                           = False
+isCompOp :: (Default a) => F.PythonTermAnn a F.OpL -> Bool
+isCompOp (F.LessThan          ::&:: _) = True
+isCompOp (F.LessThanEquals    ::&:: _) = True
+isCompOp (F.GreaterThan       ::&:: _) = True
+isCompOp (F.GreaterThanEquals ::&:: _) = True
+isCompOp (F.Equality          ::&:: _) = True
+isCompOp (F.NotEquals         ::&:: _) = True
+isCompOp (F.In                ::&:: _) = True
+isCompOp (F.Is                ::&:: _) = True
+isCompOp (F.IsNot             ::&:: _) = True
+isCompOp (F.NotIn             ::&:: _) = True
+isCompOp _                             = False
 
 -- The parser groups "a > b > c" as "(a > b) > c". However, PyComp needs the
 -- left element to be an expression, and not another comparison. This function
 -- flips the grouping to "a > (b > c)".
-reassociateComp :: F.PythonTerm F.OpL -> F.PythonTerm F.ExprL -> F.PythonTerm F.ExprL -> MPythonTerm F.ExprL
-reassociateComp op l r = injF $ reassociate (translate op) (translate l) (translate r)
+-- NOTE 2023.11.13: I'm just going to let this translation drop the annotations on the comparisons rather than trying to figure this out.
+--                  Note that, in the present case where the annotations are actually source spans, the reassociation will mess with things.
+reassociateComp :: (Default a) => F.PythonTermAnn a F.OpL -> F.PythonTermAnn a F.ExprL -> F.PythonTermAnn a F.ExprL -> a -> MPythonTermAnn a F.ExprL
+reassociateComp op l r _ = injFAnnDef $ reassociate (translate op) (translate l) (translate r)
   where
-    reassociate outer_op (project -> (Just (PyCompIsExpr (PyChainComp' inner_op left inner_right)))) outer_right =
-      iPyChainComp inner_op left (reassociate outer_op (injF inner_right) outer_right)
-    reassociate outer_op (project -> (Just (PyCompIsExpr (PyBaseComp' inner_op left inner_right)))) outer_right =
-      iPyChainComp inner_op left (iPyBaseComp outer_op inner_right outer_right)
-    reassociate op left right = iPyBaseComp op left right
+    reassociate outer_op (PyCompIsExpr (PyChainComp inner_op left inner_right ::&:: _) ::&:: _) outer_right =
+      jPyChainComp inner_op left (reassociate outer_op (injFAnnDef inner_right) outer_right)
+    reassociate outer_op (PyCompIsExpr (PyBaseComp inner_op left inner_right ::&:: _) ::&:: _) outer_right =
+      jPyChainComp inner_op left (jPyBaseComp outer_op inner_right outer_right)
+    reassociate op left right = jPyBaseComp op left right
 
 -- FIXME: This can erroneously capture a module/class as a receiver
 -- FIXME: I think I intended to translate "f(x)" to use a FunctionIdent for f
 instance Trans F.Expr where
-  trans (F.Call f args _) = iFunctionCall EmptyFunctionCallAttrs' fun (FunctionArgumentList' args')
+  trans (F.Call f args :&: a) = injFAnnDef $ FunctionCall jEmptyFunctionCallAttrs fun (jFunctionArgumentList args') ::&:: a
     where
-      (fun, args') = case project f of
-        Just (F.Dot l n _) -> (iFunctionIdent (transIdent n), ConsF' (ReceiverArg' $ injF $ translate l) (transArgs args))
-        _                  -> (injF $ translate f, transArgs args)
+      (fun, args') = case f of
+        (F.Dot l n ::&:: _) -> (jFunctionIdent (transIdent n), jConsF (jReceiverArg $ injFAnnDef $ translate l) (transArgs args))
+        _                   -> (injFAnnDef $ translate f, transArgs args)
 
-  trans t@(F.BinaryOp op l r _) =
+  trans t@(F.BinaryOp op l r :&: a) =
     if isCompOp op
-    then reassociateComp op l r
+    then reassociateComp op l r a
     else transDefault t
-  trans (F.CondExpr t c e _) = iPyCondExpr (translate c) (translate t) (translate e)
-  trans (F.ListComp comp _) = iPyListComprehension (transComprehension comp)
-  trans (F.DictComp comp _) = iPyDictComprehension (transComprehension comp)
-  trans (F.SetComp comp _) = iPySetComprehension (transComprehension comp)
-  trans x = transDefault x
+  trans (F.CondExpr t c e :&: a) = injFAnnDef $ PyCondExpr (translate c) (translate t) (translate e) ::&:: a
+  trans (F.ListComp comp  :&: a) = injFAnnDef $ PyListComprehension (transComprehension comp) ::&:: a
+  trans (F.DictComp comp  :&: a) = injFAnnDef $ PyDictComprehension (transComprehension comp) ::&:: a
+  trans (F.SetComp comp   :&: a) = injFAnnDef $ PySetComprehension (transComprehension comp) ::&:: a
+  trans x                        = transDefault x
 
-transComprehension :: F.PythonTerm F.ComprehensionL -> MPythonTerm PyComprehensionL
-transComprehension (project -> Just (F.Comprehension cexpr cfor _)) = transComprehensionFor cexpr cfor
+transComprehension :: (Default a) => F.PythonTermAnn a F.ComprehensionL -> MPythonTermAnn a PyComprehensionL
+transComprehension (F.Comprehension cexpr cfor ::&:: a) = transComprehensionFor cexpr cfor a
 
-transComprehensionIf :: F.PythonTerm F.ComprehensionExprL -> F.PythonTerm F.CompIfL -> MPythonTerm PyComprehensionL
-transComprehensionIf cexp (project -> Just (F.CompIf e mi _)) =
+-- NOTE 2023.11.13: Totally unsure I got the annotation threading correct. What is the comp_if_iter case in language-python anyhow?
+transComprehensionIf :: (Default a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompIfL -> a -> MPythonTermAnn a PyComprehensionL
+transComprehensionIf cexp (F.CompIf e mi ::&:: _) a =
   let comp = case extractF mi of
-        Just (project -> Just (F.IterFor i _)) -> transComprehensionFor cexp i
-        Just (project -> Just (F.IterIf i _)) -> transComprehensionIf cexp i
-        Nothing -> iPyComprehensionBody (translate cexp)
-  in iPyComprehensionIf (translate e) comp
+        Just (F.IterFor i ::&:: a') -> transComprehensionFor cexp i a'
+        Just (F.IterIf  i ::&:: a') -> transComprehensionIf  cexp i a'
+        Nothing -> jPyComprehensionBody (translate cexp) -- Very unsure of annotations here
+  in PyComprehensionIf (translate e) comp ::&:: a
 
-transComprehensionFor :: F.PythonTerm F.ComprehensionExprL -> F.PythonTerm F.CompForL -> MPythonTerm PyComprehensionL
-transComprehensionFor cexp (project -> Just (F.CompFor b es v mi _)) =
+transComprehensionFor :: (Default a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompForL -> a -> MPythonTermAnn a PyComprehensionL
+transComprehensionFor cexp (F.CompFor b es v mi ::&:: a) a' =
   let comp = case extractF mi of
-        Just (project -> Just (F.IterFor i _)) -> transComprehensionFor cexp i
-        Just (project -> Just (F.IterIf i _)) -> transComprehensionIf cexp i
-        Nothing -> iPyComprehensionBody (translate cexp)
-  in iPyComprehensionFor b (mapF translate es) (translate v) comp
+        Just (F.IterFor i ::&:: a'') -> transComprehensionFor cexp i a''
+        Just (F.IterIf  i ::&:: a'') -> transComprehensionIf  cexp i a''
+        Nothing -> jPyComprehensionBody (translate cexp) -- Very unsure of annotations here
+  in PyComprehensionFor b (mapF translate es) (translate v) comp ::&:: a
 
-translateLValue :: F.PythonTerm F.ExprL -> MPythonTerm PyLValueL
-translateLValue (project -> Just (F.Tuple xs _))        = iTupleLValue (mapF translateLValue xs)
-translateLValue (project -> Just (F.List xs _))         = iListLValue  (mapF translateLValue xs)
-translateLValue (project -> Just (F.Dot e i _))         = iDotLValue (translate e) (transIdent i)
-translateLValue (project -> Just (F.Starred e _))       = iStarLValue (translateLValue e)
-translateLValue (project -> Just (F.Subscript e x _))   = iSubscriptLValue (translate e) (translate x)
-translateLValue (project -> Just (F.SlicedExpr e sl _)) = iSliceLValue (translate e) (translate sl)
-translateLValue (project -> Just (F.Paren e _))         = iParenLValue (translateLValue e)
-translateLValue (project -> Just (F.Var n _))           = injF (transIdent n)
-translateLValue x                                       = error ("Invalid expression appeared in lvalue: " ++ show x)
+translateLValue :: (Default a) => F.PythonTermAnn a F.ExprL -> MPythonTermAnn a PyLValueL
+translateLValue (F.Tuple xs        ::&:: a) = TupleLValue (mapF translateLValue xs)       ::&:: a
+translateLValue (F.List xs         ::&:: a) = ListLValue  (mapF translateLValue xs)       ::&:: a
+translateLValue (F.Dot e i         ::&:: a) = DotLValue (translate e) (transIdent i)      ::&:: a
+translateLValue (F.Starred e       ::&:: a) = StarLValue (translateLValue e)              ::&:: a
+translateLValue (F.Subscript e x   ::&:: a) = SubscriptLValue (translate e) (translate x) ::&:: a
+translateLValue (F.SlicedExpr e sl ::&:: a) = SliceLValue (translate e) (translate sl)    ::&:: a
+translateLValue (F.Paren e         ::&:: a) = ParenLValue (translateLValue e)             ::&:: a
+translateLValue (F.Var n           ::&:: a) = injFAnnDef (transIdent n)
+translateLValue x                           = error ("Invalid expression appeared in lvalue: " ++ show (stripA x))
 
 
-transBinder :: F.PythonTerm (F.ExprL, Maybe F.ExprL) -> MPythonTerm PyWithBinderL
-transBinder (PairF' x y) = iPyWithBinder (translate x) (mapF translateLValue y)
+transBinder :: (Default a) => F.PythonTermAnn a (F.ExprL, Maybe F.ExprL) -> MPythonTermAnn a PyWithBinderL
+transBinder (PairF x y ::&:: a) = injFAnnDef $ PyWithBinder (translate x) (mapF translateLValue y) ::&:: a
 
-transParam :: F.PythonTerm F.ParameterL -> MPythonTerm FunctionParameterL
-transParam (project -> Just (F.Param          n ann d _)) = PositionalParameter' (iPyParamAttrs (translate ann) (translate d)) (transIdent n)
-transParam (project -> Just (F.VarArgsPos     n ann   _)) = iPythonParamVarArgs     (transIdent n) (translate ann)
-transParam (project -> Just (F.VarArgsKeyword n ann   _)) = iPythonParamVarArgsKW   (transIdent n) (translate ann)
-transParam (project -> Just (F.EndPositional _))          = iPythonEndPosParam
-transParam (project -> Just (F.UnPackTuple t    ann   _)) = iPythonParamUnpackTuple (translate t) (translate ann)
+transParam :: (Default a) => F.PythonTermAnn a F.ParameterL -> MPythonTermAnn a FunctionParameterL
+transParam (F.Param          n ann d ::&:: a) = injFAnnDef $ PositionalParameter (jPyParamAttrs (translate ann) (translate d)) (transIdent n) ::&:: a
+transParam (F.VarArgsPos     n ann   ::&:: a) = injFAnnDef $ PythonParamVarArgs     (transIdent n) (translate ann) ::&:: a
+transParam (F.VarArgsKeyword n ann   ::&:: a) = injFAnnDef $ PythonParamVarArgsKW   (transIdent n) (translate ann) ::&:: a
+transParam (F.EndPositional          ::&:: a) = injFAnnDef $ PythonEndPosParam                                     ::&:: a
+transParam (F.UnPackTuple t    ann   ::&:: a) = injFAnnDef $ PythonParamUnpackTuple (translate t) (translate ann)  ::&:: a
 
-extractString :: F.PythonTerm [CharL] -> String
+extractString :: (Default a) => F.PythonTermAnn a [CharL] -> String
 extractString cs = map getChar $ extractF cs
   where
-    getChar :: F.PythonTerm CharL -> Char
+    getChar :: (Default a) => F.PythonTermAnn a CharL -> Char
     getChar (CharF' c) = c
 
-extractStrings :: F.PythonTerm [[CharL]] -> [String]
+extractStrings :: (Default a) => F.PythonTermAnn a [[CharL]] -> [String]
 extractStrings strs = map extractString $ extractF strs
 
-makePyBlock :: F.PythonTerm [F.StatementL] -> MPythonTerm PyBlockL
-makePyBlock stmts = iPyBlock docstring (iBlock (insertF $ map (injF.translate) body) EmptyBlockEnd')
+makePyBlock :: forall a. (Default a) => F.PythonTermAnn a [F.StatementL] -> MPythonTermAnn a PyBlockL
+makePyBlock stmts = jPyBlock docstring (jBlock (insertF $ map (injFAnnDef.translate) body) jEmptyBlockEnd)
   where
-    docstring :: MPythonTerm (Maybe PyStringLitL)
-    body :: [F.PythonTerm F.StatementL]
+    docstring :: MPythonTermAnn a (Maybe PyStringLitL)
+    body :: [F.PythonTermAnn a F.StatementL]
     (docstring, body) = case extractF stmts of
       [] -> (Nothing', [])
       (fst : rest) ->
         case fst of
-          (project -> Just (F.StmtExpr exp _)) ->
+          (F.StmtExpr exp ::&:: _) ->
             case exp of
-              (project -> Just (F.Strings        strs _)) -> (Just' $ iPyStrings        (extractStrings strs), rest)
-              (project -> Just (F.UnicodeStrings strs _)) -> (Just' $ iPyUnicodeStrings (extractStrings strs), rest)
-              (project -> Just (F.ByteStrings    strs _)) -> (Just' $ iPyByteStrings    (extractStrings strs), rest)
-              _                                            -> (Nothing', fst : rest)
+              (project -> Just (F.Strings        strs :&: a)) -> (Just' $ PyStrings        (extractStrings strs) ::&:: a, rest)
+              (project -> Just (F.UnicodeStrings strs :&: a)) -> (Just' $ PyUnicodeStrings (extractStrings strs) ::&:: a, rest)
+              (project -> Just (F.ByteStrings    strs :&: a)) -> (Just' $ PyByteStrings    (extractStrings strs) ::&:: a, rest)
+              _                                              -> (Nothing', fst : rest)
           _ -> (Nothing', fst : rest)
 
 instance Trans F.Statement where
-  trans (F.Assign es e _)           = injF $ Assign' (iPyLhs $ mapF translateLValue es) AssignOpEquals' (injF $ translate e)
-  trans (F.Fun n params ann body _) = iFunctionDef (iPyFunDefAttrs $ translate ann) (transIdent n) (mapF transParam params) (injF $ makePyBlock body)
-  trans (F.With binders body _  )   = iPyWith (mapF transBinder binders) (translate body)
-  trans (F.Class id args body _)    = iPyClass (transIdent id) (translate args) (makePyBlock body)
-  trans x                           = transDefault x
+  trans (F.Assign es e           :&: a) = injFAnnDef $ Assign (jPyLhs $ mapF translateLValue es) jAssignOpEquals (injFAnnDef $ translate e) ::&:: a
+  trans (F.Fun n params ann body :&: a) = injFAnnDef $ FunctionDef (jPyFunDefAttrs $ translate ann) (transIdent n) (mapF transParam params) (injFAnnDef $ makePyBlock body) ::&:: a
+  trans (F.With binders body     :&: a) = injFAnnDef $ PyWith (mapF transBinder binders) (translate body) ::&:: a
+  trans (F.Class id args body    :&: a) = injFAnnDef $ PyClass (transIdent id) (translate args) (makePyBlock body) ::&:: a
+  trans x                               = transDefault x
 
 -------------------------------------------------------------------------------
 
@@ -188,7 +216,7 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MPythonSig) => f MPythonTerm l -> F.PythonTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ (inject t :: MPythonTerm _))
+untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
 
 do ipsNames <- sumToNames ''MPythonSig
    modNames <- sumToNames ''F.PythonSig
@@ -203,35 +231,35 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: F.PythonSig) => Untrans f wher
   untrans = untransDefault
 
 untransIdent :: MPythonTerm IdentL -> F.PythonTerm F.IdentL
-untransIdent (Ident' x) = F.iIdent x iUnitF
+untransIdent (Ident' x) = F.iIdent x
 
 instance {-# OVERLAPPING #-} Untrans IdentIsIdent where
-  untrans (IdentIsIdent (Ident' x)) = F.iIdent x iUnitF
+  untrans (IdentIsIdent (Ident' x)) = F.iIdent x
 
 untransLValue :: MPythonTerm PyLValueL -> F.PythonTerm F.ExprL
-untransLValue (project -> Just (TupleLValue xs))      = F.iTuple (mapF untransLValue xs) iUnitF
-untransLValue (project -> Just (ListLValue xs))       = F.iList  (mapF untransLValue xs) iUnitF
-untransLValue (project -> Just (DotLValue e i))       = F.iDot (untranslate e) (untransIdent i) iUnitF
-untransLValue (project -> Just (StarLValue e))        = F.iStarred (untransLValue e) iUnitF
-untransLValue (project -> Just (SubscriptLValue e x)) = F.iSubscript (untranslate e) (untranslate x) iUnitF
-untransLValue (project -> Just (SliceLValue e sl))    = F.iSlicedExpr (untranslate e) (untranslate sl) iUnitF
-untransLValue (project -> Just (ParenLValue e))       = F.iParen (untransLValue e) iUnitF
-untransLValue (project -> Just (IdentIsPyLValue n))   = F.iVar (untransIdent n) iUnitF
+untransLValue (project -> Just (TupleLValue xs))      = F.iTuple (mapF untransLValue xs)
+untransLValue (project -> Just (ListLValue xs))       = F.iList  (mapF untransLValue xs)
+untransLValue (project -> Just (DotLValue e i))       = F.iDot (untranslate e) (untransIdent i)
+untransLValue (project -> Just (StarLValue e))        = F.iStarred (untransLValue e)
+untransLValue (project -> Just (SubscriptLValue e x)) = F.iSubscript (untranslate e) (untranslate x)
+untransLValue (project -> Just (SliceLValue e sl))    = F.iSlicedExpr (untranslate e) (untranslate sl)
+untransLValue (project -> Just (ParenLValue e))       = F.iParen (untransLValue e)
+untransLValue (project -> Just (IdentIsPyLValue n))   = F.iVar (untransIdent n)
 
 instance {-# OVERLAPPING #-} Untrans AssignIsStatement where
-  untrans (AssignIsStatement (Assign' l AssignOpEquals' r)) = F.iAssign (mapF untransLValue $ fromProjF l) (untranslate $ fromProjF r) iUnitF
+  untrans (AssignIsStatement (Assign' l AssignOpEquals' r)) = F.iAssign (mapF untransLValue $ fromProjF l) (untranslate $ fromProjF r)
 
 
 untransBinder :: MPythonTerm PyWithBinderL -> F.PythonTerm (F.ExprL, Maybe F.ExprL)
 untransBinder (project -> Just (PyWithBinder x y)) = PairF' (untranslate x) (mapF untransLValue y)
 
 instance {-# OVERLAPPING #-} Untrans PyWith where
-  untrans (PyWith binders body) = F.iWith (mapF untransBinder binders) (untranslate body) iUnitF
+  untrans (PyWith binders body) = F.iWith (mapF untransBinder binders) (untranslate body)
 
 untransPyStrLit :: MPythonTerm PyStringLitL -> F.PythonTerm F.ExprL
-untransPyStrLit (project -> Just (PyStrings        strs)) = F.iStrings        (insertStrings strs) iUnitF
-untransPyStrLit (project -> Just (PyUnicodeStrings strs)) = F.iUnicodeStrings (insertStrings strs) iUnitF
-untransPyStrLit (project -> Just (PyByteStrings    strs)) = F.iByteStrings    (insertStrings strs) iUnitF
+untransPyStrLit (project -> Just (PyStrings        strs)) = F.iStrings        (insertStrings strs)
+untransPyStrLit (project -> Just (PyUnicodeStrings strs)) = F.iUnicodeStrings (insertStrings strs)
+untransPyStrLit (project -> Just (PyByteStrings    strs)) = F.iByteStrings    (insertStrings strs)
 
 untransBlock :: MPythonTerm BlockL -> F.PythonTerm [F.StatementL]
 untransBlock (Block' ss EmptyBlockEnd') = mapF (untranslate.fromProjF) ss
@@ -241,31 +269,31 @@ untransPyBlock (PyBlock' docStr body) = insertF $ docStrStmt ++ (extractF $ untr
   where
     docStrStmt = case docStr of
       Nothing' -> []
-      Just' lit -> [F.iStmtExpr (untransPyStrLit lit) iUnitF]
+      Just' lit -> [F.iStmtExpr (untransPyStrLit lit)]
 
 instance {-# OVERLAPPING #-} Untrans PyClassIsStatement where
-  untrans (PyClassIsStatement (project -> Just (PyClass id args body))) = F.iClass (untransIdent id) (untranslate args) (untransPyBlock body) iUnitF
+  untrans (PyClassIsStatement (project -> Just (PyClass id args body))) = F.iClass (untransIdent id) (untranslate args) (untransPyBlock body)
 
 undoReassociateComp :: F.PythonTerm F.OpL -> F.PythonTerm F.ExprL -> F.PythonTerm F.ExprL -> F.PythonTerm F.ExprL
-undoReassociateComp outer_op outer_left (project -> (Just (F.BinaryOp inner_op inner_left right _))) =
-  F.iBinaryOp inner_op (undoReassociateComp outer_op outer_left inner_left) right iUnitF
-undoReassociateComp op left right = F.iBinaryOp op left right iUnitF
+undoReassociateComp outer_op outer_left (project -> (Just (F.BinaryOp inner_op inner_left right))) =
+  F.iBinaryOp inner_op (undoReassociateComp outer_op outer_left inner_left) right
+undoReassociateComp op left right = F.iBinaryOp op left right
 
 instance {-# OVERLAPPING #-} Untrans PyCompIsExpr where
   untrans (PyCompIsExpr (PyBaseComp' op l r)) = undoReassociateComp (untranslate op) (untranslate l) (untranslate r)
   untrans (PyCompIsExpr (PyChainComp' op l r)) = undoReassociateComp (untranslate op) (untranslate l) (untranslate $ iPyCompIsExpr r)
 
 untransArg :: MPythonTerm FunctionArgumentL -> F.PythonTerm F.ArgumentL
-untransArg (PositionalArgument' e) = F.iArgExpr (untranslate $ fromProjF e) iUnitF
-untransArg (project -> Just (PythonArgSplat     e)) = F.iArgVarArgsPos (untranslate e) iUnitF
-untransArg (project -> Just (PythonArgKWSplat   e)) = F.iArgVarArgsKeyword (untranslate e) iUnitF
-untransArg (project -> Just (PythonArgKeyword n e)) = F.iArgKeyword (untransIdent n) (untranslate e) iUnitF
+untransArg (PositionalArgument' e) = F.iArgExpr (untranslate $ fromProjF e)
+untransArg (project -> Just (PythonArgSplat     e)) = F.iArgVarArgsPos (untranslate e)
+untransArg (project -> Just (PythonArgKWSplat   e)) = F.iArgVarArgsKeyword (untranslate e)
+untransArg (project -> Just (PythonArgKeyword n e)) = F.iArgKeyword (untransIdent n) (untranslate e)
 
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsExpr where
-  untrans (FunctionCallIsExpr (FunctionCall' EmptyFunctionCallAttrs' f args)) = F.iCall lhs args' iUnitF
+  untrans (FunctionCallIsExpr (FunctionCall' EmptyFunctionCallAttrs' f args)) = F.iCall lhs args'
     where
       (lhs, args') = case (f, args) of
-                       (FunctionIdent' n, FunctionArgumentList' (ConsF' (ReceiverArg' r) as)) -> ( F.iDot (untranslate $ fromProjF r) (untransIdent n) iUnitF
+                       (FunctionIdent' n, FunctionArgumentList' (ConsF' (ReceiverArg' r) as)) -> ( F.iDot (untranslate $ fromProjF r) (untransIdent n)
                                                                                                  , mapF untransArg as)
                        (e, FunctionArgumentList' as) -> (untranslate $ fromProjF e, mapF untransArg as)
 
@@ -276,23 +304,23 @@ insertStrings :: [String] -> F.PythonTerm [[CharL]]
 insertStrings strs = insertF $ map insertString strs
 
 untransParam :: MPythonTerm FunctionParameterL -> F.PythonTerm F.ParameterL
-untransParam (PositionalParameter' (PyParamAttrs'     ann def) n) = F.iParam          (untransIdent n) (untranslate ann) (untranslate def) iUnitF
-untransParam (project -> Just (PythonParamVarArgs   n ann))       = F.iVarArgsPos     (untransIdent n) (untranslate ann) iUnitF
-untransParam (project -> Just (PythonParamVarArgsKW n ann))       = F.iVarArgsKeyword (untransIdent n) (untranslate ann) iUnitF
-untransParam (project -> Just (PythonParamUnpackTuple pt ann))    = F.iUnPackTuple (untranslate pt) (untranslate ann) iUnitF
-untransParam (project -> Just (PythonEndPosParam))                = F.iEndPositional iUnitF
+untransParam (PositionalParameter' (PyParamAttrs'     ann def) n) = F.iParam          (untransIdent n) (untranslate ann) (untranslate def)
+untransParam (project -> Just (PythonParamVarArgs   n ann))       = F.iVarArgsPos     (untransIdent n) (untranslate ann)
+untransParam (project -> Just (PythonParamVarArgsKW n ann))       = F.iVarArgsKeyword (untransIdent n) (untranslate ann)
+untransParam (project -> Just (PythonParamUnpackTuple pt ann))    = F.iUnPackTuple (untranslate pt) (untranslate ann)
+untransParam (project -> Just (PythonEndPosParam))                = F.iEndPositional
 
 
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsStatement where
-  untrans (FunctionDefIsStatement (FunctionDef' (PyFunDefAttrs' ann) n params body)) = F.iFun (untransIdent n) (mapF untransParam params) (untranslate ann) (untransPyBlock $ fromProjF body) iUnitF
+  untrans (FunctionDefIsStatement (FunctionDef' (PyFunDefAttrs' ann) n params body)) = F.iFun (untransIdent n) (mapF untransParam params) (untranslate ann) (untransPyBlock $ fromProjF body)
 
 instance {-# OVERLAPPING #-} Untrans PyCondExpr where
-  untrans (PyCondExpr c t e) = F.iCondExpr (untranslate t) (untranslate c) (untranslate e) iUnitF
+  untrans (PyCondExpr c t e) = F.iCondExpr (untranslate t) (untranslate c) (untranslate e)
 
 instance {-# OVERLAPPING #-} Untrans PyComprehensionExpr where
-  untrans (PyListComprehension c) = F.iListComp (untransComprehension c) iUnitF
-  untrans (PyDictComprehension c) = F.iDictComp (untransComprehension c) iUnitF
-  untrans (PySetComprehension c) = F.iSetComp (untransComprehension c) iUnitF
+  untrans (PyListComprehension c) = F.iListComp (untransComprehension c)
+  untrans (PyDictComprehension c) = F.iDictComp (untransComprehension c)
+  untrans (PySetComprehension c) = F.iSetComp (untransComprehension c)
 
 -- instance {-# OVERLAPPING #-} Untrans PyComprehension where
 --   untrans = untransComprehension
@@ -300,28 +328,28 @@ instance {-# OVERLAPPING #-} Untrans PyComprehensionExpr where
 untransComprehension :: MPythonTerm PyComprehensionL -> F.PythonTerm F.ComprehensionL
 untransComprehension t =
   let (expr, comp) = untransComprehension0 t
-  in  F.iComprehension expr comp iUnitF
+  in  F.iComprehension expr comp
 
   where untransComprehension0 :: MPythonTerm PyComprehensionL -> (F.PythonTerm F.ComprehensionExprL, F.PythonTerm F.CompForL)
         untransComprehension0 (project -> Just (PyComprehensionFor b es v comp)) =
           compFor <$> go comp
 
-          where compFor mIter = F.iCompFor b (mapF untranslate es) (untranslate v) mIter iUnitF
+          where compFor mIter = F.iCompFor b (mapF untranslate es) (untranslate v) mIter
 
         go :: MPythonTerm PyComprehensionL -> (F.PythonTerm F.ComprehensionExprL, F.PythonTerm (Maybe F.CompIterL))
         go (project -> Just (PyComprehensionFor b es v comp)) =
           iterFor <$> go comp
           
           where iterFor mIter =
-                  let compFor = F.iCompFor b (mapF untranslate es) (untranslate v) mIter iUnitF
-                  in  Just' (F.iIterFor compFor iUnitF)
+                  let compFor = F.iCompFor b (mapF untranslate es) (untranslate v) mIter
+                  in  Just' (F.iIterFor compFor)
           
         go (project -> Just (PyComprehensionIf e comp)) =
           iterIf <$> go comp
 
           where iterIf mIter =
-                  let compIf = F.iCompIf (untranslate e) mIter iUnitF
-                  in Just' (F.iIterIf compIf iUnitF)
+                  let compIf = F.iCompIf (untranslate e) mIter
+                  in Just' (F.iIterIf compIf)
 
         go (project -> Just (PyComprehensionBody b)) =
           (untranslate b, Nothing')
