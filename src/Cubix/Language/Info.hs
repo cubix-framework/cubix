@@ -73,6 +73,8 @@ import GHC.Generics ( Generic )
 
 import System.IO.Unsafe ( unsafePerformIO )
 
+import Data.Aeson ( ToJSON )
+
 import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM, annotateOuter )
@@ -86,6 +88,7 @@ newtype Label = Label Int
   deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 instance NFData Label where rnf = genericRnf
+instance ToJSON Label
 
 makeClassy ''Label
 
@@ -101,6 +104,7 @@ data SourcePos = SourcePos { _sourceFile :: !String
   deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 instance NFData SourcePos where rnf = genericRnf
+instance ToJSON SourcePos
 
 makeClassy ''SourcePos
 
@@ -110,6 +114,9 @@ makeClassy ''SourcePos
 --------------------------------------------------------------------------------
 
 data SourceSpan = SourceSpan { _sourceStart :: !SourcePos, _sourceEnd :: !SourcePos } deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
+
+instance NFData SourceSpan where rnf = genericRnf
+instance ToJSON SourceSpan
 
 makeClassy ''SourceSpan
 

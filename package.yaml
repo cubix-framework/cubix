@@ -103,6 +103,7 @@ library:
   ghc-options:
   - -freduction-depth=400
   dependencies:
+  - aeson
   - base
   - cubix-compdata
   - concurrent-supply >=0.1.7

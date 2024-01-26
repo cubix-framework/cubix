@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bc2aa07699a5a227b34878db98d2380795e1d8055f2ca55dc97c35b5a3aa0f59
+-- hash: fa89f13413e8d386aac9a447e18a9abeb9f7f5aca6d648bfd127468328d56426
 
 name:           cubix
 version:        0.0.0
@@ -164,6 +164,7 @@ library
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -freduction-depth=400
   build-depends:
       MonadRandom
+    , aeson
     , base
     , compstrat
     , comptrans
