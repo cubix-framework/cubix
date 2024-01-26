@@ -36,7 +36,9 @@ module Data.Comp.Multi.Strategy.Classification
   , caseDyn
   , subterms
   , isSort
+  , hasAnySort
   , kIsSort
+  , kHasAnySort
   ) where
 
 import Data.Type.Equality ( (:~:)(..), gcastWith )
@@ -45,7 +47,8 @@ import Data.Proxy
 
 import GHC.Exts ( Constraint )
 
-import Data.Comp.Multi ( Family, Node, HFix, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt )
+import Data.Comp.Dict ( mapAll )
+import Data.Comp.Multi ( Family, Node, HFix, Sum, E, K, runE, caseH, (:&:), remA, Cxt(..), subs, NotSum, All, caseCxt, Sort )
 import Data.Comp.Multi.HFoldable ( HFoldable )
 
 --------------------------------------------------------------------------------
@@ -120,9 +123,26 @@ isSort x = case (dyncase x :: Maybe (_ :~: l)) of
   Just _  -> True
   Nothing -> False
 
+-- |
+-- @hasAnySort \@ls@ returns a boolean function that tests
+-- whether a term has any sort in the list of sorts @ls@
+-- 
+-- Example usage: @hasAnySort \@'[FunctionDefL, FunctionDeclL] t@
+hasAnySort :: forall (ls :: [Sort]) e. (All (DynCase e) ls) => forall i. e i -> Bool
+hasAnySort t = or $ mapAll @(DynCase e) @ls checkSort
+  where
+    checkSort :: forall j. (DynCase e j) => Proxy j -> Bool
+    checkSort _ = isSort @j t
+
 -- | Like `isSort`, but runs on (unwrapped) nodes rather than terms.
 kIsSort :: forall l f. (KDynCase f l) => forall i e. f e i -> Bool
 kIsSort x = case (kdyncase x :: Maybe (_ :~: l)) of
   Just _  -> True
   Nothing -> False
 
+-- |Like `hasAnySort`, but runs on (unwrapped) nodes rather than terms.
+kHasAnySort :: forall (ls :: [Sort]) f. (All (KDynCase f) ls) => forall i e. f e i -> Bool
+kHasAnySort t = or $ mapAll @(KDynCase f) @ls checkSort
+  where
+    checkSort :: forall j. (KDynCase f j) => Proxy j -> Bool
+    checkSort _ = kIsSort @j t

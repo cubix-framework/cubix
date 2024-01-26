@@ -90,7 +90,7 @@ import Data.Comp.Dict
 --
 --   except that this definition uses value-level integers (in the `Elem` datatype) in place
 --   of type-level naturals. It hence uses `unsafeCoerce` under the hood, but is type-safe if used
---   Tthrough the public API. The result is that values of this type take constant memory with respect to the number
+--   through the public API. The result is that values of this type take constant memory with respect to the number
 --   of summands (unlike vanilla datatypes à la carte), and constant time to dereference
 --   (unlike modular reifiable matching). The representation is the bare minimum: an int representing the alternative,
 --   and pointer to the value.

@@ -25,6 +25,7 @@ extra-source-files:
 
 library
   Exposed-Modules:      Data.Comp.Derive.Utils
+                        Data.Comp.Dict
                         Data.Comp.Ops
 
                         Data.Comp.Multi
@@ -58,7 +59,6 @@ library
                         Data.Comp.Multi.Derive.Show
                         Data.Comp.Multi.Derive.SmartConstructors
                         Data.Comp.Elem
-                        Data.Comp.Dict
                         Data.Comp.Multi.Alt
                         Data.Comp.Alt
 
@@ -76,4 +76,4 @@ Test-Suite test
   hs-source-dirs:               testsuite/tests examples src
   Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
                         HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
-                        th-expand-syns, deepseq, transformers, vector, ghc-prim
+                        th-expand-syns, deepseq, transformers, vector, ghc-prim, cubix-compdata

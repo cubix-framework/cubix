@@ -52,6 +52,7 @@ type instance BarrierSorts   MLuaSig = '[LCommon.StatL, LCommon.FunBodyL]
 
 -- Subexp-to-tmp transform will run on all subexps of some "barrier sort" which are not contained in a sub barrier sort
 -- E.g.: Run all all exps in a statement which are not contained in a child statement
+
 class BarrierCheck' fs (l :: [Sort]) where
   barrierCheck' :: (MonadPlus m) => Proxy l -> GRewriteM m (TermLab fs)
 

@@ -43,7 +43,7 @@ import Data.Typeable ( Typeable )
 import Control.Lens ( (^.), (%=)  )
 
 import Data.Comp.Multi ( Node, Signature, Cxt(..), (:->), K(..), inj, proj, project, para, stripA, inj, Sum, HFunctor(..), HFoldable(..), HTraversable(..), (:*:)(..), (:&:)(..), ffst, fsnd, ShowHF(..), inj', caseCxt', All, HFix, AnnTerm, Term, (:-<:) )
-import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort )
+import Data.Comp.Multi.Strategy.Classification ( DynCase, isSort, hasAnySort )
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.Cfg.Graph
@@ -51,45 +51,42 @@ import Cubix.Language.Parametric.Syntax.Functor
 
 --------------------------------------------------------------------------------------
 
+
+------------------------------------------------------------------
+--------------------------- Sort checking ------------------------
+------------------------------------------------------------------
+
+---------
+---- Computation Sorts
+---------
+
 type family ComputationSorts (fs :: Signature) :: [*]
 
-class IsComputationSort' fs (l :: [*]) where
-  isComputationSort' :: Proxy l -> Term fs i -> Bool
+type IsComputationSort fs = All (DynCase (Term fs)) (ComputationSorts fs)
 
-class IsComputationSort fs where
-  isComputationSort :: Term fs i -> Bool
-
-instance (IsComputationSort' fs (ComputationSorts fs)) => IsComputationSort fs where
-  isComputationSort = isComputationSort' (Proxy @(ComputationSorts fs))
-
-instance IsComputationSort' fs '[] where
-  isComputationSort' _ = const False
-
-instance (IsComputationSort' fs ls, DynCase (Term fs) l) => IsComputationSort' fs (l ': ls) where
-  isComputationSort' _ t = (isSort @l t) || (isComputationSort' (Proxy @ls) t)
+isComputationSort :: forall fs l. (IsComputationSort fs) => Term fs l -> Bool
+isComputationSort = hasAnySort @(ComputationSorts fs)
 
 labeledIsComputationSort :: forall fs l. (IsComputationSort fs, All HFunctor fs) => TermLab fs l -> Bool
 labeledIsComputationSort = isComputationSort . stripA
 
+---------
+---- Suspended Computation Sorts
+---------
+
 type family SuspendedComputationSorts (fs :: Signature) :: [*]
 
-class IsSuspendedComputationSort' fs (l :: [*]) where
-  isSuspendedComputationSort' :: Proxy l -> Term fs i -> Bool
+type IsSuspendedComputationSort fs = All (DynCase (Term fs)) (SuspendedComputationSorts fs)
 
-class IsSuspendedComputationSort fs where
-  isSuspendedComputationSort :: Term fs i -> Bool
-
-instance (IsSuspendedComputationSort' fs (SuspendedComputationSorts fs)) => IsSuspendedComputationSort fs where
-  isSuspendedComputationSort = isSuspendedComputationSort' (Proxy @(SuspendedComputationSorts fs))
-
-instance IsSuspendedComputationSort' fs '[] where
-  isSuspendedComputationSort' _ = const False
-
-instance (IsSuspendedComputationSort' fs ls, DynCase (Term fs) l) => IsSuspendedComputationSort' fs (l ': ls) where
-  isSuspendedComputationSort' _ t = (isSort @l t) || (isSuspendedComputationSort' (Proxy @ls) t)
+isSuspendedComputationSort :: forall fs l. (IsSuspendedComputationSort fs) => Term fs l -> Bool
+isSuspendedComputationSort = hasAnySort @(SuspendedComputationSorts fs)
 
 labeledIsSuspendedComputationSort :: (IsSuspendedComputationSort fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsSuspendedComputationSort = isSuspendedComputationSort . stripA
+
+---------
+---- Container Functors
+---------
 
 type family ContainerFunctors (fs :: Signature) :: [Node]
 
@@ -115,6 +112,10 @@ instance (IsContainer' fs ls, l :-<: fs) => IsContainer' fs (l ': ls) where
 
 labeledIsContainer :: (IsContainer fs, All HFunctor fs) => AnnTerm a fs l -> Bool
 labeledIsContainer = isContainer . stripA
+
+------------------------------------------------------------------
+--------------------------- Uncategorized ------------------------
+------------------------------------------------------------------
 
 
 data EnterExitPair fs l = EnterExitPair { enter :: CfgNode fs
