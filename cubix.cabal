@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f8e9181805c51f5bca23e9757cc81b84034d4286e9a665779e6bea826b54c840
+-- hash: bc2aa07699a5a227b34878db98d2380795e1d8055f2ca55dc97c35b5a3aa0f59
 
 name:           cubix
 version:        0.0.0
@@ -13,7 +13,7 @@ description:    Please see README.md
 category:       language
 author:         James Koppel
 maintainer:     jkoppel@mit.edu
-copyright:      2016 James Koppel
+copyright:      2016-2023 James Koppel
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -46,6 +46,8 @@ library
       Cubix.Language.Parametric.Syntax
       Cubix.Language.Python.Parametric.Common
       Cubix.Language.Python.Parametric.Full
+      Cubix.Language.Solidity.Parametric.Common
+      Cubix.Language.Solidity.Parametric.Full
       Cubix.ParsePretty
       Cubix.Sin.Compdata.Annotation
       Cubix.Sin.NFData
@@ -102,6 +104,11 @@ library
       Cubix.Language.Python.Parametric.Full.Names
       Cubix.Language.Python.Parametric.Full.Trans
       Cubix.Language.Python.Parametric.Full.Types
+      Cubix.Language.Solidity.Parametric.Common.Trans
+      Cubix.Language.Solidity.Parametric.Common.Types
+      Cubix.Language.Solidity.Parametric.Full.Names
+      Cubix.Language.Solidity.Parametric.Full.Trans
+      Cubix.Language.Solidity.Parametric.Full.Types
       Cubix.Sin.Compdata.Derive
       Cubix.Sin.Compdata.Instances
       Cubix.Transformations.Hoist.Custom
@@ -178,6 +185,7 @@ library
     , mtl
     , process
     , random
+    , solidity
     , template-haskell
     , temporary
     , text

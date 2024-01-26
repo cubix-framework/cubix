@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Cubix.ParsePretty(
+module Cubix.ParsePretty (
     ParseFile(..)
   , ParseFileTrackSources(..)
   , Pretty(..)
@@ -15,6 +15,7 @@ module Cubix.ParsePretty(
   , parseJava
   , parseJavaScript
   , parsePython
+  , parseSolidity
 
   , prettyC
   , prettyJava
@@ -31,6 +32,7 @@ import Data.Comp.Multi ( Term, AnnTerm, stripA, ann )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 
+import qualified Data.Text.IO as Text
 
 import qualified Language.C as C
 import qualified Language.Java.Pretty as Java
@@ -43,23 +45,34 @@ import qualified Language.Lua.Annotated.Simplify as Lua
 import qualified Language.Python.Common as Python
 import qualified Language.Python.Version3.Parser as Python
 
+import           Solidity ( Solidity )
+import qualified Solidity as Solidity
+
 import Cubix.Language.Info
 
-import Cubix.Language.C.Parametric.Common as CCommon
-import qualified Cubix.Language.C.Parametric.Full as CFull
-import qualified Cubix.Language.C.Parse as CParse
-import qualified Cubix.Language.Java.Parse as JParse
-import Cubix.Language.Java.Parametric.Common as JCommon
-import qualified Cubix.Language.Java.Parametric.Full as JFull
-import Cubix.Language.JavaScript.Parametric.Common as JSCommon
-import qualified Cubix.Language.JavaScript.Parametric.Full as JSFull
-import Cubix.Language.Lua.Parametric.Common as LCommon
-import qualified Cubix.Language.Lua.Parametric.Full as LFull
-import Cubix.Language.Python.Parametric.Common as PCommon
-import qualified Cubix.Language.Python.Parametric.Full as PFull
+import           Cubix.Language.C.Parametric.Common          as CCommon
+import qualified Cubix.Language.C.Parametric.Full            as CFull
+import qualified Cubix.Language.C.Parse                      as CParse
+import qualified Cubix.Language.Java.Parse                   as JParse
+import           Cubix.Language.Java.Parametric.Common       as JCommon
+import qualified Cubix.Language.Java.Parametric.Full         as JFull
+import           Cubix.Language.JavaScript.Parametric.Common as JSCommon
+import qualified Cubix.Language.JavaScript.Parametric.Full   as JSFull
+import           Cubix.Language.Lua.Parametric.Common        as LCommon
+import qualified Cubix.Language.Lua.Parametric.Full          as LFull
+import           Cubix.Language.Python.Parametric.Common     as PCommon
+import qualified Cubix.Language.Python.Parametric.Full       as PFull
+import           Cubix.Language.Solidity.Parametric.Common   as SCommon
+import qualified Cubix.Language.Solidity.Parametric.Full     as SFull
+
 import qualified Data.Text as T (unpack)
 import qualified Cubix.Language.Java.Parametric.Common as Python
 
+---------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------
+--------------------- General interfaces --------------------------
+-------------------------------------------------------------------
 
 type family RootSort (fs :: [(* -> *) -> * -> *])
 
@@ -89,6 +102,11 @@ class Pretty fs where
   default prettyUnsafe :: (DynCase (Term fs) (RootSort fs)) => Term fs l -> String
   prettyUnsafe = pretty . fromDynProj
 
+
+-------------------------------------------------------------------
+------------------------------ Lua --------------------------------
+-------------------------------------------------------------------
+
 -- | NOTE: This reflects the half-finished transition of Lua to annotated terms
 parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
 parseLua path = do
@@ -114,6 +132,11 @@ instance Pretty MLuaSig where pretty = prettyLua
 
 #ifndef ONLY_ONE_LANGUAGE
 
+
+-------------------------------------------------------------------
+------------------------------- C ---------------------------------
+-------------------------------------------------------------------
+
 parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
 parseC path = do
   res <- CParse.parse path
@@ -133,6 +156,11 @@ type instance RootSort MCSig = CTranslationUnitL
 instance ParseFile MCSig where parseFile = parseC
 instance Pretty MCSig where pretty = prettyC
 
+
+-------------------------------------------------------------------
+----------------------------- Java --------------------------------
+-------------------------------------------------------------------
+
 parseJava :: FilePath -> IO (Maybe (MJavaTerm CompilationUnitL))
 parseJava path = do
   res <- JParse.parse path
@@ -148,6 +176,11 @@ prettyJava = Java.prettyPrint . JFull.untranslate . JCommon.untranslate
 type instance RootSort MJavaSig = CompilationUnitL
 instance ParseFile MJavaSig where parseFile = parseJava
 instance Pretty MJavaSig where pretty = prettyJava
+
+
+-------------------------------------------------------------------
+--------------------------- JavaScript ----------------------------
+-------------------------------------------------------------------
 
 parseJavaScript :: FilePath -> IO (Maybe (MJSTerm JSASTL))
 parseJavaScript path = liftM (Just . JSCommon.translate . normalizeJS . JSFull.translate) $ JS.parseFile path
@@ -168,6 +201,10 @@ prettyJavaScript =  JS.prettyPrint . JSFull.untranslate . JSCommon.untranslate
 type instance RootSort MJSSig = JSASTL
 instance ParseFile MJSSig where parseFile = parseJavaScript
 instance Pretty MJSSig where pretty = prettyJavaScript
+
+-------------------------------------------------------------------
+----------------------------- Python ------------------------------
+-------------------------------------------------------------------
 
 parsePython :: FilePath -> IO (Maybe (MPythonTermAnn (Maybe SourceSpan) PCommon.ModuleL))
 parsePython path = do
@@ -191,5 +228,22 @@ type instance RootSort MPythonSig = PCommon.ModuleL
 instance ParseFile MPythonSig where parseFile = fmap (fmap stripA) . parsePython
 instance ParseFileTrackSources MPythonSig where parseFileTrackSources = parsePython
 instance Pretty MPythonSig where pretty = prettyPython
+
+-------------------------------------------------------------------
+--------------------------- Solidity ------------------------------
+-------------------------------------------------------------------
+
+parseSolidity :: FilePath -> IO (Maybe (MSolidityTerm SolidityL))
+parseSolidity path = do
+  contents <- Text.readFile path
+  let res = Solidity.parseFile path contents
+  case res of
+    Left  e -> print e >> return Nothing
+    Right s -> return $ Just $ SCommon.translate $ SFull.translate s
+
+type instance RootSort MSoliditySig = SCommon.SolidityL
+instance ParseFile MSoliditySig where parseFile = parseSolidity
+
+-- 2023.11.02: Initial Solidity library we're using has no pretty-printer.
 
 #endif

@@ -15,38 +15,66 @@ module Cubix.Sin.Compdata.Annotation (
 import Control.Monad.Identity ( Identity(..) )
 import Control.Monad.Trans ( MonadTrans(..) )
 import Data.Default ( Default(..) )
-import Data.Comp.Multi ( Node, Cxt(..), Context, (:=>), CxtFunM, SigFun, appSigFunM, appCxt, HFix, AnnHFix )
+import Data.Comp.Multi ( All, caseCxt, Node, Cxt(..), Context, (:=>), CxtFunM, SigFun, appSigFunM, appCxt, HFix, AnnHFix )
 import Data.Comp.Multi.HTraversable ( HTraversable )
-import Data.Comp.Multi.Ops ((:&:)(..), Sum (..), contract)
+import Data.Comp.Multi.Ops ((:&:)(..), Sum (..))
 
 import Cubix.Sin.Compdata.Instances ()
-import Data.Type.Equality
+
+--------------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------
+------------------------- Getting annotations ---------------------
+-------------------------------------------------------------------
 
 ---- This exists so you can constrain a functor to be annotated without also
 ---- naming the unannotated functor. This makes it more convenient for inclusion
 ---- in constraint synonyms
-class Annotated (f :: Node) a | f -> a where
+class Annotated a (f :: Node) | f -> a where
   getAnn' :: f e l -> a
 
-instance Annotated (f :&: a) a where
+instance Annotated a (f :&: a) where
   getAnn' (_ :&: x) = x
 
-instance ( Annotated f a
-         , Annotated (Sum fs) a
-         ) => Annotated (Sum (f ': fs)) a where
-  getAnn' (Sum w a) = case contract w of
-    Left Refl -> getAnn' a
-    Right w0  -> go (Sum w0 a)
-
-    where go :: (Annotated (Sum fs) a) => Sum fs e l -> a
-          go = getAnn'
+-- The funny constraint is to get the functional dependency working
+instance ( Annotated a f
+         , All (Annotated a) fs
+         ) => Annotated a (Sum (f ': fs)) where
+  getAnn' = caseCxt @(Annotated a) getAnn'
 
 
-getAnn :: (Annotated f a) => HFix f :=> a
+getAnn :: (Annotated a f) => HFix f :=> a
 getAnn (Term x) = getAnn' x
+
+-------------------------------------------------------------------
+------------------------- Adding annotations ---------------------
+-------------------------------------------------------------------
+
+-----------------------------------
+------------------ MonadAnnotater
+------------------------------------
+
+-------------
+--- Class
+-------------
 
 class (Monad m) => MonadAnnotater a m where
   annM :: forall (f :: Node) e l. f e l -> m ((f :&: a) e l)
+
+instance (MonadAnnotater a m, MonadTrans t, Monad (t m)) => MonadAnnotater a (t m) where
+  annM = lift . annM
+
+-------------
+--- Operations
+-------------
+
+annotateM :: (HTraversable f, MonadAnnotater a m) => CxtFunM m f (f :&: a)
+annotateM = appSigFunM annM
+
+----------------------------------
+------------------- AnnotateDefault
+----------------------------------
 
 newtype AnnotateDefault x = AnnotateDefault' { runAnnotateDefault' :: Identity x}
   deriving ( Functor, Applicative, Monad )
@@ -61,11 +89,11 @@ runAnnotateDefault = runIdentity . runAnnotateDefault'
 instance (Default a) => MonadAnnotater a AnnotateDefault where
   annM x = return (x :&: def)
 
-instance (MonadAnnotater a m, MonadTrans t, Monad (t m)) => MonadAnnotater a (t m) where
-  annM = lift . annM
 
-annotateM :: (HTraversable f, MonadAnnotater a m) => CxtFunM m f (f :&: a)
-annotateM = appSigFunM annM
+
+-----------------------------------
+------------------ Lifting other functions to annotated versions
+------------------------------------
 
 propAnnSigFun :: SigFun f g -> SigFun (f :&: a) (g :&: a)
 propAnnSigFun f (t :&: a) = (f t) :&: a
