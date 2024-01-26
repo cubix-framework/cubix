@@ -225,53 +225,53 @@ instance AssertCfgWellFormed MPythonSig S.ListF where
 instance AssertCfgWellFormed MPythonSig S.PairF
 
 instance AssertCfgWellFormed MPythonSig Statement where
-  assertCfgWellFormed t@(remA -> While cond body els _) =
+  assertCfgWellFormed t@(remA -> While cond body els) =
     assertCfgWhileOrForElse (inject' t) cond body els
-  assertCfgWellFormed t@(remA -> For _ cond body els _) =
+  assertCfgWellFormed t@(remA -> For _ cond body els) =
     assertCfgWhileOrForElse (inject' t) cond body els
-  assertCfgWellFormed t@(remA -> Conditional clauses els _) =
+  assertCfgWellFormed t@(remA -> Conditional clauses els) =
     assertCfgIfElse (inject' t) (map S.extractF2 (S.extractF clauses)) els
-  assertCfgWellFormed t@(remA -> Return e _) =
+  assertCfgWellFormed t@(remA -> Return e) =
     assertCfgReturn (inject' t) (S.extractF e) 
-  assertCfgWellFormed t@(remA -> Raise e _) =
+  assertCfgWellFormed t@(remA -> Raise e) =
     assertCfgRaise (inject' t) (extractRaiseExprs e)
-  assertCfgWellFormed t@(remA -> Break _) =
+  assertCfgWellFormed t@(remA -> Break) =
     assertCfgBreak (inject' t)
-  assertCfgWellFormed t@(remA -> Continue _) =
+  assertCfgWellFormed t@(remA -> Continue) =
     assertCfgContinue (inject' t)
   -- NOTE: Assign and Fun does not exist
-  assertCfgWellFormed t@(remA -> AsyncFor f _) =
+  assertCfgWellFormed t@(remA -> AsyncFor f) =
     assertCfgIsGeneric (inject' t) [E f]
-  assertCfgWellFormed t@(remA -> AsyncFun f _) =
+  assertCfgWellFormed t@(remA -> AsyncFun f) =
     assertCfgIsGeneric (inject' t) [E f]    
-  assertCfgWellFormed t@(remA -> AsyncWith w _) =
+  assertCfgWellFormed t@(remA -> AsyncWith w) =
     assertCfgIsGeneric (inject' t) [E w]    
   assertCfgWellFormed t@(remA -> Import {}) =
     assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> FromImport {}) =
     assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> AugmentedAssign el _ er _) =
+  assertCfgWellFormed t@(remA -> AugmentedAssign el _ er) =
     assertCfgIsGeneric (inject' t) [E el, E er]
-  assertCfgWellFormed t@(remA -> AnnotatedAssign ann el er _) =
+  assertCfgWellFormed t@(remA -> AnnotatedAssign ann el er) =
     assertCfgIsGeneric (inject' t) exps
     where exps = case S.extractF er of
             Just er0 -> [E ann, E el, E er0]
             Nothing -> [E ann, E el]
-  assertCfgWellFormed t@(remA -> Decorated decs def _) =
+  assertCfgWellFormed t@(remA -> Decorated decs def) =
     assertCfgIsGenericAuto (inject' t) [E decs, E def]
-  assertCfgWellFormed t@(remA -> Try body handlers els finally _) =
+  assertCfgWellFormed t@(remA -> Try body handlers els finally) =
     assertCfgTry (inject' t) body (map extractHandler $ S.extractF handlers) els finally
   assertCfgWellFormed t@(remA -> Pass {}) =
     assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> Delete es _) =
+  assertCfgWellFormed t@(remA -> Delete es) =
     assertCfgIsGeneric (inject' t) (map E $ S.extractF es)
-  assertCfgWellFormed t@(remA -> StmtExpr e _) =
+  assertCfgWellFormed t@(remA -> StmtExpr e) =
     assertCfgIsGeneric (inject' t) [E e]    
   assertCfgWellFormed t@(remA -> Global {}) =
     assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> NonLocal {}) =
     assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> Assert exprs _) =
+  assertCfgWellFormed t@(remA -> Assert exprs) =
     assertCfgIsGeneric (inject' t) (map E $ S.extractF exprs)
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
   
@@ -298,45 +298,45 @@ instance AssertCfgWellFormed MPythonSig Expr where
   assertCfgWellFormed t@(remA -> UnicodeStrings {}) =
     withPyExprCheck assertCfgIsGeneric (inject' t) []
   -- skipping call
-  assertCfgWellFormed t@(remA -> Subscript e1 e2 _) =
+  assertCfgWellFormed t@(remA -> Subscript e1 e2) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) [E e1, E e2]
   
-  assertCfgWellFormed t@(remA -> SlicedExpr e es _) =
+  assertCfgWellFormed t@(remA -> SlicedExpr e es) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) [E e, E es]
   -- skipping CondExpr, Comprehensions
-  assertCfgWellFormed t@(remA -> BinaryOp op l r _) =
+  assertCfgWellFormed t@(remA -> BinaryOp op l r) =
     case extractOp op of
-      And _ -> assertCfgShortCircuit (inject' t) l r
-      Or _  -> assertCfgShortCircuit (inject' t) l r
+      And -> assertCfgShortCircuit (inject' t) l r
+      Or  -> assertCfgShortCircuit (inject' t) l r
       _   -> withPyExprCheck assertCfgIsGeneric (inject' t) [E l, E r]
 
     where extractOp :: MPythonTermLab OpL -> Op MPythonTerm OpL
           extractOp (stripA -> project -> Just op) = op
-  assertCfgWellFormed t@(remA -> UnaryOp _ e _) =
+  assertCfgWellFormed t@(remA -> UnaryOp _ e) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]    
-  assertCfgWellFormed t@(remA -> Dot e _ _) =
+  assertCfgWellFormed t@(remA -> Dot e _) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]    
-  assertCfgWellFormed t@(remA -> Lambda _ body _) = do
+  assertCfgWellFormed t@(remA -> Lambda _ body) = do
     let t0 = inject' t
     withPyExprCheck' t0 (assertCfgFunctionDef t0 body)
-  assertCfgWellFormed t@(remA -> Tuple es _) =
+  assertCfgWellFormed t@(remA -> Tuple es) =
     withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)
-  assertCfgWellFormed t@(remA -> Yield a _) =
+  assertCfgWellFormed t@(remA -> Yield a) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) [E a]
   assertCfgWellFormed t@(remA -> Generator {}) =
     -- TODO
     pure ()
-  assertCfgWellFormed t@(remA -> Await e _) =
+  assertCfgWellFormed t@(remA -> Await e) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> List es _) =
+  assertCfgWellFormed t@(remA -> List es) =
     withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
-  assertCfgWellFormed t@(remA -> Dictionary ds _) =
+  assertCfgWellFormed t@(remA -> Dictionary ds) =
     withPyExprCheck assertCfgIsGenericAuto (inject' t) (map E $ S.extractF ds)
-  assertCfgWellFormed t@(remA -> Set es _) =
+  assertCfgWellFormed t@(remA -> Set es) =
     withPyExprCheck assertCfgIsGeneric (inject' t) (map E $ S.extractF es)        
-  assertCfgWellFormed t@(remA -> Starred e _) =
+  assertCfgWellFormed t@(remA -> Starred e) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> Paren e _) =
+  assertCfgWellFormed t@(remA -> Paren e) =
     withPyExprCheck assertCfgIsGeneric (inject' t) [E e]          
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
@@ -608,9 +608,9 @@ assertCfgTry t body catchs els finally = do
 
 
 extractHandler :: MPythonTermLab HandlerL -> (E MPythonTermLab, E MPythonTermLab)
-extractHandler (project' -> Just (remA -> Handler e s _)) =
+extractHandler (project' -> Just (remA -> Handler e s)) =
   let eClause = case project' e of
-        Just (remA -> ExceptClause e0 _) -> case S.extractF e0 of
+        Just (remA -> ExceptClause e0) -> case S.extractF e0 of
           Just (S.extractF2 -> (e1, e2)) -> case S.extractF e2 of
             Just e3 -> [E e1, E e3]
             Nothing -> [E e1]
