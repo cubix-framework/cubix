@@ -65,6 +65,7 @@ import Control.Monad.State ( MonadState, StateT(..), state, runState, evalStateT
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
 
 import Data.Data ( Data )
+import Data.Hashable ( Hashable )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Typeable ( Typeable )
@@ -73,7 +74,7 @@ import GHC.Generics ( Generic )
 
 import System.IO.Unsafe ( unsafePerformIO )
 
-import Data.Aeson ( ToJSON )
+import Data.Aeson ( ToJSON, FromJSON )
 
 import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
 
@@ -104,7 +105,9 @@ data SourcePos = SourcePos { _sourceFile :: !String
   deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 instance NFData SourcePos where rnf = genericRnf
+instance Hashable SourcePos
 instance ToJSON SourcePos
+instance FromJSON SourcePos
 
 makeClassy ''SourcePos
 
@@ -116,7 +119,9 @@ makeClassy ''SourcePos
 data SourceSpan = SourceSpan { _sourceStart :: !SourcePos, _sourceEnd :: !SourcePos } deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
 
 instance NFData SourceSpan where rnf = genericRnf
+instance Hashable SourceSpan
 instance ToJSON SourceSpan
+instance FromJSON SourceSpan
 
 makeClassy ''SourceSpan
 

@@ -1,5 +1,5 @@
 name: cubix
-11;rgb:0000/0000/0000version: '0.7.0.0'
+version: '0.7.0.1'
 synopsis: A framework for multi-language transformation
 description: Please see README.md
 category: language
@@ -111,6 +111,7 @@ library:
   - data-default
   - deepseq-generics
   - fgl
+  - hashable
   - language-c
   - language-dot
   - language-java >= 0.2.8.1

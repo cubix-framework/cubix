@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fa89f13413e8d386aac9a447e18a9abeb9f7f5aca6d648bfd127468328d56426
+-- hash: 05af84f661406d4ccb05ae815dc32b8c755af3fb239dda092f7e09095ecf99c9
 
 name:           cubix
-version:        0.0.0
+version:        0.7.0.1
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
@@ -176,6 +176,7 @@ library
     , deepseq
     , deepseq-generics
     , fgl
+    , hashable
     , language-c
     , language-dot
     , language-java >=0.2.8.1
