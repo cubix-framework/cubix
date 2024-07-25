@@ -30,6 +30,7 @@ import Cubix.Language.Java.Parametric.Common
 import Cubix.Language.JavaScript.Parametric.Common
 import Cubix.Language.Lua.Parametric.Common
 import Cubix.Language.Python.Parametric.Common as PCommon
+import Cubix.Language.Solidity.Parametric.Common
 
 import Cubix.Analysis.Call.Trivial
 
@@ -42,63 +43,69 @@ import Cubix.Transformations.TestCoverage
 data LangProg = LuaProg (MLuaTerm LBlockL) | CfgDot Dot.Graph
   deriving ( Eq, Ord, Show )
 #else
-data LangProg = CProg      (MCTerm CTranslationUnitL)
-              | JavaProg   (MJavaTerm CompilationUnitL)
-              | JSProg     (MJSTerm JSASTL)
-              | LuaProg    (MLuaTerm LBlockL)
-              | PythonProg (MPythonTerm PCommon.ModuleL)
-              | CfgDot     Dot.Graph
+data LangProg = CProg        (MCTerm CTranslationUnitL)
+              | JavaProg     (MJavaTerm CompilationUnitL)
+              | JSProg       (MJSTerm JSASTL)
+              | LuaProg      (MLuaTerm LBlockL)
+              | PythonProg   (MPythonTerm PCommon.ModuleL)
+              | SolidityProg (MSolidityTerm SolidityL)
+              | CfgDot       Dot.Graph
   deriving ( Eq, Ord, Show )
 #endif
 
 data LangProj = LuaProj    (Project MLuaSig)
 #ifndef ONLY_ONE_LANGUAGE
-              | CProj      (Project MCSig)
-              | JavaProj   (Project MJavaSig)
-              | JSProj     (Project MJSSig)
-              | PythonProj (Project MPythonSig)
+              | CProj        (Project MCSig)
+              | JavaProj     (Project MJavaSig)
+              | JSProj       (Project MJSSig)
+              | PythonProj   (Project MPythonSig)
+              | SolidityProj (Project MSoliditySig)
 #endif
 
 
 prettyProg :: LangProg -> String
 #ifndef ONLY_ONE_LANGUAGE
-prettyProg (CProg      p) = pretty p
-prettyProg (JavaProg   p) = pretty p
-prettyProg (JSProg     p) = pretty p
-prettyProg (PythonProg p) = pretty p
+prettyProg (CProg      p)   = pretty p
+prettyProg (JavaProg   p)   = pretty p
+prettyProg (JSProg     p)   = pretty p
+prettyProg (PythonProg p)   = pretty p
+prettyProg (SolidityProg p) = error "2024.07.24: No Solidity pretty-printing available"
 #endif
-prettyProg (LuaProg    p) = pretty p
-prettyProg (CfgDot     p) = Dot.renderDot p
+prettyProg (LuaProg    p)   = pretty p
+prettyProg (CfgDot     p)   = Dot.renderDot p
 
 parseProg :: String -> String -> IO (Maybe LangProg)
 #ifndef ONLY_ONE_LANGUAGE
-parseProg "c"          = liftM (liftM CProg)      . parseFile
-parseProg "java"       = liftM (liftM JavaProg)   . parseFile
-parseProg "javascript" = liftM (liftM JSProg)     . parseFile
-parseProg "python"     = liftM (liftM PythonProg) . parseFile
+parseProg "c"          = liftM (liftM CProg)        . parseFile
+parseProg "java"       = liftM (liftM JavaProg)     . parseFile
+parseProg "javascript" = liftM (liftM JSProg)       . parseFile
+parseProg "python"     = liftM (liftM PythonProg)   . parseFile
+parseProg "solidity"   = liftM (liftM SolidityProg) . parseFile
 #endif
-parseProg "lua"        = liftM (liftM LuaProg)    . parseFile
+parseProg "lua"        = liftM (liftM LuaProg)      . parseFile
 parseProg _            = error "Unrecognized language. Must be one of: c, java, javascript, lua, python"
 
 
 parseProj :: LabelGen -> String -> [FilePath] -> IO (Maybe LangProj)
 #ifndef ONLY_ONE_LANGUAGE
-parseProj gen "c"          = (return . maybe Nothing (Just . CProj))      <=< parseProject gen parseFile
-parseProj gen "java"       = (return . maybe Nothing (Just . JavaProj))   <=< parseProject gen parseFile
-parseProj gen "javascript" = (return . maybe Nothing (Just . JSProj))     <=< parseProject gen parseFile
-parseProj gen "python"     = (return . maybe Nothing (Just . PythonProj)) <=< parseProject gen parseFile
+parseProj gen "c"          = (return . maybe Nothing (Just . CProj))        <=< parseProject gen parseFile
+parseProj gen "java"       = (return . maybe Nothing (Just . JavaProj))     <=< parseProject gen parseFile
+parseProj gen "javascript" = (return . maybe Nothing (Just . JSProj))       <=< parseProject gen parseFile
+parseProj gen "python"     = (return . maybe Nothing (Just . PythonProj))   <=< parseProject gen parseFile
+parseProj gen "solidity"   = (return . maybe Nothing (Just . SolidityProj)) <=< parseProject gen parseFile
 #endif
-parseProj gen "lua"        = (return . maybe Nothing (Just . LuaProj))    <=< parseProject gen parseFile
+parseProj gen "lua"        = (return . maybe Nothing (Just . LuaProj))      <=< parseProject gen parseFile
 parseProj _   _            = error "Unrecognized language. Must be one of: c, java, javascript, lua, python"
 
 putProj :: LangProj -> IO ()
 #ifndef ONLY_ONE_LANGUAGE
-putProj (CProj      p) = putProject (prettyC          . fromJust . dynProj . stripA) p
-putProj (JavaProj   p) = putProject (prettyJava       . fromJust . dynProj . stripA) p
-putProj (JSProj     p) = putProject (prettyJavaScript . fromJust . dynProj . stripA) p
-putProj (PythonProj p) = putProject (prettyPython     . fromJust . dynProj . stripA) p
+putProj (CProj        p) = putProject (prettyC          . fromJust . dynProj . stripA) p
+putProj (JavaProj     p) = putProject (prettyJava       . fromJust . dynProj . stripA) p
+putProj (JSProj       p) = putProject (prettyJavaScript . fromJust . dynProj . stripA) p
+putProj (PythonProj   p) = putProject (prettyPython     . fromJust . dynProj . stripA) p
+putProj (SolidityProj p) = error "2024.07.24: No Solidity pretty-printing available"
 #endif
-putProj (LuaProj    p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
+putProj (LuaProj      p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
 
 
 debugTree' :: (All ShowHF fs, All HFoldable fs, CfgBuilder fs) => Term fs l -> IO ()
@@ -137,10 +144,10 @@ printCfgDot t = do
   gen <- mkConcurrentSupplyLabelGen
   case t of
 #ifndef ONLY_ONE_LANGUAGE
-    CProg      p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
-    JavaProg   p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
-    JSProg     p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
-    PythonProg p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
+    CProg        p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
+    JavaProg     p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
+    JSProg       p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
+    PythonProg   p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
 #endif
     LuaProg    p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
     _          -> error "Cannot render the CFG of that program"
@@ -213,11 +220,12 @@ tId        = "id"
 tCfg       = "cfg"
 tElemHoist = "elementary-hoist"
 tHoist     = "hoist"
+tPrintAst  = "print-ast"
 tTac       = "tac"
 tTestcov   = "testcov"
 
 transformsList :: [String]
-transformsList = [tDebug, tId, tCfg, tElemHoist, tHoist, tTac, tTestcov]
+transformsList = [tDebug, tId, tCfg, tElemHoist, tHoist, tTac, tTestcov, tPrintAst]
 
 isTransform :: String -> Bool
 isTransform a = elem a transformsList
@@ -262,6 +270,7 @@ doTransform language transform file = do
       | t == tId        = checkRoundTrip language prog
       | t == tCfg       = printCfgDot prog
       | t == tElemHoist = return $ runElementaryHoist prog
+      | t == tPrintAst  = print prog >> return prog
       | t == tHoist     = return $ runHoist prog
       | t == tTac       = runTAC prog
       | t == tTestcov   = runTestCov prog
@@ -290,7 +299,7 @@ description :: String
 description = "Cubix 0.1.0.0\n"
            ++ "Cubix is a framework for language-parametric program "
            ++ "transformation. It currently supports C, Java, JavaScript, "
-           ++ "Lua, and Python.\n"
+           ++ "Lua, Python, and Solidity.\n"
 
 usage :: String
 usage =  "Usage:\n"
