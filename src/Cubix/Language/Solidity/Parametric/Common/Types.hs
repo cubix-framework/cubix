@@ -70,4 +70,14 @@ type MSolidityCxtA h a p = AnnCxtS p h MSoliditySig a
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
 
+instance InjF MSoliditySig IdentL ExpressionL where
+    injF = iIdentifierExpression . injF
+
+    projF e
+     | Just (IdentifierExpression i) <- project e
+     , Just (IdentIsIdentifier j) <- project i
+     = Just j
+    projF _ = Nothing
+      
+
 #endif
