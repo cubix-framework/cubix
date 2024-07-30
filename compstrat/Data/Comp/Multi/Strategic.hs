@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-} -- For isSortR and isSortT
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -115,7 +116,7 @@ import Control.Applicative ( Applicative, (<*), liftA, liftA2, Alternative(..) )
 import Control.Applicative.Backwards ( Backwards(..) )
 
 import Control.Monad ( MonadPlus(..), liftM, liftM2, (>=>), guard )
-import Control.Monad.Identity ( Identity )
+import Control.Monad.Identity ( Identity, runIdentity )
 import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.Maybe ( MaybeT, runMaybeT )
 import Control.Monad.State ( StateT, runStateT, evalStateT, get, put )
@@ -272,7 +273,7 @@ allIdxR f = allStateR (\n x -> (,) <$> f n x <*> pure (n + 1)) 0
 f >+> g = unwrapAnyR (wrapAnyR f >=> wrapAnyR g)
 
 -- | Left-biased choice -- (f <+ g) runs f, and, if it fails, then runs g
-(<+) :: (Alternative m) => RewriteM m f l -> RewriteM m f l -> RewriteM m f l
+(<+) :: (Alternative m) => TranslateM m f l t -> TranslateM m f l t -> TranslateM m f l t
 (<+) f g x = f x <|> g x
 
 -- | Applies a rewrite to all immediate subterms of the current term, succeeding if any succeed
@@ -421,15 +422,15 @@ addFail :: Monad m => TranslateM m f l t -> TranslateM (MaybeT m) f l t
 addFail = (lift . )
 
 -- | Runs a failable computation, replacing failure with `mempty`
-mtryM :: (Monad m, Monoid a) => MaybeT m a -> m a
-mtryM = liftM (maybe mempty id) . runMaybeT
+mtryM :: (Applicative m, Monoid a) => MaybeT m a -> m a
+mtryM = fmap (maybe mempty id) . runMaybeT
 
 -- | Runs a translation in a top-down manner, combining its effects. Succeeds if any succeeds.
 --   When run using MaybeT, returns its result for the last node where it succeded
 onetdT :: (MonadPlus m, HFoldable f) => GTranslateM m (HFix f) t -> GTranslateM m (HFix f) t
 onetdT t = query t mplus
 
-parQuery :: forall r f. HFoldable f => (HFix f :=>  r) -> (r -> r -> r) -> HFix f :=> r
+parQuery :: forall r f. HFoldable f => (HFix f :=> r) -> (r -> r -> r) -> HFix f :=> r
 parQuery q c tree = runEval $ rec 8 tree
   where
     rec :: Int -> HFix f :=> Eval r
@@ -447,3 +448,19 @@ foldtdT t = parQuery t (liftM2 mappend)
 -- | An always successful top-down fold, replacing failures with `mempty`.
 crushtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM (MaybeT m) (HFix f) t -> GTranslateM m (HFix f) t
 crushtdT f = foldtdT $ mtryM . f
+
+-- | Similar to crushtdT, except it never recurses below successes
+pruningCrushtdTF :: (HFoldable f, Monoid t, Alternative m) => GTranslateM m (HFix f) t -> GTranslateM m (HFix f) t
+pruningCrushtdTF f = f <+ (\(Term t) -> hfoldl (\s x -> liftA2 (<>) s $ pruningCrushtdTF f x) (pure mempty) t)
+
+-- NOTE 2024.07.30: Monad instead of Applicative, because the Applicative instance for MaybeT requires Monad (will submit issue)
+-- | pruningCrushtdTF, replacing top-level failure with mempty
+pruningCrushtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM (MaybeT m) (HFix f) t -> GTranslateM m (HFix f) t
+pruningCrushtdT f = mtryM . pruningCrushtdTF f
+
+-- | Gives all subterms of any given sort of a term which are not contained in another term of that sort
+maximalSubterms :: forall f l l'. (DynCase (HFix f) l, HFoldable f) => HFix f l' -> [HFix f l]
+maximalSubterms = runIdentity . pruningCrushtdT (promoteTF idOnTargetSort)
+  where
+    idOnTargetSort :: TranslateM (MaybeT Identity) (HFix f) l [HFix f l]
+    idOnTargetSort x = return [x]
