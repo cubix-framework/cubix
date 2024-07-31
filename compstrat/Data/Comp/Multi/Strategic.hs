@@ -102,6 +102,9 @@ module Data.Comp.Multi.Strategic
   , foldtdT
   , crushtdT
   , onetdT
+  , pruningCrushtdTF
+  , pruningCrushtdT
+  , maximalSubterms
 
   , (+>>)
   , isSortT
@@ -453,7 +456,7 @@ crushtdT f = foldtdT $ mtryM . f
 pruningCrushtdTF :: (HFoldable f, Monoid t, Alternative m) => GTranslateM m (HFix f) t -> GTranslateM m (HFix f) t
 pruningCrushtdTF f = f <+ (\(Term t) -> hfoldl (\s x -> liftA2 (<>) s $ pruningCrushtdTF f x) (pure mempty) t)
 
--- NOTE 2024.07.30: Monad instead of Applicative, because the Applicative instance for MaybeT requires Monad (will submit issue)
+-- Monad instead of Applicative, because the Applicative instance for MaybeT requires Monad
 -- | pruningCrushtdTF, replacing top-level failure with mempty
 pruningCrushtdT :: (HFoldable f, Monoid t, Monad m) => GTranslateM (MaybeT m) (HFix f) t -> GTranslateM m (HFix f) t
 pruningCrushtdT f = mtryM . pruningCrushtdTF f
