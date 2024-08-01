@@ -24,6 +24,7 @@ module Data.Comp.Multi.Algebra (
       -- * Algebras & Catamorphisms
       Alg,
       free,
+      plugHoles,
       cata,
       cata',
       appCxt,
@@ -110,6 +111,10 @@ free f g = run
     where run :: Cxt h f a :-> b
           run (Hole v) = g v
           run (Term c) = f $ hfmap run c
+
+
+plugHoles :: (HFunctor f) => (a :-> Cxt h' f b) -> Context f a l -> Cxt h' f b l
+plugHoles f = free Term f
 
 -- | Construct a catamorphism from the given algebra.
 cata :: forall f a. HFunctor f => Alg f a -> HFix f :-> a

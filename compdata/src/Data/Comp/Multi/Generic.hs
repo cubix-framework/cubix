@@ -36,20 +36,29 @@ import Data.Maybe
 
 -- | This function returns a list of all subterms of the given
 -- term. This function is similar to Uniplate's @universe@ function.
-subterms :: forall f  . HFoldable f => HFix f  :=> [E (HFix f)]
+subterms :: forall h f a. HFoldable f => Cxt h f a  :=> [E (Cxt h f a)]
 subterms t = build (f t)
-    where f :: forall i b. HFix f i -> (E (HFix f) -> b -> b) -> b -> b
-          f t cons nil = E t `cons` hfoldl (\u s -> f s cons u) nil (unTerm t)
+    where f :: forall i b. Cxt h f a i -> (E (Cxt h f a) -> b -> b) -> b -> b
+          f (Term t) cons nil = E (Term t) `cons` hfoldl (\u s -> f s cons u) nil t
+          f (Hole h) cons nil = E (Hole h) `cons` nil
 
 -- | This function returns a list of all subterms of the given term
 -- that are constructed from a particular functor.
-subterms' :: forall f g . (HFoldable f, g :<: f) => HFix f :=> [E (g (HFix f))]
+subterms' :: forall f g h a. (HFoldable f, g :<: f) => Cxt h f a :=> [E (g (Cxt h f a))]
 subterms' (Term t) = build (f t)
-    where f :: forall i b. f (HFix f) i -> (E (g (HFix f)) -> b -> b) -> b -> b
-          f t cons nil = let rest = hfoldl (\u (Term s) -> f s cons u) nil t
+    where f :: forall i b. f (Cxt h f a) i -> (E (g (Cxt h f a)) -> b -> b) -> b -> b
+          f t cons nil = let rest = hfoldl (\u s -> case s of
+                                                      Term r -> f r cons u
+                                                      Hole _ -> nil
+                                           )
+                                           nil
+                                           t
                          in case proj t of
                               Just t' -> E t' `cons` rest
                               Nothing -> rest
+
+allHoles :: (HFoldable f) => Context f a l -> [E a]
+allHoles t = [E h | E (Hole h) <- subterms t]
 
 -- |
 -- @
@@ -85,15 +94,16 @@ transformM  f = run
 -- @
 --
 -- returns a list of all integer constants in @term@.
-query :: HFoldable f => (HFix f :=>  r) -> (r -> r -> r) -> HFix f :=> r
+query :: HFoldable f => (Cxt h f a :=>  r) -> (r -> r -> r) -> Cxt h f a :=> r
 -- query q c = run
 --     where run i@(Term t) = foldl (\s x -> s `c` run x) (q i) t
 query q c i@(Term t) = hfoldl (\s x -> s `c` query q c x) (q i) t
+query q c i@(Hole _) = q i
 
-subs :: HFoldable f => HFix f  :=> [E (HFix f)]
+subs :: HFoldable f => Cxt h f a  :=> [E (Cxt h f a)]
 subs = query (\x-> [E x]) (++)
 
-subs' :: (HFoldable f, g :<: f) => HFix f :=> [E (g (HFix f))]
+subs' :: (HFoldable f, g :<: f) => Cxt h f a :=> [E (g (Cxt h f a))]
 subs' = mapMaybe pr . subs
         where pr (E v) = fmap E (project v)
 
