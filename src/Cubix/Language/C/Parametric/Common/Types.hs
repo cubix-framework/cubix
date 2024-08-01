@@ -168,18 +168,10 @@ data CVoidArg :: Node where
 -- Try again after upgrading GHC?
 deriveAll [''CVoidArg]
 
-pattern CVoidArg' :: (CVoidArg :-<: fs, All HFunctor fs) => CxtS h fs a CSpecialParamL
-pattern CVoidArg' <- (project -> Just CVoidArg) where
-  CVoidArg' = iCVoidArg
-
 data CVarArgParam :: Node where
   CVarArgParam :: CVarArgParam e CSpecialParamL
 
 deriveAll [''CVarArgParam]
-
-pattern CVarArgParam' :: (CVarArgParam :-<: fs, All HFunctor fs) => CxtS h fs a CSpecialParamL
-pattern CVarArgParam' <- (project -> Just CVarArgParam) where
-  CVarArgParam' = iCVarArgParam
 
 -- These can be used in function definitions, but not function declarations
 data COldStyleParamL
@@ -188,41 +180,16 @@ data COldStyleParam e l where
 
 deriveAll [''COldStyleParam]
 
-pattern COldStyleParam' :: (COldStyleParam :-<: fs, All HFunctor fs) => CxtS h fs a P.IdentL -> CxtS h fs a COldStyleParamL
-pattern COldStyleParam' n <- (project -> Just (COldStyleParam n)) where
-  COldStyleParam' n = iCOldStyleParam n
-
 -- Contains both fields from the first CDerivedDeclarator  in the original abstract syntax, as well as the CDeclarator its
 data CFunDeclAttrs e l where
   CFunDeclAttrs :: e [C.CDerivedDeclaratorL] -> e [C.CAttributeL] -> e (Maybe (C.CStringLiteralL)) -> e [C.CAttributeL] -> CFunDeclAttrs e FunctionDeclAttrsL
 
 deriveAll [''CFunDeclAttrs]
 
-pattern CFunDeclAttrs' ::
-  ( CFunDeclAttrs :-<: fs
-  , All HFunctor fs
-  ) => CxtS h fs a [C.CDerivedDeclaratorL]
-  -> CxtS h fs a [C.CAttributeL]
-  -> CxtS h fs a (Maybe (C.CStringLiteralL))
-  -> CxtS h fs a [C.CAttributeL]
-  -> CxtS h fs a FunctionDeclAttrsL
-pattern CFunDeclAttrs' dds attrs1 asmNm attrs2 <- (project -> Just (CFunDeclAttrs dds attrs1 asmNm attrs2)) where
-  CFunDeclAttrs' dds attrs1 asmNm attrs2 = iCFunDeclAttrs dds attrs1 asmNm attrs2
-
 data CFunDefAttrs e l where
   CFunDefAttrs :: e [CDeclarationSpecifierL] -> e FunctionDeclAttrsL -> e [CDeclarationL] -> CFunDefAttrs e FunctionDefAttrsL
 
 deriveAll [''CFunDefAttrs]
-
-pattern CFunDefAttrs' ::
-  ( CFunDefAttrs :-<: fs
-  , All HFunctor fs
-  ) => CxtS h fs a [CDeclarationSpecifierL]
-  -> CxtS h fs a FunctionDeclAttrsL
-  -> CxtS h fs a [CDeclarationL]
-  -> CxtS h fs a FunctionDefAttrsL
-pattern CFunDefAttrs' dss fda decls <- (project -> Just (CFunDefAttrs dss fda decls)) where
-  CFunDefAttrs' dss fda decls = iCFunDefAttrs dss fda decls
 
 -- Modeling note: The only difference between parameters and parameter decls
 -- is that identifiers are optional for decls. Sharing an attributes type
@@ -231,17 +198,6 @@ data CFunParamAttrs e l where
   CFunParamAttrs :: e [CDeclarationSpecifierL] -> e [CDerivedDeclaratorL] -> e (Maybe CStringLiteralL) -> e [CAttributeL] -> CFunParamAttrs e CFunParamAttrsL
 
 deriveAll [''CFunParamAttrs]
-
-pattern CFunParamAttrs' ::
-  ( CFunParamAttrs :-<: fs
-  , All HFunctor fs
-  ) => CxtS h fs a [CDeclarationSpecifierL]
-  -> CxtS h fs a [CDerivedDeclaratorL]
-  -> CxtS h fs a (Maybe CStringLiteralL)
-  -> CxtS h fs a [CAttributeL]
-  -> CxtS h fs a CFunParamAttrsL
-pattern CFunParamAttrs' dss dds asmNm attrs <- (project -> Just (CFunParamAttrs dss dds asmNm attrs)) where
-  CFunParamAttrs' dss dds asmNm attrs = iCFunParamAttrs dss dds asmNm attrs
 
 createSortInclusionTypes [  ''P.FunctionCallL, ''C.CExpressionL, ''C.CExpressionL,      ''P.FunctionDeclL, ''CFunParamAttrsL,               ''CSpecialParamL,           ''P.FunctionDefL,  ''CFunParamAttrsL,   ''CSpecialParamL,       ''COldStyleParamL,      ''C.CStatementL
                          ] [''C.CExpressionL,  ''P.FunctionExpL, ''P.PositionalArgExpL, ''C.CDeclaratorL,  ''P.FunctionParameterDeclAttrsL, ''P.FunctionParameterDeclL, ''C.CFunctionDefL, ''P.ParameterAttrsL, ''P.FunctionParameterL, ''P.FunctionParameterL, ''P.FunctionBodyL

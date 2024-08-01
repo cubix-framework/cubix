@@ -41,7 +41,7 @@ module Cubix.Language.Parametric.Syntax.Base (
 
 import Data.Text ( Text )
 
-import Data.Comp.Multi ( Node, Cxt, (:-<:), (:<:), project)
+import Data.Comp.Multi ( Node )
 
 import Cubix.Language.Parametric.Derive
 
@@ -80,34 +80,4 @@ data UnitF :: Node where
 ------------------ Instances (via TH)
 -----------------------------------
 
-
 deriveAll [''BoolF, ''IntF, ''IntegerF, ''CharF, ''TextF, ''UnitF]
-
-
------------------------------------
------------------- Pattern synonyms
------------------------------------
-
-pattern BoolF' :: (BoolF :<: f) => Bool -> Cxt h f a BoolL
-pattern BoolF' b <- (project -> Just (BoolF b)) where
-  BoolF' b = jBoolF b
-
-pattern IntF' :: (IntF :<: f) => Int -> Cxt h f a IntL
-pattern IntF' x <- (project -> Just (IntF x)) where
-  IntF' x = jIntF x
-
-pattern IntegerF' :: (IntegerF :<: f) => Integer -> Cxt h f a IntegerL
-pattern IntegerF' x <- (project -> Just (IntegerF x)) where
-  IntegerF' x = jIntegerF x
-
-pattern CharF' :: (CharF :<: f) => Char -> Cxt h f a CharL
-pattern CharF' x <- (project -> Just (CharF x)) where
-  CharF' x = jCharF x
-
-pattern TextF' :: (TextF :<: f) => Text -> Cxt h f a TextL
-pattern TextF' x <- (project -> Just (TextF x)) where
-  TextF' x = jTextF x
-
-pattern UnitF' :: (UnitF :<: f) => Cxt h f a ()
-pattern UnitF' <- (project -> Just UnitF) where
-  UnitF' = jUnitF

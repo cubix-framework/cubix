@@ -16,7 +16,6 @@ module Cubix.Language.Solidity.Parametric.Full.Types where
 
 import Data.Comp.Multi ( Term )
 
-import qualified Language.Haskell.TH as TH
 import qualified Solidity            as Solidity
 
 import Data.Comp.Trans ( runCompTrans, deriveMultiComp, makeSumType )

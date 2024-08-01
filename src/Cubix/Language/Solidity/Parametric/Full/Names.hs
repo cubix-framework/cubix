@@ -13,7 +13,6 @@ module Cubix.Language.Solidity.Parametric.Full.Names (
   ) where
 
 
-import           Language.Haskell.TH hiding ( Name )
 import qualified Language.Haskell.TH as TH
 
 import           Solidity

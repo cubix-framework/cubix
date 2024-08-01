@@ -77,17 +77,6 @@ deriveAll [''LuaVarArgsParam]
 
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
-pattern LuaFunctionDefinedObj' :: (LuaFunctionDefinedObj :-<: fs, All HFunctor fs) => CxtS h fs a [P.IdentL] -> CxtS h fs a LuaFunctionDefinedObjL
-pattern LuaFunctionDefinedObj' nms <- (project -> Just (LuaFunctionDefinedObj nms)) where
-  LuaFunctionDefinedObj' nms = iLuaFunctionDefinedObj nms
-
-pattern LuaFunctionAttrs' :: (LuaFunctionAttrs :-<: fs, All HFunctor fs) => CxtS h fs a LuaFunctionDefinedObjL -> CxtS h fs a FunctionDefAttrsL
-pattern LuaFunctionAttrs' o <- (project -> Just (LuaFunctionAttrs o)) where
-  LuaFunctionAttrs' o = iLuaFunctionAttrs o
-
-pattern LuaVarArgsParam' :: (LuaVarArgsParam :-<: fs, All HFunctor fs) => CxtS h fs a FunctionParameterL
-pattern LuaVarArgsParam' <- (project -> Just LuaVarArgsParam) where
-  LuaVarArgsParam' = iLuaVarArgsParam
 
 createSortInclusionTypes [ ''P.FunctionDefL, ''P.BlockL
                          ] [

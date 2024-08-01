@@ -122,18 +122,6 @@ data PyComprehension e l where
 
 deriveAll [''PyWith, ''PyWithBinder, ''PyStringLit, ''PyBlock, ''PyClass, ''PyComp, ''PyCondExpr, ''PyComprehensionExpr, ''PyComprehension]
 
-pattern PyBlock' :: (PyBlock :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe PyStringLitL) -> CxtS h fs a BlockL -> CxtS h fs a PyBlockL
-pattern PyBlock' docStr body <- (project -> Just (PyBlock docStr body)) where
-  PyBlock' docStr body = iPyBlock docStr body
-
-pattern PyChainComp' :: (PyComp :-<: fs, All HFunctor fs) => CxtS h fs a Py.OpL -> CxtS h fs a Py.ExprL -> CxtS h fs a PyCompL -> CxtS h fs a PyCompL
-pattern PyChainComp' op l r <- (project -> Just (PyChainComp op l r)) where
-  PyChainComp' op l r = iPyChainComp op l r
-
-pattern PyBaseComp' :: (PyComp :-<: fs, All HFunctor fs) => CxtS h fs a Py.OpL -> CxtS h fs a Py.ExprL -> CxtS h fs a Py.ExprL -> CxtS h fs a PyCompL
-pattern PyBaseComp' op l r <- (project -> Just (PyBaseComp op l r)) where
-  PyBaseComp' op l r = iPyBaseComp op l r
-
 
 createSortInclusionTypes [ ''P.IdentL,  ''P.AssignL,     ''Py.ExprL, ''Py.StatementL, ''PyCompL,  ''P.IdentL,  ''PyClassL
                          ] [
@@ -172,14 +160,6 @@ data PythonParam e l where
   PythonEndPosParam      ::                                           PythonParam e FunctionParameterL
 
 deriveAll [''PyFunDefAttrs, ''PyParamAttrs, ''PythonParam]
-
-pattern PyFunDefAttrs' :: (PyFunDefAttrs :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a FunctionDefAttrsL
-pattern PyFunDefAttrs' ann <- (project -> Just (PyFunDefAttrs ann)) where
-  PyFunDefAttrs' ann = iPyFunDefAttrs ann
-
-pattern PyParamAttrs' :: (PyParamAttrs :-<: fs, All HFunctor fs) => CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a (Maybe Py.ExprL) -> CxtS h fs a ParameterAttrsL
-pattern PyParamAttrs' ann def <- (project -> Just (PyParamAttrs ann def)) where
-  PyParamAttrs' ann def = iPyParamAttrs ann def
 
 -- | FIXME: Python lets you call class/static methods through an instance.
 -- I should probably model this similarly to how I do so for Java, or create a more interesting representation

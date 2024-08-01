@@ -100,7 +100,7 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   ,        jEmptyBlockItem
   ) where
 
-import Data.Comp.Multi ( Node, project, project', HFunctor, (:-<:), (:<:), All, CxtS, Cxt)
+import Data.Comp.Multi ( Node, project', HFunctor, (:-<:), All)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 
@@ -110,15 +110,10 @@ data Ident :: Node where
 
 deriveAll [''Ident]
 
-pattern Ident' :: (Ident :<: f) => String -> Cxt h f a IdentL
-pattern Ident' s <- (project -> (Just (Ident s))) where
-  Ident' s = jIdent s
-
 data MultiLocalVarDeclCommonAttrsL
 data LocalVarInitL
 
 data IsOptional = Optional | NotOptional
-
 
 data OptLocalVarInitL
 
@@ -133,14 +128,6 @@ data OptLocalVarInit e l where
 
 deriveAll [''OptLocalVarInit]
 
-pattern JustLocalVarInit' :: (OptLocalVarInit :<: f) => Cxt h f a LocalVarInitL -> Cxt h f a OptLocalVarInitL
-pattern JustLocalVarInit' x <- (project -> Just (JustLocalVarInit x)) where
-  JustLocalVarInit' x = jJustLocalVarInit x
-
-pattern NoLocalVarInit' :: (OptLocalVarInit :<: f) => Cxt h f a OptLocalVarInitL
-pattern NoLocalVarInit' <- (project -> Just NoLocalVarInit) where
-  NoLocalVarInit' = jNoLocalVarInit
-
 data LocalVarDeclAttrsL
 
 -- Needs better name because may need to distinguish part of multi-decl from a standalone decl
@@ -150,11 +137,6 @@ data EmptyLocalVarDeclAttrs :: Node where
   EmptyLocalVarDeclAttrs :: EmptyLocalVarDeclAttrs e LocalVarDeclAttrsL
 
 deriveAll [''EmptyLocalVarDeclAttrs]
-
-pattern EmptyLocalVarDeclAttrs' :: (EmptyLocalVarDeclAttrs :<: f) => Cxt h f a LocalVarDeclAttrsL
-pattern EmptyLocalVarDeclAttrs' <- (project -> Just EmptyLocalVarDeclAttrs) where
-  EmptyLocalVarDeclAttrs' = jEmptyLocalVarDeclAttrs
-
 
 data VarDeclBinderL
 -- | Represents declaring a list of identifiers, where the list of identifiers
@@ -166,10 +148,6 @@ data TupleBinder e l where
 
 deriveAll [''TupleBinder]
 
-pattern TupleBinder' :: (TupleBinder :<: f) => Cxt h f a [IdentL] -> Cxt h f a VarDeclBinderL
-pattern TupleBinder' xs <- (project -> Just (TupleBinder xs)) where
-  TupleBinder' xs = jTupleBinder xs
-
 
 instance (TupleBinder :-<: fs, All HFunctor fs) => InjF fs [IdentL] VarDeclBinderL where
   injF = iTupleBinder
@@ -180,10 +158,6 @@ instance (TupleBinder :-<: fs, All HFunctor fs) => InjF fs [IdentL] VarDeclBinde
 createSortInclusionType ''IdentL ''VarDeclBinderL
 deriveAll [''IdentIsVarDeclBinder]
 createSortInclusionInfer ''IdentL ''VarDeclBinderL
-
-pattern IdentIsVarDeclBinder' :: (IdentIsVarDeclBinder :<: f) => Cxt h f a IdentL -> Cxt h f a VarDeclBinderL
-pattern IdentIsVarDeclBinder' n <- (project -> Just (IdentIsVarDeclBinder n)) where
-  IdentIsVarDeclBinder' n = jIdentIsVarDeclBinder n
 
 
 -- |
@@ -208,24 +182,11 @@ data SingleLocalVarDecl e l where
 
 deriveAll [''SingleLocalVarDecl]
 
-pattern SingleLocalVarDecl' ::
-  ( SingleLocalVarDecl :<: f
-  ) => Cxt h f a LocalVarDeclAttrsL
-  -> Cxt h f a VarDeclBinderL
-  -> Cxt h f a OptLocalVarInitL
-  -> Cxt h f a SingleLocalVarDeclL
-pattern SingleLocalVarDecl' x y z <- (project -> (Just (SingleLocalVarDecl x y z))) where
-  SingleLocalVarDecl' x y z = jSingleLocalVarDecl x y z
-
 
 data EmptyMultiLocalVarDeclCommonAttrs :: Node where
   EmptyMultiLocalVarDeclCommonAttrs :: EmptyMultiLocalVarDeclCommonAttrs e MultiLocalVarDeclCommonAttrsL
 
 deriveAll [''EmptyMultiLocalVarDeclCommonAttrs]
-
-pattern EmptyMultiLocalVarDeclCommonAttrs' :: (EmptyMultiLocalVarDeclCommonAttrs :<: f) => Cxt h f a MultiLocalVarDeclCommonAttrsL
-pattern EmptyMultiLocalVarDeclCommonAttrs' <- (project -> Just EmptyMultiLocalVarDeclCommonAttrs) where
-  EmptyMultiLocalVarDeclCommonAttrs' = jEmptyMultiLocalVarDeclCommonAttrs
 
 -- | Informal spec:
 --
@@ -249,14 +210,6 @@ data MultiLocalVarDecl e l where
 
 deriveAll [''MultiLocalVarDecl]
 
-pattern MultiLocalVarDecl' ::
-  ( MultiLocalVarDecl :<: f
-  ) => Cxt h f a MultiLocalVarDeclCommonAttrsL
-  -> Cxt h f a [SingleLocalVarDeclL]
-  -> Cxt h f a MultiLocalVarDeclL
-pattern MultiLocalVarDecl' x y <- (project -> (Just (MultiLocalVarDecl x y))) where
-  MultiLocalVarDecl' x y = jMultiLocalVarDecl x y
-
 
 -- |
 -- See spec for assign
@@ -269,10 +222,6 @@ data AssignOpEquals :: Node where
   AssignOpEquals :: AssignOpEquals e AssignOpL
 
 deriveAll [''AssignOpEquals]
-
-pattern AssignOpEquals' :: (AssignOpEquals :<: f) => Cxt h f a AssignOpL
-pattern AssignOpEquals' <- (project -> Just AssignOpEquals) where
-  AssignOpEquals' = jAssignOpEquals
 
 data LhsL
 data RhsL
@@ -303,11 +252,6 @@ data Assign e l where
 
 deriveAll [''Assign]
 
-pattern Assign' :: (Assign :<: f) => Cxt h f a LhsL -> Cxt h f a AssignOpL -> Cxt h f a RhsL -> Cxt h f a AssignL
-pattern Assign' l o r <- (project -> Just (Assign l o r)) where
-  Assign' l o r = jAssign l o r
-
-
 data BlockItemL
 data BlockEndL
 data BlockL
@@ -316,10 +260,6 @@ data EmptyBlockEnd :: Node where
   EmptyBlockEnd :: EmptyBlockEnd e BlockEndL
 
 deriveAll [''EmptyBlockEnd]
-
-pattern EmptyBlockEnd' :: (EmptyBlockEnd :<: f) => Cxt h f a BlockEndL
-pattern EmptyBlockEnd' <- (project -> Just EmptyBlockEnd) where
-  EmptyBlockEnd' = jEmptyBlockEnd
 
 -- | Block has the following semantics
 -- * Any variable introduced by MultiLocalVarDecl may not be referenced outside of the items contained in this block.
@@ -333,10 +273,6 @@ data Block e l where
 
 deriveAll [''Block]
 
-pattern Block' :: (Block :<: f) => Cxt h f a [BlockItemL] -> Cxt h f a BlockEndL -> Cxt h f a BlockL
-pattern Block' xs e <- (project -> Just (Block xs e)) where
-  Block' xs e = jBlock xs e
-
 -- | This is inserted at the end of blocks
 -- so that there's a place to insert at the end of blocks,
 -- and so that the sort of empty block-item lists can be correctly determined
@@ -346,7 +282,3 @@ data EmptyBlockItem :: Node where
   EmptyBlockItem :: EmptyBlockItem e BlockItemL
 
 deriveAll [''EmptyBlockItem]
-
-pattern EmptyBlockItem' :: (EmptyBlockItem :<: f) => Cxt h f a BlockItemL
-pattern EmptyBlockItem' <- (project -> Just EmptyBlockItem) where
-  EmptyBlockItem' = jEmptyBlockItem

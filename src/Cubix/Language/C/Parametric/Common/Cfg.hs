@@ -20,7 +20,7 @@ import Data.Comp.Multi ( stripA, remA, (:*:)(..), ffst, fsnd, project, proj, E(.
 import Cubix.Language.Info
 
 import Cubix.Language.C.Parametric.Common.Types as C
-import Cubix.Language.C.Parametric.Full.Types as F hiding (CFor)
+import Cubix.Language.C.Parametric.Full.Types as F hiding (CFor, pattern Ident')
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Semantics.Cfg
 import Cubix.Language.Parametric.Syntax as P

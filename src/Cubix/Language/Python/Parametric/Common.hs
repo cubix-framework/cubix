@@ -34,7 +34,7 @@ import Cubix.Language.Python.Parametric.Common.Cfg () -- instances only
 import Cubix.Language.Python.Parametric.Common.Semantics as Semantics
 import Cubix.Language.Python.Parametric.Common.Types as Types
 import Cubix.Language.Python.Parametric.Common.Trans as Trans
-import Cubix.Language.Python.Parametric.Full as F hiding ( translate, untranslate, Ident, iIdent, IdentL, AssignOp, AssignOpL, With, iWith )
+import Cubix.Language.Python.Parametric.Full as F hiding ( translate, untranslate, Ident, iIdent, jIdent, IdentL, pattern Ident', AssignOp, AssignOpL, pattern Assign', With, iWith )
 -- FIXME: Incomplete import list. Probably easier to just hide the Python things that clash
 import Cubix.Language.Parametric.Syntax as Para ( Assign, AssignOpL, AssignOpEquals
                                                 , LhsL, RhsL, EmptyBlockEnd, Block, BlockL, BlockItemL, BlockEndL

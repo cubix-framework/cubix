@@ -29,7 +29,7 @@ import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax hiding ( Cxt )
 
 import Data.Comp.Multi ( (:-<:), project', HFunctor, All )
-import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF, smartConstructors )
+import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF, smartConstructors, patternSynonyms )
 import Data.Comp.Multi.Strategy.Derive ( makeDynCase )
 
 import Cubix.Language.Parametric.InjF
@@ -46,11 +46,11 @@ import Cubix.Sin.Compdata.Derive ( smartFConstructors )
 -- Additonally, it will create smart constructors for the data type
 deriveAll :: [Name] -> Q [Dec]
 deriveAll = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF, smartConstructors, smartFConstructors, makeDynCase]
+                    makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors, makeDynCase]
   
 deriveAllButDynCase :: [Name] -> Q [Dec]
 deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF, smartConstructors, smartFConstructors]
+                    makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors]
 
 -- TODO: distributeAnnotation
 -- -- | Distributes an annotation over a sum

@@ -110,6 +110,7 @@ abstractConType (GadtC (constr:_) args _typ) = (constr,length args) -- Only firs
 {-|
   This function returns the name of a bound type variable
 -}
+tyVarBndrName :: TyVarBndr () -> Name
 tyVarBndrName (PlainTV n _) = n
 tyVarBndrName (KindedTV n _ _) = n
 

@@ -13,15 +13,11 @@ module Cubix.Language.Solidity.Parametric.Common.Trans (
   , untranslate
   ) where
 
-import Control.Monad.Identity ( Identity(..) )
-
-import Data.Monoid ( Any(..) )
 import Data.List( (\\) )
 import Data.Text qualified as Text
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Data.Comp.Multi ( project, inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
-import Data.Comp.Multi.Strategic ( crushtdT, addFail, promoteTF )
 
 import Cubix.Language.Solidity.Parametric.Common.Types
 import qualified Cubix.Language.Solidity.Parametric.Full as F

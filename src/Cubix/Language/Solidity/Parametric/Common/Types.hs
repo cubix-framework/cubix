@@ -14,7 +14,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Node, HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
+import Data.Comp.Multi ( Term,  project', CxtS, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Solidity.Parametric.Full.Names
@@ -73,11 +73,11 @@ type MSolidityCxtA h a p = AnnCxtS p h MSoliditySig a
 instance InjF MSoliditySig IdentL ExpressionL where
     injF = iIdentifierExpression . injF
 
-    projF e
-     | Just (IdentifierExpression i) <- project e
-     , Just (IdentIsIdentifier j) <- project i
+    projF' e
+     | Just (IdentifierExpression i) <- project' e
+     , Just (IdentIsIdentifier j) <- project' i
      = Just j
-    projF _ = Nothing
+    projF' _ = Nothing
       
 
 #endif

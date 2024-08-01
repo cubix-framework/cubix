@@ -17,11 +17,10 @@ module Cubix.Language.Python.Parametric.Full.Trans (
 
 import Data.Typeable (Typeable )
 
-import Data.Comp.Multi ( caseCxt, caseCxt'', Sum, All, (:&:)(..), DistAnn )
+import Data.Comp.Multi ( caseCxt'', Sum, All, (:&:)(..), DistAnn )
 
 
 import qualified Language.Python.Common.AST as P
-import qualified Language.Haskell.TH as TH
 
 import Data.Comp.Trans ( runCompTrans, withSubstitutions, deriveTrans, deriveUntrans, withAnnotationProp, defaultPropAnn, defaultUnpropAnn )
 
