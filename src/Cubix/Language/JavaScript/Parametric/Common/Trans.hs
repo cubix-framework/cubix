@@ -76,9 +76,9 @@ instance {-# OVERLAPPABLE #-} Trans F.JSVarInitializer where
 translateAssign :: F.JSTerm F.JSExpressionL -> F.JSTerm F.JSAssignOpL -> F.JSTerm F.JSExpressionL -> MJSTerm F.JSExpressionL
 translateAssign lhs op rhs = iAssign (injF $ translate lhs) op' (injF $ translate rhs)
   where
-    op' = case project op of
-      Just (F.JSAssign _) -> AssignOpEquals'
-      _                   -> injF $ translate op
+    op' = case op of
+      F.JSAssign' _ -> AssignOpEquals'
+      _             -> injF $ translate op
 
 -- This takes out things like "use strict";, which aren't really part of the computation,
 -- and have to be at the front
@@ -126,9 +126,9 @@ varInitToDecl :: F.JSTerm F.JSExpressionL -> MJSTerm SingleLocalVarDeclL
 varInitToDecl (project -> (Just (F.JSVarInitExpression lhs init))) =
           SingleLocalVarDecl' EmptyLocalVarDeclAttrs' (injF $ translate lhs) rhs
   where
-    rhs = case project init of
-      Just (F.JSVarInit _ e) -> JustLocalVarInit' $ injF $ translate e
-      Just F.JSVarInitNone   -> NoLocalVarInit'
+    rhs = case init of
+      F.JSVarInit' _ e -> JustLocalVarInit' $ injF $ translate e
+      F.JSVarInitNone' -> NoLocalVarInit'
 
 extractVarDecls :: F.JSTerm (F.JSCommaList F.JSExpressionL) -> MJSTerm [SingleLocalVarDeclL]
 extractVarDecls commaList = insertF $ map varInitToDecl exps

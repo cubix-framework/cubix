@@ -164,9 +164,9 @@ transParam (project -> Just (F.FormalParam mods tp isVarargs vid)) =
 -- The Nothing' field is for default methods; Java 8 only
 instance {-# OVERLAPPING #-} Trans F.MemberDecl where
   trans (F.MethodDecl mods tparams typ n params ex Nothing' body) =
-      case project body of
-        Just (F.MethodBody Nothing') -> iFunctionDecl (injF attrs) (transIdent n) (addUnlessStatic SelfParameterDecl' $ mapF transParamDecl params)
-        Just (F.MethodBody (Just' b)) -> iFunctionDef  (injF attrs) (transIdent n) (addUnlessStatic SelfParameter' $ mapF transParam params) (injF $ transBlock b)
+      case body of
+        F.MethodBody' Nothing'  -> iFunctionDecl (injF attrs) (transIdent n) (addUnlessStatic SelfParameterDecl' $ mapF transParamDecl params)
+        F.MethodBody' (Just' b) -> iFunctionDef  (injF attrs) (transIdent n) (addUnlessStatic SelfParameter' $ mapF transParam params) (injF $ transBlock b)
     where
       attrs :: MJavaTerm JavaMethodDeclAttrsL
       attrs = iJavaMethodDeclAttrs (translate mods) (translate tparams) (translate typ) (translate ex)
@@ -251,11 +251,11 @@ instance {-# OVERLAPPING #-} Untrans FunctionCallIsMethodInvocation where
       case args of
         ConsF' (ReceiverArg' receiver) nonReceiverArgs ->
             let args' = mapF (untranslate.fromProjF) nonReceiverArgs in
-            case project receiver of
-                Just (PrimaryReceiver e)    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
-                Just SuperReceiver          -> F.iSuperMethodCall                   (untranslate targs) n' args'
-                Just (ClassSuperReceiver c) -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
-                Just (TypeReceiver c)       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
+            case receiver of
+                PrimaryReceiver' e    -> F.iPrimaryMethodCall (untranslate e) (untranslate targs) n' args'
+                SuperReceiver'        -> F.iSuperMethodCall                   (untranslate targs) n' args'
+                ClassSuperReceiver' c -> F.iClassMethodCall (untranslate c)   (untranslate targs) n' args'
+                TypeReceiver' c       -> F.iTypeMethodCall  (untranslate c)   (untranslate targs) n' args'
 
         _ -> case targs of
                  NilF' -> F.iMethodCall (F.iName $ SingletonF' n') (mapF (untranslate . fromProjF) args)

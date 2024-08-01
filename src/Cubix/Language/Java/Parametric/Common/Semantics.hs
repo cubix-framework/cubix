@@ -26,10 +26,10 @@ import Unsafe.Coerce ( unsafeCoerce )
 
 instance {-# OVERLAPPING #-} (Op :-<: gs) => GetStrictness' gs Exp where
   getStrictness'   (Cond _ _ _)   = [Strict, GuardedBy (Place 0), GuardedBy (NegPlace 0)]
-  getStrictness' t@(BinOp _ op _) = case project op of
-    Just CAnd -> [Strict, NoEval, GuardedBy (Place 0)]
-    Just COr  -> [Strict, NoEval, GuardedBy (NegPlace 0)]
-    _           -> defaultGetStrictness t
+  getStrictness' t@(BinOp _ op _) = case op of
+    CAnd' -> [Strict, NoEval, GuardedBy (Place 0)]
+    COr'  -> [Strict, NoEval, GuardedBy (NegPlace 0)]
+    _     -> defaultGetStrictness t
   getStrictness' x              = defaultGetStrictness x
 
 instance {-# OVERLAPPING #-} InsertAt' MJavaSig BlockItemL Stmt where

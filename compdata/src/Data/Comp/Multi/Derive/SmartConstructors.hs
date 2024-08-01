@@ -105,7 +105,6 @@ smartConstructors fname = do
   pattern Add' :: (Arith :<: f) => Cxt h f a ExpL -> Cxt h f a ExpL -> Cxt h f a ExpL
   pattern Add' a b <- (project -> Just (Add a b)) where
     Add' a b = inject $ Add a b
-
 -}
 
 patternSynonyms :: Name -> Q [Dec]

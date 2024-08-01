@@ -27,10 +27,10 @@ import Unsafe.Coerce ( unsafeCoerce )
 
 instance {-# OVERLAPPING #-} (JSBinOp :-<: gs) => GetStrictness' gs JSExpression where
   getStrictness' (JSExpressionTernary _ _ _ _ _) = [Strict, NoEval, GuardedBy (Place 0), NoEval, GuardedBy (NegPlace 0)]
-  getStrictness' t@(JSExpressionBinary _ op _)   = case project op of
-    Just (JSBinOpAnd _) -> [Strict, NoEval, GuardedBy (Place 0)]
-    Just (JSBinOpOr _)  -> [Strict, NoEval, GuardedBy (NegPlace 0)]
-    _           -> defaultGetStrictness t
+  getStrictness' t@(JSExpressionBinary _ op _)   = case op of
+    JSBinOpAnd' _ -> [Strict, NoEval, GuardedBy (Place 0)]
+    JSBinOpOr' _  -> [Strict, NoEval, GuardedBy (NegPlace 0)]
+    _             -> defaultGetStrictness t
   getStrictness' x                  = defaultGetStrictness x
 
 -- We can insert statements before list of statements, *or* before lists of BlockItem's

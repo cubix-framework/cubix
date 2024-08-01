@@ -94,16 +94,16 @@ class VarInitToRhs f where
 
 #ifndef ONLY_ONE_LANGUAGE
 instance VarInitToRhs MCTerm where
-  varInitToRhs cAttrs (projF -> Just (Ident' nam)) lAttrs (projF -> Just (x :: MCTerm CInitializerL)) = case project x of
-    Just (CInitExpr e _) -> injF e
-    Just (CInitList l ann) -> iCCompoundLit decl l ann
+  varInitToRhs cAttrs (projF -> Just (Ident' nam)) lAttrs (projF -> Just (x :: MCTerm CInitializerL)) = case x of
+    CInitExpr' e _   -> injF e
+    CInitList' l ann -> iCCompoundLit decl l ann
       where
         decl = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam) iUnitF) iUnitF))) riNilF iUnitF
 
 instance VarInitToRhs MJavaTerm where
-  varInitToRhs cAttrs _ lAttrs (projF -> Just (x :: MJavaTerm VarInitL)) = case project x of
-    Just (InitExp e)   -> injF e
-    Just (InitArray a) -> iArrayCreateInit t dim a
+  varInitToRhs cAttrs _ lAttrs (projF -> Just (x :: MJavaTerm VarInitL)) = case x of
+    InitExp'   e -> injF e
+    InitArray' a -> iArrayCreateInit t dim a
       where
         Just (ArrayDimVarDeclAttrs dim) = project lAttrs
         Just (cAttrPair :: MJavaTerm ([ModifierL], TypeL)) = projF cAttrs
@@ -224,12 +224,12 @@ instance {-# OVERLAPPABLE #-} SpecialHoist MCSig where
   -- We turn "int x[3] = {1,2,3};" into "int x[3];" and "memcpy(&x, (typeof(x)){1,2,3}, sizeof(x));"
   specialHoistMulti _ attrs lattrs (projF -> Just (Ident' nam)) init
     | JustLocalVarInit' linit <- init
-    , Just (x :: MCTerm CInitializerL) <- projF linit = case project x of
-             Just (CInitExpr e _) -> if isArray lattrs then
-                                       hoistArrayInitString attrs lattrs nam e
-                                     else
-                                       Nothing
-             Just (CInitList l _) -> Just ([decl], [memcpy])
+    , Just (x :: MCTerm CInitializerL) <- projF linit = case x of
+             CInitExpr' e _ -> if isArray lattrs then
+                                 hoistArrayInitString attrs lattrs nam e
+                               else
+                                 Nothing
+             CInitList' l _ -> Just ([decl], [memcpy])
                where
                  litType = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam) iUnitF) iUnitF))) riNilF iUnitF
                  compoundLit = iCCompoundLit litType l iUnitF :: MCTerm CExpressionL

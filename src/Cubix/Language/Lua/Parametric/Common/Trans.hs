@@ -163,17 +163,17 @@ instance {-# OVERLAPPING #-} Untrans FunctionCallIsFunCall where
       getFunPE (project -> Just (FunctionIdent n))          = F.iPEVar $ F.iVarName $ injF $ untransIdent n
 
       funNm :: Maybe (F.LuaTerm F.NameL)
-      funNm = case project f of
-              Just (FunctionIdent i) -> Just (untransIdent i)
-              _                      -> Nothing
+      funNm = case f of
+              FunctionIdent' i -> Just (untransIdent i)
+              _                -> Nothing
 
       receiver :: Maybe (F.LuaTerm F.PrefixExpL)
       receiver = case args of
                    FunctionArgumentList' (ConsF' (ReceiverArg' r) _) -> fmap untranslate $ projF r
-                   _     -> case project args of
-                                Just (LuaReceiverAndTableArg  rec _) -> Just (untranslate rec)
-                                Just (LuaReceiverAndStringArg rec _) -> Just (untranslate rec)
-                                _                                    -> Nothing
+                   _     -> case args of
+                                LuaReceiverAndTableArg'  rec _ -> Just (untranslate rec)
+                                LuaReceiverAndStringArg' rec _ -> Just (untranslate rec)
+                                _                              -> Nothing
 
       untransArgs :: MLuaTerm [FunctionArgumentL] -> F.LuaTerm [F.ExpL]
       untransArgs = mapF untransArg
@@ -184,11 +184,11 @@ instance {-# OVERLAPPING #-} Untrans FunctionCallIsFunCall where
       fa = case args of
              FunctionArgumentList' (ConsF' (ReceiverArg' _) as) -> F.iArgs (untransArgs as)
              FunctionArgumentList' as                           -> F.iArgs (untransArgs as)
-             _      -> case project args of
-                          Just (LuaTableArg               x) -> F.iTableArg  (untranslate x)
-                          Just (LuaStringArg              s) -> F.iStringArg (pack s)
-                          Just (LuaReceiverAndTableArg  _ x) -> F.iTableArg  (untranslate x)
-                          Just (LuaReceiverAndStringArg _ s) -> F.iStringArg (pack s)
+             _      -> case args of
+                          LuaTableArg'               x -> F.iTableArg  (untranslate x)
+                          LuaStringArg'              s -> F.iStringArg (pack s)
+                          LuaReceiverAndTableArg'  _ x -> F.iTableArg  (untranslate x)
+                          LuaReceiverAndStringArg' _ s -> F.iStringArg (pack s)
 
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsStat where
   untrans (FunctionDefIsStat (FunctionDef' attrs n params body)) =

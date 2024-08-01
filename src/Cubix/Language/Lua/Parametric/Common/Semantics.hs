@@ -18,10 +18,10 @@ import Cubix.Language.Parametric.Syntax
 import Cubix.Sin.Compdata.Annotation ( annM )
 
 instance {-# OVERLAPPING #-} (Binop :-<: gs) => GetStrictness' gs Exp where
-  getStrictness' t@(Binop op _ _) = case project op of
-    Just And -> [NoEval, Strict, GuardedBy (Place 1)]
-    Just Or  -> [NoEval, Strict, GuardedBy (NegPlace 1)]
-    _           -> defaultGetStrictness t
+  getStrictness' t@(Binop op _ _) = case op of
+    And' -> [NoEval, Strict, GuardedBy (Place 1)]
+    Or'  -> [NoEval, Strict, GuardedBy (NegPlace 1)]
+    _    -> defaultGetStrictness t
   getStrictness' x                  = defaultGetStrictness x
 
 -- Special casing functions so we don't put stuff at top level b/c looks weird even though correct
