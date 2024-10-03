@@ -25,7 +25,7 @@ extra-deps:
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
 - alex-tools-0.6.1
 - git: https://github.com/jkoppel/solidity-hs
-  commit: da8617c3adee32446990a69b79ba8d796610afa2
+  commit: 39c37ec75aa55180b0bb3a7b5160e744bc4a24f5
 
 
 # Override default flag values for local packages and extra-deps
