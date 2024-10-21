@@ -1,13 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ed191de94d39cd595f1f82aac0b3f829acf55bb3218b1a47dd531ba0e2778f1b
+-- hash: 910f4d6371cbdbf468904fd9a56e58e3fe123721847da7bcf29aa9d64cd838fb
 
 name:           cubix
-version:        0.7.0.2
+version:        0.7.0.12
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
