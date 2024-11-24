@@ -15,13 +15,16 @@ extra-deps:
 - concurrent-supply-0.1.8
 - language-lua-0.11.0.1
 - git: https://github.com/jkoppel/language-javascript.git
-  commit: 3b2026cf9c443bc798683c12206de439354283ce
+  commit: 516f52b13870fa7d99b0503a0730438f07891340
 - language-dot-0.1.1
 - git: https://github.com/jkoppel/language-c.git
-  commit: 49c340419e9ea6395c1915f9de7aedf903483c95
+  commit: 2aee906576087ba3d5a1bd7ebc86f30bf8416470
 - git: https://github.com/jkoppel/language-java.git
-  commit: a41ba850a1e2b3e233cc8e5132433921b6a6dca0
-- language-python-0.5.8
+  commit: 31de71c063d8586d6d69f49fbc55030f7e865593
+- git: https://github.com/jkoppel/language-python.git
+  commit: 7efbe33c9175de03358e85529f453eefb4d43b33
+  subdirs:
+   - language-python
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
 - alex-tools-0.6.1
 - git: https://github.com/jkoppel/solidity-hs

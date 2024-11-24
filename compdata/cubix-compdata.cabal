@@ -74,6 +74,6 @@ Test-Suite test
   Main-is:                      Data_Test.hs
   Extensions:           FlexibleContexts
   hs-source-dirs:               testsuite/tests examples src
-  Build-Depends:        base, template-haskell, containers, mtl, QuickCheck, 
+  Build-Depends:        base, data-default, template-haskell, containers, mtl, QuickCheck, 
                         HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
                         th-expand-syns, deepseq, transformers, vector, ghc-prim, cubix-compdata
