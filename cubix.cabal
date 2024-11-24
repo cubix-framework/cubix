@@ -4,7 +4,7 @@
 
 cabal-version:  >= 1.10
 name:           cubix
-version:        0.7.0.13
+version:        0.7.0.14
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language

@@ -63,4 +63,4 @@ package cubix
 optimization: False
 
 -- Build settings
-jobs $ncpus
+jobs: $ncpus
