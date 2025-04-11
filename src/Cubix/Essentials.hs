@@ -12,13 +12,14 @@
 --
 -- __Guide to using this file__
 --
---       * __Strongly recommend__: Click "Collapse All Instances" in the top-right corner
---       * For newcomers: Look at the examples given, not at the types
---       * This file is not the authoritative source for any of its exports. Some
---         typeclasses have methods hidden here. Some functions are exported
---         with more-specific type signatures that are easier to understand. An
---         unfortunate consequence of this is that __some definitions in this file
---         conflict with the original Cubix definitions__.
+--       * __Strongly recommend__: In the top-right corner, click "Instances" and then collapse all instances.
+--
+--       * This file is excellent for Cubix beginners, as it re-exports the most important functions,
+--         often with a simplified type. As you progress, you will want to increasingly use
+--         the original versions, rather than the versions from this file.
+--
+--       * Because some definitions are re-exported with simplified types,
+--         those definitions __conflict with the original Cubix definitions__.
 --
 --
 --------------------------------------------------------------------------------
