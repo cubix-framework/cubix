@@ -1,7 +1,7 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-21.0
+resolver: lts-23.19
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -13,7 +13,7 @@ packages:
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - concurrent-supply-0.1.8
-- language-lua-0.11.0.1
+- language-lua-0.11.0.2
 - git: https://github.com/jkoppel/language-javascript.git
   commit: 516f52b13870fa7d99b0503a0730438f07891340
 - language-dot-0.1.1

@@ -4,8 +4,8 @@ packages:
     comptrans/
     compstrat/
 
--- Match the GHC version from stack's resolver (lts-21.0)
-with-compiler: ghc-9.2.8
+-- Match the GHC version from stack's resolver (lts-23.19)
+with-compiler: ghc-9.8.4
 
 -- External source dependencies from stack.yaml
 source-repository-package
@@ -37,7 +37,7 @@ source-repository-package
 -- Additional dependencies from stack.yaml
 constraints:
     concurrent-supply == 0.1.8,
-    language-lua == 0.11.0.1,
+    language-lua == 0.11.0.2,
     language-dot == 0.1.1,
     wl-pprint == 1.2.1,
     alex-tools == 0.6.1
