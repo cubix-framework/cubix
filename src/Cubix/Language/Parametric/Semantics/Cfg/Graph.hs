@@ -248,12 +248,12 @@ satisfyingBoundary seen succ pred cfg node =
       nextLab <- select labs  -- `select ( labs :: [Label] )` produces a `ListT Maybe Label`
       satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
 
--- The function `runListT` defined in the `list-transformer` package has the wrong type signature.
+-- The function `runListT` defined in the `list-transformer` package has the wrong type signature. Let's define a shim.
 runListT :: ListT Maybe a -> Maybe [a]
 runListT = fold (\x a -> x ++ [a]) [] id
 
 satisfyingPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
-satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node -- ***
+satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node
 
 satisfyingSuccBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingSuccBoundary pred cfg node = runListT x where
