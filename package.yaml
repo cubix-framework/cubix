@@ -118,6 +118,7 @@ library:
   - language-javascript >= 0.6.0.9
   - language-lua
   - language-python
+  - list-transformer
   - lens
   - MonadRandom
   - process

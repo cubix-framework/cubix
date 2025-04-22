@@ -53,7 +53,7 @@ module Cubix.Language.Parametric.Semantics.Cfg.Graph (
 
 import Control.DeepSeq ( NFData )
 import Control.Monad ( mzero )
-import Control.Monad.Trans.List ( ListT(..) )
+import List.Transformer ( ListT(..), fold, select )
 import Control.Monad.State ( MonadState )
 import Control.Monad.Trans ( lift )
 
@@ -245,15 +245,19 @@ satisfyingBoundary seen succ pred cfg node =
     if labs == [] then
       lift Nothing
     else do
-      nextLab <- ListT (Just labs)
+      nextLab <- select labs  -- `select ( labs :: [Label] )` produces a `ListT Maybe Label`
       satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
 
+-- The function `runListT` defined in the `list-transformer` package has the wrong type signature.
+runListT :: ListT Maybe a -> Maybe [a]
+runListT = fold (\x a -> x ++ [a]) [] id
 
 satisfyingPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
-satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node
+satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node -- ***
 
 satisfyingSuccBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
-satisfyingSuccBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_succs) pred cfg node
+satisfyingSuccBoundary pred cfg node = runListT x where
+  x =  satisfyingBoundary Set.empty (^. cfg_node_succs) pred cfg node
 
 satisfyingStrictPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingStrictPredBoundary pred cfg node = satisfyingPredBoundary pred' cfg node
