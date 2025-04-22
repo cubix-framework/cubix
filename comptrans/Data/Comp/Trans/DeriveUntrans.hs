@@ -85,14 +85,14 @@ deriveUntrans names term = do targDec <- mkTarg targNm
 {- type family Targ l -}
 mkTarg :: Name -> CompTrans [Dec]
 mkTarg targNm = do i <- CompTrans $ lift $ newName "i"
-                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i ()] NoSig Nothing)]
+                   return [OpenTypeFamilyD (TypeFamilyHead targNm [PlainTV i BndrReq] NoSig Nothing)]
 
 {- newtype T l = T { t :: Targ l } -}
 mkWrapper :: Name -> Name -> Name -> CompTrans [Dec]
 mkWrapper tpNm fNm targNm = do i <- CompTrans $ lift $ newName "i"
                                let con = RecC tpNm [(fNm, bang, AppT (ConT targNm) (VarT i))]
                                    bang = Bang NoSourceUnpackedness NoSourceStrictness
-                                   nt   = NewtypeD [] tpNm [PlainTV i ()] Nothing con []
+                                   nt   = NewtypeD [] tpNm [PlainTV i BndrReq] Nothing con []
                                return [nt]
 {-
   untranslate :: JavaTerm l -> Targ l
@@ -124,7 +124,7 @@ mkFn fnNm term targNm fldNm untransNm = sequence [sig, def]
 mkClass :: Name -> Name -> Name -> CompTrans [Dec]
 mkClass classNm funNm newtpNm = do f <- CompTrans $ lift $ newName "f"
                                    let funDec = SigD funNm (AppT (AppT (ConT ''Alg) (VarT f)) (ConT newtpNm))
-                                   return [ClassD [] classNm [PlainTV f ()] [] [funDec]]
+                                   return [ClassD [] classNm [PlainTV f BndrReq] [] [funDec]]
 
 {-
   type instance Targ CompilationUnitL = J.CompilationUnit

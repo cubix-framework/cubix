@@ -16,19 +16,19 @@ extra-deps:
 - language-lua-0.11.0.2
 - git: https://github.com/jkoppel/language-javascript.git
   commit: 516f52b13870fa7d99b0503a0730438f07891340
-- language-dot-0.1.1
+- language-dot-0.1.2
 - git: https://github.com/jkoppel/language-c.git
   commit: 2aee906576087ba3d5a1bd7ebc86f30bf8416470
 - git: https://github.com/jkoppel/language-java.git
   commit: 31de71c063d8586d6d69f49fbc55030f7e865593
-- git: https://github.com/jkoppel/language-python.git
-  commit: 7efbe33c9175de03358e85529f453eefb4d43b33
+- git: https://github.com/winitzki/language-python.git
+  commit: 19370545706444928e624077d0f07fda66b26e18
   subdirs:
    - language-python
 - wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
 - alex-tools-0.6.1
-- git: https://github.com/jkoppel/solidity-hs
-  commit: 148b5258b8a03f3fd4f1b0e81038d7f28c0044bd
+- git: https://github.com/winitzki/solidity-hs
+  commit: ac25b25cf4cb176ad36175fb979c767f72577f29
 
 
 # Override default flag values for local packages and extra-deps

@@ -53,7 +53,7 @@ module Cubix.Language.Parametric.Semantics.Cfg.Graph (
 
 import Control.DeepSeq ( NFData )
 import Control.Monad ( mzero )
-import Control.Monad.List ( ListT(..) )
+import Control.Monad.Trans.List ( ListT(..) )
 import Control.Monad.State ( MonadState )
 import Control.Monad.Trans ( lift )
 

@@ -4,7 +4,6 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverlappingInstances  #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -215,7 +214,7 @@ class SubstVars v t a where
 appSubst :: (Ord v, SubstVars v t a) => GSubst v t -> a :-> a
 appSubst subst = substVars (substFun subst)
 
-instance (Ord v, HasVars v f, HTraversable f) => SubstVars v (Cxt h f a) (Cxt h f a) where
+instance {-# OVERLAPS #-} (Ord v, HasVars v f, HTraversable f) => SubstVars v (Cxt h f a) (Cxt h f a) where
     -- have to use explicit GADT pattern matching!!
     substVars subst = doSubst Set.empty
       where doSubst :: Set v -> Cxt h f a :-> Cxt h f a
@@ -226,7 +225,7 @@ instance (Ord v, HasVars v f, HTraversable f) => SubstVars v (Cxt h f a) (Cxt h 
                 where run :: Set v -> Cxt h f a :-> Cxt h f a
                       run vars = doSubst (b `Set.union` vars)
 
-instance (SubstVars v t a, HFunctor f) => SubstVars v t (f a) where
+instance {-# OVERLAPS #-} (SubstVars v t a, HFunctor f) => SubstVars v t (f a) where
     substVars subst = hfmap (substVars subst)
 
 {-| This function composes two substitutions @s1@ and @s2@. That is,
