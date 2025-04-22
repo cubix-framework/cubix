@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           cubix
-version:        0.7.0.14
+version:        0.7.0.15
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
