@@ -16,7 +16,7 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/jkoppel/language-c.git
-    tag: 2aee906576087ba3d5a1bd7ebc86f30bf8416470
+    tag: 9a496ea8da36742ab3c4ca7769f072f8f6091deb
 
 source-repository-package
     type: git
@@ -25,14 +25,14 @@ source-repository-package
 
 source-repository-package
     type: git
-    location: https://github.com/winitzki/language-python.git
-    tag: 19370545706444928e624077d0f07fda66b26e18
+    location: https://github.com/jkoppel/language-python.git
+    tag: 4ef1ba415badfb58e043bef543d9d9857ab0f2cc
     subdir: language-python
 
 source-repository-package
     type: git
-    location: https://github.com/winitzki/solidity-hs
-    tag: ac25b25cf4cb176ad36175fb979c767f72577f29
+    location: https://github.com/jkoppel/solidity-hs
+    tag: ed56714c994693e7458ad5f5b02d6bb1c53fe435
 
 -- Additional dependencies from stack.yaml
 constraints:

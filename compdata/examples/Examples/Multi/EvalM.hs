@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
   FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs,
-  ConstraintKinds #-}
+  ConstraintKinds, TypeApplications #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.EvalM
@@ -28,8 +28,8 @@ import Examples.Multi.Common
 -- Monadic term evaluation algebra
 class EvalM f v where
   evalAlgM :: AlgM Maybe f (Term v)
-
-$(derive [liftSum] [''EvalM])
+{-  The API has changed and the derivation below no longer works.
+$(derive [liftSum] [''Sig])
 
 evalM :: (HTraversable f, EvalM f v) => Term f i -> Maybe (Term v i)
 evalM = cataM evalAlgM
@@ -58,3 +58,4 @@ projP v = case project v of
 -- Example: evalMEx = Just (iConst 5)
 evalMEx :: Maybe (Term Value Int)
 evalMEx = evalM (iConst 1 `iAdd` (iConst 2 `iMult` iConst 2) :: Term Sig Int)
+-}

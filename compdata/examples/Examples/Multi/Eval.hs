@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
   FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs,
-  ConstraintKinds #-}
+  ConstraintKinds, TypeApplications #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.Eval
@@ -27,13 +27,13 @@ import Examples.Multi.Common
 -- Term evaluation algebra
 class Eval f v where
   evalAlg :: Alg f (Term v)
+{-  The API has changed and the derivation below no longer works.
 
 $(derive [liftSum] [''Eval])
 
 -- Lift the evaluation algebra to a catamorphism
 eval :: (HFunctor f, Eval f v) => Term f :-> Term v
 eval = cata evalAlg
-
 instance (f :<: v) => Eval f v where
   evalAlg = inject -- default instance
 
@@ -52,3 +52,4 @@ projP v = case project v of Just (Pair x y) -> (x,y)
 -- Example: evalEx = iConst 2
 evalEx :: Term Value Int
 evalEx = eval (iFst $ iPair (iConst 2) (iConst 1) :: Term Sig Int)
+-}

@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
-  FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs #-}
+DataKinds, FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.Common
@@ -32,7 +32,7 @@ data Op a i where
   Snd       ::          a (i,j) -> Op a j
 
 -- Signature for the simple expression language
-type Sig = Op :+: Value
+type Sig = '[Op, Value]
 -- Derive boilerplate code using Template Haskell (GHC 7 needed)
 $(derive [makeHFunctor, makeHFoldable, makeHTraversable, makeShowHF, makeEqHF,
           makeOrdHF, smartConstructors]
