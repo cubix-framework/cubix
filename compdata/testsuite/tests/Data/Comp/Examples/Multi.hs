@@ -5,7 +5,7 @@ import Examples.Multi.Common
 import Examples.Multi.Eval as Eval
 import Examples.Multi.EvalI as EvalI
 import Examples.Multi.EvalM as EvalM
--- import Examples.Multi.Mut as Mut
+-- import Examples.Multi.Mut as Mut -- The module Examples.Multi.Mut does not exist.
 
 import Data.Comp.Multi
 
