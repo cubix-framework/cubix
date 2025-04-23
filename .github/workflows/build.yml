@@ -4,6 +4,7 @@ jobs:
   cubix_test:
     name: Cubix test suites
     runs-on: ubuntu-24.04 # or macOS-latest, or windows-latest
+    container: haskell:9.8.4-bullseye
     steps:
       - uses: actions/checkout@v4
       - uses: haskell/actions/setup@v2
@@ -13,4 +14,3 @@ jobs:
           enable-stack: true
           stack-version: '3.5.1'
       - run: stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS' --test
-

@@ -31,7 +31,7 @@ class EvalI f where
 $(derive [liftSum] [''EvalI])
 
 -- Lift the evaluation algebra to a catamorphism
-evalI :: (HFunctor f, EvalI f) => Term '[f] i -> i
+evalI :: (All HFunctor fs, All EvalI fs) => Term fs i -> i
 evalI = unI . cata evalAlgI
 
 instance EvalI Value where
@@ -43,11 +43,11 @@ instance EvalI Op where
   evalAlgI (Mult (I x) (I y)) = I (x * y)
   evalAlgI (Fst (I (x,_)))    = I x
   evalAlgI (Snd (I (_,y)))    = I y
-{-
+{- TODO restore old code here -}
 -- Example: evalEx = 2
-expr :: Term '[Op] Int
+expr :: Term Sig Int
 expr = jFst $ jPair (jConst 2) (jConst 1)
 
 evalIEx :: Int
 evalIEx = evalI expr
--}
+{- -}

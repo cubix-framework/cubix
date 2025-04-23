@@ -20,6 +20,7 @@
 
 module Examples.Multi.EvalM where
 
+import Data.Comp.Multi.Ops ( (:-<:) )
 import Data.Comp.Multi
 import Data.Comp.Multi.Derive
 import Control.Monad (liftM)
@@ -28,8 +29,8 @@ import Examples.Multi.Common
 -- Monadic term evaluation algebra
 class EvalM f v where
   evalAlgM :: AlgM Maybe f (Term v)
-{-  The API has changed and the derivation below no longer works.
-$(derive [liftSum] [''Sig])
+{-  The API has changed and the derivation below no longer works. -}
+$(derive [liftSum] [''EvalM])
 
 evalM :: (HTraversable f, EvalM f v) => Term f i -> Maybe (Term v i)
 evalM = cataM evalAlgM
@@ -58,4 +59,4 @@ projP v = case project v of
 -- Example: evalMEx = Just (iConst 5)
 evalMEx :: Maybe (Term Value Int)
 evalMEx = evalM (iConst 1 `iAdd` (iConst 2 `iMult` iConst 2) :: Term Sig Int)
--}
+{--}
