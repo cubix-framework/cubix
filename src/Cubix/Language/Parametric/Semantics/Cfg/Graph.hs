@@ -52,7 +52,6 @@ module Cubix.Language.Parametric.Semantics.Cfg.Graph (
  ) where
 
 import Control.DeepSeq ( NFData )
-import Control.Monad ( mzero, join )
 import Control.Monad.State ( MonadState )
 
 import Data.Map ( Map )
@@ -235,14 +234,14 @@ contractNode l g = removeNode n $
 satisfyingBoundary :: Set Label -> (CfgNode fs -> Set Label) -> (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingBoundary seen succ pred cfg node =
   if Set.member (node ^. cfg_node_lab) seen then
-    mzero
+    Nothing
   else if pred node then
-    return [node]
+    Just [ node ]
   else
     let labs = Set.toList $ succ node in
     if labs == [] then
       Nothing
-    else  Just $ join $ mapMaybe getNext labs  where -- In this case, we convert [ Maybe [ CfgNode fs ] ] always into Just [ CfgNode fs ].
+    else  Just $ concat $ mapMaybe getNext labs  where -- In this case, we convert [ Maybe [ CfgNode fs ] ] always into Just [ CfgNode fs ].
       -- getNext :: CfgNode fs -> Maybe [ CfgNode fs ]
       getNext nextLab = satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
 
