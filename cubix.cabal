@@ -182,7 +182,6 @@ library
     , language-lua
     , language-python
     , lens
-    , list-transformer
     , mtl
     , process
     , random
