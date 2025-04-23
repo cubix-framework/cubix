@@ -60,19 +60,19 @@ $(derive [makeHFunctor, makeHTraversable, makeHFoldable,
           makeEqHF, makeShowHF, smartConstructors]
          [''Op, ''Val, ''Let, ''LetRec])
 
-instance HasVars Val Var where
+instance HasVars Var Val where
     isVar (Var v) = Just v
     isVar _       = Nothing
     
     bindsVars (Abs v a) = a |-> Set.singleton v
     bindsVars _         = empty
 
-instance HasVars Op a where
+instance HasVars a Op where
 
-instance HasVars Let Var where
+instance HasVars Var Let  where
     bindsVars (Let v _ a) = a |-> Set.singleton v
 
-instance HasVars LetRec Var where
+instance HasVars Var LetRec where
     bindsVars (LetRec v a b) = a |-> vs & b |-> vs
         where vs = Set.singleton v
 
