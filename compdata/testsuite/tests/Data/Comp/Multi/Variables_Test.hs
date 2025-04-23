@@ -104,7 +104,7 @@ case_recSubst = appSubst s recExp @=? recExp'
     where s = subst :: Subst SigRec Var
 
 --------------------------------------------------------------------------------
--- Test Suits
+-- Test Suites
 --------------------------------------------------------------------------------
 
 main = defaultMain [tests]

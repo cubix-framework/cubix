@@ -17,6 +17,7 @@ extra-source-files:
   -- test files
   testsuite/tests/*.hs
   testsuite/tests/Data/*.hs
+  testsuite/tests/Data/Comp/*.hs
   testsuite/tests/Data/Comp/Multi/*.hs
   testsuite/tests/Data/Comp/Examples/*.hs
   testsuite/tests/Test/Utils.hs
