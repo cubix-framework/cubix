@@ -1,0 +1,16 @@
+on: [push]
+name: build
+jobs:
+  cubix_test:
+    name: Cubix test suites
+    runs-on: ubuntu-latest # or macOS-latest, or windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-haskell@v1.1
+        with:
+          ghc-version: '9.8.4' # Exact version of ghc to use
+          # cabal-version: 'latest'. Omitted, but defalts to 'latest'
+          enable-stack: true
+          stack-version: '3.5.1'
+      - run: stack build --ghc-options='-O0 -j +RTS -A256m -n2m -RTS' --test
+
