@@ -18,10 +18,10 @@ import Test.HUnit
 --------------------------------------------------------------------------------
 
 tests = testGroup "Generalised Compositional Data Types" [
-        --  testCase "eval" evalTest,
-        --  testCase "evalI" evalITest,
-        --  testCase "evalM" evalMTest,
-        --  testCase "desugarEval" desugarEvalTest,
+         testCase "eval" evalTest,
+         testCase "evalI" evalITest,
+         testCase "evalM" evalMTest
+        --  testCase "desugarEval" desugarEvalTest, -- These no longer exist.
         --  testCase "desugarPos" desugarPosTest
         ]
 
@@ -32,8 +32,7 @@ tests = testGroup "Generalised Compositional Data Types" [
 
 instance (EqHF f, Eq p) => EqHF (f :&: p) where
     eqHF (v1 :&: p1) (v2 :&: p2) = p1 == p2 && v1 `eqHF` v2
-{-
-evalTest = Eval.evalEx @=? iConst 2
+
+evalTest = Eval.evalEx @=? jConst 2
 evalITest = evalIEx @=? 2
-evalMTest = evalMEx @=? Just (iConst 5)
--}
+evalMTest = evalMEx @=? Just (jConst 5)
