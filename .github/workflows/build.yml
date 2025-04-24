@@ -5,8 +5,8 @@ jobs:
   cubix_test:
     name: Cubix test suites
     runs-on: ubuntu-24.04 # or macOS-latest, or windows-latest
-    #container: haskell:9.8.4-bullseye
-    container: winitzki/cubix_build_image:v1
+    container: haskell:9.8.4-bullseye
+    #container: winitzki/cubix_build_image:v1
     steps:
       - uses: actions/checkout@v4
       - uses: haskell-actions/setup@v2
