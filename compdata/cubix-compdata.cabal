@@ -1,5 +1,5 @@
 Name:                   cubix-compdata
-Version:                        1.0.1
+Version:                        1.0.2
 Synopsis:                       Compositional Data Types for Cubix
 Description: This is forked from Patrick Bahr's compdata library to be more tightly integrated with Cubix
 
