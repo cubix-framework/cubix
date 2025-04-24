@@ -43,11 +43,7 @@ instance EvalI Op where
   evalAlgI (Mult (I x) (I y)) = I (x * y)
   evalAlgI (Fst (I (x,_)))    = I x
   evalAlgI (Snd (I (_,y)))    = I y
-{- TODO restore old code here -}
--- Example: evalEx = 2
-expr :: Term Sig Int
-expr = jFst $ jPair (jConst 2) (jConst 1)
 
+-- Example: evalEx = 2
 evalIEx :: Int
-evalIEx = evalI expr
-{- -}
+evalIEx = evalI (jFst $ jPair (jConst 2) (jConst 1) :: Term Sig Int)

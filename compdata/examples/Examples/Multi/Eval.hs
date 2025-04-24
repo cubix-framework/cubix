@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
   FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs,
-  ConstraintKinds, TypeApplications #-}
+  ConstraintKinds, TypeApplications, DataKinds #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.Eval
@@ -20,36 +20,38 @@
 
 module Examples.Multi.Eval where
 
+import Data.Comp.Multi.Ops ( (:-<:) )
 import Data.Comp.Multi
 import Data.Comp.Multi.Derive
 import Examples.Multi.Common
+import Data.Comp.Multi.HFunctor ( (:->) )
 
--- Term evaluation algebra
-class Eval f v where
-  evalAlg :: Alg f (Term v)
-{-  The API has changed and the derivation below no longer works.
+-- Term evaluation algebra: forall i. f (Term '[Value]) i -> Term '[Value] i  
+-- Question: Is this a good fix for this test? We need `Eval` to be a typeclass with a single argument of kind (* -> *) -> * -> *.
+class Eval f where
+  evalAlg :: Alg f (Term '[Value])
 
 $(derive [liftSum] [''Eval])
 
 -- Lift the evaluation algebra to a catamorphism
-eval :: (HFunctor f, Eval f v) => Term f :-> Term v
+eval :: Term Sig :-> Term '[Value]
 eval = cata evalAlg
-instance (f :<: v) => Eval f v where
-  evalAlg = inject -- default instance
 
-instance (Value :<: v) => Eval Op v where
-  evalAlg (Add x y)  = iConst $ projC x + projC y
-  evalAlg (Mult x y) = iConst $ projC x * projC y
+instance Eval Value where
+  evalAlg = inject
+
+instance Eval Op where
+  evalAlg (Add x y)  = jConst $ projC x + projC y
+  evalAlg (Mult x y) = jConst $ projC x * projC y
   evalAlg (Fst x)    = fst $ projP x
   evalAlg (Snd x)    = snd $ projP x
 
-projC :: (Value :<: v) => Term v Int -> Int
+projC :: (Value :-<: fs) => Term fs Int -> Int
 projC v = case project v of Just (Const n) -> n
 
-projP :: (Value :<: v) => Term v (s,t) -> (Term v s, Term v t)
+projP :: (Value :-<: fs) => Term fs (s, t) -> (Term fs s, Term fs t)
 projP v = case project v of Just (Pair x y) -> (x,y)
 
 -- Example: evalEx = iConst 2
-evalEx :: Term Value Int
-evalEx = eval (iFst $ iPair (iConst 2) (iConst 1) :: Term Sig Int)
--}
+evalEx :: Term '[Value] Int
+evalEx = eval (jFst $ jPair (jConst 2) (jConst 1) :: Term Sig Int)
