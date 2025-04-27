@@ -21,7 +21,7 @@ tests = testGroup "Generalised Compositional Data Types" [
          testCase "eval" evalTest,
          testCase "evalI" evalITest,
          testCase "evalM" evalMTest
-        --  testCase "desugarEval" desugarEvalTest, -- These no longer exist.
+        --  testCase "desugarEval" desugarEvalTest, -- 2025.04.24: These no longer exist.
         --  testCase "desugarPos" desugarPosTest
         ]
 
