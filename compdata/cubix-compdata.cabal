@@ -1,5 +1,5 @@
 Name:                   cubix-compdata
-Version:                        1.0.1
+Version:                        1.0.2
 Synopsis:                       Compositional Data Types for Cubix
 Description: This is forked from Patrick Bahr's compdata library to be more tightly integrated with Cubix
 
@@ -17,6 +17,7 @@ extra-source-files:
   -- test files
   testsuite/tests/*.hs
   testsuite/tests/Data/*.hs
+  testsuite/tests/Data/Comp/*.hs
   testsuite/tests/Data/Comp/Multi/*.hs
   testsuite/tests/Data/Comp/Examples/*.hs
   testsuite/tests/Test/Utils.hs

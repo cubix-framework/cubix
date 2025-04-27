@@ -153,7 +153,7 @@ instance AssertCfgWellFormed MCSig CAssemblyOperand
 instance AssertCfgWellFormed MCSig CArraySize
 instance AssertCfgWellFormed MCSig CAlignmentSpecifier
 instance AssertCfgWellFormed MCSig Position
-instance AssertCfgWellFormed MCSig FilePosition
+-- instance AssertCfgWellFormed MCSig FilePosition -- The type `FilePosition` does not exist anywhere in cubix or in language-c.
 instance AssertCfgWellFormed MCSig NodeInfo
 instance AssertCfgWellFormed MCSig Name
 

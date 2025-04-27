@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
   FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs,
-  OverlappingInstances, ConstraintKinds #-}
+  ConstraintKinds, TypeApplications, DataKinds #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.EvalM
@@ -20,41 +20,42 @@
 
 module Examples.Multi.EvalM where
 
+import Data.Comp.Multi.Ops ( (:-<:) )
 import Data.Comp.Multi
 import Data.Comp.Multi.Derive
 import Control.Monad (liftM)
 import Examples.Multi.Common
 
 -- Monadic term evaluation algebra
-class EvalM f v where
-  evalAlgM :: AlgM Maybe f (Term v)
+class EvalM f where
+  evalAlgM :: AlgM Maybe f (Term '[Value])
 
 $(derive [liftSum] [''EvalM])
 
-evalM :: (HTraversable f, EvalM f v) => Term f i -> Maybe (Term v i)
+evalM :: Term Sig i -> Maybe (Term '[Value] i)
 evalM = cataM evalAlgM
 
-instance (f :<: v) => EvalM f v where
+instance EvalM Value where
   evalAlgM = return . inject -- default instance
 
-instance (Value :<: v) => EvalM Op v where
+instance EvalM Op where
   evalAlgM (Add x y)  = do n1 <- projC x
                            n2 <- projC y
-                           return $ iConst $ n1 + n2
+                           return $ jConst $ n1 + n2
   evalAlgM (Mult x y) = do n1 <- projC x
                            n2 <- projC y
-                           return $ iConst $ n1 * n2
+                           return $ jConst $ n1 * n2
   evalAlgM (Fst v)    = liftM fst $ projP v
   evalAlgM (Snd v)    = liftM snd $ projP v
 
-projC :: (Value :<: v) => Term v Int -> Maybe Int
+projC :: (Value :-<: fs) => Term fs Int -> Maybe Int
 projC v = case project v of
             Just (Const n) -> return n; _ -> Nothing
 
-projP :: (Value :<: v) => Term v (a,b) -> Maybe (Term v a, Term v b)
+projP :: (Value :-<: fs) => Term fs (a,b) -> Maybe (Term fs a, Term fs b)
 projP v = case project v of
             Just (Pair x y) -> return (x,y); _ -> Nothing
 
 -- Example: evalMEx = Just (iConst 5)
-evalMEx :: Maybe (Term Value Int)
-evalMEx = evalM (iConst 1 `iAdd` (iConst 2 `iMult` iConst 2) :: Term Sig Int)
+evalMEx :: Maybe (Term '[Value] Int)
+evalMEx = evalM (jConst 1 `jAdd` (jConst 2 `jMult` jConst 2) :: Term Sig Int)

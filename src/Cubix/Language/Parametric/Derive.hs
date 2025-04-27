@@ -91,7 +91,7 @@ createSortInclusionType fromNm toNm = do
   let ctx = [foldl AppT EqualityT [VarT i, ConT toNm]]
   let notStrict = Bang NoSourceUnpackedness NoSourceStrictness
   let con = ForallC [] ctx $ NormalC tName [(notStrict, AppT (VarT e) (ConT fromNm))]
-  return $ [DataD [] tName [KindedTV e () (AppT (AppT ArrowT StarT) StarT), PlainTV i ()] Nothing [con] []]
+  return $ [DataD [] tName [KindedTV e BndrReq (AppT (AppT ArrowT StarT) StarT), PlainTV i BndrReq] Nothing [con] []]
 
   
 createSortInclusionTypes :: [Name] -> [Name] -> Q [Dec]

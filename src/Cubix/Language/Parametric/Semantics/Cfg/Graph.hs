@@ -52,14 +52,11 @@ module Cubix.Language.Parametric.Semantics.Cfg.Graph (
  ) where
 
 import Control.DeepSeq ( NFData )
-import Control.Monad ( mzero )
-import Control.Monad.List ( ListT(..) )
 import Control.Monad.State ( MonadState )
-import Control.Monad.Trans ( lift )
 
 import Data.Map ( Map )
 import qualified Data.Map as Map
-import Data.Maybe ( fromJust, fromMaybe, isNothing )
+import Data.Maybe ( fromJust, fromMaybe, isNothing, mapMaybe )
 
 import Data.Set ( Set )
 import qualified Data.Set as Set
@@ -234,26 +231,25 @@ contractNode l g = removeNode n $
     n = lookupCfg g l
     add (x, y) gr = addEdge (lookupCfg gr x) (lookupCfg gr y) gr
 
-satisfyingBoundary :: Set Label -> (CfgNode fs -> Set Label) -> (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> ListT Maybe (CfgNode fs)
+satisfyingBoundary :: Set Label -> (CfgNode fs -> Set Label) -> (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingBoundary seen succ pred cfg node =
   if Set.member (node ^. cfg_node_lab) seen then
-    mzero
+    Nothing
   else if pred node then
-    return node
+    Just [ node ]
   else
     let labs = Set.toList $ succ node in
     if labs == [] then
-      lift Nothing
-    else do
-      nextLab <- ListT (Just labs)
-      satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
-
+      Nothing
+    else  Just $ concat $ mapMaybe getNext labs  where -- In this case, we convert [ Maybe [ CfgNode fs ] ] always into Just [ CfgNode fs ].
+      -- getNext :: CfgNode fs -> Maybe [ CfgNode fs ]
+      getNext nextLab = satisfyingBoundary (Set.insert (node ^. cfg_node_lab) seen) succ pred cfg (lookupCfg cfg nextLab)
 
 satisfyingPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
-satisfyingPredBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_prevs) pred cfg node
+satisfyingPredBoundary = satisfyingBoundary Set.empty (^. cfg_node_prevs)
 
 satisfyingSuccBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
-satisfyingSuccBoundary pred cfg node = runListT $ satisfyingBoundary Set.empty (^. cfg_node_succs) pred cfg node
+satisfyingSuccBoundary = satisfyingBoundary Set.empty (^. cfg_node_succs)
 
 satisfyingStrictPredBoundary :: (CfgNode fs -> Bool) -> Cfg fs -> CfgNode fs -> Maybe [CfgNode fs]
 satisfyingStrictPredBoundary pred cfg node = satisfyingPredBoundary pred' cfg node

@@ -7,7 +7,7 @@ cabal-version: 1.12
 -- hash: f31771e5e49450a27b8ea0c95caa88cc58676be7cbb0357f436bde07c3fc8f47
 
 name:           comptrans
-version:        0.1.0.6
+version:        0.1.0.7
 synopsis:       Automatically converting ASTs into compositional data types
 description:    Template Haskell for converting an AST for a language written using normal
                 algebraic data types into ones written using multi-sorted compositional data types

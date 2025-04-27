@@ -52,7 +52,7 @@ mkGADT n cons = do
     Just _annPropInf  -> mapM_ checkUniqueVar cons
     Nothing          -> return ()
   cons' <- mapM (mkCon n' e i) cons
-  return $ [DataD [] n' [KindedTV e () (AppT (AppT ArrowT StarT) StarT), PlainTV i ()] Nothing cons' []
+  return $ [DataD [] n' [KindedTV e BndrReq (AppT (AppT ArrowT StarT) StarT), PlainTV i BndrReq] Nothing cons' []
            ,DataD [] (nameLab n) [] Nothing [] []
            ]
 

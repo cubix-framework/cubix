@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators, MultiParamTypeClasses,
-  FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs #-}
+  FlexibleInstances, FlexibleContexts, UndecidableInstances, GADTs, DataKinds, TypeApplications #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Examples.Multi.EvalI
@@ -19,6 +19,7 @@
 
 module Examples.Multi.EvalI where
 
+import Data.Comp.Multi.Ops ( (:-<:) )
 import Data.Comp.Multi
 import Data.Comp.Multi.Derive
 import Examples.Multi.Common
@@ -30,7 +31,7 @@ class EvalI f where
 $(derive [liftSum] [''EvalI])
 
 -- Lift the evaluation algebra to a catamorphism
-evalI :: (HFunctor f, EvalI f) => Term f i -> i
+evalI :: (All HFunctor fs, All EvalI fs) => Term fs i -> i
 evalI = unI . cata evalAlgI
 
 instance EvalI Value where
@@ -45,4 +46,4 @@ instance EvalI Op where
 
 -- Example: evalEx = 2
 evalIEx :: Int
-evalIEx = evalI (iFst $ iPair (iConst 2) (iConst 1) :: Term Sig Int)
+evalIEx = evalI (jFst $ jPair (jConst 2) (jConst 1) :: Term Sig Int)

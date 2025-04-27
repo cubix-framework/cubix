@@ -1,0 +1,20 @@
+# See https://github.com/haskell-actions/setup/blob/main/docs/examples.md
+on: [push]
+name: build
+jobs:
+  cubix_test:
+    name: Cubix test suites
+    runs-on: ubuntu-24.04 # or macOS-latest, or windows-latest
+    container: haskell:9.8.4-bullseye
+    #container: winitzki/cubix_build_image:v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.8.4' # Exact version of ghc to use
+          # cabal-version: 'latest'. Omitted, but defalts to 'latest'
+          enable-stack: true
+          stack-version: '3.5.1'
+      - name: Permissions bug workaround, see https://github.com/commercialhaskell/stack/issues/2187
+        run: "chown -R $(id -un):$(id -gn) ~"
+      - run: "stack build --allow-different-user --ghc-options='-O0 -j +RTS -A256m -n2m -RTS' --test"

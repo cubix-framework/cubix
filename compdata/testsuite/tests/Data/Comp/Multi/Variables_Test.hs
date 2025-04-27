@@ -60,34 +60,34 @@ $(derive [makeHFunctor, makeHTraversable, makeHFoldable,
           makeEqHF, makeShowHF, smartConstructors]
          [''Op, ''Val, ''Let, ''LetRec])
 
-instance HasVars Val Var where
+instance HasVars Var Val where
     isVar (Var v) = Just v
     isVar _       = Nothing
     
     bindsVars (Abs v a) = a |-> Set.singleton v
     bindsVars _         = empty
 
-instance HasVars Op a where
+instance HasVars a Op where
 
-instance HasVars Let Var where
+instance HasVars Var Let  where
     bindsVars (Let v _ a) = a |-> Set.singleton v
 
-instance HasVars LetRec Var where
+instance HasVars Var LetRec where
     bindsVars (LetRec v a b) = a |-> vs & b |-> vs
         where vs = Set.singleton v
 
 -- let x = x + 1 in (\y. y + x) z
 letExp, letExp' :: Expression SigLet
-letExp = iLet X (iVar X `iPlus` iInt 1) (iAbs Y (iVar Y `iPlus` iVar X) `iApp` iVar Z)
-letExp' = iLet X (iInt 1 `iPlus` iInt 1) (iAbs Y (iVar Y `iPlus` iVar X) `iApp` iInt 3)
+letExp = jLet X (jVar X `jPlus` jInt 1) (jAbs Y (jVar Y `jPlus` jVar X) `jApp` jVar Z)
+letExp' = jLet X (jInt 1 `jPlus` jInt 1) (jAbs Y (jVar Y `jPlus` jVar X) `jApp` jInt 3)
 
 -- letrec x = x + 1 in (\y. y + x) z
 recExp, recExp' :: Expression SigRec
-recExp = iLetRec X (iVar X `iPlus` iInt 1) (iAbs Y (iVar Y `iPlus` iVar X) `iApp` iVar Z)
-recExp' = iLetRec X (iVar X `iPlus` iInt 1) (iAbs Y (iVar Y `iPlus` iVar X) `iApp` iInt 3)
+recExp = jLetRec X (jVar X `jPlus` jInt 1) (jAbs Y (jVar Y `jPlus` jVar X) `jApp` jVar Z)
+recExp' = jLetRec X (jVar X `jPlus` jInt 1) (jAbs Y (jVar Y `jPlus` jVar X) `jApp` jInt 3)
 
-subst :: (Val :<: f) => Subst f Var
-subst = Map.fromList [(X, A $ iInt 1), (Y, A $ iInt 2), (Z, A $ iInt 3)]
+subst :: (Val :-<: f) => Subst (Sum f) Var
+subst = Map.fromList [(X, A $ jInt 1), (Y, A $ jInt 2), (Z, A $ jInt 3)]
 
 --------------------------------------------------------------------------------
 -- Properties
@@ -98,13 +98,13 @@ case_letFree = variables letExp @=? Set.fromList [Z,X]
 case_recFree = variables recExp @=? Set.fromList [Z]
 
 case_letSubst = appSubst s letExp @=? letExp'
-    where s = subst :: Subst SigLet Var
+    where s = subst :: Subst (Sum SigLet) Var
 
 case_recSubst = appSubst s recExp @=? recExp'
-    where s = subst :: Subst SigRec Var
+    where s = subst :: Subst (Sum SigRec) Var
 
 --------------------------------------------------------------------------------
--- Test Suits
+-- Test Suites
 --------------------------------------------------------------------------------
 
 main = defaultMain [tests]
