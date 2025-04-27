@@ -80,18 +80,6 @@ mkNormalTransAlts = return $ TransAlts { makeTransRhs = makeTransRhsNormal}
 -- translate = trans
 -- @
 
--- This function `mkFunc` is not used.
--- mkFunc :: Type -> Name -> Type -> CompTrans [Dec]
--- mkFunc typ funNm term = do
---   srcTyp <- applyCurSubstitutions typ
---   isAnn <- getIsAnn
---   lab <- getLab isAnn srcTyp
---   return [ SigD translate (AppT (AppT ArrowT srcTyp) (AppT term lab))
---          , ValD (VarP translate) (NormalB funNm') []
---          ]
---   where
---     translate = mkName "translate"
---     funNm' = VarE funNm
 
 -- |
 -- Example:
