@@ -5,7 +5,6 @@ import Examples.Multi.Common
 import Examples.Multi.Eval as Eval
 import Examples.Multi.EvalI as EvalI
 import Examples.Multi.EvalM as EvalM
--- import Examples.Multi.Mut as Mut -- The module Examples.Multi.Mut does not exist.
 
 import Data.Comp.Multi
 
@@ -21,8 +20,6 @@ tests = testGroup "Generalised Compositional Data Types" [
          testCase "eval" evalTest,
          testCase "evalI" evalITest,
          testCase "evalM" evalMTest
-        --  testCase "desugarEval" desugarEvalTest, -- 2025.04.24: These no longer exist.
-        --  testCase "desugarPos" desugarPosTest
         ]
 
 
