@@ -1,0 +1,25 @@
+ Installed gcc-11, failed to run
+
+Java:
+  ID: 745
+    Hoist: 744
+      Tetscov: 744
+
+JS:
+  ID: 2538
+    Hoist: 2538
+      Testcov: 2374
+        TAC: 2536
+
+Lua:
+
+  ID: 70287/70303 passed
+    Hoist 70388/70404 passed
+
+
+Python:
+  ID: 366
+    Testcov: 248
+      TAC: 219
+      ~
+

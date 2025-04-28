@@ -154,6 +154,7 @@ all_tests.each do |testnam|
   
   puts "Transforming from #{testfil} to #{outfil}"
   res = `gtimeout #{TIMELIMIT} #{RUNPROG} python #{transform} #{testfil}`
+  res.force_encoding(Encoding::UTF_8)
 
   if $? != 0 then
     puts "Failed to transform: #{testfil}"

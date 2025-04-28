@@ -1,0 +1,81 @@
+
+April 27th, 2025 jkoppel: I ran the language tests for the first time in a long time to test the upgrade to GHC 9.8.4. I found that quite a few tests were failing that weren't failing in the paper. Whether this is due to changes in the environment that weren't stabilized, or to changes in Cubix, is as yet unknown. It was enough to determine however that the recent upgrades did not introduce any new test failers.
+
+Results:
+
+
+Ran at 39c12de365aee9a12095b48922cda6e5f81bfbac
+
+Versions used:
+
+(base) [jkoppel@MacBook-Pro-173:cubix_framework/cubix]$ gcc --version                                                                                               (04-27 20:58)
+Apple clang version 16.0.0 (clang-1600.0.26.6)
+Target: x86_64-apple-darwin23.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+
+(base) [jkoppel@MacBook-Pro-173:cubix_framework/cubix]$ javac --version                                                                                             (04-27 20:58)
+javac 23.0.1
+
+(base) [jkoppel@MacBook-Pro-173:cubix_framework/cubix]$ node --version                                                                                              (04-27 20:59)
+v20.9.0
+
+Lua and Python versions are pinned
+
+————————
+
+C: (run with Clang; didn’t get gcc re-set-up. Expected low success, because this is gcc-torture, not clang-torture)
+
+  ID: 688
+  Hoist: 609
+  Testcov: 688
+
+Java:
+  ID: 745
+  Hoist: 744
+  Testcov: 744
+^^ This implies one new failing case for tescov
+
+JS:
+
+    ID: 2538
+    Hoist: 2538
+    Testcov: 2533
+    TAC: 2536
+^^ Suggests there’s one test that’s failing TAC that wasn’t before
+
+Lua:
+ID: 70230/70296
+Hoist: 70366/70382
+
+Python:
+  ID: 366
+  Testcov: 364
+  TAC: 219. From an error where “del t42” gets generated twice, second one errors. Since the version of Python is pinned, this may be new.
+
+
+Rerunning at  c45ce8ae12d384ac63d3e8182a52d7e795d2ef4a:
+
+C: Installed gcc-11, failed to run
+
+Java:
+  ID: 745
+  Hoist: 744
+  Tetscov: 744
+
+JS:
+  ID: 2538
+  Hoist: 2538
+  Testcov: 2374
+  TAC: 2536
+
+Lua:
+
+  ID: 70287/70303 passed
+  Hoist 70388/70404 passed
+
+
+Python:
+  ID: 366
+  Testcov: 248
+  TAC: 219
