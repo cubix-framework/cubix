@@ -30,6 +30,6 @@ module Cubix.Language.Solidity.Parametric.Common (
 
 import Cubix.Language.Solidity.Parametric.Common.Types as Types
 import Cubix.Language.Solidity.Parametric.Common.Trans as Trans
-import Cubix.Language.Solidity.Parametric.Full as F hiding ( translate, untranslate )
-import Cubix.Language.Parametric.Syntax as Para hiding ( FunctionCall, iFunctionCall, jFunctionCall, pattern FunctionCall', Assign, iAssign, jAssign, pattern Assign' )
+import Cubix.Language.Solidity.Parametric.Full as F hiding ( translate, untranslate, Assign, iAssign, jAssign, pattern Assign' )
+import Cubix.Language.Parametric.Syntax as Para hiding ( FunctionCall, iFunctionCall, jFunctionCall, pattern FunctionCall' )
 #endif

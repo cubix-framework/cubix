@@ -31,29 +31,28 @@ import Cubix.Language.Parametric.Syntax as P
 ---------------------     Identifiers and assignments      ------------------------
 -----------------------------------------------------------------------------------
 
+createSortInclusionTypes
+  [''P.IdentL,    ''P.AssignL,   ''ExpressionL, ''ExpressionL ]
+  [''IdentifierL, ''ExpressionL, ''P.RhsL,      ''P.LhsL      ]
+deriveAll
+  [''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs, ''ExpressionIsLhs]
+createSortInclusionInfers
+  [''P.IdentL,    ''P.AssignL,   ''ExpressionL, ''ExpressionL]
+  [''IdentifierL, ''ExpressionL, ''P.RhsL,      ''P.LhsL     ]
 
-
-createSortInclusionTypes [  ''IdentL
-                         ] [''IdentifierL
-                         ]
-deriveAll [''IdentIsIdentifier ]
-createSortInclusionInfers [  ''IdentL
-                          ] [''IdentifierL
-                          ]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
-do let soliditySortInjections = [ ''IdentIsIdentifier ]
+do let soliditySortInjections = [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs, ''ExpressionIsLhs ]
    let solidityNewNodes       = [ ]
    let names = (soliditySigNames \\ [mkName "Identifier"])
                           ++ soliditySortInjections
                           ++ solidityNewNodes
-                          ++ [ ''P.Ident --, ''Assign, ''AssignOpEquals
+                          ++ [ ''P.Ident, ''P.Assign, ''AssignOpEquals
                              ]
-   sumDec <- runCompTrans $ makeSumType "MSoliditySig" names
-   return sumDec
+   runCompTrans $ makeSumType "MSoliditySig" names
 
 
 -- TODO 2023.11.02: I don't remember what this is for
