@@ -73,6 +73,20 @@ transIdent (project -> Just (F.Identifier t)) = Ident' (Text.unpack t)
 instance Trans F.Identifier where
   trans (F.Identifier n) = iIdent (Text.unpack n)
 
+transBinOp
+  :: F.SolidityTerm F.BinaryOpL
+  -> F.SolidityTerm F.ExpressionL
+  -> F.SolidityTerm F.ExpressionL
+  -> MSolidityTerm F.ExpressionL
+transBinOp F.Assign' a b = iAssign (injF $ translate a) AssignOpEquals' (injF $ translate b)
+transBinOp f a b  = F.BinaryExpression' (injF $ translate f) (injF $ translate a) (injF $ translate b)
+
+instance Trans F.Expression where
+-- covered by default
+--  trans (F.IdentifierExpression id) = trans @F.Identifier id -- injF $ transIdent id
+  trans (F.BinaryExpression f a b) = transBinOp f a b
+  trans x = transDefault x
+
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
 ------------------------------------------------------------------------------------
@@ -92,11 +106,11 @@ instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
 
 untransError :: (HFunctor f, f :-<: MSoliditySig) => f MSolidityTerm l -> F.SolidityTerm l
-untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
+untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 
 do ipsNames <- sumToNames ''MSoliditySig
    modNames <- sumToNames ''F.SoliditySig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier]
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier, ''AssignIsExpression ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.SoliditySig) => f MSolidityTerm l -> F.SolidityTerm l
@@ -122,6 +136,13 @@ untransIdent (Ident' s) = F.iIdentifier (Text.pack s)
 
 instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
   untrans (IdentIsIdentifier n) = untransIdent n
+
+untransAssign :: MSolidityTerm AssignL -> F.SolidityTerm F.ExpressionL
+untransAssign (Assign' lhs AssignOpEquals' rhs) =
+  F.iBinaryExpression F.iAssign (untranslate $ fromProjF lhs) (untranslate $ fromProjF rhs)
+
+instance Untrans AssignIsExpression where
+  untrans (AssignIsExpression n) = untransAssign n
 
 
 #endif
