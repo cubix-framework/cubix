@@ -1,8 +1,8 @@
-Name:                compstrat
-Version:             0.1.0.3
-Synopsis:            Strategy combinators for compositional data types
-Description:         
-
+cabal-version: 3.4
+name:          compstrat
+version:       0.1.0.3
+synopsis:      Strategy combinators for compositional data types
+description:
     A library for strategic programming on compositional data types. See
     /The Essence of Strategic Programming/, <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.104.5296&rep=rep1&type=pdf>,
     by Ralf Laemmel et al.
@@ -18,34 +18,43 @@ Description:
     that ekmett proposed and rejected as an extension to the current
     lens library. A /Vertical/ is essentially a monadic traversal. This hence
     could potentially be merged with the lens library.
-License:             BSD3
-License-File:        LICENSE
-Author:              James Koppel
-Maintainer:          jkoppel@mit.edu
-Category:            Language, Generics
-build-type:          Simple
-extra-source-files:  README.md
-Cabal-version:       >=1.9.2
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        James Koppel
+maintainer:    jkoppel@mit.edu
+category:      Language, Generics
+build-type:    Simple
 
-Source-Repository head
-  Type: git
-  Location: https://github.com/jkoppel/compstrat
+extra-source-files:
+  README.md
 
-Library
+tested-with:
+  GHC == 9.8.4
 
-  Exposed-Modules:     
-                     Data.Comp.Multi.Strategic
-                     Data.Comp.Multi.Strategy.Classification
-                     Data.Comp.Multi.Strategy.Derive
+common language
+  default-language: Haskell2010
 
-  Build-Depends:
+common ghc-options
+  ghc-options: -W
 
-                     base
-                   , cubix-compdata
-                   , mtl
-                   , parallel
-                   , template-haskell
-                   , th-expand-syns
-                   , transformers
+source-repository head
+  type: git
+  location: https://github.com/jkoppel/compstrat
 
-  Ghc-Options:     -O2 -threaded -rtsopts
+library
+  import: language
+  import: ghc-options
+  hs-source-dirs: src
+  exposed-modules:
+    Data.Comp.Multi.Strategic
+    Data.Comp.Multi.Strategy.Classification
+    Data.Comp.Multi.Strategy.Derive
+
+  build-depends:
+    , base >= 4.19.2.0
+    , cubix-compdata >= 1.0.2
+    , mtl >= 2.3.1
+    , parallel >= 3.2.2.0
+    , template-haskell >= 2.21.0.0
+    , th-expand-syns >= 0.4.12.0
+    , transformers >= 0.6.1.0
