@@ -1,80 +1,119 @@
-Name:                   cubix-compdata
-Version:                        1.0.2
-Synopsis:                       Compositional Data Types for Cubix
-Description: This is forked from Patrick Bahr's compdata library to be more tightly integrated with Cubix
+cabal-version: 3.4
+name:          cubix-compdata
+version:       1.0.2
+synopsis:      Compositional Data Types for Cubix
+description:   This is forked from Patrick Bahr's compdata library to be more tightly integrated with Cubix
+category:      Generics
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Patrick Bahr, Tom Hvitved
+maintainer:    paba@diku.dk
+build-type:    Simple
+bug-reports:   https://github.com/pa-ba/compdata/issues
 
+tested-with:
+  GHC == 9.8.4
 
-Category:               Generics
-License:                BSD3
-License-file:           LICENSE
-Author:                 Patrick Bahr, Tom Hvitved
-Maintainer:             paba@diku.dk
-Build-Type:             Simple
-Cabal-Version:          >=1.9.2
-bug-reports:            https://github.com/pa-ba/compdata/issues
+common language
+  default-language: Haskell2010
+  default-extensions:
+    FlexibleContexts
 
-extra-source-files:
-  -- test files
-  testsuite/tests/*.hs
-  testsuite/tests/Data/*.hs
-  testsuite/tests/Data/Comp/*.hs
-  testsuite/tests/Data/Comp/Multi/*.hs
-  testsuite/tests/Data/Comp/Examples/*.hs
-  testsuite/tests/Test/Utils.hs
-  -- example files
-  examples/Examples/Multi/*.hs
+common ghc-options
+  ghc-options: -W
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , containers >= 0.6.8
+    , ghc-prim >= 0.11.0
+    , vector >= 0.13.2.0
+
+library internal
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src-internal
+  visibility: public
+  exposed-modules:
+    Data.Comp.SubsumeCommon
+    Data.Comp.Elem
+    Data.Comp.Alt
 
 library
-  Exposed-Modules:      Data.Comp.Derive.Utils
-                        Data.Comp.Dict
-                        Data.Comp.Ops
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src
+  exposed-modules:
+    Data.Comp.Derive.Utils
+    Data.Comp.Dict
+    Data.Comp.Ops
+    Data.Comp.Multi
+    Data.Comp.Multi.Kinds
+    Data.Comp.Multi.Term
+    Data.Comp.Multi.Sum
+    Data.Comp.Multi.HFunctor
+    Data.Comp.Multi.HFoldable
+    Data.Comp.Multi.HTraversable
+    Data.Comp.Multi.Algebra
+    Data.Comp.Multi.Annotation
+    Data.Comp.Multi.Show
+    Data.Comp.Multi.Equality
+    Data.Comp.Multi.Ordering
+    Data.Comp.Multi.Variables
+    Data.Comp.Multi.Ops
+    Data.Comp.Multi.Mapping
+    Data.Comp.Multi.Derive
+    Data.Comp.Multi.Generic
+    Data.Comp.Multi.Projection
+    Data.Comp.Multi.Mutable
 
-                        Data.Comp.Multi
-                        Data.Comp.Multi.Kinds
-                        Data.Comp.Multi.Term
-                        Data.Comp.Multi.Sum
-                        Data.Comp.Multi.HFunctor
-                        Data.Comp.Multi.HFoldable
-                        Data.Comp.Multi.HTraversable
-                        Data.Comp.Multi.Algebra
-                        Data.Comp.Multi.Annotation
-                        Data.Comp.Multi.Show
-                        Data.Comp.Multi.Equality
-                        Data.Comp.Multi.Ordering
-                        Data.Comp.Multi.Variables
-                        Data.Comp.Multi.Ops
-                        Data.Comp.Multi.Mapping
-                        Data.Comp.Multi.Derive
-                        Data.Comp.Multi.Generic
-                        Data.Comp.Multi.Projection
-                        Data.Comp.Multi.Mutable
+  other-modules:
+    Data.Comp.Multi.Derive.Generic
+    Data.Comp.Multi.Derive.HFunctor
+    Data.Comp.Multi.Derive.HFoldable
+    Data.Comp.Multi.Derive.HTraversable
+    Data.Comp.Multi.Derive.Equality
+    Data.Comp.Multi.Derive.Ordering
+    Data.Comp.Multi.Derive.Show
+    Data.Comp.Multi.Derive.SmartConstructors
+    Data.Comp.Multi.Alt
 
-  Other-Modules:        Data.Comp.SubsumeCommon
+  build-depends:
+    , cubix-compdata:internal
+    , data-default >= 0.7.1.3
+    , deepseq >= 1.5.1.0
+    , mtl >= 2.3.1
+    , template-haskell >= 2.21.0.0
+    , th-expand-syns >= 0.4.12.0
+    , transformers >= 0.6.1.0
 
-                        Data.Comp.Multi.Derive.Generic
-                        Data.Comp.Multi.Derive.HFunctor
-                        Data.Comp.Multi.Derive.HFoldable
-                        Data.Comp.Multi.Derive.HTraversable
-                        Data.Comp.Multi.Derive.Equality
-                        Data.Comp.Multi.Derive.Ordering
-                        Data.Comp.Multi.Derive.Show
-                        Data.Comp.Multi.Derive.SmartConstructors
-                        Data.Comp.Elem
-                        Data.Comp.Multi.Alt
-                        Data.Comp.Alt
+test-suite test
+  import: language
+  import: ghc-options
+  import: dependencies
+  type: exitcode-stdio-1.0
+  main-is: Data_Test.hs
+  hs-source-dirs:
+    testsuite/tests
+    examples
+  other-modules:
+    Data.Comp.Examples.Multi
+    Data.Comp.Multi.Variables_Test
+    Data.Comp.Multi_Test
+    Data.Comp.Subsume_Test
+    Data.Comp_Test
+    Examples.Multi.Common
+    Examples.Multi.Eval
+    Examples.Multi.EvalI
+    Examples.Multi.EvalM
 
-  Build-Depends:        base, data-default, template-haskell, containers, mtl, QuickCheck,
-                        deepseq, th-expand-syns, transformers, vector, ghc-prim
-  Extensions:           FlexibleContexts
-  hs-source-dirs:       src
-  ghc-options:          -W
-
-
-Test-Suite test
-  Type:                 exitcode-stdio-1.0
-  Main-is:                      Data_Test.hs
-  Extensions:           FlexibleContexts
-  hs-source-dirs:               testsuite/tests examples src
-  Build-Depends:        base, data-default, template-haskell, containers, mtl, QuickCheck, 
-                        HUnit, test-framework, test-framework-hunit, test-framework-quickcheck2,
-                        th-expand-syns, deepseq, transformers, vector, ghc-prim, cubix-compdata
+  build-depends:
+    , cubix-compdata
+    , cubix-compdata:internal
+    , HUnit >= 1.6.2.0
+    , QuickCheck >= 2.14.3
+    , test-framework >= 0.8.2.2
+    , test-framework-hunit >= 0.3.0.2
+    , test-framework-quickcheck2 >= 0.3.0.6

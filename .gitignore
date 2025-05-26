@@ -11,6 +11,23 @@ devenv.local.nix
 
 # direnv
 .direnv
+.envrc-local
 
 # pre-commit
 .pre-commit-config.yaml
+
+# cabal
+cabal.project.local*
+dist
+dist-newstyle
+dist-repl
+.ghc.environment.*
+.ghci_history
+.hie
+.build
+.log
+ghcid.log
+
+# haskell
+*.hi
+*.o
