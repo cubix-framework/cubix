@@ -4,6 +4,7 @@ packages:
     comptrans
     compstrat
     cubix-solidity
+    cubix-examples
 
 -- Match the GHC version from stack's resolver (lts-23.19)
 with-compiler: ghc-9.8.4

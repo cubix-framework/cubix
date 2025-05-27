@@ -4,8 +4,8 @@ import Data.Map ( Map )
 
 import Cubix.Language.Info
 
-import Examples.Multi.Syntax
-import Examples.Multi.Strat
+import Examples.Syntax
+import Examples.Strat
 
 prog1 :: Prog ExpL
 prog1 = iPair (iConst 2) (iConst 3)

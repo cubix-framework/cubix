@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP                    #-}
-
 module Main where
 
 import Control.Monad ( when, liftM, (<=<) )
@@ -21,6 +19,7 @@ import qualified Language.Dot.Syntax as Dot
 import System.IO.Temp ( withSystemTempFile )
 
 import Cubix.ParsePretty
+import Cubix.Language.Solidity.ParsePretty ()
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.Cfg
@@ -39,10 +38,6 @@ import Cubix.Transformations.Plumbing.IPT
 import Cubix.Transformations.TAC
 import Cubix.Transformations.TestCoverage
 
-#ifdef ONLY_ONE_LANGUAGE
-data LangProg = LuaProg (MLuaTerm LBlockL) | CfgDot Dot.Graph
-  deriving ( Eq, Ord, Show )
-#else
 data LangProg = CProg        (MCTerm CTranslationUnitL)
               | JavaProg     (MJavaTerm CompilationUnitL)
               | JSProg       (MJSTerm JSASTL)
@@ -51,60 +46,49 @@ data LangProg = CProg        (MCTerm CTranslationUnitL)
               | SolidityProg (MSolidityTerm SolidityL)
               | CfgDot       Dot.Graph
   deriving ( Eq, Ord, Show )
-#endif
 
 data LangProj = LuaProj    (Project MLuaSig)
-#ifndef ONLY_ONE_LANGUAGE
               | CProj        (Project MCSig)
               | JavaProj     (Project MJavaSig)
               | JSProj       (Project MJSSig)
               | PythonProj   (Project MPythonSig)
               | SolidityProj (Project MSoliditySig)
-#endif
 
 
 prettyProg :: LangProg -> String
-#ifndef ONLY_ONE_LANGUAGE
 prettyProg (CProg      p)   = pretty p
 prettyProg (JavaProg   p)   = pretty p
 prettyProg (JSProg     p)   = pretty p
 prettyProg (PythonProg p)   = pretty p
 prettyProg (SolidityProg p) = error "2024.07.24: No Solidity pretty-printing available"
-#endif
 prettyProg (LuaProg    p)   = pretty p
 prettyProg (CfgDot     p)   = Dot.renderDot p
 
 parseProg :: String -> String -> IO (Maybe LangProg)
-#ifndef ONLY_ONE_LANGUAGE
 parseProg "c"          = liftM (liftM CProg)        . parseFile
 parseProg "java"       = liftM (liftM JavaProg)     . parseFile
 parseProg "javascript" = liftM (liftM JSProg)       . parseFile
 parseProg "python"     = liftM (liftM PythonProg)   . parseFile
 parseProg "solidity"   = liftM (liftM SolidityProg) . parseFile
-#endif
 parseProg "lua"        = liftM (liftM LuaProg)      . parseFile
 parseProg _            = error "Unrecognized language. Must be one of: c, java, javascript, lua, python"
 
 
 parseProj :: LabelGen -> String -> [FilePath] -> IO (Maybe LangProj)
-#ifndef ONLY_ONE_LANGUAGE
 parseProj gen "c"          = (return . maybe Nothing (Just . CProj))        <=< parseProject gen parseFile
 parseProj gen "java"       = (return . maybe Nothing (Just . JavaProj))     <=< parseProject gen parseFile
 parseProj gen "javascript" = (return . maybe Nothing (Just . JSProj))       <=< parseProject gen parseFile
 parseProj gen "python"     = (return . maybe Nothing (Just . PythonProj))   <=< parseProject gen parseFile
 parseProj gen "solidity"   = (return . maybe Nothing (Just . SolidityProj)) <=< parseProject gen parseFile
-#endif
 parseProj gen "lua"        = (return . maybe Nothing (Just . LuaProj))      <=< parseProject gen parseFile
 parseProj _   _            = error "Unrecognized language. Must be one of: c, java, javascript, lua, python"
 
 putProj :: LangProj -> IO ()
-#ifndef ONLY_ONE_LANGUAGE
 putProj (CProj        p) = putProject (prettyC          . fromJust . dynProj . stripA) p
 putProj (JavaProj     p) = putProject (prettyJava       . fromJust . dynProj . stripA) p
 putProj (JSProj       p) = putProject (prettyJavaScript . fromJust . dynProj . stripA) p
 putProj (PythonProj   p) = putProject (prettyPython     . fromJust . dynProj . stripA) p
 putProj (SolidityProj p) = error "2024.07.24: No Solidity pretty-printing available"
-#endif
 putProj (LuaProj      p) = putProject (prettyLua        . fromJust . dynProj . stripA) p
 
 
@@ -117,12 +101,10 @@ debugTree' t = do
 
 
 debugTree :: LangProg -> IO ()
-#ifndef ONLY_ONE_LANGUAGE
 debugTree (CProg      p) = debugTree' p
 debugTree (JavaProg   p) = debugTree' p
 debugTree (JSProg     p) = debugTree' p
 debugTree (PythonProg p) = debugTree' p
-#endif
 debugTree (LuaProg    p) = debugTree' p
 
 
@@ -143,40 +125,32 @@ printCfgDot :: LangProg -> IO LangProg
 printCfgDot t = do
   gen <- mkConcurrentSupplyLabelGen
   case t of
-#ifndef ONLY_ONE_LANGUAGE
     CProg        p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
     JavaProg     p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
     JSProg       p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
     PythonProg   p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
-#endif
     LuaProg    p -> return $ CfgDot $ renderCfgDot (labelProg gen p)
     _          -> error "Cannot render the CFG of that program"
 
 runHoist :: LangProg -> LangProg
-#ifndef ONLY_ONE_LANGUAGE
 runHoist (CProg p)    = CProg    $ runIdentity $ hoistDeclarations p
 runHoist (JavaProg p) = JavaProg $ runIdentity $ hoistDeclarations p
 runHoist (JSProg p)   = JSProg   $ runIdentity $ hoistDeclarations p
-#endif
 runHoist (LuaProg p)  = LuaProg  $ runIdentity $ hoistDeclarations p
 runHoist _            = error "Cannot run hoist on that program"
 
 runElementaryHoist :: LangProg -> LangProg
-#ifndef ONLY_ONE_LANGUAGE
 runElementaryHoist (CProg p)    = CProg    $ elementaryHoist p
 runElementaryHoist (JavaProg p) = JavaProg $ elementaryHoist p
 runElementaryHoist (JSProg p)   = JSProg   $ elementaryHoist p
-#endif
 runElementaryHoist _            = error "Cannot run elementary hoist on that program"
 
 runTAC :: LangProg -> IO LangProg
 runTAC t = do
   gen <- mkConcurrentSupplyLabelGen
   case t of
-#ifndef ONLY_ONE_LANGUAGE
     JSProg     p -> liftM (JSProg     . stripA) $ toTAC (labelProg gen p)
     PythonProg p -> liftM (PythonProg . stripA) $ toTAC (labelProg gen p)
-#endif
     LuaProg    p -> liftM (LuaProg    . stripA) $ toTAC (labelProg gen p)
     _          -> error "Cannot run TAC transform on that program"
 
@@ -184,31 +158,25 @@ runTestCov :: LangProg -> IO LangProg
 runTestCov t = do
   gen <- mkConcurrentSupplyLabelGen
   case t of
-#ifndef ONLY_ONE_LANGUAGE
     CProg      p -> liftM (CProg      . stripA) $ instrumentTestCoverage (labelProg gen p)
     JavaProg   p -> liftM (JavaProg   . stripA) $ instrumentTestCoverage (labelProg gen p)
     JSProg     p -> liftM (JSProg     . stripA) $ instrumentTestCoverage (labelProg gen p)
     PythonProg p -> liftM (PythonProg . stripA) $ instrumentTestCoverage (labelProg gen p)
-#endif
     LuaProg    p -> liftM (LuaProg    . stripA) $ instrumentTestCoverage (labelProg gen p)
     _          -> error "Cannot run testcov on that program"
 
 runTrivCallAnalysis :: LangProj -> Map String [NodeIdx]
-#ifndef ONLY_ONE_LANGUAGE
 runTrivCallAnalysis (CProj      p) = callAnalysis p
 runTrivCallAnalysis (JavaProj   p) = callAnalysis p
 runTrivCallAnalysis (JSProj     p) = callAnalysis p
 --runTrivCallAnalysis (PythonProj p) = callAnalysis p
-#endif
 runTrivCallAnalysis (LuaProj    p) = callAnalysis p
 
 runIpt :: LabelGen -> LangProj -> IO ()
-#ifndef ONLY_ONE_LANGUAGE
 runIpt gen (CProj      p) = putProj =<< (CProj      <$> interproceduralPlumbingTransform gen p)
 runIpt gen (JavaProj   p) = putProj =<< (JavaProj   <$> interproceduralPlumbingTransform gen p)
 runIpt gen (JSProj     p) = putProj =<< (JSProj     <$> interproceduralPlumbingTransform gen p)
 runIpt gen (PythonProj p) = putProj =<< (PythonProj <$> interproceduralPlumbingTransform gen p)
-#endif
 runIpt gen (LuaProj    p) = putProj =<< (LuaProj    <$> interproceduralPlumbingTransform gen p)
 
 downcase :: String -> String
