@@ -15,7 +15,6 @@ module Cubix.ParsePretty (
   , parseJava
   , parseJavaScript
   , parsePython
-  , parseSolidity
 
   , prettyC
   , prettyJava
@@ -45,9 +44,6 @@ import qualified Language.Lua.Annotated.Simplify as Lua
 import qualified Language.Python.Common as Python
 import qualified Language.Python.Version3.Parser as Python
 
-import           Solidity ( Solidity )
-import qualified Solidity as Solidity
-
 import Cubix.Language.Info
 
 import           Cubix.Language.C.Parametric.Common          as CCommon
@@ -62,8 +58,6 @@ import           Cubix.Language.Lua.Parametric.Common        as LCommon
 import qualified Cubix.Language.Lua.Parametric.Full          as LFull
 import           Cubix.Language.Python.Parametric.Common     as PCommon
 import qualified Cubix.Language.Python.Parametric.Full       as PFull
-import           Cubix.Language.Solidity.Parametric.Common   as SCommon
-import qualified Cubix.Language.Solidity.Parametric.Full     as SFull
 
 import qualified Data.Text as T (unpack)
 import qualified Cubix.Language.Java.Parametric.Common as Python
@@ -228,22 +222,5 @@ type instance RootSort MPythonSig = PCommon.ModuleL
 instance ParseFile MPythonSig where parseFile = fmap (fmap stripA) . parsePython
 instance ParseFileTrackSources MPythonSig where parseFileTrackSources = parsePython
 instance Pretty MPythonSig where pretty = prettyPython
-
--------------------------------------------------------------------
---------------------------- Solidity ------------------------------
--------------------------------------------------------------------
-
-parseSolidity :: FilePath -> IO (Maybe (MSolidityTerm SolidityL))
-parseSolidity path = do
-  contents <- Text.readFile path
-  let res = Solidity.parseFile path contents
-  case res of
-    Left  e -> print e >> return Nothing
-    Right s -> return $ Just $ SCommon.translate $ SFull.translate s
-
-type instance RootSort MSoliditySig = SCommon.SolidityL
-instance ParseFile MSoliditySig where parseFile = parseSolidity
-
--- 2023.11.02: Initial Solidity library we're using has no pretty-printer.
 
 #endif

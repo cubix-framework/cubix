@@ -1,6 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -9,7 +8,6 @@
 
 module Cubix.Language.Solidity.Parametric.Common.Types where
 
-#ifndef ONLY_ONE_LANGUAGE
 import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
@@ -77,6 +75,3 @@ instance InjF MSoliditySig IdentL ExpressionL where
      , Just (IdentIsIdentifier j) <- project' i
      = Just j
     projF' _ = Nothing
-      
-
-#endif

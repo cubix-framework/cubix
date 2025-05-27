@@ -1,15 +1,11 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_HADDOCK hide                      #-}
 
-{-# LANGUAGE CPP                              #-}
 {-# LANGUAGE TemplateHaskell                  #-}
 {-# LANGUAGE UndecidableInstances             #-}
 
 -- This is a separate file due to GHC's phase restriction.
 
-#ifdef ONLY_ONE_LANGUAGE
-module Cubix.Language.Solidity.Parametric.Full.Trans () where
-#else
 module Cubix.Language.Solidity.Parametric.Full.Trans (
     translate
   , untranslate
@@ -24,8 +20,9 @@ import qualified Solidity as S
 import Data.Comp.Multi ( caseCxt, Sum, All )
 import Data.Comp.Trans ( runCompTrans, deriveTrans, deriveUntrans )
 
-import Cubix.Language.Parametric.Syntax.Base
-import Cubix.Language.Parametric.Syntax.Functor
+import Cubix.Language.Parametric.Syntax
+  ( IntF (..), IntL, ListF (..), MaybeF (..), PairF (..), TextF (..), TextL, TripleF (..), UnitF (..)
+  , iConsF, iIntF, iJustF, iTextF, iUnitF, riNilF, riNothingF, riPairF, riTripleF )
 import Cubix.Language.Solidity.Parametric.Full.Names
 import Cubix.Language.Solidity.Parametric.Full.Types
 
@@ -43,7 +40,7 @@ translate = trans
 
 instance (Trans c l, Typeable l) => Trans [c] [l] where
   trans [] = riNilF
-  trans (x:xs) = (trans x :: SolidityTerm l) `iConsF` (trans xs)
+  trans (x:xs) = (trans x :: SolidityTerm l) `iConsF` trans xs
 
 instance (Trans c l, Typeable l) => Trans (Maybe c) (Maybe l) where
   trans Nothing = riNothingF
@@ -59,10 +56,10 @@ instance (Trans c l, Trans d l', Trans e l'',
 
 
 instance Trans Int IntL where
-  trans x = iIntF x
+  trans = iIntF
 
 instance Trans Text TextL where
-  trans x = iTextF x
+  trans = iTextF
 
 instance Trans () () where
   trans _ = iUnitF
@@ -107,5 +104,4 @@ instance Untrans UnitF where
 
 instance (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
-  
-#endif
+

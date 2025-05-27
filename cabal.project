@@ -3,6 +3,7 @@ packages:
     compdata
     comptrans
     compstrat
+    cubix-solidity
 
 -- Match the GHC version from stack's resolver (lts-23.19)
 with-compiler: ghc-9.8.4

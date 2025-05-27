@@ -1,0 +1,69 @@
+cabal-version: 3.4
+name:          cubix-solidity
+version:       1.0.2
+synopsis:      Cubix support for Solidity smart contract language
+description:   Cubix support for Solidity smart contract language
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        James Koppel
+maintainer:    jkoppel@mit.edu
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+
+tested-with:
+  GHC == 9.8.4
+
+common language
+  default-language: GHC2021
+  default-extensions:
+    ApplicativeDo
+    DataKinds
+    DefaultSignatures
+    DerivingStrategies
+    FunctionalDependencies
+    GADTs
+    LambdaCase
+    MultiWayIf
+    NamedFieldPuns
+    OverloadedStrings
+    PatternSynonyms
+    QuasiQuotes
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+    ViewPatterns
+
+common ghc-options
+  ghc-options:
+    -W -fno-warn-unused-foralls
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , containers >= 0.6.8
+    , comptrans >= 0.1.0.7
+    , cubix >= 0.7.0.15
+    , cubix-compdata >= 1.0.2
+    , ghc-prim >= 0.11.0
+    , template-haskell >= 2.21.0.0
+    , text >= 2.1.1
+    , vector >= 0.13.2.0
+
+library
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src
+  exposed-modules:
+    Cubix.Language.Solidity.ParsePretty
+    Cubix.Language.Solidity.Parametric.Common
+    Cubix.Language.Solidity.Parametric.Full
+  other-modules:
+    Cubix.Language.Solidity.Parametric.Common.Trans
+    Cubix.Language.Solidity.Parametric.Common.Types
+    Cubix.Language.Solidity.Parametric.Full.Names
+    Cubix.Language.Solidity.Parametric.Full.Trans
+    Cubix.Language.Solidity.Parametric.Full.Types
+  build-depends:
+    , solidity 

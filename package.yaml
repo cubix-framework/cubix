@@ -89,8 +89,6 @@ library:
   - Cubix.Language.Parametric.Syntax
   - Cubix.Language.Python.Parametric.Common
   - Cubix.Language.Python.Parametric.Full
-  - Cubix.Language.Solidity.Parametric.Common
-  - Cubix.Language.Solidity.Parametric.Full
   - Cubix.ParsePretty
   - Cubix.Sin.Compdata.Annotation
   - Cubix.Sin.NFData
