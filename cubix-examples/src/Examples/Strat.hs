@@ -1,4 +1,4 @@
-module Examples.Multi.Strat where
+module Examples.Strat where
 
 import Control.Monad ( MonadPlus(..) )
 import Control.Monad.Identity ( Identity(..) )
@@ -14,7 +14,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase )
 import Cubix.Language.Info ( TermLab )
 import Cubix.Sin.Compdata.Annotation ( Annotated, getAnn )
 
-import Examples.Multi.Syntax
+import Examples.Syntax
 
 -----------------------------------------------------------------------
 

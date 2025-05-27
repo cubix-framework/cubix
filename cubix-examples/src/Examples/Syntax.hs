@@ -2,7 +2,7 @@
 
 -- Example modified from the examples directory of compdata
 
-module Examples.Multi.Syntax where
+module Examples.Syntax where
 
 import Data.Comp.Multi
 
