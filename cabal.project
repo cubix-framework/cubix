@@ -1,7 +1,7 @@
 packages:
     .
-    comptrans/
     compdata
+    comptrans
     compstrat
 
 -- Match the GHC version from stack's resolver (lts-23.19)
