@@ -1,11 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
-
-{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-#ifdef ONLY_ONE_LANGUAGE
-module Cubix.Language.Solidity.Parametric.Full.Names () where
-#else
 module Cubix.Language.Solidity.Parametric.Full.Names (
     origASTTypes
   , newASTTypes
@@ -13,14 +8,13 @@ module Cubix.Language.Solidity.Parametric.Full.Names (
   ) where
 
 
-import qualified Language.Haskell.TH as TH
+import Language.Haskell.TH qualified as TH
 
-import           Solidity
+import Solidity
 
-import           Data.Comp.Trans ( runCompTrans, generateNameLists )
+import Data.Comp.Trans ( runCompTrans, generateNameLists )
 
-import           Cubix.Language.Parametric.Syntax.Base
-import           Cubix.Language.Parametric.Syntax.Functor
+import Cubix.Language.Parametric.Syntax
 
 ----------------------------------------------------------------
 
@@ -28,5 +22,3 @@ runCompTrans $ generateNameLists ''Solidity
 
 soliditySigNames :: [TH.Name]
 soliditySigNames = newASTTypes ++ [''PairF, ''TripleF, ''ListF, ''MaybeF, ''IntF, ''TextF, ''UnitF]
-
-#endif

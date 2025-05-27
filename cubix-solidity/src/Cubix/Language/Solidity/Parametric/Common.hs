@@ -1,8 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-# LANGUAGE CPP #-}
-
-
 --------------------------------------------------------------------------------
 -- |
 -- Module      :  Cubix.Language.Solidity.Parametric.Common
@@ -16,10 +13,6 @@
 --
 --------------------------------------------------------------------------------
 
-#ifdef ONLY_ONE_LANGUAGE
-module Cubix.Language.Solidity.Parametric.Common () where
-#else
-
 module Cubix.Language.Solidity.Parametric.Common (
     module Types
   , module Trans
@@ -32,4 +25,3 @@ import Cubix.Language.Solidity.Parametric.Common.Types as Types
 import Cubix.Language.Solidity.Parametric.Common.Trans as Trans
 import Cubix.Language.Solidity.Parametric.Full as F hiding ( translate, untranslate, Assign, iAssign, jAssign, pattern Assign' )
 import Cubix.Language.Parametric.Syntax as Para hiding ( FunctionCall, iFunctionCall, jFunctionCall, pattern FunctionCall' )
-#endif

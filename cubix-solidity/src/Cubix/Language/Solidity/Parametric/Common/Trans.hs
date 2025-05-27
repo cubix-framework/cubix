@@ -1,13 +1,9 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# LANGUAGE CPP                     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE TemplateHaskell         #-}
-{-# LANGUAGE UndecidableInstances    #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
-#ifdef ONLY_ONE_LANGUAGE
-module Cubix.Language.Solidity.Parametric.Common.Trans () where
-#else
 module Cubix.Language.Solidity.Parametric.Common.Trans (
     translate
   , untranslate
@@ -143,6 +139,3 @@ untransAssign (Assign' lhs AssignOpEquals' rhs) =
 
 instance Untrans AssignIsExpression where
   untrans (AssignIsExpression n) = untransAssign n
-
-
-#endif
