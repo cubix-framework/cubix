@@ -258,6 +258,3 @@ main = do
                     , bench "untransMod"      $ nf LFull.untranslate (ann Nothing full)
                     ]
                 ]
-
-instance NFData SourceSpan where
-  rnf = rnf . show

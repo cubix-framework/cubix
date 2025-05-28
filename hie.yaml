@@ -5,52 +5,44 @@ cradle:
       cradle:
         direct:
           arguments: []
-  - path: "./"
+  - path: "./compdata/Setup.hs"
     config:
       cradle:
-        stack:
-        - path: "./src"
-          component: "cubix:lib"
-        - path: "./examples/multi"
-          component: "cubix:exe:examples-multi"
-        - path: "./examples/basic"
-          component: "cubix:exe:examples-basic"
-        - path: "./examples/c"
-          component: "cubix:exe:examples-c"
-        - path: "./examples/java"
-          component: "cubix:exe:examples-java"
-        - path: "./examples/java"
-          component: "cubix:exe:examples-java"
-        - path: "./examples/javascript"
-          component: "cubix:exe:examples-javascript"
-        - path: "./examples/lua"
-          component: "cubix:exe:examples-lua"
-        - path: "./examples/python"
-          component: "cubix:exe:examples-python"
-        - path: "./benchmarks"
-          component: "cubix:bench:mainbench"
-        - path: "./cfg-test"
-          component: "cubix:cfg-test"
+        direct:
+          arguments: []
   - path: "./compdata"
     config:
       cradle:
-        stack:
-        - path: "./src"
-          component: "cubix-compdata:lib"
-        - path: "./examples"
-          component: "cubix-compdata:test"
-        - path: "./testsuite"
-          component: "cubix-compdata:test"
+        cabal:
+  - path: "./compstrat/Setup.hs"
+    config:
+      cradle:
+        direct:
+          arguments: []
   - path: "./compstrat"
     config:
       cradle:
-        stack:
-        - path: "./"
-          component: "compstrat:lib"
+        cabal:
+  - path: "./comptrans/Setup.hs"
+    config:
+      cradle:
+        direct:
+          arguments: []
   - path: "./comptrans"
     config:
       cradle:
-        stack:
-        - path: "./"
-          component: "comptrans:lib"
+        cabal:
+  - path: "./cubix-solidity"
+    config:
+      cradle:
+        cabal:
+  - path: "./cubix-examples"
+    config:
+      cradle:
+        cabal:
+  - path: "./"
+    config:
+      cradle:
+        cabal:
+
 
