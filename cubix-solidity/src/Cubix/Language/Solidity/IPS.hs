@@ -2,7 +2,7 @@
 
 --------------------------------------------------------------------------------
 -- |
--- Module      :  Cubix.Language.Solidity.Parametric.Common
+-- Module      :  Cubix.Language.Solidity.IPS
 -- Copyright   :  (c) 2016-2023 James Koppel
 -- License     :  BSD3
 --
@@ -13,15 +13,15 @@
 --
 --------------------------------------------------------------------------------
 
-module Cubix.Language.Solidity.Parametric.Common (
+module Cubix.Language.Solidity.IPS (
     module Types
   , module Trans
-  , module F
+  , module M
 
   , module Para
   ) where
 
-import Cubix.Language.Solidity.Parametric.Common.Types as Types
-import Cubix.Language.Solidity.Parametric.Common.Trans as Trans
-import Cubix.Language.Solidity.Parametric.Full as F hiding ( translate, untranslate, Assign, iAssign, jAssign, pattern Assign' )
+import Cubix.Language.Solidity.IPS.Types as Types
+import Cubix.Language.Solidity.IPS.Trans as Trans
+import Cubix.Language.Solidity.Modularized as M hiding ( translate, untranslate, Assign, iAssign, jAssign, pattern Assign' )
 import Cubix.Language.Parametric.Syntax as Para hiding ( FunctionCall, iFunctionCall, jFunctionCall, pattern FunctionCall' )

@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module Cubix.Language.Solidity.Parametric.Common.Trans (
+module Cubix.Language.Solidity.IPS.Trans (
     translate
   , untranslate
   ) where
@@ -15,8 +15,8 @@ import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Data.Comp.Multi ( project, inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 
-import Cubix.Language.Solidity.Parametric.Common.Types
-import qualified Cubix.Language.Solidity.Parametric.Full as F
+import Cubix.Language.Solidity.IPS.Types
+import qualified Cubix.Language.Solidity.Modularized as F
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
