@@ -6,7 +6,7 @@
 
 -- | 
 
-module Cubix.Language.Solidity.Parametric.Common.Types where
+module Cubix.Language.Solidity.IPS.Types where
 
 import Data.List ( (\\) )
 
@@ -15,8 +15,8 @@ import Language.Haskell.TH ( mkName )
 import Data.Comp.Multi ( Term,  project', CxtS, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
-import Cubix.Language.Solidity.Parametric.Full.Names
-import Cubix.Language.Solidity.Parametric.Full.Types as Solidity
+import Cubix.Language.Solidity.Modularized.Names
+import Cubix.Language.Solidity.Modularized.Types as Solidity
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF

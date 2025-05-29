@@ -6,7 +6,7 @@
 
 -- This is a separate file due to GHC's phase restriction.
 
-module Cubix.Language.Solidity.Parametric.Full.Trans (
+module Cubix.Language.Solidity.Modularized.Trans (
     translate
   , untranslate
   ) where
@@ -23,8 +23,8 @@ import Data.Comp.Trans ( runCompTrans, deriveTrans, deriveUntrans )
 import Cubix.Language.Parametric.Syntax
   ( IntF (..), IntL, ListF (..), MaybeF (..), PairF (..), TextF (..), TextL, TripleF (..), UnitF (..)
   , iConsF, iIntF, iJustF, iTextF, iUnitF, riNilF, riNothingF, riPairF, riTripleF )
-import Cubix.Language.Solidity.Parametric.Full.Names
-import Cubix.Language.Solidity.Parametric.Full.Types
+import Cubix.Language.Solidity.Modularized.Names
+import Cubix.Language.Solidity.Modularized.Types
 
 ----------------------------------------------------------------------------
 

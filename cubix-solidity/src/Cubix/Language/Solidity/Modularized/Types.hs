@@ -8,7 +8,7 @@
 
 -- This is a separate file due to GHC's phase restriction
 
-module Cubix.Language.Solidity.Parametric.Full.Types where
+module Cubix.Language.Solidity.Modularized.Types where
 
 import Data.Comp.Multi ( Term )
 
@@ -17,7 +17,7 @@ import Solidity qualified as Solidity
 import Data.Comp.Trans ( runCompTrans, deriveMultiComp, makeSumType )
 
 import Cubix.Language.Info
-import Cubix.Language.Solidity.Parametric.Full.Names
+import Cubix.Language.Solidity.Modularized.Names
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax
 

@@ -1,7 +1,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Cubix.Language.Solidity.Parametric.Full.Names (
+module Cubix.Language.Solidity.Modularized.Names (
     origASTTypes
   , newASTTypes
   , soliditySigNames

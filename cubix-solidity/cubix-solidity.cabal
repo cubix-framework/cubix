@@ -57,13 +57,13 @@ library
   hs-source-dirs: src
   exposed-modules:
     Cubix.Language.Solidity.ParsePretty
-    Cubix.Language.Solidity.Parametric.Common
-    Cubix.Language.Solidity.Parametric.Full
+    Cubix.Language.Solidity.IPS
+    Cubix.Language.Solidity.Modularized
   other-modules:
-    Cubix.Language.Solidity.Parametric.Common.Trans
-    Cubix.Language.Solidity.Parametric.Common.Types
-    Cubix.Language.Solidity.Parametric.Full.Names
-    Cubix.Language.Solidity.Parametric.Full.Trans
-    Cubix.Language.Solidity.Parametric.Full.Types
+    Cubix.Language.Solidity.IPS.Trans
+    Cubix.Language.Solidity.IPS.Types
+    Cubix.Language.Solidity.Modularized.Names
+    Cubix.Language.Solidity.Modularized.Trans
+    Cubix.Language.Solidity.Modularized.Types
   build-depends:
     , solidity 
