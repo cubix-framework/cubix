@@ -22,7 +22,8 @@ import Cubix.Language.Info
 import Cubix.Language.Lua.Parametric.Common.Types as C
 import Cubix.Language.Lua.Parametric.Full.Types as F
 import Cubix.Language.Parametric.Semantics.Cfg
-import Cubix.Language.Parametric.Syntax as P
+import Cubix.Language.Parametric.Syntax hiding (ExpL)
+import Cubix.Language.Parametric.Syntax qualified as P
 
 -----------------------------------------------------------------------------------
 ---------------           Labelling mechanism              ------------------------
