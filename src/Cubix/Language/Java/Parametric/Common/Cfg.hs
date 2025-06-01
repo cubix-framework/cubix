@@ -19,7 +19,7 @@ import Cubix.Language.Info
 import Cubix.Language.Java.Parametric.Common.Types as J
 import Cubix.Language.Java.Parametric.Full.Types as F hiding ( pattern Ident' )
 import Cubix.Language.Parametric.Semantics.Cfg
-import Cubix.Language.Parametric.Syntax
+import Cubix.Language.Parametric.Syntax hiding (ExpL)
 
 data JavaCfgState = JavaCfgState {
                    _jcs_cfg       :: Cfg MJavaSig

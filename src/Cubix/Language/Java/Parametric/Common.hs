@@ -33,5 +33,12 @@ import Cubix.Language.Java.Parametric.Common.Semantics as Semantics
 import Cubix.Language.Java.Parametric.Common.Types as Types
 import Cubix.Language.Java.Parametric.Common.Trans as Trans
 import Cubix.Language.Java.Parametric.Full as F hiding ( translate, untranslate, Ident, iIdent, jIdent, IdentL, pattern Ident', Block, iBlock, jBlock, BlockL, LhsL )
-import Cubix.Language.Parametric.Syntax as Para hiding ( Block, BlockL, iBlock, jBlock, pattern Block', LhsL, AssignOpL, Assign, iAssign, jAssign, pattern Assign' )
+import Cubix.Language.Parametric.Syntax as Para hiding
+  ( Block, BlockL, iBlock, jBlock, pattern Block'
+  , LhsL
+  , AssignOpL, Assign, iAssign, jAssign, pattern Assign'
+  -- TODO: Expressions
+  , ExpL
+  , Add, Add', iAdd, jAdd, Sub, Sub', iSub, jSub, Div, Div', iDiv, jDiv
+  )
 #endif

@@ -90,6 +90,7 @@ library
       Cubix.Language.Parametric.Semantics.Cfg.CommonNodes
       Cubix.Language.Parametric.Semantics.Cfg.Graph
       Cubix.Language.Parametric.Syntax.Base
+      Cubix.Language.Parametric.Syntax.Expression
       Cubix.Language.Parametric.Syntax.Function
       Cubix.Language.Parametric.Syntax.Functor
       Cubix.Language.Parametric.Syntax.VarDecl

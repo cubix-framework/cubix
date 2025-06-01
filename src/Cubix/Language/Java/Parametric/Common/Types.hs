@@ -22,7 +22,8 @@ import Cubix.Language.Java.Parametric.Full.Names
 import Cubix.Language.Java.Parametric.Full.Types as J
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax as P
+import Cubix.Language.Parametric.Syntax hiding (ExpL)
+import Cubix.Language.Parametric.Syntax qualified as P
 
 --------------------------------------------------------------------------------------------------------
 
