@@ -106,19 +106,77 @@ instance Trans F.FunCall where
 instance Trans F.FunArg where
   trans _ = error "Lua FunArg found not with FunCall"
 
+transUnOp :: F.LuaTerm F.UnopL -> Maybe (MLuaTerm UnaryOpL)
+transUnOp F.Neg' = Just UnaryMinus'
+transUnOp F.Not' = Just Not'
+transUnOp F.Complement' = Just Complement'
+-- transUnOp F.Len' = _
+transUnOp _ = Nothing
+
+translateUnary
+  :: F.LuaTerm F.UnopL
+  -> F.LuaTerm F.ExpL
+  -> MLuaTerm F.ExpL
+translateUnary (transUnOp -> Just op) exp = iUnary op (injF $ translate exp)
+translateUnary op exp = F.iUnop (injF $ translate op) (injF $ translate exp)
+
+transBinOp :: F.LuaTerm F.BinopL -> Maybe (MLuaTerm BinaryOpL)
+transBinOp F.Add' = Just Add'
+transBinOp F.Sub' = Just Sub'
+transBinOp F.Mul' = Just Mul'
+transBinOp F.Div' = Just Div'
+transBinOp F.Mod' = Just Mod'
+transBinOp F.And' = Just LogicAnd'
+transBinOp F.Or' = Just LogicOr'
+transBinOp F.ShiftL' = Just Shl'
+transBinOp F.ShiftR' = Just LogicShr'
+transBinOp F.BAnd' = Just BitAnd'
+transBinOp F.BOr' = Just BitOr'
+transBinOp F.BXor' = Just BitXor'
+transBinOp F.LT' = Just Lt'
+transBinOp F.LTE' = Just Lte'
+transBinOp F.GT' = Just Gt'
+transBinOp F.GTE' = Just Gte'
+transBinOp F.EQ' = Just Eq'
+transBinOp F.NEQ' = Just Neq'
+transBinOp F.IDiv' = Just IDiv'
+transBinOp F.Exp' = Just Pow'
+-- transBinOp F.Concat' = _
+transBinOp _ = Nothing
+
+translateBinary
+  :: F.LuaTerm F.BinopL
+  -> F.LuaTerm F.ExpL
+  -> F.LuaTerm F.ExpL
+  -> MLuaTerm F.ExpL
+translateBinary (transBinOp -> Just op) a b = iBinary op (injF $ translate a) (injF $ translate b)
+translateBinary op a b = F.iBinop (injF $ translate op) (injF $ translate a) (injF $ translate b)
+
+instance Trans F.Exp where
+  trans :: F.Exp F.LuaTerm l -> MLuaTerm l
+  trans (F.Unop op exp) = translateUnary op exp
+  trans (F.Binop op a b) = translateBinary op a b
+  trans exp = transDefault exp
+  -- there is something called PEFunCall here, probably should translate it as well?
+  -- trans (F.PrefixExp exp) = _
 
 class Untrans f where
   untrans :: f MLuaTerm l -> F.LuaTerm l
 
 instance {-# OVERLAPPING #-} (All Untrans fs) => Untrans (Sum fs) where
   untrans = caseCxt @Untrans untrans
-  
+
 untransError :: (HFunctor f, f :-<: MLuaSig) => f MLuaTerm l -> F.LuaTerm l
 untransError t = error $ "Cannot untranslate root node: " ++ (show $ inject t)
-  
+
 do ipsNames <- sumToNames ''MLuaSig
    modNames <- sumToNames ''F.LuaSig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [''BlockIsBlock, ''SingleLocalVarDeclIsStat, ''AssignIsStat, ''IdentIsName, ''FunctionCallIsFunCall, ''FunctionDefIsStat]
+   let targTs = map ConT
+         $ (ipsNames \\ modNames) \\
+         [ ''BlockIsBlock, ''SingleLocalVarDeclIsStat, ''AssignIsStat, ''IdentIsName
+         , ''FunctionCallIsFunCall, ''FunctionDefIsStat
+         , ''ExpIsExpression, ''ExpressionIsExp
+         ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.LuaSig) => f MLuaTerm l -> F.LuaTerm l
@@ -228,6 +286,58 @@ instance {-# OVERLAPPING #-} Untrans FunctionDefIsStat where
       removeSelf l | hasSelf l = tail  l
                    | otherwise = l
 
+untransUnaryOp :: MLuaTerm UnaryOpL -> F.LuaTerm F.UnopL
+untransUnaryOp UnaryMinus' = F.Neg'
+untransUnaryOp Not' = F.Not'
+untransUnaryOp Complement' = F.Complement'
+
+untransUnary
+  :: MLuaTerm UnaryOpL
+  -> MLuaTerm ExpressionL
+  -> F.LuaTerm F.ExpL
+untransUnary op e = F.iUnop (untransUnaryOp op) (untransExpression e)
+
+untransBinOp :: MLuaTerm BinaryOpL -> F.LuaTerm F.BinopL
+untransBinOp Add' = F.Add'
+untransBinOp Sub' = F.Sub'
+untransBinOp Mul' = F.Mul'
+untransBinOp Div' = F.Div'
+untransBinOp Mod' = F.Mod'
+untransBinOp LogicAnd' = F.And'
+untransBinOp LogicOr' = F.Or'
+untransBinOp Shl' = F.ShiftL'
+untransBinOp LogicShr' = F.ShiftR'
+untransBinOp BitAnd' = F.BAnd'
+untransBinOp BitOr' = F.BOr'
+untransBinOp BitXor' = F.BXor'
+untransBinOp Lt' = F.LT'
+untransBinOp Lte' = F.LTE'
+untransBinOp Gt'  = F.GT'
+untransBinOp Gte' = F.GTE'
+untransBinOp Eq' = F.EQ'
+untransBinOp Neq' = F.NEQ'
+untransBinOp IDiv' = F.IDiv'
+untransBinOp Pow' = F.Exp'
+
+untransBinary
+  :: MLuaTerm BinaryOpL
+  -> MLuaTerm ExpressionL -> MLuaTerm ExpressionL
+  -> F.LuaTerm F.ExpL
+untransBinary op a b = F.iBinop (untransBinOp op) (untransExpression a) (untransExpression b)
+
+untransExpression :: MLuaTerm ExpressionL -> F.LuaTerm F.ExpL
+untransExpression (Unary' op e) = untransUnary op e
+untransExpression (Binary' op a b) = untransBinary op a b
+untransExpression (ExpIsExpression' e) = untranslate e
+
+instance {-# OVERLAPPING #-} Untrans ExpressionIsExp where
+  untrans (ExpressionIsExp e) = untransExpression e
+
+untransExp :: MLuaTerm F.ExpL -> F.LuaTerm ExpressionL
+untransExp (ExpressionIsExp' e) = untranslate e
+
+instance {-# OVERLAPPING #-} Untrans ExpIsExpression where
+  untrans (ExpIsExpression e) = untransExp e
 
 untranslate :: MLuaTerm l -> F.LuaTerm l
 untranslate = untrans . unTerm
