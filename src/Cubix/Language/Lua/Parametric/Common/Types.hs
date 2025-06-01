@@ -16,7 +16,8 @@ import Cubix.Language.Info
 import Cubix.Language.Lua.Parametric.Full.Types as L
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax as P
+import Cubix.Language.Parametric.Syntax hiding (ExpL)
+import Cubix.Language.Parametric.Syntax qualified as P
 
 -----------------------------------------------------------------------------------
 ---------------       Variable declarations and blocks     ------------------------
@@ -42,10 +43,9 @@ data LuaSpecialFunArg e l where
 
 deriveAll [''LuaLocalVarInit, ''LuaLhs, ''LuaRhs, ''LuaBlockEnd, ''LuaSpecialFunArg]
 
-createSortInclusionTypes [ ''P.IdentL, ''P.AssignL, ''P.BlockL, ''L.StatL,      ''P.SingleLocalVarDeclL, ''P.FunctionCallL, ''L.ExpL,              ''L.PrefixExpL,   ''L.PrefixExpL
-                         ] [
-                           ''L.NameL,  ''L.StatL, ''L.BlockL,   ''P.BlockItemL, ''L.StatL,               ''L.FunCallL,      ''P.PositionalArgExpL, ''P.FunctionExpL, ''ReceiverL
-                         ]
+createSortInclusionTypes
+  [''P.IdentL, ''P.AssignL, ''P.BlockL, ''L.StatL,      ''P.SingleLocalVarDeclL, ''P.FunctionCallL, ''L.ExpL,              ''L.PrefixExpL,   ''L.PrefixExpL]
+  [''L.NameL,  ''L.StatL, ''L.BlockL,   ''P.BlockItemL, ''L.StatL,               ''L.FunCallL,      ''P.PositionalArgExpL, ''P.FunctionExpL, ''ReceiverL]
 deriveAll [''IdentIsName, ''AssignIsStat, ''BlockIsBlock, ''StatIsBlockItem, ''SingleLocalVarDeclIsStat,
            ''FunctionCallIsFunCall, ''ExpIsPositionalArgExp, ''PrefixExpIsFunctionExp, ''PrefixExpIsReceiver]
 createSortInclusionInfers [ ''P.IdentL, ''P.AssignL, ''P.BlockL, ''L.StatL,      ''P.SingleLocalVarDeclL, ''P.FunctionCallL, ''L.ExpL,              ''L.PrefixExpL,   ''L.PrefixExpL
@@ -78,37 +78,63 @@ deriveAll [''LuaVarArgsParam]
 -- When I did the deriveAll's on one line, I got a mysterious GHC crash
 
 
-createSortInclusionTypes [ ''P.FunctionDefL, ''P.BlockL
-                         ] [
-                           ''L.StatL,        ''P.FunctionBodyL
-                         ]
+createSortInclusionTypes
+  [''P.FunctionDefL, ''P.BlockL]
+  [''L.StatL,        ''P.FunctionBodyL]
 deriveAll [''FunctionDefIsStat, ''BlockIsFunctionBody]
-createSortInclusionInfers [ ''P.FunctionDefL, ''P.BlockL
-                          ] [
-                            ''L.StatL,        ''P.FunctionBodyL
-                          ]
+createSortInclusionInfers
+  [''P.FunctionDefL, ''P.BlockL]
+  [''L.StatL,        ''P.FunctionBodyL]
+
+-----------------------------------------------------------------------------------
+---------------               Expressions                  ------------------------
+-----------------------------------------------------------------------------------
+
+createSortInclusionTypes
+  [''P.ExpressionL, ''ExpL]
+  [''ExpL,          ''P.ExpressionL]
+deriveAll [''ExpressionIsExp, ''ExpIsExpression]
+createSortInclusionInfers
+  [''P.ExpressionL, ''ExpL]
+  [''ExpL,          ''P.ExpressionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
-
-do let newLuaNodes       = [ ''LuaLocalVarInit, ''LuaLhs, ''LuaRhs, ''LuaBlockEnd, ''LuaSpecialFunArg
-                           , ''LuaFunctionDefinedObj, ''LuaFunctionAttrs, ''LuaVarArgsParam]
-       luaSortInjections = [ ''IdentIsName, ''AssignIsStat, ''BlockIsBlock, ''StatIsBlockItem, ''SingleLocalVarDeclIsStat
-                           , ''FunctionCallIsFunCall, ''ExpIsPositionalArgExp, ''PrefixExpIsFunctionExp, ''PrefixExpIsReceiver
-                           , ''FunctionDefIsStat, ''BlockIsFunctionBody]
-   let names = (luaSigNames \\ [mkName "Name", mkName "Block", mkName "FunArg", mkName "FunCall"])
-                            ++ newLuaNodes
-                            ++ luaSortInjections
-                            ++ [ ''OptLocalVarInit, ''SingleLocalVarDecl, ''P.Ident
-                               , ''AssignOpEquals, ''Assign, ''P.Block, ''P.TupleBinder
-                               , ''EmptyLocalVarDeclAttrs
-                               , ''FunctionCall, ''EmptyFunctionCallAttrs, ''FunctionArgumentList, ''PositionalArgument, ''ReceiverArg, ''FunctionIdent
-                               , ''FunctionDef, ''EmptyFunctionDefAttrs, ''SelfParameter, ''PositionalParameter, ''EmptyParameterAttrs
-                               ]
-   sumDec <- runCompTrans $ makeSumType "MLuaSig" names
-   return sumDec
+do let newLuaNodes =
+         [ ''LuaLocalVarInit, ''LuaLhs, ''LuaRhs, ''LuaBlockEnd
+         , ''LuaSpecialFunArg, ''LuaFunctionDefinedObj
+         , ''LuaFunctionAttrs, ''LuaVarArgsParam
+         ]
+       luaSortInjections =
+         [ ''IdentIsName, ''AssignIsStat
+         , ''BlockIsBlock, ''StatIsBlockItem
+         , ''SingleLocalVarDeclIsStat, ''FunctionCallIsFunCall
+         , ''ExpIsPositionalArgExp, ''PrefixExpIsFunctionExp
+         , ''PrefixExpIsReceiver, ''FunctionDefIsStat
+         , ''BlockIsFunctionBody
+         , ''ExpressionIsExp, ''ExpIsExpression
+         ]
+   let names =
+         (luaSigNames \\ [mkName "Name", mkName "Block", mkName "FunArg", mkName "FunCall"]) ++
+         newLuaNodes ++
+         luaSortInjections ++
+         [ ''OptLocalVarInit, ''SingleLocalVarDecl, ''P.Ident
+         , ''AssignOpEquals, ''Assign, ''P.Block, ''P.TupleBinder
+         , ''EmptyLocalVarDeclAttrs
+         , ''FunctionCall, ''EmptyFunctionCallAttrs
+         , ''FunctionArgumentList, ''PositionalArgument
+         , ''ReceiverArg, ''FunctionIdent
+         , ''FunctionDef, ''EmptyFunctionDefAttrs, ''SelfParameter
+         , ''PositionalParameter, ''EmptyParameterAttrs
+         , ''UnaryMinusOp, ''ComplementOp, ''LogicalNegationOp
+         , ''ArithBinOp, ''IDivOp, ''ExpOp
+         , ''BitwiseBinOp, ''LogicalBinOp, ''LogicalShrOp, ''ShlOp
+         , ''RelationalBinOp
+         , ''Operator
+         ]
+   runCompTrans $ makeSumType "MLuaSig" names
 
 type instance InjectableSorts MLuaSig AssignL = '[StatL]
 type instance InjectableSorts MLuaSig SingleLocalVarDeclL = '[StatL]

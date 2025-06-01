@@ -19,6 +19,7 @@ module Cubix.Language.Lua.Parametric.Common (
   , module Types
   , module Trans
   , module F
+  , module Para
 
   , LBlock
   , LBlockL
@@ -28,9 +29,20 @@ import Cubix.Language.Lua.Parametric.Common.Cfg () -- instances only
 import Cubix.Language.Lua.Parametric.Common.Semantics as Semantics
 import Cubix.Language.Lua.Parametric.Common.Types as Types
 import Cubix.Language.Lua.Parametric.Common.Trans as Trans
-import Cubix.Language.Lua.Parametric.Full as F hiding ( translate, untranslate, Name, iName, NameL
-                                                      , Block, iBlock, jBlock, BlockL, pattern Block', Assign, iAssign, jAssign, pattern Assign'  )
-
+import Cubix.Language.Lua.Parametric.Full as F hiding
+  ( translate, untranslate, Name, iName, NameL
+  , Block, iBlock, jBlock, BlockL, pattern Block'
+  , Assign, iAssign, jAssign, pattern Assign'
+  , Complement, iComplement, jComplement, pattern Complement'
+  , Not, iNot, jNot, pattern Not'
+  , Add, iAdd, jAdd, pattern Add'
+  , Sub, iSub, jSub, pattern Sub'
+  , Mul, iMul, jMul, pattern Mul'
+  , Div, iDiv, jDiv, pattern Div'
+  , Mod, iMod, jMod, pattern Mod'
+  , IDiv, iIDiv, jIDiv, pattern IDiv'
+  )
+import Cubix.Language.Parametric.Syntax as Para
 
 
 ------------------------------------------------------------------------------------------
