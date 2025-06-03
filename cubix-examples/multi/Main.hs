@@ -29,7 +29,7 @@ import Cubix.Language.Java.Parametric.Common
 import Cubix.Language.JavaScript.Parametric.Common
 import Cubix.Language.Lua.Parametric.Common
 import Cubix.Language.Python.Parametric.Common as PCommon
-import Cubix.Language.Solidity.Parametric.Common
+import Cubix.Language.Solidity.IPS
 
 import Cubix.Analysis.Call.Trivial
 

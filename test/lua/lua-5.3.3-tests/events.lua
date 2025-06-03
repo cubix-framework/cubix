@@ -20,10 +20,10 @@ assert(B == 30)
 assert(getmetatable{} == nil)
 assert(getmetatable(4) == nil)
 assert(getmetatable(nil) == nil)
-a={}; setmetatable(a, {__metatable = "xuxu",
+a={name = "NAME"}; setmetatable(a, {__metatable = "xuxu",
                     __tostring=function(x) return x.name end})
 assert(getmetatable(a) == "xuxu")
-assert(tostring(a) == nil)
+assert(tostring(a) == "NAME")
 -- cannot change a protected metatable
 assert(pcall(setmetatable, a, {}) == false)
 a.name = "gororoba"

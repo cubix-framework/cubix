@@ -1,20 +1,25 @@
-#!/usr/bin/ruby
-
-LUA_DIR     = "/Users/jkoppel/research_large/other_frameworks/lua/"
-PATH_TO_LUA = LUA_DIR + "src/lua"
-LUA_TESTS   = LUA_DIR + "lua-5.3.3-tests/"
-
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
+#!/usr/bin/env ruby
 
 transform = ARGV[0]
 
+# In order to override env values put them in the devenv.local.nix
+# file in the projet root diretory.
+LUA_TESTS = ENV["LUA_TESTS"]
+RUNPROG = `cabal list-bin multi`.strip
 OUT_DIR = "tmp_lua_" + transform
+
+# Build driver first
+system("cabal build cubix-examples:multi")
+if !$?.success?
+  puts "cubix-examples:multi failed to build, aborting..."
+  exit
+end
 
 Dir.mkdir OUT_DIR
 
 num_loc = 0
 
-Dir.glob(LUA_TESTS + "*.lua") do |testfil|
+Dir.glob(LUA_TESTS + "/*.lua") do |testfil|
   outfil = OUT_DIR + "/" + File.basename(testfil)
   
   if transform == "count_loc"
@@ -32,9 +37,8 @@ Dir.glob(LUA_TESTS + "*.lua") do |testfil|
   system("#{RUNPROG} lua #{transform} #{testfil} > #{outfil}")
 end
 
-
 if transform == "count_loc"
   puts num_loc
 else
-  system("cd #{OUT_DIR}; #{PATH_TO_LUA} -e\"_U=true\" all.lua")
+  system("cd #{OUT_DIR}; lua -e\"_U=true\" all.lua")
 end

@@ -3,6 +3,8 @@
 {
   packages = with pkgs; [
     ghcid
+    lua53Packages.lua
+    ruby
   ];
 
   # https://devenv.sh/languages/
@@ -13,6 +15,9 @@
     };
   };
 
+  env = {
+    "LUA_TESTS" = ./. + "/test/lua/lua-5.3.3-tests";
+  };
 
   # See full reference at https://devenv.sh/reference/options/
 }
