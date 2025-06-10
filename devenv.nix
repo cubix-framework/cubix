@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
   packages = with pkgs; [
@@ -16,7 +16,7 @@
   };
 
   env = {
-    "LUA_TESTS" = ./. + "/test/lua/lua-5.3.3-tests";
+    "LUA_TESTS" = "${config.devenv.root}/test/lua/lua-5.3.3-tests";
   };
 
   # See full reference at https://devenv.sh/reference/options/
