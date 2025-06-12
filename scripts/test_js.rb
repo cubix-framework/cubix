@@ -1,5 +1,15 @@
 #!/usr/bin/ruby
 
+transform = ARGV[0]
+
+TIMELIMIT = "45s"
+
+# Jakub 2025.06.12: Updated to match new Lua tests script, but I
+#                   have not run it.
+JS_TESTS = ENV["JS_TESTS"]
+RUNPROG = `cabal list-bin multi`.strip
+OUT_DIR = "tmp_js_" + transform
+
 TC_ARR_INIT = "TestCoverage = {coverage: []};\n"
 def addTestCoverageArr(s)
   if s.index(/^\"use strict\"/m)
@@ -9,21 +19,16 @@ def addTestCoverageArr(s)
   end
 end
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
-TIMELIMIT = "45s"
-
-JS_DIR     = "/Users/jkoppel/research_large/other_frameworks/javascript-semantics/"
-PATH_TO_JS = "node"
-JS_TESTS   = JS_DIR + "test262/test/suite/"
-PRELUDE = JS_DIR + "prelude.js"
-
-transform = ARGV[0]
-
-OUT_DIR = "tmp_js_" + transform
+# Build driver first
+system("cabal build cubix-examples:multi")
+if !$?.success?
+  puts "cubix-examples:multi failed to build, aborting..."
+  exit
+end
 
 Dir.mkdir OUT_DIR
 
-excluded_tests = File.read(JS_DIR + "list-invalid-tests.txt").split(/\s+/)
+excluded_tests = File.read(JS_EXCLUDE").split(/\s+/)
 
 tests = `find #{JS_TESTS}ch{08,09,10,11,12,13,14} -name '*.js'`.split(/\s+/).select {|s| not (excluded_tests.index s) }
 
@@ -45,7 +50,7 @@ tests.each do |testfil|
   positive = (nil == test_contents.index("@negative"))
 
   # I had mysterious errors on big files using "<(" that "=(" seems to fix
-  system("zsh -c \"#{PATH_TO_JS} =(cat #{PRELUDE} #{testfil})\"")
+  system("zsh -c \"node =(cat #{JS_PRELUDE} #{testfil})\"")
 
   status = $?
 
@@ -86,7 +91,7 @@ tests.each do |testfil|
   end
 
   # I had mysterious errors on big files using "<(" that "=(" seems to fix
-  system("zsh -c \"#{PATH_TO_JS} =(cat #{PRELUDE} #{outfil})\"")
+  system("zsh -c \"node =(cat #{JS_PRELUDE} #{outfil})\"")
   status = $?
 
   if (status == 0) == positive

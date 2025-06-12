@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+transform = ARGV[0]
+
 # WARNING
 # When running Java tests for multiple transformations, please offset them by a few minutes
 # to avoid having multiple instances of javac compile the same file at the same time
@@ -12,19 +14,23 @@
 # And so, we had a run where the identity transformation failed many tests that the Hoist/Testcov transformation passed!
 # Offsetting the runs of the tests by 5 minutes resulted in a flawless execution.
 
-JAVA_DIR     = "/Users/jkoppel/research_large/other_frameworks/java-semantics/"
-# Using system javac
-JAVA_TESTS   = JAVA_DIR + "tests/"
-
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
-
 TIMELIMIT=60
 
-transform = ARGV[0]
-
+# Jakub 2025.06.12: Updated to match new Lua tests script, but I
+#                   have not run it.
+JAVA_TESTS = ENV["JAVA_TESTS"]
+RUNPROG = `cabal list-bin multi`.strip
 OUT_DIR = "tmp_java_" + transform
 
+# Build driver first
+system("cabal build cubix-examples:multi")
+if !$?.success?
+  puts "cubix-examples:multi failed to build, aborting..."
+  exit
+end
+
 Dir.mkdir OUT_DIR
+
 
 def get_output(fil, input_fil)
   folder = File.dirname(fil)
@@ -59,7 +65,7 @@ num_passed = 0
 
 num_loc = 0
 
-Dir.glob(JAVA_TESTS + "*/") do |testdir|
+Dir.glob(JAVA_TESTS + "/*/") do |testdir|
   out_subdir = OUT_DIR + "/" + File.basename(testdir)
 
   Dir.mkdir out_subdir
