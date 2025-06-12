@@ -1,17 +1,19 @@
 #!/usr/bin/ruby
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
-
-GCC_DIR     = "/Users/jkoppel/research_large/other_frameworks/gcc/"
-#PATH_TO_GCC = GCC_DIR + "../gcc_build/gcc/xgcc"
-# Just using system GCC. GCC torture tests are meant to be portable
-# Okay, actually they're not that portable. Using Homebrew GCC
-GCC_COMMAND = "/usr/local/bin/gcc-11"
-GCC_TORTURE_TESTS   = GCC_DIR + "gcc/testsuite/gcc.c-torture/execute/"
-
 transform = ARGV[0]
 
+# Jakub 2025.06.12: Updated to match new Lua tests script, but I
+#                   have not run it.
+GCC_TORTURE_TESTS = ENV["GCC_TORTURE_TESTS"]
+RUNPROG = `cabal list-bin multi`.strip
 OUT_DIR = "tmp_c_" + transform
+
+# Build driver first
+system("cabal build cubix-examples:multi")
+if !$?.success?
+  puts "cubix-examples:multi failed to build, aborting..."
+  exit
+end
 
 Dir.mkdir OUT_DIR
 
@@ -32,7 +34,7 @@ Dir.glob(GCC_TORTURE_TESTS + "*.c") do |testfil|
 
   num_tests += 1
 
-  system("cd #{GCC_TORTURE_TESTS}; #{GCC_COMMAND} -w -o #{testnam} #{testnam}.c; ./#{testnam}")
+  system("cd #{GCC_TORTURE_TESTS}; gcc -w -o #{testnam} #{testnam}.c; ./#{testnam}")
   if $? != 0 then
     puts "Clang failed: #{testfil}"
     next
@@ -58,7 +60,7 @@ Dir.glob(GCC_TORTURE_TESTS + "*.c") do |testfil|
 
   if $? == 0 then
     puts "Running program"
-    system("cd #{OUT_DIR}; #{GCC_COMMAND} -w -o #{testnam} #{testnam}.c; ./#{testnam}")
+    system("cd #{OUT_DIR}; gcc -w -o #{testnam} #{testnam}.c; ./#{testnam}")
     if $? != 0
       puts "#{testnam} transformed version failed"
     else

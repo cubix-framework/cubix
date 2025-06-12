@@ -1,5 +1,10 @@
 #!/usr/bin/ruby
 
+transform = ARGV[0]
+
+if ARGV[1]
+  all_tests = [ARGV[1]]
+end
 
 #### NOTE FOR MAC USERS (2023.11.13):
 ####
@@ -11,6 +16,8 @@
 #### directory and comment out
 ####
 ####  resource.setrlimit(resource.RLIMIT_STACK, (newsoft, hard))
+
+TIMELIMIT = "180s"
 
 # Python has some way of specifying certain tests as too resource-intensive, and only runs some of the tests by default. I'm not going to figure
 # out how to determine which to include; instead, I'll just copy its list
@@ -109,21 +116,18 @@ all_tests =
     test_zipfile test_zipfile64 test_zipimport test_zipimport_support
     test_zlib]
 
-RUNPROG = ".stack-work/dist/x86_64-osx/Cabal-3.8.1.0/build/examples-multi/examples-multi"
-
-PYTHON_DIR     = "/Users/jkoppel/research_large/other_frameworks/cpython/"
-PATH_TO_PYTHON = PYTHON_DIR + "python.exe"
-PYTHON_TESTS   = PYTHON_DIR + "Lib/test/"
-
+# Jakub 2025.06.12: Updated to match new Lua tests script, but I
+#                   have not run it.
+PYTHON_TESTS = ENV["PYTHON_TESTS"]
+RUNPROG = `cabal list-bin multi`.strip
 OUT_DIR = PYTHON_TESTS
 
-transform = ARGV[0]
-
-if ARGV[1]
-  all_tests = [ARGV[1]]
+# Build driver first
+system("cabal build cubix-examples:multi")
+if !$?.success?
+  puts "cubix-examples:multi failed to build, aborting..."
+  exit
 end
-
-TIMELIMIT = "180s"
 
 num_tests = 0
 num_passed = 0
@@ -170,7 +174,7 @@ all_tests.each do |testnam|
     f.puts(oth_lines.join("\n"))
   end
 
-  system("gtimeout #{TIMELIMIT} #{PATH_TO_PYTHON} -m test #{out_test}")
+  system("gtimeout #{TIMELIMIT} python -m test #{out_test}")
 
   if $? == 0
     num_passed += 1
