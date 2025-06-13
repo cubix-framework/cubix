@@ -20,7 +20,7 @@ import Cubix.Language.Solidity.Modularized.Types as Solidity
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax as P
+import Cubix.Language.Parametric.Syntax qualified as P
 
 --------------------------------------------------------------------------------
 
@@ -38,18 +38,38 @@ createSortInclusionInfers
   [''P.IdentL,    ''P.AssignL,   ''ExpressionL, ''ExpressionL]
   [''IdentifierL, ''ExpressionL, ''P.RhsL,      ''P.LhsL     ]
 
+-----------------------------------------------------------------------------------
+---------------               Expressions                  ------------------------
+-----------------------------------------------------------------------------------
+
+createSortInclusionType' ''P.ExpressionL ''ExpressionL (mkName "ExpressionIsSolExp")
+createSortInclusionType' ''ExpressionL ''P.ExpressionL (mkName "SolExpIsExpression")
+deriveAll [''ExpressionIsSolExp, ''SolExpIsExpression]
+createSortInclusionInfer' ''P.ExpressionL ''ExpressionL (mkName "ExpressionIsSolExp")
+createSortInclusionInfer' ''ExpressionL ''P.ExpressionL (mkName "SolExpIsExpression")
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
-do let soliditySortInjections = [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs, ''ExpressionIsLhs ]
-   let solidityNewNodes       = [ ]
-   let names = (soliditySigNames \\ [mkName "Identifier"])
-                          ++ soliditySortInjections
-                          ++ solidityNewNodes
-                          ++ [ ''P.Ident, ''P.Assign, ''AssignOpEquals
-                             ]
+do let soliditySortInjections =
+         [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs, ''ExpressionIsLhs
+         , ''ExpressionIsSolExp, ''SolExpIsExpression
+         ]
+       solidityNewNodes = [ ]
+       names =
+         (soliditySigNames \\ [mkName "Identifier"]) ++
+         soliditySortInjections ++
+         solidityNewNodes ++
+         [ ''P.Ident, ''P.Assign, ''P.AssignOpEquals
+         , ''P.UnaryMinusOp, ''P.ComplementOp, ''P.LogicalNegationOp
+         , ''P.ArithBinOp, ''P.DivOp, ''P.ModOp, ''P.ExpOp
+         , ''P.BitwiseBinOp, ''P.LogicalBinOp, ''P.ShlOp, ''P.ArithShrOp
+         , ''P.RelationalBinOp
+         , ''P.CondTernaryOp
+         , ''P.Operator
+         , ''P.SeqOp
+         ]
    runCompTrans $ makeSumType "MSoliditySig" names
 
 
@@ -67,7 +87,7 @@ type MSolidityCxtA h a p = AnnCxtS p h MSoliditySig a
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
 
-instance InjF MSoliditySig IdentL ExpressionL where
+instance InjF MSoliditySig P.IdentL ExpressionL where
     injF = iIdentifierExpression . injF
 
     projF' e

@@ -12,14 +12,14 @@ module Cubix.Language.Solidity.Modularized.Types where
 
 import Data.Comp.Multi ( Term )
 
-import Solidity qualified as Solidity
+import Solidity qualified
 
 import Data.Comp.Trans ( runCompTrans, deriveMultiComp, makeSumType )
 
 import Cubix.Language.Info
 import Cubix.Language.Solidity.Modularized.Names
 import Cubix.Language.Parametric.Derive
-import Cubix.Language.Parametric.Syntax
+import Cubix.Language.Parametric.Syntax ( IntL, TextL )
 
 -----------------------------------------------------------
 
