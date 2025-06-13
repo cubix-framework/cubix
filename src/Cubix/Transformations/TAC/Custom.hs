@@ -139,7 +139,7 @@ instance RenderGuard MLuaSig where -- handle the insertF
       signedCond = if sign then
                      Hole cond
                    else
-                     LCommon.iUnop LCommon.iNot (Hole cond)
+                     LCommon.iUnary LCommon.iNot $ injF $ Hole cond
 
       block = iBlock (insertFHole body) (iLuaBlockEnd Nothing')
 

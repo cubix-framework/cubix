@@ -129,7 +129,7 @@ do let newLuaNodes =
          , ''FunctionDef, ''EmptyFunctionDefAttrs, ''SelfParameter
          , ''PositionalParameter, ''EmptyParameterAttrs
          , ''UnaryMinusOp, ''ComplementOp, ''LogicalNegationOp
-         , ''ArithBinOp, ''IDivOp, ''ExpOp
+         , ''ArithBinOp, ''DivOp, ''ModOp, ''IDivOp, ''ExpOp
          , ''BitwiseBinOp, ''LogicalBinOp, ''LogicalShrOp, ''ShlOp
          , ''RelationalBinOp
          , ''Operator
