@@ -15,8 +15,12 @@ module Cubix.Language.Parametric.Derive
   , deriveAllButDynCase
 
   , createSortInclusionType
+  , createSortInclusionType'
+  , createSortInclusionTypeQualified
   , createSortInclusionTypes
   , createSortInclusionInfer
+  , createSortInclusionInfer'
+  , createSortInclusionInferQualified
   , createSortInclusionInfers
 
   , sumToNames
@@ -47,7 +51,7 @@ import Cubix.Sin.Compdata.Derive ( smartFConstructors )
 deriveAll :: [Name] -> Q [Dec]
 deriveAll = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
                     makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors, makeDynCase]
-  
+
 deriveAllButDynCase :: [Name] -> Q [Dec]
 deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
                     makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors]
@@ -82,10 +86,8 @@ deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, mak
 -- declareAnnotated :: String -> Name -> Name -> Q [Dec]
 -- declareAnnotated s ann nm = declareAnnotatedType s ann <$> expandSyns (ConT nm)
 
-
-createSortInclusionType :: Name -> Name -> Q [Dec]
-createSortInclusionType fromNm toNm = do
-  let tName = sortInclusionName fromNm toNm
+createSortInclusionType' :: Name -> Name -> Name -> Q [Dec]
+createSortInclusionType' fromNm toNm tName = do
   e <- newName "e"
   i <- newName "i"
   let ctx = [foldl AppT EqualityT [VarT i, ConT toNm]]
@@ -93,36 +95,46 @@ createSortInclusionType fromNm toNm = do
   let con = ForallC [] ctx $ NormalC tName [(notStrict, AppT (VarT e) (ConT fromNm))]
   return $ [DataD [] tName [KindedTV e BndrReq (AppT (AppT ArrowT StarT) StarT), PlainTV i BndrReq] Nothing [con] []]
 
-  
+createSortInclusionType :: Name -> Name -> Q [Dec]
+createSortInclusionType fromNm toNm = do
+  let tName = sortInclusionName fromNm toNm
+   in createSortInclusionType' fromNm toNm tName
+
+createSortInclusionTypeQualified :: Name -> Name -> Q [Dec]
+createSortInclusionTypeQualified fromNm toNm =
+  createSortInclusionType' fromNm toNm $ qualifiedSortInclusionName fromNm toNm
+
 createSortInclusionTypes :: [Name] -> [Name] -> Q [Dec]
 createSortInclusionTypes froms tos = liftM concat $ mapM (uncurry createSortInclusionType) $ zip froms tos
 
 -- | This is separated from createSortInclusionType because of phase limitations.
---  This needs to refer to the smart constructor, and deriving a smart constructor needs to reify
---  the type name.
+-- This needs to refer to the smart constructor, and deriving a smart constructor needs to reify
+-- the type name.
+createSortInclusionInfer' :: Name -> Name -> Name -> Q [Dec]
+createSortInclusionInfer' fromNm toNm tName = do
+  let t     = conT tName
+  let fromT = conT fromNm
+  let toT   = conT toNm
+  let smartCon = varE $ smartConName tName
+
+  x <- newName "x"
+  let p = conP tName [varP x]
+  let xe = varE x
+
+  [d| instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
+        injF = $smartCon
+
+        projF' (project' -> Just $p) = Just $xe
+        projF' _                     = Nothing
+    |]
+
 createSortInclusionInfer :: Name -> Name -> Q [Dec]
-createSortInclusionInfer fromNm toNm = do
-    let tname = sortInclusionName fromNm toNm
-    mkInjF tname
-  where
-    mkInjF :: Name -> Q [Dec]
-    mkInjF tName = do
-      let t     = conT tName
-      let fromT = conT fromNm
-      let toT   = conT toNm
-      let smartCon = varE $ smartConName tName
+createSortInclusionInfer from to =
+  createSortInclusionInfer' from to $ sortInclusionName from to
 
-      x <- newName "x"
-      let p = conP tName [varP x]
-      let xe = varE x
-
-      [d| instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
-            injF = $smartCon
-
-            projF' (project' -> Just $p) = Just $xe
-            projF' _                     = Nothing
-        |]
-
+createSortInclusionInferQualified :: Name -> Name -> Q [Dec]
+createSortInclusionInferQualified from to =
+  createSortInclusionInfer' from to $ qualifiedSortInclusionName from to
 
 createSortInclusionInfers :: [Name] -> [Name] -> Q [Dec]
 createSortInclusionInfers froms tos = liftM concat $ mapM (uncurry createSortInclusionInfer) $ zip froms tos
@@ -133,6 +145,11 @@ smartConName n = mkName $ "i" ++ (nameBase n)
 
 sortInclusionName :: Name -> Name -> Name
 sortInclusionName fromNm toNm = mkName $ (chopL $ nameBase fromNm) ++ "Is" ++ (chopL $ nameBase toNm)
+
+qualifiedSortInclusionName :: Name -> Name -> Name
+qualifiedSortInclusionName from to =
+  let fullName name = maybe "" (filter (/= '.')) (nameModule name) ++ chopL (nameBase name)
+   in mkName $ fullName from ++ "Is" ++ fullName to
 
 -- Be warned! This is coupled to the type label name scheme in comptrans
 chopL :: String -> String
