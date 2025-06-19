@@ -64,7 +64,7 @@ do let soliditySortInjections =
          [ ''P.Ident, ''P.Assign, ''P.AssignOpEquals
          , ''P.UnaryMinusOp, ''P.ComplementOp, ''P.LogicalNegationOp
          , ''P.ArithBinOp, ''P.DivOp, ''P.ModOp, ''P.ExpOp
-         , ''P.BitwiseBinOp, ''P.LogicalBinOp, ''P.ShlOp, ''P.ArithShrOp
+         , ''P.BitwiseBinOp, ''P.LogicalBinOp, ''P.ShlOp, ''P.LogicalShrOp, ''P.ArithShrOp
          , ''P.RelationalBinOp
          , ''P.CondTernaryOp
          , ''P.Operator
