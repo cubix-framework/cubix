@@ -132,10 +132,6 @@ createSortInclusionInfer :: Name -> Name -> Q [Dec]
 createSortInclusionInfer from to =
   createSortInclusionInfer' from to $ sortInclusionName from to
 
-createSortInclusionInferQualified :: Name -> Name -> Q [Dec]
-createSortInclusionInferQualified from to =
-  createSortInclusionInfer' from to $ qualifiedSortInclusionName from to
-
 createSortInclusionInfers :: [Name] -> [Name] -> Q [Dec]
 createSortInclusionInfers froms tos = liftM concat $ mapM (uncurry createSortInclusionInfer) $ zip froms tos
 
@@ -145,11 +141,6 @@ smartConName n = mkName $ "i" ++ (nameBase n)
 
 sortInclusionName :: Name -> Name -> Name
 sortInclusionName fromNm toNm = mkName $ (chopL $ nameBase fromNm) ++ "Is" ++ (chopL $ nameBase toNm)
-
-qualifiedSortInclusionName :: Name -> Name -> Name
-qualifiedSortInclusionName from to =
-  let fullName name = maybe "" (filter (/= '.')) (nameModule name) ++ chopL (nameBase name)
-   in mkName $ fullName from ++ "Is" ++ fullName to
 
 -- Be warned! This is coupled to the type label name scheme in comptrans
 chopL :: String -> String
