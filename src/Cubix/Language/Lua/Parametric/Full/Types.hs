@@ -30,6 +30,8 @@ do substs <- makeSubsts
 
 deriveAll newASTTypes
 
+-- | TAG_LUA_FUNBODY_EXCEPTION
+-- This replaces FunBody in the original AST
 data FunBody e l where
   FunBody :: e [NameL] -> Bool -> e BlockL -> FunBody e FunBodyL
 
