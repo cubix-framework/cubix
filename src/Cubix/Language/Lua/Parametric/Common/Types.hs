@@ -46,7 +46,7 @@ deriveAll [''LuaLocalVarInit, ''LuaLhs, ''LuaRhs, ''LuaBlockEnd, ''LuaSpecialFun
 createSortInclusionTypes
   [''P.IdentL, ''P.AssignL, ''P.BlockL, ''L.StatL,      ''P.SingleLocalVarDeclL, ''P.FunctionCallL, ''L.ExpL,              ''L.PrefixExpL,   ''L.PrefixExpL]
   [''L.NameL,  ''L.StatL, ''L.BlockL,   ''P.BlockItemL, ''L.StatL,               ''L.FunCallL,      ''P.PositionalArgExpL, ''P.FunctionExpL, ''ReceiverL]
-deriveAll [''IdentIsName, ''AssignIsStat, ''BlockIsBlock, ''StatIsBlockItem, ''SingleLocalVarDeclIsStat,
+deriveAllButSortInjection [''IdentIsName, ''AssignIsStat, ''BlockIsBlock, ''StatIsBlockItem, ''SingleLocalVarDeclIsStat,
            ''FunctionCallIsFunCall, ''ExpIsPositionalArgExp, ''PrefixExpIsFunctionExp, ''PrefixExpIsReceiver]
 createSortInclusionInfers [ ''P.IdentL, ''P.AssignL, ''P.BlockL, ''L.StatL,      ''P.SingleLocalVarDeclL, ''P.FunctionCallL, ''L.ExpL,              ''L.PrefixExpL,   ''L.PrefixExpL
                           ] [
@@ -81,7 +81,7 @@ deriveAll [''LuaVarArgsParam]
 createSortInclusionTypes
   [''P.FunctionDefL, ''P.BlockL]
   [''L.StatL,        ''P.FunctionBodyL]
-deriveAll [''FunctionDefIsStat, ''BlockIsFunctionBody]
+deriveAllButSortInjection [''FunctionDefIsStat, ''BlockIsFunctionBody]
 createSortInclusionInfers
   [''P.FunctionDefL, ''P.BlockL]
   [''L.StatL,        ''P.FunctionBodyL]
@@ -93,7 +93,7 @@ createSortInclusionInfers
 createSortInclusionTypes
   [''P.ExpressionL, ''ExpL]
   [''ExpL,          ''P.ExpressionL]
-deriveAll [''ExpressionIsExp, ''ExpIsExpression]
+deriveAllButSortInjection [''ExpressionIsExp, ''ExpIsExpression]
 createSortInclusionInfers
   [''P.ExpressionL, ''ExpL]
   [''ExpL,          ''P.ExpressionL]

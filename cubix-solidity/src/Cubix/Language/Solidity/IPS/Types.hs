@@ -43,7 +43,7 @@ deriveAll [''LValue]
 createSortInclusionTypes
   [''P.IdentL,    ''P.AssignL,     ''P.ExpressionL, ''LValueL, ''LValueL       ]
   [''IdentifierL, ''P.ExpressionL, ''P.RhsL,        ''P.LhsL,  ''P.ExpressionL ]
-deriveAll
+deriveAllButSortInjection
   [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs
   , ''LValueIsLhs, ''LValueIsExpression
   ]
@@ -57,7 +57,8 @@ createSortInclusionInfers
 
 createSortInclusionType' ''P.ExpressionL ''ExpressionL (mkName "ExpressionIsSolExp")
 createSortInclusionType' ''ExpressionL ''P.ExpressionL (mkName "SolExpIsExpression")
-deriveAll [''ExpressionIsSolExp, ''SolExpIsExpression]
+deriveAllButSortInjection [''ExpressionIsSolExp]
+deriveAllButSortInjection [''SolExpIsExpression]
 createSortInclusionInfer' ''P.ExpressionL ''ExpressionL (mkName "ExpressionIsSolExp")
 createSortInclusionInfer' ''ExpressionL ''P.ExpressionL (mkName "SolExpIsExpression")
 

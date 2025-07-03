@@ -8,6 +8,7 @@
 module Cubix.Language.Parametric.Derive
   (
     deriveAll
+  , deriveAllButSortInjection
   -- , distributeAnnotation
   -- , declareAnnotatedNames
   -- , declareAnnotated
@@ -16,13 +17,10 @@ module Cubix.Language.Parametric.Derive
 
   , createSortInclusionType
   , createSortInclusionType'
-  , createSortInclusionTypeQualified
   , createSortInclusionTypes
   , createSortInclusionInfer
   , createSortInclusionInfer'
-  , createSortInclusionInferQualified
   , createSortInclusionInfers
-
   , sumToNames
   , makeDefaultInstances
   ) where
@@ -41,6 +39,17 @@ import Cubix.Sin.Compdata.Derive ( smartFConstructors )
 
 --------------------------------------------------------------------------------
 
+makeIsNotSortInjection :: Name -> Q [Dec]
+makeIsNotSortInjection tName =
+  let t = conT tName
+   in [d| type instance IsSortInjection $t = 'False |]
+
+makeIsSortInjection :: Name -> Q [Dec]
+makeIsSortInjection tName =
+  let t = conT tName
+   in [d| type instance IsSortInjection $t = 'True |]
+
+
 -- | Derives instances of the following for each type in the list:
 -- 
 -- @
@@ -49,8 +58,18 @@ import Cubix.Sin.Compdata.Derive ( smartFConstructors )
 -- 
 -- Additonally, it will create smart constructors for the data type
 deriveAll :: [Name] -> Q [Dec]
-deriveAll = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors, makeDynCase]
+deriveAll = derive
+  [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
+  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeDynCase, makeIsNotSortInjection
+  ]
+
+deriveAllButSortInjection :: [Name] -> Q [Dec]
+deriveAllButSortInjection = derive
+  [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
+  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeDynCase
+  ]
 
 deriveAllButDynCase :: [Name] -> Q [Dec]
 deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
@@ -100,10 +119,6 @@ createSortInclusionType fromNm toNm = do
   let tName = sortInclusionName fromNm toNm
    in createSortInclusionType' fromNm toNm tName
 
-createSortInclusionTypeQualified :: Name -> Name -> Q [Dec]
-createSortInclusionTypeQualified fromNm toNm =
-  createSortInclusionType' fromNm toNm $ qualifiedSortInclusionName fromNm toNm
-
 createSortInclusionTypes :: [Name] -> [Name] -> Q [Dec]
 createSortInclusionTypes froms tos = liftM concat $ mapM (uncurry createSortInclusionType) $ zip froms tos
 
@@ -121,11 +136,13 @@ createSortInclusionInfer' fromNm toNm tName = do
   let p = conP tName [varP x]
   let xe = varE x
 
-  [d| instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
-        injF = $smartCon
+  [d|
+   type instance IsSortInjection $t = 'True
+   instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
+     injF = $smartCon
 
-        projF' (project' -> Just $p) = Just $xe
-        projF' _                     = Nothing
+     projF' (project' -> Just $p) = Just $xe
+     projF' _                     = Nothing
     |]
 
 createSortInclusionInfer :: Name -> Name -> Q [Dec]

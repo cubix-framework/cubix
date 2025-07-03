@@ -37,7 +37,7 @@ data CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs e l where
 data CLocalVarAttrs e l where
   CLocalVarAttrs :: e [CDerivedDeclaratorL] -> e (Maybe CStringLiteralL) -> e [CAttributeL] -> CLocalVarAttrs e LocalVarDeclAttrsL
 
-deriveAll [''CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs, ''CLocalVarAttrs]
+deriveAllButSortInjection [''CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs, ''CLocalVarAttrs]
 
 instance ( CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs :-<: fs
          , All HFunctor fs
@@ -50,7 +50,7 @@ instance ( CDeclarationSpecifiersIsMultiLocalVarDeclCommonAttrs :-<: fs
 createSortInclusionTypes [  ''MultiLocalVarDeclL,  ''CInitializerL, ''P.IdentL, ''C.CExpressionL, ''C.CExpressionL, ''C.CAssignOpL, ''P.AssignL,      ''C.CCompoundBlockItemL
                          ] [''CCompoundBlockItemL, ''LocalVarInitL, ''C.IdentL, ''P.LhsL,         ''P.RhsL,         ''P.AssignOpL,  ''C.CExpressionL, ''P.BlockItemL
                          ]
-deriveAll [''MultiLocalVarDeclIsCCompoundBlockItem, ''CInitializerIsLocalVarInit, ''IdentIsIdent, ''CExpressionIsLhs,
+deriveAllButSortInjection [''MultiLocalVarDeclIsCCompoundBlockItem, ''CInitializerIsLocalVarInit, ''IdentIsIdent, ''CExpressionIsLhs,
            ''CExpressionIsRhs, ''CAssignOpIsAssignOp, ''AssignIsCExpression, ''CCompoundBlockItemIsBlockItem]
 createSortInclusionInfers [  ''MultiLocalVarDeclL,  ''CInitializerL, ''P.IdentL, ''C.CExpressionL, ''C.CExpressionL, ''C.CAssignOpL, ''P.AssignL,         ''C.CCompoundBlockItemL
                           ] [''CCompoundBlockItemL, ''LocalVarInitL, ''C.IdentL, ''P.LhsL,         ''P.RhsL,         ''P.AssignOpL,  ''C.CExpressionL,    ''P.BlockItemL
@@ -202,7 +202,7 @@ deriveAll [''CFunParamAttrs]
 createSortInclusionTypes [  ''P.FunctionCallL, ''C.CExpressionL, ''C.CExpressionL,      ''P.FunctionDeclL, ''CFunParamAttrsL,               ''CSpecialParamL,           ''P.FunctionDefL,  ''CFunParamAttrsL,   ''CSpecialParamL,       ''COldStyleParamL,      ''C.CStatementL
                          ] [''C.CExpressionL,  ''P.FunctionExpL, ''P.PositionalArgExpL, ''C.CDeclaratorL,  ''P.FunctionParameterDeclAttrsL, ''P.FunctionParameterDeclL, ''C.CFunctionDefL, ''P.ParameterAttrsL, ''P.FunctionParameterL, ''P.FunctionParameterL, ''P.FunctionBodyL
                          ]
-deriveAll [ ''FunctionCallIsCExpression, ''CExpressionIsFunctionExp, ''CExpressionIsPositionalArgExp
+deriveAllButSortInjection [ ''FunctionCallIsCExpression, ''CExpressionIsFunctionExp, ''CExpressionIsPositionalArgExp
           , ''FunctionDeclIsCDeclarator, ''CFunParamAttrsIsFunctionParameterDeclAttrs, ''CSpecialParamIsFunctionParameterDecl
           , ''FunctionDefIsCFunctionDef, ''CFunParamAttrsIsParameterAttrs, ''CSpecialParamIsFunctionParameter, ''COldStyleParamIsFunctionParameter
           , ''CStatementIsFunctionBody]

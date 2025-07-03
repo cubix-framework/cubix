@@ -12,6 +12,7 @@ module Cubix.Language.Parametric.InjF
   , labeledInjF
   , injFAnnDef
   , injectFAnnDef
+  , type IsSortInjection
 
   , InjectableSorts
   , AInjF(..)
@@ -31,6 +32,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 import Cubix.Language.Info
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, AnnotateDefault, runAnnotateDefault, annotateOuter )
+import Data.Kind (Type)
 
 --------------------------------------------------------------------------------
 
@@ -93,6 +95,8 @@ injectFAnnDef :: ( InjF fs l l'
                  , Default a
                 ) => (f :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
 injectFAnnDef =  injFAnnDef . inject
+
+type family IsSortInjection (name :: (Type -> Type) -> Type -> Type) :: Bool
 
 --------------------------------------------------------------------------------
 

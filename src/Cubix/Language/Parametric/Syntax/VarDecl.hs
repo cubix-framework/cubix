@@ -156,7 +156,7 @@ instance (TupleBinder :-<: fs, All HFunctor fs) => InjF fs [IdentL] VarDeclBinde
   projF' _                                   = Nothing
 
 createSortInclusionType ''IdentL ''VarDeclBinderL
-deriveAll [''IdentIsVarDeclBinder]
+deriveAllButSortInjection [''IdentIsVarDeclBinder]
 createSortInclusionInfer ''IdentL ''VarDeclBinderL
 
 
