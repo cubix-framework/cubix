@@ -45,7 +45,7 @@ createSortInclusionTypes [ ''VarInitL,       ''MultiLocalVarDeclL, ''P.IdentL, '
                          ] [
                            ''LocalVarInitL,  ''BlockStmtL,         ''J.IdentL, ''J.BlockL, ''ExpL,    ''RhsL, ''P.LhsL, ''BlockItemL, ''P.AssignOpL
                          ]
-deriveAll [''VarInitIsLocalVarInit, ''MultiLocalVarDeclIsBlockStmt, ''IdentIsIdent, ''BlockIsBlock, ''AssignIsExp, ''ExpIsRhs,
+deriveAllButSortInjection [''VarInitIsLocalVarInit, ''MultiLocalVarDeclIsBlockStmt, ''IdentIsIdent, ''BlockIsBlock, ''AssignIsExp, ''ExpIsRhs,
            ''LhsIsLhs, ''BlockStmtIsBlockItem, ''AssignOpIsAssignOp]
 createSortInclusionInfers [ ''VarInitL,       ''MultiLocalVarDeclL, ''P.IdentL, ''P.BlockL, ''AssignL, ''ExpL, ''J.LhsL, ''BlockStmtL, ''J.AssignOpL
                           ] [
@@ -89,7 +89,7 @@ createSortInclusionTypes [ ''P.FunctionCallL,     ''J.NameL,        ''J.ExpL,   
                          ] [
                            ''J.MethodInvocationL, ''P.FunctionExpL, ''P.PositionalArgExpL, ''J.MemberDeclL,   ''P.FunctionDeclAttrsL, ''P.FunctionParameterDeclAttrsL, ''FunctionParameterDeclL
                          ]
-deriveAll [ ''FunctionCallIsMethodInvocation, ''NameIsFunctionExp, ''ExpIsPositionalArgExp, ''FunctionDeclIsMemberDecl
+deriveAllButSortInjection [ ''FunctionCallIsMethodInvocation, ''NameIsFunctionExp, ''ExpIsPositionalArgExp, ''FunctionDeclIsMemberDecl
           , ''JavaMethodDeclAttrsIsFunctionDeclAttrs, ''JavaParamAttrsIsFunctionParameterDeclAttrs, ''JavaVarargsParamIsFunctionParameterDecl]
 createSortInclusionInfers [ ''P.FunctionCallL,     ''J.NameL,        ''J.ExpL,              ''P.FunctionDeclL, ''JavaMethodDeclAttrsL, ''JavaParamAttrsL,               ''JavaVarargsParamL
                           ] [
@@ -100,7 +100,7 @@ createSortInclusionTypes [ ''P.FunctionDefL, ''JavaMethodDeclAttrsL, ''JavaParam
                          ] [
                            ''J.MemberDeclL,  ''P.FunctionDefAttrsL,  ''P.ParameterAttrsL, ''P.FunctionParameterL, ''P.FunctionBodyL
                          ]
-deriveAll [ ''FunctionDefIsMemberDecl, ''JavaMethodDeclAttrsIsFunctionDefAttrs, ''JavaParamAttrsIsParameterAttrs, ''JavaVarargsParamIsFunctionParameter, ''BlockIsFunctionBody]
+deriveAllButSortInjection [ ''FunctionDefIsMemberDecl, ''JavaMethodDeclAttrsIsFunctionDefAttrs, ''JavaParamAttrsIsParameterAttrs, ''JavaVarargsParamIsFunctionParameter, ''BlockIsFunctionBody]
 createSortInclusionInfers [ ''P.FunctionDefL, ''JavaMethodDeclAttrsL, ''JavaParamAttrsL,   ''JavaVarargsParamL,    ''P.BlockL
                           ] [
                             ''J.MemberDeclL,  ''P.FunctionDefAttrsL,  ''P.ParameterAttrsL, ''P.FunctionParameterL, ''P.FunctionBodyL

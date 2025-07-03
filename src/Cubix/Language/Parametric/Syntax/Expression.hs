@@ -167,14 +167,6 @@ data SeqOp e l where
 
 deriveAll [''SeqOp]
 
-createSortInclusionTypes
-  [''IdentL, ''FunctionCallL, ''SeqOpL]
-  [''ExpressionL, ''ExpressionL, ''ExpressionL]
-deriveAll [''IdentIsExpression, ''FunctionCallIsExpression, ''SeqOpIsExpression]
-createSortInclusionInfers
-  [''IdentL, ''FunctionCallL, ''SeqOpL]
-  [''ExpressionL, ''ExpressionL, ''ExpressionL]
-
 -- | Unary operators
 --
 -- This represent unary prefix operator syntax form: @◇ e@, where @◇@

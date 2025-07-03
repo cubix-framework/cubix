@@ -44,7 +44,7 @@ createSortInclusionTypes [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL, 
                          ] [
                            ''JSExpressionL, ''P.LocalVarInitL, ''P.VarDeclBinderL, ''JSStatementL,         ''P.RhsL,        ''P.LhsL,        ''P.AssignOpL, ''JSExpressionL,  ''JSStatementL, ''P.BlockItemL,  ''JSASTL
                          ]
-deriveAll [''IdentIsJSExpression, ''JSExpressionIsLocalVarInit, ''JSExpressionIsVarDeclBinder,
+deriveAllButSortInjection [''IdentIsJSExpression, ''JSExpressionIsLocalVarInit, ''JSExpressionIsVarDeclBinder,
            ''MultiLocalVarDeclIsJSStatement, ''JSExpressionIsRhs, ''JSExpressionIsLhs, ''JSAssignOpIsAssignOp,
            ''AssignIsJSExpression, ''BlockIsJSStatement, ''JSStatementIsBlockItem, ''JSBlockIsJSAST]
 createSortInclusionInfers [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,    ''P.MultiLocalVarDeclL, ''JSExpressionL, ''JSExpressionL, ''JSAssignOpL, ''P.AssignL,     ''P.BlockL,     ''JSStatementL, ''JSBlockL
@@ -55,7 +55,7 @@ createSortInclusionInfers [ ''P.IdentL,      ''JSExpressionL,   ''JSExpressionL,
 data MaybeIdentIsJSIdent e l where
   MaybeIdentIsJSIdent :: e (Maybe IdentL) -> MaybeIdentIsJSIdent e JSIdentL
 
-deriveAll [''MaybeIdentIsJSIdent]
+deriveAllButSortInjection [''MaybeIdentIsJSIdent]
 
 pattern JSIdent' :: (MaybeIdentIsJSIdent :-<: fs, Ident :-<: fs, MaybeF :-<: fs, All HFunctor fs) => String -> CxtS h fs a JSIdentL
 pattern JSIdent' ident <- (project -> Just (MaybeIdentIsJSIdent (Just' (Ident' ident)))) where
@@ -90,7 +90,7 @@ createSortInclusionTypes [ ''FunctionCallL, ''JSExpressionL,     ''JSExpressionL
                          ] [
                            ''JSExpressionL, ''PositionalArgExpL, ''FunctionExpL,  ''JSStatementL, ''FunctionBodyL
                          ]
-deriveAll [ ''FunctionCallIsJSExpression, ''JSExpressionIsPositionalArgExp, ''JSExpressionIsFunctionExp
+deriveAllButSortInjection [ ''FunctionCallIsJSExpression, ''JSExpressionIsPositionalArgExp, ''JSExpressionIsFunctionExp
           , ''FunctionDefIsJSStatement, ''JSBlockIsFunctionBody]
 createSortInclusionInfers [ ''FunctionCallL, ''JSExpressionL,     ''JSExpressionL, ''FunctionDefL, ''JSBlockL
                           ] [

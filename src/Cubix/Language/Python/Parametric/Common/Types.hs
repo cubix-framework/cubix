@@ -127,7 +127,7 @@ createSortInclusionTypes [ ''P.IdentL,  ''P.AssignL,     ''Py.ExprL, ''Py.Statem
                          ] [
                            ''Py.IdentL, ''Py.StatementL, ''P.RhsL,   ''P.BlockItemL,  ''Py.ExprL, ''PyLValueL, ''Py.StatementL
                          ]
-deriveAll [''IdentIsIdent, ''AssignIsStatement, ''ExprIsRhs, ''StatementIsBlockItem, ''PyCompIsExpr, ''IdentIsPyLValue, ''PyClassIsStatement]
+deriveAllButSortInjection [''IdentIsIdent, ''AssignIsStatement, ''ExprIsRhs, ''StatementIsBlockItem, ''PyCompIsExpr, ''IdentIsPyLValue, ''PyClassIsStatement]
 createSortInclusionInfers [ ''P.IdentL,  ''P.AssignL,     ''Py.ExprL, ''Py.StatementL, ''PyCompL,  ''P.IdentL,  ''PyClassL
                           ] [
                             ''Py.IdentL, ''Py.StatementL, ''P.RhsL,   ''P.BlockItemL,  ''Py.ExprL, ''PyLValueL, ''Py.StatementL
@@ -170,7 +170,7 @@ createSortInclusionTypes [ ''P.FunctionCallL, ''Py.ExprL,       ''Py.ExprL,     
                          ] [
                            ''Py.ExprL,        ''P.FunctionExpL, ''P.PositionalArgExpL, ''P.ReceiverL, ''Py.StatementL,  ''P.FunctionBodyL
                          ]
-deriveAll [ ''FunctionCallIsExpr, ''ExprIsFunctionExp, ''ExprIsPositionalArgExp, ''ExprIsReceiver
+deriveAllButSortInjection [ ''FunctionCallIsExpr, ''ExprIsFunctionExp, ''ExprIsPositionalArgExp, ''ExprIsReceiver
           , ''FunctionDefIsStatement, ''PyBlockIsFunctionBody]
 createSortInclusionInfers [ ''P.FunctionCallL, ''Py.ExprL,       ''Py.ExprL,            ''Py.ExprL,    ''P.FunctionDefL, ''PyBlockL
                           ] [
