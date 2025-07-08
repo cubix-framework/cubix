@@ -87,6 +87,8 @@ data MaybeF e l where
   NothingF :: Typeable l => MaybeF e (Maybe l)
   JustF    :: Typeable l => e l -> MaybeF e (Maybe l)
 
+type instance IsSortInjection MaybeF = False
+
 -- | A higher-order functor version of [], for use with
 -- multi-sorted compositional data types
 -- 
@@ -96,6 +98,8 @@ data MaybeF e l where
 data ListF e l where
   NilF  :: Typeable l => ListF e [l]
   ConsF :: Typeable l => e l -> e [l] -> ListF e [l]
+
+type instance IsSortInjection ListF = False
 
 -- | A higher-order functor version of (,), for use with
 -- multi-sorted compositional data types
@@ -107,9 +111,12 @@ data ListF e l where
 data PairF e l where
   PairF :: (Typeable i, Typeable j) => e i -> e j -> PairF e (i, j)
 
+type instance IsSortInjection PairF = False
+
 data TripleF e l where
   TripleF :: (Typeable i, Typeable j, Typeable k) => e i -> e j -> e k -> TripleF e (i, j, k)
 
+type instance IsSortInjection TripleF = False
 
 -- | A higher-order functor version of Either, for use with
 -- multi-sorted compositional data types
@@ -120,6 +127,8 @@ data TripleF e l where
 data EitherF e l where
   LeftF  :: (Typeable i, Typeable j) => e i -> EitherF e (Either i j)
   RightF :: (Typeable i, Typeable j) => e j -> EitherF e (Either i j)
+
+type instance IsSortInjection EitherF = False
 
 --------------------------------------------------------------------------------
 -- Instances of Generic
