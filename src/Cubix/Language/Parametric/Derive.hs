@@ -137,12 +137,16 @@ createSortInclusionInfer' fromNm toNm tName = do
   let xe = varE x
 
   [d|
-   type instance IsSortInjection $t = 'True
+   type instance IsSortInjection $t = True
+   type instance SortInjectionSource $t = $fromT
+   type instance SortInjectionTarget $t = $toT
    instance {-# OVERLAPPING #-} ($t :-<: fs, All HFunctor fs) => InjF fs $fromT $toT where
      injF = $smartCon
 
      projF' (project' -> Just $p) = Just $xe
      projF' _                     = Nothing
+   instance RemoveSortInjectionNode $t where
+     removeSortInjectionNode $p = $xe
     |]
 
 createSortInclusionInfer :: Name -> Name -> Q [Dec]
@@ -153,11 +157,17 @@ createSortInclusionInfers :: [Name] -> [Name] -> Q [Dec]
 createSortInclusionInfers froms tos = liftM concat $ mapM (uncurry createSortInclusionInfer) $ zip froms tos
 
 smartConName :: Name -> Name
-smartConName n = mkName $ "i" ++ (nameBase n)
+smartConName n = mkName $ "i" ++ nameBase n
 
+fragment :: Name -> String
+fragment = chopL . nameBase
+{-# INLINE fragment #-}
+
+fragmentName :: Name -> Name
+fragmentName = mkName . fragment
 
 sortInclusionName :: Name -> Name -> Name
-sortInclusionName fromNm toNm = mkName $ (chopL $ nameBase fromNm) ++ "Is" ++ (chopL $ nameBase toNm)
+sortInclusionName fromNm toNm = mkName $ fragment fromNm ++ "Is" ++ fragment toNm
 
 -- Be warned! This is coupled to the type label name scheme in comptrans
 chopL :: String -> String

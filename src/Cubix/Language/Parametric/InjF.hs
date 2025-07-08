@@ -13,6 +13,9 @@ module Cubix.Language.Parametric.InjF
   , injFAnnDef
   , injectFAnnDef
   , type IsSortInjection
+  , type SortInjectionSource
+  , type SortInjectionTarget
+  , RemoveSortInjectionNode(..)
 
   , InjectableSorts
   , AInjF(..)
@@ -25,7 +28,7 @@ import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
-import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable )
+import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable, Fragment )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewriteM )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
@@ -96,7 +99,12 @@ injectFAnnDef :: ( InjF fs l l'
                 ) => (f :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
 injectFAnnDef =  injFAnnDef . inject
 
-type family IsSortInjection (name :: (Type -> Type) -> Type -> Type) :: Bool
+type family IsSortInjection (f :: Fragment) :: Bool
+type family SortInjectionSource (f :: Fragment) :: Sort
+type family SortInjectionTarget (f :: Fragment) :: Sort
+
+class RemoveSortInjectionNode f where
+  removeSortInjectionNode :: f (Cxt h fs a) l -> Cxt h fs a (SortInjectionSource f)
 
 --------------------------------------------------------------------------------
 
