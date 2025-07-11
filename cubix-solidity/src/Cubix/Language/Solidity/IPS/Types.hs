@@ -26,13 +26,11 @@ import Cubix.Language.Parametric.Syntax qualified as P
 ---------------       Variable declarations and blocks     ------------------------
 -----------------------------------------------------------------------------------
 
-data LValueL
-
 data LValue e l where
-  IndexExpr        :: e P.ExpressionL -> e P.ExpressionL              -> LValue e LValueL
-  IdentifierExpr   :: e P.IdentL                                      -> LValue e LValueL
-  MemberAccessExpr :: e P.ExpressionL -> e Solidity.MemberAccessTypeL -> LValue e LValueL
-  TupleExpr        :: e [Maybe P.ExpressionL]                         -> LValue e LValueL
+  IndexLValue        :: e P.ExpressionL -> e P.ExpressionL              -> LValue e P.LhsL
+  IdentifierLValue   :: e P.IdentL                                      -> LValue e P.LhsL
+  MemberAccessLValue :: e P.ExpressionL -> e Solidity.MemberAccessTypeL -> LValue e P.LhsL
+  TupleLValue        :: e [Maybe P.ExpressionL]                         -> LValue e P.LhsL
 
 deriveAll [''LValue]
 
@@ -41,15 +39,13 @@ deriveAll [''LValue]
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
-  [''P.IdentL,    ''P.AssignL,     ''P.ExpressionL, ''LValueL, ''LValueL       ]
-  [''IdentifierL, ''P.ExpressionL, ''P.RhsL,        ''P.LhsL,  ''P.ExpressionL ]
+  [''P.IdentL,    ''P.AssignL,     ''P.ExpressionL ]
+  [''IdentifierL, ''P.ExpressionL, ''P.RhsL        ]
 deriveAllButSortInjection
-  [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs
-  , ''LValueIsLhs, ''LValueIsExpression
-  ]
+  [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsRhs ]
 createSortInclusionInfers
-  [''P.IdentL,    ''P.AssignL,     ''P.ExpressionL, ''LValueL, ''LValueL       ]
-  [''IdentifierL, ''P.ExpressionL, ''P.RhsL,        ''P.LhsL,  ''P.ExpressionL ]
+  [''P.IdentL,    ''P.AssignL,     ''P.ExpressionL ]
+  [''IdentifierL, ''P.ExpressionL, ''P.RhsL        ]
 
 -----------------------------------------------------------------------------------
 ---------------               Expressions                  ------------------------
@@ -68,7 +64,6 @@ createSortInclusionInfer' ''ExpressionL ''P.ExpressionL (mkName "SolExpIsExpress
 
 do let soliditySortInjections =
          [ ''IdentIsIdentifier
-         , ''LValueIsLhs, ''LValueIsExpression
          , ''AssignIsExpression
          , ''ExpressionIsRhs
          , ''ExpressionIsSolExp, ''SolExpIsExpression
@@ -104,28 +99,12 @@ type MSolidityCxtA h a p = AnnCxtS p h MSoliditySig a
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
 
-instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL LValueL where
-  injF = iIdentifierExpr
-
-  projF' e
-    | Just (IdentifierExpr ident) <- project' e
-    = Just ident
-  projF' _ = Nothing
-
 instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL P.LhsL where
-    injF = LValueIsLhs' . injF
+    injF = iIdentifierLValue
 
     projF' e
-      | Just (LValueIsLhs lval) <- project' e
-      = projF' lval
-    projF' _ = Nothing
-
-instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL P.ExpressionL where
-    injF = LValueIsExpression' . injF
-
-    projF' e
-      | Just (LValueIsExpression lval) <- project' e
-      = projF' lval
+      | Just (IdentifierLValue ident) <- project' e
+      = Just ident
     projF' _ = Nothing
 
 instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL ExpressionL where
@@ -135,6 +114,14 @@ instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL ExpressionL where
      | Just (IdentifierExpression i) <- project' e
      , Just (IdentIsIdentifier j) <- project' i
      = Just j
+    projF' _ = Nothing
+
+instance {-# OVERLAPPING #-} InjF MSoliditySig P.IdentL P.ExpressionL where
+    injF = SolExpIsExpression' . injF
+
+    projF' e
+      | Just (SolExpIsExpression exp) <- project' e
+      = projF' exp
     projF' _ = Nothing
 
 instance InjF MSoliditySig P.AssignL ExpressionL where
@@ -151,12 +138,4 @@ instance InjF MSoliditySig ExpressionL P.RhsL where
   projF' e
     | Just (ExpressionIsRhs rhs) <- project' e
     = projF' rhs
-  projF' _ = Nothing
-
-instance InjF MSoliditySig LValueL ExpressionL where
-  injF = ExpressionIsSolExp' . injF
-
-  projF' e
-    | Just (ExpressionIsSolExp exp) <- project' e
-    = projF' exp
   projF' _ = Nothing
