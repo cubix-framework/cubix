@@ -41,6 +41,11 @@ translate = trans . unTerm @(Sum F.SoliditySig)
 translate' :: (InjF MSoliditySig l l') => F.SolidityTerm l -> MSolidityTerm l'
 translate' = injF . translate
 
+mtranslate'
+  :: (Typeable l', InjF MSoliditySig l l')
+  => F.SolidityTerm (Maybe l) -> MSolidityTerm (Maybe l')
+mtranslate' = insertF . fmap translate' . extractF
+
 ------ Class
 
 class Trans f where
@@ -79,9 +84,9 @@ transUnop _ = Nothing
 translateUnary
   :: F.SolidityTerm F.UnaryOpL
   -> F.SolidityTerm F.ExpressionL
-  -> MSolidityTerm ExpressionL
-translateUnary (transUnop -> Just op) exp = Unary' op (translate' exp)
-translateUnary op exp = F.iUnaryExpression (translate' op) (translate exp)
+  -> MSolidityTerm F.ExpressionL
+translateUnary (transUnop -> Just op) exp = iUnary op (injF $ translate exp)
+translateUnary op exp = F.iUnaryExpression (injF $ translate op) (injF $ translate exp)
 
 transBinOp :: F.SolidityTerm F.BinaryOpL -> Maybe (MSolidityTerm BinaryOpL)
 transBinOp F.Exp' = Just Pow'
@@ -112,49 +117,41 @@ transAssignOp _ = Nothing
 
 translateLValue
   :: F.SolidityTerm F.ExpressionL
-  -> Maybe (MSolidityTerm LhsL)
+  -> Maybe (MSolidityTerm LValueL)
 translateLValue (F.IndexExpression' arr idx) =
-  Just $ IndexLValue' (translateExpression arr) (translateExpression idx)
+  Just $ IndexExpr' (translate' arr) (translate' idx)
 translateLValue (F.IdentifierExpression' id) =
-  Just $ IdentifierLValue' (transIdent id)
-translateLValue (F.MemberAccess' struct access) =
-  Just $ MemberAccessLValue' (translateExpression struct) (translate' access)
+  Just $ IdentifierExpr' (transIdent id)
+translateLValue (F.MemberAccess' struct mem) =
+  Just $ MemberAccessExpr' (translate' struct) (translate mem)
 translateLValue (F.TupleExpression' (extractF -> exprs)) =
-  Just $ TupleLValue' $ insertF $ map (mapF translateExpression) exprs
+  Just $ TupleExpr' $ insertF $ map mtranslate' exprs
 translateLValue _ = Nothing
 
 translateBinary
   :: F.SolidityTerm F.BinaryOpL
   -> F.SolidityTerm F.ExpressionL
   -> F.SolidityTerm F.ExpressionL
-  -> MSolidityTerm ExpressionL
+  -> MSolidityTerm F.ExpressionL
 translateBinary (transBinOp -> Just op) a b =
-  Binary' op (translateExpression a) (translateExpression b)
+  let lhs = maybe (translate a) injF (translateLValue a)
+   in iBinary op (injF lhs) (injF $ translate b)
 translateBinary (transAssignOp -> Just op) a b
-  | Just (lhs :: MSolidityTerm LhsL) <- translateLValue a
-  = iAssign lhs op (injF $ translateExpression b)
+  | Just (lhs :: MSolidityTerm LValueL) <- translateLValue a
+  = iAssign (injF lhs) op (injF $ translate b)
 translateBinary op a b =
-  F.iBinaryExpression (translate' op) (injF $ translateExpression a) (injF $ translateExpression b)
-
-translateExpression
-  :: F.SolidityTerm F.ExpressionL
-  -> MSolidityTerm ExpressionL
-transalteExpression (F.UnaryExpression' f a) =
-  translateUnary f a
-transalteExpression (F.BinaryExpression' f a b) =
-  translateBinary f a b
-transalteExpression (F.ConditionalExpression' cond a b) =
-  Ternary' ITE' (translateExpression cond) (translateExpression a) (translateExpression b)
-translateExpression =
-  translate'
+  let lhs = maybe (translate a) injF (translateLValue a)
+   in F.iBinaryExpression (injF $ translate op) lhs (injF $ translate b)
 
 instance Trans F.Expression where
+-- covered by default
+--  trans (F.IdentifierExpression id) = trans @F.Identifier id -- injF $ transIdent id
   trans (F.UnaryExpression f a) =
-    injF $ translateUnary f a
+    translateUnary f a
   trans (F.BinaryExpression f a b) =
-    injF $ translateBinary f a b
+    translateBinary f a b
   trans (F.ConditionalExpression cond a b) =
-    iTernary ITE' (translate' cond) (translate' a) (translate' b)
+    iTernary ITE' (injF $ translate cond) (injF $ translate a) (injF $ translate b)
   trans x =
     transDefault x
 
@@ -181,7 +178,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 
 do ipsNames <- sumToNames ''MSoliditySig
    modNames <- sumToNames ''F.SoliditySig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsSolExp, ''SolExpIsExpression ]
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier, ''LValueIsExpression, ''AssignIsExpression, ''ExpressionIsSolExp, ''SolExpIsExpression ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.SoliditySig) => f MSolidityTerm l -> F.SolidityTerm l
@@ -275,20 +272,24 @@ untransSolExp (ExpressionIsSolExp' e) = untranslate e
 instance {-# OVERLAPPING #-} Untrans SolExpIsExpression where
   untrans (SolExpIsExpression e) = untransSolExp e
 
-untransLValue :: MSolidityTerm LhsL -> MSolidityTerm F.ExpressionL
-untransLValue (IndexLValue' arr idx) =
+untransLValue :: MSolidityTerm LValueL -> MSolidityTerm ExpressionL
+untransLValue (IndexExpr' arr idx) = SolExpIsExpression' $
   F.iIndexExpression (injF arr) (injF idx)
-untransLValue (IdentifierLValue' (Ident' s)) =
+untransLValue (IdentifierExpr' (Ident' s)) = SolExpIsExpression' $
   F.iIdentifierExpression $ iIdent s
-untransLValue (MemberAccessLValue' struct mem) =
+untransLValue (MemberAccessExpr' struct mem) = SolExpIsExpression' $
   F.iMemberAccess (injF struct) (injF mem)
-untransLValue (TupleLValue' (extractF -> exprs)) =
+untransLValue (TupleExpr' (extractF -> exprs)) = SolExpIsExpression' $
   F.iTupleExpression $ insertF $ map (insertF . fmap injF . extractF) exprs
+
+instance {-# OVERLAPPING #-} Untrans LValueIsExpression where
+  untrans :: LValueIsExpression MSolidityTerm l -> F.SolidityTerm l
+  untrans (LValueIsExpression lval) = untranslate' $ untransLValue lval
 
 instance Untrans AssignIsExpression where
   untrans :: AssignIsExpression MSolidityTerm l -> F.SolidityTerm l
   untrans (AssignIsExpression (Assign' lhs AssignOpEquals' rhs))
-    | lval :: MSolidityTerm LhsL <- fromProjF lhs
+    | lval :: MSolidityTerm LValueL <- fromProjF lhs
     , arg :: MSolidityTerm ExpressionL <- fromProjF rhs
     = untranslate' $ SolExpIsExpression' $
       F.iBinaryExpression F.iAssign (injF $ untransLValue lval) (injF arg)
