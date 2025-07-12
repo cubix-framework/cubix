@@ -12,8 +12,6 @@
 {-# LANGUAGE UndecidableInstances       #-}
 {-# LANGUAGE ViewPatterns               #-}
 
-{-# OPTIONS_GHC -fcontext-stack=300     #-}
-
 module Cubix.Language.Java.Cfg.Test where
 
 import           Control.Lens hiding ( para, Empty )
