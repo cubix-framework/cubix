@@ -78,6 +78,23 @@ instance AssertCfgWellFormed MLuaSig AssignOpEquals
 instance AssertCfgWellFormed MLuaSig Ident
 instance AssertCfgWellFormed MLuaSig TupleBinder
 
+instance AssertCfgWellFormed MLuaSig UnaryMinusOp
+instance AssertCfgWellFormed MLuaSig ComplementOp
+instance AssertCfgWellFormed MLuaSig LogicalNegationOp
+instance AssertCfgWellFormed MLuaSig ArithBinOp
+instance AssertCfgWellFormed MLuaSig DivOp
+instance AssertCfgWellFormed MLuaSig ModOp
+instance AssertCfgWellFormed MLuaSig IDivOp
+instance AssertCfgWellFormed MLuaSig ExpOp
+instance AssertCfgWellFormed MLuaSig BitwiseBinOp
+instance AssertCfgWellFormed MLuaSig LogicalBinOp
+instance AssertCfgWellFormed MLuaSig LogicalShrOp
+instance AssertCfgWellFormed MLuaSig ShlOp
+instance AssertCfgWellFormed MLuaSig RelationalBinOp
+instance AssertCfgWellFormed MLuaSig Operator
+instance AssertCfgWellFormed MLuaSig ExpIsExpression
+instance AssertCfgWellFormed MLuaSig ExpressionIsExp
+
 instance AssertCfgWellFormed MLuaSig Assign where
   assertCfgWellFormed t@(remA -> Assign (project' -> Just (LuaLhs lhs :&: _)) _ (project' -> Just (LuaRhs rhs :&: _))) = do
     assertCfgIsGeneric (inject' t) $ (map E (S.extractF lhs)) ++ (map E (S.extractF rhs))
