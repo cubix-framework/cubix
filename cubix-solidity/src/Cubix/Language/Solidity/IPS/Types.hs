@@ -74,6 +74,9 @@ do let soliditySortInjections =
          soliditySortInjections ++
          solidityNewNodes ++
          [ ''P.Ident, ''P.Assign, ''P.AssignOpEquals
+         , ''P.AssignOpAdd, ''P.AssignOpSub, ''P.AssignOpMul, ''P.AssignOpDiv, ''P.AssignOpMod
+         , ''P.AssignOpBitAnd, ''P.AssignOpBitOr, ''P.AssignOpBitXor
+         , ''P.AssignOpArithShr, ''P.AssignOpLogicShr, ''P.AssignOpShl
          , ''P.UnaryMinusOp, ''P.ComplementOp, ''P.LogicalNegationOp
          , ''P.ArithBinOp, ''P.DivOp, ''P.ModOp, ''P.ExpOp
          , ''P.BitwiseBinOp, ''P.LogicalBinOp, ''P.ShlOp, ''P.LogicalShrOp, ''P.ArithShrOp
