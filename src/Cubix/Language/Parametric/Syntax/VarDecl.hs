@@ -65,6 +65,17 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
     -- * Assignment
   , AssignOpL
   , AssignOpEquals(..)
+  , AssignOpAdd(..)
+  , AssignOpSub(..)
+  , AssignOpMul(..)
+  , AssignOpDiv(..)
+  , AssignOpMod(..)
+  , AssignOpBitAnd(..)
+  , AssignOpBitOr(..)
+  , AssignOpBitXor(..)
+  , AssignOpArithShr(..)
+  , AssignOpLogicShr(..)
+  , AssignOpShl(..)
   , LhsL
   , RhsL
   , AssignL
@@ -75,6 +86,39 @@ module Cubix.Language.Parametric.Syntax.VarDecl (
   , pattern AssignOpEquals'
   ,        iAssignOpEquals
   ,        jAssignOpEquals
+  , pattern AssignOpAdd'
+  ,        iAssignOpAdd
+  ,        jAssignOpAdd
+  , pattern AssignOpSub'
+  ,        iAssignOpSub
+  ,        jAssignOpSub
+  , pattern AssignOpMul'
+  ,        iAssignOpMul
+  ,        jAssignOpMul
+  , pattern AssignOpDiv'
+  ,        iAssignOpDiv
+  ,        jAssignOpDiv
+  , pattern AssignOpMod'
+  ,        iAssignOpMod
+  ,        jAssignOpMod
+  , pattern AssignOpBitAnd'
+  ,        iAssignOpBitAnd
+  ,        jAssignOpBitAnd
+  , pattern AssignOpBitOr'
+  ,        iAssignOpBitOr
+  ,        jAssignOpBitOr
+  , pattern AssignOpBitXor'
+  ,        iAssignOpBitXor
+  ,        jAssignOpBitXor
+  , pattern AssignOpArithShr'
+  ,        iAssignOpArithShr
+  ,        jAssignOpArithShr
+  , pattern AssignOpLogicShr'
+  ,        iAssignOpLogicShr
+  ,        jAssignOpLogicShr
+  , pattern AssignOpShl'
+  ,        iAssignOpShl
+  ,        jAssignOpShl
   , pattern Assign'
   ,        iAssign
   ,        jAssign
@@ -221,7 +265,44 @@ data AssignOpL
 data AssignOpEquals :: Node where
   AssignOpEquals :: AssignOpEquals e AssignOpL
 
-deriveAll [''AssignOpEquals]
+data AssignOpAdd :: Node where
+  AssignOpAdd :: AssignOpAdd e AssignOpL
+
+data AssignOpSub :: Node where
+  AssignOpSub :: AssignOpSub e AssignOpL
+
+data AssignOpMul :: Node where
+  AssignOpMul :: AssignOpMul e AssignOpL
+
+data AssignOpDiv :: Node where
+  AssignOpDiv :: AssignOpDiv e AssignOpL
+
+data AssignOpMod :: Node where
+  AssignOpMod :: AssignOpMod e AssignOpL
+
+data AssignOpBitAnd :: Node where
+  AssignOpBitAnd :: AssignOpBitAnd e AssignOpL
+
+data AssignOpBitOr :: Node where
+  AssignOpBitOr :: AssignOpBitOr e AssignOpL
+
+data AssignOpBitXor :: Node where
+  AssignOpBitXor :: AssignOpBitXor e AssignOpL
+
+data AssignOpArithShr :: Node where
+  AssignOpArithShr :: AssignOpArithShr e AssignOpL
+
+data AssignOpLogicShr :: Node where
+  AssignOpLogicShr :: AssignOpLogicShr e AssignOpL
+
+data AssignOpShl :: Node where
+  AssignOpShl :: AssignOpShl e AssignOpL
+
+deriveAll
+  [ ''AssignOpEquals, ''AssignOpAdd, ''AssignOpSub, ''AssignOpMul, ''AssignOpDiv, ''AssignOpMod
+  , ''AssignOpBitAnd, ''AssignOpBitOr, ''AssignOpBitXor
+  , ''AssignOpArithShr, ''AssignOpLogicShr, ''AssignOpShl
+  ]
 
 data LhsL
 data RhsL
