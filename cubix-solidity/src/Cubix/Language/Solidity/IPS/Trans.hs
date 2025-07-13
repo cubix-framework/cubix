@@ -108,6 +108,17 @@ transBinOp _ = Nothing
 
 transAssignOp :: F.SolidityTerm F.BinaryOpL -> Maybe (MSolidityTerm AssignOpL)
 transAssignOp F.Assign' = Just AssignOpEquals'
+transAssignOp F.AssignAdd' = Just AssignOpAdd'
+transAssignOp F.AssignSub' = Just AssignOpSub'
+transAssignOp F.AssignMul' = Just AssignOpMul'
+transAssignOp F.AssignDiv' = Just AssignOpDiv'
+transAssignOp F.AssignMod' = Just AssignOpMod'
+transAssignOp F.AssignBitAnd' = Just AssignOpBitAnd'
+transAssignOp F.AssignBitOr' = Just AssignOpBitOr'
+transAssignOp F.AssignBitXor' = Just AssignOpBitXor'
+transAssignOp F.AssignSar' = Just AssignOpArithShr'
+transAssignOp F.AssignShr' = Just AssignOpLogicShr'
+transAssignOp F.AssignShl' = Just AssignOpShl'
 transAssignOp _ = Nothing
 
 translateLValue
