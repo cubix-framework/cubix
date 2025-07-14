@@ -192,7 +192,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 
 do ipsNames <- sumToNames ''MSoliditySig
    modNames <- sumToNames ''F.SoliditySig
-   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier, ''AssignIsExpression, ''ExpressionIsSolExp, ''SolExpIsExpression ]
+   let targTs = map ConT $ (ipsNames \\ modNames) \\ [ ''IdentIsIdentifier, ''ExpressionIsSolExp, ''SolExpIsExpression ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 untransDefault :: (HFunctor f, f :-<: F.SoliditySig) => f MSolidityTerm l -> F.SolidityTerm l
@@ -275,6 +275,7 @@ untransExpression :: MSolidityTerm ExpressionL -> F.SolidityTerm F.ExpressionL
 untransExpression (Unary' op e) = untransUnary op e
 untransExpression (Binary' op a b) = untransBinary op a b
 untransExpression (Ternary' op cond a b) = untransTernary op cond a b
+untransExpression (AssignIsExpression' e) = untransAssign e
 untransExpression (SolExpIsExpression' e) = untranslate e
 
 instance {-# OVERLAPPING #-} Untrans ExpressionIsSolExp where
@@ -286,20 +287,31 @@ untransSolExp (ExpressionIsSolExp' e) = untranslate e
 instance {-# OVERLAPPING #-} Untrans SolExpIsExpression where
   untrans (SolExpIsExpression e) = untransSolExp e
 
-untransLValue :: MSolidityTerm LhsL -> MSolidityTerm F.ExpressionL
+untransLValue :: MSolidityTerm LhsL -> F.SolidityTerm F.ExpressionL
 untransLValue (IndexLValue' arr idx) =
-  F.iIndexExpression (injF arr) (injF idx)
-untransLValue (IdentifierLValue' (Ident' s)) =
-  F.iIdentifierExpression $ iIdent s
+  F.iIndexExpression (untransExpression arr) (untransExpression idx)
+untransLValue (IdentifierLValue' ident) =
+  F.iIdentifierExpression $ untransIdent ident
 untransLValue (MemberAccessLValue' struct mem) =
-  F.iMemberAccess (injF struct) (injF mem)
+  F.iMemberAccess (untransExpression struct) (untranslate mem)
 untransLValue (TupleLValue' (extractF -> exprs)) =
-  F.iTupleExpression $ insertF $ map (insertF . fmap injF . extractF) exprs
+  F.iTupleExpression $ insertF $ map (insertF . fmap untransExpression . extractF) exprs
 
-instance Untrans AssignIsExpression where
-  untrans :: AssignIsExpression MSolidityTerm l -> F.SolidityTerm l
-  untrans (AssignIsExpression (Assign' lhs AssignOpEquals' rhs))
-    | lval :: MSolidityTerm LhsL <- fromProjF lhs
-    , arg :: MSolidityTerm ExpressionL <- fromProjF rhs
-    = untranslate' $ SolExpIsExpression' $
-      F.iBinaryExpression F.iAssign (injF $ untransLValue lval) (injF arg)
+untransAssignOp :: MSolidityTerm AssignOpL -> F.SolidityTerm F.BinaryOpL
+untransAssignOp AssignOpEquals'   = F.Assign'
+untransAssignOp AssignOpAdd'      = F.AssignAdd'
+untransAssignOp AssignOpSub'      = F.AssignSub'
+untransAssignOp AssignOpMul'      = F.AssignMul'
+untransAssignOp AssignOpDiv'      = F.AssignDiv'
+untransAssignOp AssignOpMod'      = F.AssignMod'
+untransAssignOp AssignOpBitAnd'   = F.AssignBitAnd'
+untransAssignOp AssignOpBitOr'    = F.AssignBitOr'
+untransAssignOp AssignOpBitXor'   = F.AssignBitXor'
+untransAssignOp AssignOpArithShr' = F.AssignSar'
+untransAssignOp AssignOpLogicShr' = F.AssignShr'
+untransAssignOp AssignOpShl'      = F.AssignShl'
+
+untransAssign :: MSolidityTerm AssignL -> F.SolidityTerm F.ExpressionL
+untransAssign (Assign' lhs op rhs)
+    | arg :: MSolidityTerm ExpressionL <- fromProjF rhs
+    = F.iBinaryExpression (untransAssignOp op) (untransLValue lhs) (untransExpression arg)
