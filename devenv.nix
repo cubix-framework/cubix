@@ -1,8 +1,15 @@
-{ config, pkgs, ... }:
+{ config, inputs, pkgs, ... }:
 
-{
+let
+  unstable = import inputs.unstable {
+    config.allowUnfree = true;
+    system = pkgs.stdenv.system;
+  };
+
+in {
   packages = with pkgs; [
     ghcid
+    unstable.claude-code
   ];
 
   # This sets gcc version brought into env by languages.c option
