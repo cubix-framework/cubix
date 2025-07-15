@@ -1,0 +1,73 @@
+cabal-version: 3.4
+name:          cubix-benchmarks
+version:       1.0.0
+synopsis:      Benchmarks for the Cubix framework
+description:   Performance benchmarks for the Cubix framework
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        James Koppel
+maintainer:    jkoppel@mit.edu
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+
+tested-with:
+  GHC == 9.8.4
+
+common language
+  default-language: GHC2021
+  default-extensions:
+    ApplicativeDo
+    DataKinds
+    DefaultSignatures
+    DerivingStrategies
+    FunctionalDependencies
+    GADTs
+    LambdaCase
+    MultiWayIf
+    NamedFieldPuns
+    OverloadedStrings
+    PatternSynonyms
+    QuasiQuotes
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+    ViewPatterns
+
+common ghc-options
+  ghc-options:
+    -W -fno-warn-unused-foralls
+
+common rts-options
+  ghc-options:
+    -rtsopts
+    -threaded
+    -with-rtsopts=-N
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , containers >= 0.6.8
+    , cubix >= 0.7.0.12
+    , cubix-compdata >= 1.0.2
+    , lens >= 5.3.4
+    , text >= 2.1.1
+
+benchmark mainbench
+  import: language
+  import: ghc-options
+  import: rts-options
+  import: dependencies
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+    benchmarks
+  main-is: Benchmarks.hs
+  ghc-options:
+    -freduction-depth=400
+  build-depends:
+    , criterion >= 1.6.3
+    , language-c >= 0.5.3
+    , language-java >= 0.2.8.2
+    , language-javascript >= 0.6.0.10
+    , language-lua >= 0.11.0.2
+    , language-python >= 0.6.2
