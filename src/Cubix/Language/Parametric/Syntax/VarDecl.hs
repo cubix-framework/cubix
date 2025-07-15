@@ -251,50 +251,94 @@ data MultiLocalVarDeclL
 data MultiLocalVarDecl e l where
   MultiLocalVarDecl :: e MultiLocalVarDeclCommonAttrsL -> e [SingleLocalVarDeclL] -> MultiLocalVarDecl e MultiLocalVarDeclL
 
-
 deriveAll [''MultiLocalVarDecl]
 
 
+data AssignOpL
+
 -- |
--- See spec for assign
+-- See spec for assign 'Assign'
 --
--- We assume that AssignOpEquals has, as its associated f_op, the function f(x,y)=(typeof x)y
+-- We assume that 'AssignOpEquals' has, as its associated f_op, the function f(x,y)=(typeof x)y
 -- where (typeof x)y denotes a type conversion from y to the type of x. We leave it unspecified what
 -- exactly that means
-data AssignOpL
 data AssignOpEquals :: Node where
   AssignOpEquals :: AssignOpEquals e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpAdd' is the same as 'Add' semantics.
 data AssignOpAdd :: Node where
   AssignOpAdd :: AssignOpAdd e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpSub' is the same as 'Sub' semantics.
 data AssignOpSub :: Node where
   AssignOpSub :: AssignOpSub e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpMul' is the same as 'Mul' semantics.
 data AssignOpMul :: Node where
   AssignOpMul :: AssignOpMul e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpDiv' is the same as 'Div' semantics.
 data AssignOpDiv :: Node where
   AssignOpDiv :: AssignOpDiv e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpMod' is the same as 'Mod' semantics.
 data AssignOpMod :: Node where
   AssignOpMod :: AssignOpMod e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpBitAnd' is the same as 'BitAnd' semantics.
 data AssignOpBitAnd :: Node where
   AssignOpBitAnd :: AssignOpBitAnd e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpBitOr' is the same as 'BitOr' semantics.
 data AssignOpBitOr :: Node where
   AssignOpBitOr :: AssignOpBitOr e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpBitXor' is the same as 'BitXor' semantics.
 data AssignOpBitXor :: Node where
   AssignOpBitXor :: AssignOpBitXor e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpArithShr' is the same as 'ArithShr' semantics.
 data AssignOpArithShr :: Node where
   AssignOpArithShr :: AssignOpArithShr e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpLogicShr' is the same as 'Shr' semantics.
 data AssignOpLogicShr :: Node where
   AssignOpLogicShr :: AssignOpLogicShr e AssignOpL
 
+-- |
+-- See spec for 'Assign'.
+--
+-- The @f_op@ for 'AssignOpShl' is the same as 'Shl' semantics.
 data AssignOpShl :: Node where
   AssignOpShl :: AssignOpShl e AssignOpL
 
@@ -306,6 +350,8 @@ deriveAll
 
 data LhsL
 data RhsL
+
+data AssignL
 
 -- |
 -- The Assign node must have semantics of the following form:
@@ -327,7 +373,6 @@ data RhsL
 -- FIXME: This spec should maybe contain something like "every var init can be a valid assign", because there
 -- are restrictions on assignments, e.g.: C can assign between lvalues with partial overlap. This opens up a rabbit
 -- hole of possible constraints we need to specify to avoid allowing transformations to create invalid programs
-data AssignL
 data Assign e l where
   Assign :: e LhsL -> e AssignOpL -> e RhsL -> Assign e AssignL
 
