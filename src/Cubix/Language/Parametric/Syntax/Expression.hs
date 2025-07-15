@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE TemplateHaskell       #-}
 
 module Cubix.Language.Parametric.Syntax.Expression
   (
@@ -146,13 +147,16 @@ module Cubix.Language.Parametric.Syntax.Expression
   , pattern ITE'
   ,        iITE
   ,        jITE
+
+  -- * Assignment to binary relation
+  , AssociatedBinaryOp(..)
+  , AssignOpArbitrary(..)
+  , AssignOpToBinaryOp(..)
   ) where
 
-import Data.Comp.Multi ( Node, project', HFunctor, (:-<:), All)
+import Data.Comp.Multi ( Node, (:-<:), All, Signature, Term, Sum, caseCxt)
 import Cubix.Language.Parametric.Derive
-import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax.VarDecl
-import Cubix.Language.Parametric.Syntax.Function
 
 data ExpressionL
 
@@ -372,3 +376,56 @@ data Operator e l where
           -> Operator e ExpressionL
 
 deriveAll [''Operator]
+
+
+------------------------------------------------------------------------------------
+--------------  Relating assignment operators with binary operators  ---------------
+------------------------------------------------------------------------------------
+
+data AssociatedBinaryOp fs = NoOp | SomeOp (Term fs BinaryOpL)
+
+data AssignOpArbitrary e l where
+  AssignOpArbitrary :: e BinaryOpL -> AssignOpArbitrary e AssignOpL
+
+class AssignOpToBinaryOp (fs :: Signature) (f :: Node) where
+  assignOpToBinaryOp :: f (Term fs) AssignOpL -> AssociatedBinaryOp fs
+
+instance {-# OVERLAPPABLE #-} AssignOpToBinaryOp fs f where
+  assignOpToBinaryOp = const NoOp
+
+instance All (AssignOpToBinaryOp fs) fs => AssignOpToBinaryOp fs (Sum fs) where
+  assignOpToBinaryOp = caseCxt @(AssignOpToBinaryOp fs) assignOpToBinaryOp
+
+instance ArithBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpAdd where
+  assignOpToBinaryOp AssignOpAdd = SomeOp Add'
+
+instance ArithBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpSub where
+  assignOpToBinaryOp AssignOpSub = SomeOp Sub'
+
+instance ArithBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpMul where
+  assignOpToBinaryOp AssignOpMul = SomeOp Mul'
+
+instance DivOp :-<: fs => AssignOpToBinaryOp fs AssignOpDiv where
+  assignOpToBinaryOp AssignOpDiv = SomeOp Div'
+
+instance ModOp :-<: fs => AssignOpToBinaryOp fs AssignOpMod where
+  assignOpToBinaryOp AssignOpMod = SomeOp Mod'
+
+instance ArithShrOp :-<: fs => AssignOpToBinaryOp fs AssignOpArithShr where
+  assignOpToBinaryOp AssignOpArithShr = SomeOp ArithShr'
+
+instance LogicalShrOp :-<: fs => AssignOpToBinaryOp fs AssignOpLogicShr where
+  assignOpToBinaryOp AssignOpLogicShr = SomeOp LogicShr'
+
+instance ShlOp :-<: fs => AssignOpToBinaryOp fs AssignOpShl where
+  assignOpToBinaryOp AssignOpShl = SomeOp Shl'
+
+instance BitwiseBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpBitAnd where
+  assignOpToBinaryOp AssignOpBitAnd = SomeOp BitAnd'
+
+instance BitwiseBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpBitOr where
+  assignOpToBinaryOp AssignOpBitOr = SomeOp BitOr'
+
+instance BitwiseBinOp :-<: fs => AssignOpToBinaryOp fs AssignOpBitXor where
+  assignOpToBinaryOp AssignOpBitXor = SomeOp BitXor'
+
