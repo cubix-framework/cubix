@@ -40,6 +40,10 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./cubix-benchmarks"
+    config:
+      cradle:
+        cabal:
   - path: "./"
     config:
       cradle:
