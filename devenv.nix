@@ -3,6 +3,7 @@
 {
   packages = with pkgs; [
     ghcid
+    tree-sitter
   ];
 
   # This sets gcc version brought into env by languages.c option
