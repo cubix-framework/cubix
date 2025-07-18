@@ -126,27 +126,6 @@ library:
   - text
   - th-expand-syns
   - wl-pprint
-benchmarks:
-  mainbench:
-    main: Benchmarks.hs
-    source-dirs: benchmarks
-    ghc-options:
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-      - -freduction-depth=400
-    dependencies:
-     - base
-     - cubix
-     - cubix-compdata
-     - criterion
-     - language-c
-     - language-java >= 0.2.8.1
-     - language-javascript >= 0.6.0.9
-     - language-lua
-     - language-python
-     - lens
-     - text
 tests:
   cfg-test:
     main: Main.hs

@@ -242,7 +242,7 @@ test-suite cfg-test
       TypeFamilyDependencies
       TypeOperators
       ViewPatterns
-  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -fcontext-stack=300
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=300
   build-depends:
       base
     , compstrat

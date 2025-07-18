@@ -10,7 +10,7 @@ import Control.Monad ( (=<<) )
 import Data.Maybe ( fromJust )
 import qualified Data.Text as T
 import Control.Lens ( (^.) )
-import Data.Comp.Multi.Annotation (ann)
+import Data.Comp.Multi.Annotation (ann, stripA)
 
 import Criterion.Main
 
@@ -53,13 +53,19 @@ fromRight :: Either a b -> b
 fromRight (Right x) = x
 fromRight (Left x) = error "Benchmarks.fromRight passed a Left"
 
+instance NFData (CLib.CTranslationUnit ()) where
+  rnf = rnf . show
+
+instance NFData (CLib.CTranslationUnit CLib.NodeInfo) where
+  rnf = rnf . show
+
 instance NFData JLib.CompilationUnit where
   rnf = rnf . show
 
 instance NFData JSLib.JSAST where
   rnf = rnf . show
 
-instance NFData (PLib.Module ()) where
+instance NFData (PLib.Module (Maybe SourceSpan)) where
   rnf = rnf . show
 
 -- Evaluating all but the term
@@ -114,16 +120,16 @@ getJS path = do
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
 
-getPython :: FilePath -> IO (PLib.Module (), PFull.PythonTerm ModuleL
+getPython :: FilePath -> IO (PLib.Module (Maybe SourceSpan), PFull.PythonTermOptAnn SourceSpan ModuleL
                          , MPythonTerm ModuleL, MPythonTermLab ModuleL
                          , Cfg MPythonSig)
 getPython path = do
   contents <- readFile path
   let rawAnnot = fst $ fromRight $ PLib.parseModule contents path
-  let raw = fmap (const ()) rawAnnot
+  let raw = fmap (const Nothing) rawAnnot
   gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = PFull.translate raw
-  let commTree = PCommon.translate fullTree
+  let commTree = stripA $ PCommon.translate fullTree
   let labTree  = labelProg gen commTree
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 #endif
@@ -134,10 +140,10 @@ getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTerm LBlock
 getLua path = do
   raw <- fromRight <$> LuaLib.parseFile path
   gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
-  let fullTree = LFull.translate (fmap toSourceSpan raw)
+  let fullTree = stripA $ LFull.translate (fmap toSourceSpan raw)
   let commTree = LCommon.translate fullTree
   let labTree  = labelProg gen commTree
-  return (raw, fullTree, commTree, labTree , makeCfg labTree)
+  return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
 -- NOTE: duplicated from Cubix.ParsePretty. Find a common home.
 toSourceSpan :: LuaLib.SourceRange -> Maybe SourceSpan
