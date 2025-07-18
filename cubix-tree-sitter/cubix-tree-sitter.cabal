@@ -1,0 +1,98 @@
+cabal-version: 3.4
+name:          cubix-tree-sitter
+version:       1.0.2
+synopsis:      Cubix integration with Tree sitter parsing library
+description:   Generate modularized syntax based on tree-sitter grammar definitions.
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Jakub Kopański
+maintainer:    jakub@up-to-speed.ai
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+
+tested-with:
+  GHC == 9.8.4
+
+common language
+  default-language: GHC2021
+  default-extensions:
+    ApplicativeDo
+    DataKinds
+    DefaultSignatures
+    DerivingStrategies
+    FunctionalDependencies
+    GADTs
+    LambdaCase
+    MultiWayIf
+    NamedFieldPuns
+    OverloadedStrings
+    PatternSynonyms
+    QuasiQuotes
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+    ViewPatterns
+
+common ghc-options
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Werror
+    -Wpartial-fields
+    -Wprepositive-qualified-module
+    -Wredundant-constraints
+    -fhide-source-paths
+    -fwrite-ide-info
+    -hiedir=.hie
+    -haddock
+    -j
+
+common rts-options
+  ghc-options:
+    -rtsopts
+    -threaded
+    -with-rtsopts=-N
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , aeson ^>= 2.2
+    , containers >= 0.6.8
+    , comptrans >= 0.1.0.7
+    , cubix >= 0.7.0.15
+    , cubix-compdata >= 1.0.2
+    , hashable ^>= 1.4
+    , path ^>= 0.9
+    , path-io ^>= 1.6
+    , template-haskell >= 2.21.0.0
+    , text >= 2.1.1
+    , unordered-containers ^>= 0.2
+    , vector >= 0.13.2.0
+    , tree-sitter ^>= 0.9.0.3
+    , tree-sitter-sui-move
+
+library
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src
+  exposed-modules:
+    AST.Deserialize
+    AST.GenerateSyntax
+  
+executable gen-syntax
+  import: language
+  import: dependencies
+  import: ghc-options
+  import: rts-options
+  main-is: Main.hs
+  hs-source-dirs:
+    gen-syntax
+  other-modules:
+    Options
+  build-depends:
+    , cubix-tree-sitter
+    , neat-interpolation ^>= 0.5
+    , optparse-applicative
+    , optparse-generic ^>= 1.5
