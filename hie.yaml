@@ -36,6 +36,10 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./cubix-move"
+    config:
+      cradle:
+        cabal:
   - path: "./cubix-solidity"
     config:
       cradle:

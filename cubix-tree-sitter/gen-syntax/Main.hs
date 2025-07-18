@@ -24,8 +24,8 @@ import TreeSitter.Move     qualified as Move
 import AST.GenerateSyntax
 
 parserFor :: Text -> Ptr TreeSitter.Language.Language
-parserFor = Text.toLower >> \case
-  "move" -> Move.tree_sitter_move
+parserFor = \case
+  "Move" -> Move.tree_sitter_move
   lang -> error $ "Unknown language encountered: " <> Text.unpack lang
 
 emit
