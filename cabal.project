@@ -6,6 +6,7 @@ packages:
     cubix-benchmarks
     cubix-examples
     cubix-solidity
+    cubix-sui-move
     cubix-tree-sitter
     tree-sitter-sui-move
 

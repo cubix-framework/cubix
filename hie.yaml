@@ -44,6 +44,10 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./cubix-sui-move"
+    config:
+      cradle:
+        cabal:
   - path: "./cubix-tree-sitter"
     config:
       cradle:

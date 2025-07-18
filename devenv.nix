@@ -8,6 +8,7 @@ let
 
 in {
   packages = with pkgs; [
+    fourmolu
     ghcid
     tree-sitter
     unstable.claude-code
@@ -37,6 +38,18 @@ in {
 
     # test running is in ruby
     ruby.enable = true;
+  };
+
+  scripts = {
+    gen-sui-move.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run cubix-tree-sitter:exe:gen-syntax -- \
+        --language SuiMove \
+        --nodes tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/node-types.json \
+        | fourmolu --stdin-input-file cubix-sui-move/cubix-move.cabal \
+        > cubix-sui-move/src/Language/SuiMove/Syntax.hs
+      popd
+    '';
   };
 
   env = {
