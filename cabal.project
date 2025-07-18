@@ -3,8 +3,9 @@ packages:
     compdata
     comptrans
     compstrat
-    cubix-solidity
     cubix-examples
+    cubix-solidity
+    cubix-sui-move
     cubix-tree-sitter
     tree-sitter-sui-move
 

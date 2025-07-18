@@ -40,6 +40,10 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./cubix-sui-move"
+    config:
+      cradle:
+        cabal:
   - path: "./cubix-examples"
     config:
       cradle:
