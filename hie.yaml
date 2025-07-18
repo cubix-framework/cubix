@@ -32,11 +32,23 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./cubix-tree-sitter"
+    config:
+      cradle:
+        cabal:
+  - path: "./cubix-move"
+    config:
+      cradle:
+        cabal:
   - path: "./cubix-solidity"
     config:
       cradle:
         cabal:
   - path: "./cubix-examples"
+    config:
+      cradle:
+        cabal:
+  - path: "./tree-sitter-move"
     config:
       cradle:
         cabal:

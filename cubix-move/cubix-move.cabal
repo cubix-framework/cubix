@@ -1,0 +1,70 @@
+cabal-version: 3.4
+name:          cubix-move
+version:       1.0.2
+synopsis:      Cubix support for Move smart contract language
+description:   Cubix support for Move smart contract language
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Jakub Kopański
+maintainer:    jakub@up-to-speed.ai
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+
+tested-with:
+  GHC == 9.8.4
+
+common language
+  default-language: GHC2021
+  default-extensions:
+    ApplicativeDo
+    DataKinds
+    DefaultSignatures
+    DerivingStrategies
+    FunctionalDependencies
+    GADTs
+    LambdaCase
+    MultiWayIf
+    NamedFieldPuns
+    OverloadedStrings
+    PatternSynonyms
+    QuasiQuotes
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+    ViewPatterns
+
+common ghc-options
+  ghc-options:
+    -W -fno-warn-unused-foralls
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , containers >= 0.6.8
+    , comptrans >= 0.1.0.7
+    , cubix >= 0.7.0.15
+    , cubix-compdata >= 1.0.2
+    , ghc-prim >= 0.11.0
+    , template-haskell >= 2.21.0.0
+    , text >= 2.1.1
+    , vector >= 0.13.2.0
+
+library
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src
+  exposed-modules:
+    Cubix.Language.Move.ParsePretty
+    Cubix.Language.Move.IPS
+    Cubix.Language.Move.Modularized
+    Language.Move.Syntax
+  -- other-modules:
+  --   Cubix.Language.Move.IPS.Trans
+  --   Cubix.Language.Move.IPS.Types
+  --   Cubix.Language.Move.Modularized.Names
+  --   Cubix.Language.Move.Modularized.Trans
+  --   Cubix.Language.Move.Modularized.Types
+
+
