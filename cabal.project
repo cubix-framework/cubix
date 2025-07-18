@@ -6,6 +6,7 @@ packages:
     cubix-benchmarks
     cubix-examples
     cubix-solidity
+    cubix-tree-sitter
     tree-sitter-sui-move
 
 -- Match the GHC version from stack's resolver (lts-23.19)
