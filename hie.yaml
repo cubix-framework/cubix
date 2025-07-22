@@ -40,6 +40,10 @@ cradle:
     config:
       cradle:
         cabal:
+  - path: "./tree-sitter-sui-move"
+    config:
+      cradle:
+        cabal:
   - path: "./"
     config:
       cradle:
