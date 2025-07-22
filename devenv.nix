@@ -9,6 +9,7 @@ let
 in {
   packages = with pkgs; [
     ghcid
+    tree-sitter
     unstable.claude-code
   ];
 
