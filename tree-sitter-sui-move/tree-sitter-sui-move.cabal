@@ -1,0 +1,58 @@
+cabal-version: 3.4
+name:          tree-sitter-sui-move
+version:       1.0.0
+synopsis:      Tree-sitter grammar/parser for Sui Move
+description:   This package provides a parser for Sui Move suitable for use with the tree-sitter package.
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Jakub Kopański
+maintainer:    jakub@up-to-speed.ai
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+data-files:    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/node-types.json
+             , vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/tests/*.move
+
+common language
+  default-language: GHC2021
+
+common ghc-options
+  ghc-options:
+    -Weverything
+    -Wno-all-missed-specialisations
+    -Wno-implicit-prelude
+    -Wno-missed-specialisations
+    -Wno-missing-import-lists
+    -Wno-missing-local-signatures
+    -Wno-monomorphism-restriction
+    -Wno-name-shadowing
+    -Wno-safe
+    -Wno-unsafe
+    -Wno-star-is-type
+    -Wno-missing-deriving-strategies
+    -Wno-missing-safe-haskell-mode
+    -Wno-prepositive-qualified-module
+    -Wno-missing-kind-signatures
+    -Wno-implicit-lift
+    -fwrite-ide-info
+    -hiedir=.hie
+
+library
+  import: language
+  import: ghc-options
+  exposed-modules:
+    TreeSitter.SuiMove
+  autogen-modules:
+    Paths_tree_sitter_sui_move
+  other-modules:
+    Paths_tree_sitter_sui_move
+  build-depends:
+      base >= 4.12 && < 5
+    , tree-sitter ^>= 0.9.0.0
+  include-dirs:
+    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src
+  install-includes:
+    tree_sitter/parser.h
+  c-sources:
+    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c
+

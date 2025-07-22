@@ -5,6 +5,7 @@ packages:
     compstrat
     cubix-solidity
     cubix-examples
+    tree-sitter-sui-move
 
 -- Match the GHC version from stack's resolver (lts-23.19)
 with-compiler: ghc-9.8.4
@@ -35,6 +36,12 @@ source-repository-package
     type: git
     location: https://github.com/jkoppel/solidity-hs
     tag: ed56714c994693e7458ad5f5b02d6bb1c53fe435
+
+source-repository-package
+    type: git
+    location: https://github.com/tree-sitter/haskell-tree-sitter.git
+    tag: b76872ec73eff1ccdea771b49433be5ad87493d0
+    subdir: tree-sitter
 
 -- Additional dependencies from stack.yaml
 constraints:
