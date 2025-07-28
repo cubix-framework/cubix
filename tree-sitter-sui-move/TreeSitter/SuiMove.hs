@@ -1,3 +1,4 @@
+{-# LANGUAGE CApiFFI #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 module TreeSitter.SuiMove
@@ -6,16 +7,8 @@ module TreeSitter.SuiMove
   , getTestDir
   ) where
 
-import Foreign.Ptr
-import TreeSitter.Language
-import Paths_tree_sitter_sui_move
-
-foreign import ccall unsafe
-  "vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c"
-  tree_sitter_move :: Ptr Language
-
-tree_sitter_sui_move :: Ptr Language
-tree_sitter_sui_move = tree_sitter_move
+import Foreign.C.ConstPtr.Compat (ConstPtr (..))
+import Paths_tree_sitter_sui_move (getDataFileName)
 
 getNodeTypesPath :: IO FilePath
 getNodeTypesPath = getDataFileName
@@ -24,3 +17,11 @@ getNodeTypesPath = getDataFileName
 getTestDir :: IO FilePath
 getTestDir = getDataFileName
   "vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/tests"
+
+data
+  {-# CTYPE "tree-sitter-move.h" "TSLanguage" #-}
+  TSLanguage
+
+foreign import capi unsafe "tree-sitter-move.h tree_sitter_move"
+  tree_sitter_sui_move ::
+    IO (ConstPtr TSLanguage)

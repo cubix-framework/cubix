@@ -63,13 +63,13 @@ common dependencies
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2
     , hashable ^>= 1.4
+    , hs-tree-sitter ^>= 13
     , path ^>= 0.9
     , path-io ^>= 1.6
     , template-haskell >= 2.21.0.0
     , text >= 2.1.1
     , unordered-containers ^>= 0.2
     , vector >= 0.13.2.0
-    , tree-sitter ^>= 0.9.0.3
     , tree-sitter-sui-move
 
 library
