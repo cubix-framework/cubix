@@ -1,5 +1,5 @@
 cabal-version: 3.4
-name:          cubix-move
+name:          cubix-sui-move
 version:       1.0.2
 synopsis:      Cubix support for Move smart contract language
 description:   Cubix support for Move smart contract language
@@ -41,13 +41,18 @@ common ghc-options
 common dependencies
   build-depends:
     , base >= 4.19.2.0
+    , bytestring ^>= 0.12
     , containers >= 0.6.8
     , comptrans >= 0.1.0.7
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2
     , ghc-prim >= 0.11.0
+    , hs-tree-sitter ^>= 13
+    , mtl ^>= 2.3
+    , prettyprinter ^>= 1.7
     , template-haskell >= 2.21.0.0
     , text >= 2.1.1
+    , transformers ^>= 0.6
     , vector >= 0.13.2.0
 
 library
@@ -56,10 +61,10 @@ library
   import: dependencies
   hs-source-dirs: src
   exposed-modules:
-    Cubix.Language.Move.ParsePretty
-    Cubix.Language.Move.IPS
-    Cubix.Language.Move.Modularized
-    Language.Move.Syntax
+    Cubix.Language.SuiMove.ParsePretty
+    Cubix.Language.SuiMove.IPS
+    Cubix.Language.SuiMove.Modularized
+    Language.SuiMove.Syntax
   -- other-modules:
   --   Cubix.Language.Move.IPS.Trans
   --   Cubix.Language.Move.IPS.Types

@@ -19,7 +19,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Language.SuiMove.Syntax (
+module Cubix.Language.SuiMove.Modularized (
   Label (..),
   LabelSing (..),
   decLabelSing,
@@ -5517,18 +5517,6 @@ instance HasParser Range where
   p :: P Range
   p = liftIO . TS.nodeRange =<< getCurrentNode
 
-instance (HasParser a, HasParser b) => HasParser (a, b) where
-  p :: P (a, b)
-  p = (,) <$> p <*> p
-
-instance (HasParser a, HasParser b) => HasParser (Either a b) where
-  p :: P (Either a b)
-  p = do
-    some <- optional (p :: P a)
-    case some of
-      Just a  -> pure (Left a)
-      Nothing -> Right <$> p
-
 pPostFence :: P a -> P () -> P [a]
 pPostFence post fence = postFence
  where
@@ -5925,3 +5913,867 @@ instance Pretty (SymbolSing symbolType symbol) where
     SErrorSymbol -> "ERROR"
     SMissingSymbol -> "MISSING"
     SSortMismatchSymbol -> "SORT_MISMATCH"
+
+--------------------------------------------------------------------------------
+-- Cubix modularized syntax
+--------------------------------------------------------------------------------
+
+data SourceFile e l where
+  SourceFile ::
+        e [Node ModuleDefinitionL] ->
+        SourceFile SourceFileL
+
+data ModuleDefinition e l where
+  ModuleDefinition ::
+        e Node ModuleIdentityL ->
+        e Node ModuleBodyL ->
+        ModuleDefinition ModuleDefinitionL
+
+data ModuleBody e l where
+  ModuleBody ::
+        e [Either (Node FriendDeclarationL) (Either (Node ConstantL) (Either (Node HiddenFunctionItemL) (Either (Node HiddenStructItemL) (Either (Node HiddenEnumItemL) (Either (Node SpecBlockL) (Node UseDeclarationL))))))] ->
+        ModuleBody ModuleBodyL
+
+data HiddenEnumItem e l where
+  HiddenEnumItem ::
+        e Node EnumDefinitionL ->
+        HiddenEnumItem HiddenEnumItemL
+
+data EnumDefinition e l where
+  EnumDefinition ::
+        e Node HiddenEnumSignatureL ->
+        e Node EnumVariantsL ->
+        e Maybe (Node PostfixAbilityDeclsL) ->
+        EnumDefinition EnumDefinitionL
+
+data HiddenEnumSignature e l where
+  HiddenEnumSignature ::
+        e Node HiddenEnumIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Maybe (Node AbilityDeclsL) ->
+        HiddenEnumSignature HiddenEnumSignatureL
+
+data HiddenEnumIdentifier e l where
+  HiddenEnumIdentifier ::
+        e Node IdentifierL ->
+        HiddenEnumIdentifier HiddenEnumIdentifierL
+
+data Identifier e l where
+  Identifier ::
+        e () ->
+        Identifier IdentifierL
+
+data AbilityDecls e l where
+  AbilityDecls ::
+        e (Maybe (Node AbilityL), [Node AbilityL]) ->
+        AbilityDecls AbilityDeclsL
+
+data Ability e l where
+  Ability ::
+        e () ->
+        Ability AbilityL
+
+data TypeParameters e l where
+  TypeParameters ::
+        e ([Node TypeParameterL], Node TypeParameterL) ->
+        TypeParameters TypeParametersL
+
+data TypeParameter e l where
+  TypeParameter ::
+        e Node HiddenTypeParameterIdentifierL ->
+        e Maybe ([Node AbilityL], Node AbilityL) ->
+        TypeParameter TypeParameterL
+
+data HiddenTypeParameterIdentifier e l where
+  HiddenTypeParameterIdentifier ::
+        e Node IdentifierL ->
+        HiddenTypeParameterIdentifier HiddenTypeParameterIdentifierL
+
+data EnumVariants e l where
+  EnumVariants ::
+        e (Maybe (Node VariantL), [Node VariantL]) ->
+        EnumVariants EnumVariantsL
+
+data Variant e l where
+  Variant ::
+        e Node HiddenVariantIdentifierL ->
+        e Maybe (Node DatatypeFieldsL) ->
+        Variant VariantL
+
+data HiddenVariantIdentifier e l where
+  HiddenVariantIdentifier ::
+        e Node IdentifierL ->
+        HiddenVariantIdentifier HiddenVariantIdentifierL
+
+data DatatypeFields e l where
+  DatatypeFields ::
+        e Either (Node NamedFieldsL) (Node PositionalFieldsL) ->
+        DatatypeFields DatatypeFieldsL
+
+data NamedFields e l where
+  NamedFields ::
+        e (Maybe (Node FieldAnnotationL), [Node FieldAnnotationL]) ->
+        NamedFields NamedFieldsL
+
+data FieldAnnotation e l where
+  FieldAnnotation ::
+        e Node HiddenFieldIdentifierL ->
+        e Node HiddenTypeL ->
+        FieldAnnotation FieldAnnotationL
+
+data HiddenFieldIdentifier e l where
+  HiddenFieldIdentifier ::
+        e Node IdentifierL ->
+        HiddenFieldIdentifier HiddenFieldIdentifierL
+
+data HiddenType e l where
+  HiddenType ::
+        e Either (Node RefTypeL) (Either (Node TupleTypeL) (Either (Node FunctionTypeL) (Either (Node PrimitiveTypeL) (Node ApplyTypeL)))) ->
+        HiddenType HiddenTypeL
+
+data ApplyType e l where
+  ApplyType ::
+        e (Maybe (Node TypeArgumentsL), Node ModuleAccessL) ->
+        ApplyType ApplyTypeL
+
+data ModuleAccess e l where
+  ModuleAccess ::
+        e Either (Node IdentifierL) (Either (Node HiddenReservedIdentifierL) (Either (Maybe (Node TypeArgumentsL), Node IdentifierL) (Either (Maybe (Node TypeArgumentsL), (Node IdentifierL, Node HiddenModuleIdentifierL)) (Either (Node IdentifierL, (Node TypeArgumentsL, Node ModuleIdentityL)) (Either (Maybe (Node TypeArgumentsL), Node ModuleIdentityL) (Either (Maybe (Node TypeArgumentsL), (Node IdentifierL, Node ModuleIdentityL)) (Either (Node IdentifierL, (Maybe (Node TypeArgumentsL), (Node IdentifierL, Node ModuleIdentityL))) (Node IdentifierL)))))))) ->
+        ModuleAccess ModuleAccessL
+
+data HiddenModuleIdentifier e l where
+  HiddenModuleIdentifier ::
+        e Node IdentifierL ->
+        HiddenModuleIdentifier HiddenModuleIdentifierL
+
+data HiddenReservedIdentifier e l where
+  HiddenReservedIdentifier ::
+        e Either (Node HiddenExistsL) (Node HiddenForallL) ->
+        HiddenReservedIdentifier HiddenReservedIdentifierL
+
+data HiddenExists e l where
+  HiddenExists ::
+        e () ->
+        HiddenExists HiddenExistsL
+
+data HiddenForall e l where
+  HiddenForall ::
+        e () ->
+        HiddenForall HiddenForallL
+
+data ModuleIdentity e l where
+  ModuleIdentity ::
+        e Either (Node HiddenModuleIdentifierL) (Node NumLiteralL) ->
+        e Node HiddenModuleIdentifierL ->
+        ModuleIdentity ModuleIdentityL
+
+data NumLiteral e l where
+  NumLiteral ::
+        NumLiteral NumLiteralL
+
+data TypeArguments e l where
+  TypeArguments ::
+        e ([Node HiddenTypeL], Node HiddenTypeL) ->
+        TypeArguments TypeArgumentsL
+
+data FunctionType e l where
+  FunctionType ::
+        e Node FunctionTypeParametersL ->
+        e Maybe (Node HiddenTypeL) ->
+        FunctionType FunctionTypeL
+
+data FunctionTypeParameters e l where
+  FunctionTypeParameters ::
+        e (Maybe (Node HiddenTypeL), [Node HiddenTypeL]) ->
+        FunctionTypeParameters FunctionTypeParametersL
+
+data PrimitiveType e l where
+  PrimitiveType ::
+        e () ->
+        PrimitiveType PrimitiveTypeL
+
+data RefType e l where
+  RefType ::
+        e Node HiddenReferenceL ->
+        e Node HiddenTypeL ->
+        RefType RefTypeL
+
+data HiddenReference e l where
+  HiddenReference ::
+        e Either (Node MutRefL) (Node ImmRefL) ->
+        HiddenReference HiddenReferenceL
+
+data ImmRef e l where
+  ImmRef ::
+        e () ->
+        ImmRef ImmRefL
+
+data MutRef e l where
+  MutRef ::
+        MutRef MutRefL
+
+data TupleType e l where
+  TupleType ::
+        e (Maybe (Node HiddenTypeL), [Node HiddenTypeL]) ->
+        TupleType TupleTypeL
+
+data PositionalFields e l where
+  PositionalFields ::
+        e (Maybe (Node HiddenTypeL), [Node HiddenTypeL]) ->
+        PositionalFields PositionalFieldsL
+
+data PostfixAbilityDecls e l where
+  PostfixAbilityDecls ::
+        e (Maybe (Node AbilityL), [Node AbilityL]) ->
+        PostfixAbilityDecls PostfixAbilityDeclsL
+
+data HiddenFunctionItem e l where
+  HiddenFunctionItem ::
+        e Either (Node MacroFunctionDefinitionL) (Either (Node FunctionDefinitionL) (Node NativeFunctionDefinitionL)) ->
+        HiddenFunctionItem HiddenFunctionItemL
+
+data FunctionDefinition e l where
+  FunctionDefinition ::
+        e Node HiddenFunctionSignatureL ->
+        e Node BlockL ->
+        FunctionDefinition FunctionDefinitionL
+
+data HiddenFunctionSignature e l where
+  HiddenFunctionSignature ::
+        e Maybe (Node ModifierL) ->
+        e Maybe (Node ModifierL) ->
+        e Maybe (Node ModifierL) ->
+        e Node HiddenFunctionIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Node FunctionParametersL ->
+        e Maybe (Node RetTypeL) ->
+        HiddenFunctionSignature HiddenFunctionSignatureL
+
+data HiddenFunctionIdentifier e l where
+  HiddenFunctionIdentifier ::
+        e Node IdentifierL ->
+        HiddenFunctionIdentifier HiddenFunctionIdentifierL
+
+data FunctionParameters e l where
+  FunctionParameters ::
+        e (Maybe (Either (Node FunctionParameterL) (Node MutFunctionParameterL)), [Either (Node FunctionParameterL) (Node MutFunctionParameterL)]) ->
+        FunctionParameters FunctionParametersL
+
+data FunctionParameter e l where
+  FunctionParameter ::
+        e Either (Node HiddenVariableIdentifierL) (Node HiddenVariableIdentifierL) ->
+        e Node HiddenTypeL ->
+        FunctionParameter FunctionParameterL
+
+data HiddenVariableIdentifier e l where
+  HiddenVariableIdentifier ::
+        e Node IdentifierL ->
+        HiddenVariableIdentifier HiddenVariableIdentifierL
+
+data MutFunctionParameter e l where
+  MutFunctionParameter ::
+        e Node FunctionParameterL ->
+        MutFunctionParameter MutFunctionParameterL
+
+data Modifier e l where
+  Modifier ::
+        e () ->
+        Modifier ModifierL
+
+data RetType e l where
+  RetType ::
+        e Node HiddenTypeL ->
+        RetType RetTypeL
+
+data Block e l where
+  Block ::
+        e [Node UseDeclarationL] ->
+        e [Node BlockItemL] ->
+        e Maybe (Node HiddenExpressionL) ->
+        Block BlockL
+
+data HiddenExpression e l where
+  HiddenExpression ::
+        e Either (Node MacroCallExpressionL) (Either (Node LambdaExpressionL) (Either (Node IfExpressionL) (Either (Node WhileExpressionL) (Either (Node ReturnExpressionL) (Either (Node AbortExpressionL) (Either (Node AssignExpressionL) (Either (Node HiddenUnaryExpressionL) (Either (Node BinaryExpressionL) (Either (Node CastExpressionL) (Either (Node QuantifierExpressionL) (Either (Node MatchExpressionL) (Either (Node VectorExpressionL) (Either (Node LoopExpressionL) (Either (Node IdentifiedExpressionL) (Node CallExpressionL))))))))))))))) ->
+        HiddenExpression HiddenExpressionL
+
+data HiddenUnaryExpression e l where
+  HiddenUnaryExpression ::
+        e Either (Node BorrowExpressionL) (Either (Node DereferenceExpressionL) (Either (Node MoveOrCopyExpressionL) (Either (Node HiddenExpressionTermL) (Node UnaryExpressionL)))) ->
+        HiddenUnaryExpression HiddenUnaryExpressionL
+
+data HiddenExpressionTerm e l where
+  HiddenExpressionTerm ::
+        e Either (Node BreakExpressionL) (Either (Node ContinueExpressionL) (Either (Node NameExpressionL) (Either (Node MacroCallExpressionL) (Either (Node PackExpressionL) (Either (Node HiddenLiteralValueL) (Either (Node UnitExpressionL) (Either (Node ExpressionListL) (Either (Node AnnotationExpressionL) (Either (Node BlockL) (Either (Node SpecBlockL) (Either (Node IfExpressionL) (Either (Node DotExpressionL) (Either (Node IndexExpressionL) (Either (Node VectorExpressionL) (Either (Node MatchExpressionL) (Node CallExpressionL)))))))))))))))) ->
+        HiddenExpressionTerm HiddenExpressionTermL
+
+data HiddenLiteralValue e l where
+  HiddenLiteralValue ::
+        e Either (Node BoolLiteralL) (Either (Node NumLiteralL) (Either (Node HexStringLiteralL) (Either (Node ByteStringLiteralL) (Node AddressLiteralL)))) ->
+        HiddenLiteralValue HiddenLiteralValueL
+
+data AddressLiteral e l where
+  AddressLiteral ::
+        e () ->
+        AddressLiteral AddressLiteralL
+
+data BoolLiteral e l where
+  BoolLiteral ::
+        e () ->
+        BoolLiteral BoolLiteralL
+
+data ByteStringLiteral e l where
+  ByteStringLiteral ::
+        e () ->
+        ByteStringLiteral ByteStringLiteralL
+
+data HexStringLiteral e l where
+  HexStringLiteral ::
+        e () ->
+        HexStringLiteral HexStringLiteralL
+
+data AnnotationExpression e l where
+  AnnotationExpression ::
+        e Node HiddenExpressionL ->
+        e Node HiddenTypeL ->
+        AnnotationExpression AnnotationExpressionL
+
+data BreakExpression e l where
+  BreakExpression ::
+        e Maybe (Node LabelL) ->
+        e Maybe (Node HiddenExpressionL) ->
+        BreakExpression BreakExpressionL
+
+data Label e l where
+  Label ::
+        e Node IdentifierL ->
+        Label LabelL
+
+data CallExpression e l where
+  CallExpression ::
+        e (Node ArgListL, Node NameExpressionL) ->
+        CallExpression CallExpressionL
+
+data ArgList e l where
+  ArgList ::
+        e (Maybe (Node HiddenExpressionL), [Node HiddenExpressionL]) ->
+        ArgList ArgListL
+
+data NameExpression e l where
+  NameExpression ::
+        e Node ModuleAccessL ->
+        NameExpression NameExpressionL
+
+data ContinueExpression e l where
+  ContinueExpression ::
+        e Maybe (Node LabelL) ->
+        ContinueExpression ContinueExpressionL
+
+data DotExpression e l where
+  DotExpression ::
+        e (Node HiddenExpressionTermL, Node HiddenExpressionTermL) ->
+        DotExpression DotExpressionL
+
+data ExpressionList e l where
+  ExpressionList ::
+        e ([Node HiddenExpressionL], Node HiddenExpressionL) ->
+        ExpressionList ExpressionListL
+
+data IfExpression e l where
+  IfExpression ::
+        e (Node HiddenExpressionL, (Node HiddenExpressionL, Maybe (Node HiddenExpressionL))) ->
+        IfExpression IfExpressionL
+
+data IndexExpression e l where
+  IndexExpression ::
+        e ((Maybe (Node HiddenExpressionL), [Node HiddenExpressionL]), Node HiddenExpressionTermL) ->
+        IndexExpression IndexExpressionL
+
+data MacroCallExpression e l where
+  MacroCallExpression ::
+        e Node MacroModuleAccessL ->
+        e Maybe (Node TypeArgumentsL) ->
+        e Node ArgListL ->
+        MacroCallExpression MacroCallExpressionL
+
+data MacroModuleAccess e l where
+  MacroModuleAccess ::
+        e Node ModuleAccessL ->
+        MacroModuleAccess MacroModuleAccessL
+
+data MatchExpression e l where
+  MatchExpression ::
+        e Node HiddenExpressionL ->
+        e Node HiddenMatchBodyL ->
+        MatchExpression MatchExpressionL
+
+data HiddenMatchBody e l where
+  HiddenMatchBody ::
+        e (Maybe (Node MatchArmL), [Node MatchArmL]) ->
+        HiddenMatchBody HiddenMatchBodyL
+
+data MatchArm e l where
+  MatchArm ::
+        e Node BindListL ->
+        e Maybe (Node MatchConditionL) ->
+        e Node HiddenExpressionL ->
+        MatchArm MatchArmL
+
+data BindList e l where
+  BindList ::
+        e Either (Node CommaBindListL) (Either (Node OrBindListL) (Node HiddenBindL)) ->
+        BindList BindListL
+
+data HiddenBind e l where
+  HiddenBind ::
+        e Either (Node BindUnpackL) (Either (Node AtBindL) (Either (Node HiddenLiteralValueL) (Either (Node HiddenVariableIdentifierL) (Node MutBindVarL)))) ->
+        HiddenBind HiddenBindL
+
+data AtBind e l where
+  AtBind ::
+        e Node HiddenVariableIdentifierL ->
+        e Node BindListL ->
+        AtBind AtBindL
+
+data BindUnpack e l where
+  BindUnpack ::
+        e Node NameExpressionL ->
+        e Maybe (Node BindFieldsL) ->
+        BindUnpack BindUnpackL
+
+data BindFields e l where
+  BindFields ::
+        e Either (Node BindNamedFieldsL) (Node BindPositionalFieldsL) ->
+        BindFields BindFieldsL
+
+data BindNamedFields e l where
+  BindNamedFields ::
+        e (Maybe (Either (Node MutBindFieldL) (Node BindFieldL)), [Either (Node MutBindFieldL) (Node BindFieldL)]) ->
+        BindNamedFields BindNamedFieldsL
+
+data BindField e l where
+  BindField ::
+        e Either (Node HiddenSpreadOperatorL) (Maybe (Node BindListL), Node BindListL) ->
+        BindField BindFieldL
+
+data HiddenSpreadOperator e l where
+  HiddenSpreadOperator ::
+        e () ->
+        HiddenSpreadOperator HiddenSpreadOperatorL
+
+data MutBindField e l where
+  MutBindField ::
+        e Node BindFieldL ->
+        MutBindField MutBindFieldL
+
+data BindPositionalFields e l where
+  BindPositionalFields ::
+        e (Maybe (Either (Node MutBindFieldL) (Node BindFieldL)), [Either (Node MutBindFieldL) (Node BindFieldL)]) ->
+        BindPositionalFields BindPositionalFieldsL
+
+data MutBindVar e l where
+  MutBindVar ::
+        e Node HiddenVariableIdentifierL ->
+        MutBindVar MutBindVarL
+
+data CommaBindList e l where
+  CommaBindList ::
+        e (Maybe (Node HiddenBindL), [Node HiddenBindL]) ->
+        CommaBindList CommaBindListL
+
+data OrBindList e l where
+  OrBindList ::
+        e ([Node HiddenBindL], Node HiddenBindL) ->
+        OrBindList OrBindListL
+
+data MatchCondition e l where
+  MatchCondition ::
+        e Node HiddenExpressionL ->
+        MatchCondition MatchConditionL
+
+data PackExpression e l where
+  PackExpression ::
+        e Node NameExpressionL ->
+        e Node FieldInitializeListL ->
+        PackExpression PackExpressionL
+
+data FieldInitializeList e l where
+  FieldInitializeList ::
+        e (Maybe (Node ExpFieldL), [Node ExpFieldL]) ->
+        FieldInitializeList FieldInitializeListL
+
+data ExpField e l where
+  ExpField ::
+        e Node HiddenFieldIdentifierL ->
+        e Maybe (Node HiddenExpressionL) ->
+        ExpField ExpFieldL
+
+data SpecBlock e l where
+  SpecBlock ::
+        e Either (Node HiddenSpecFunctionL) (Node SpecBodyL, Maybe (Node HiddenSpecBlockTargetL)) ->
+        SpecBlock SpecBlockL
+
+data HiddenSpecBlockTarget e l where
+  SpecBlockIdentifier ::
+        e Node IdentifierL ->
+        SpecBlockIdentifier HiddenSpecBlockTargetL
+  SpecBlockTargetSchema ::
+        e Node HiddenStructIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        SpecBlockTargetSchema HiddenSpecBlockTargetL
+
+data HiddenStructIdentifier e l where
+  HiddenStructIdentifier ::
+        e Node IdentifierL ->
+        HiddenStructIdentifier HiddenStructIdentifierL
+
+data HiddenSpecFunction e l where
+  HiddenSpecFunction ::
+        e Either (Node UsualSpecFunctionL) (Either (Node UninterpretedSpecFunctionL) (Node NativeSpecFunctionL)) ->
+        HiddenSpecFunction HiddenSpecFunctionL
+
+data NativeSpecFunction e l where
+  NativeSpecFunction ::
+        e Node HiddenSpecFunctionSignatureL ->
+        NativeSpecFunction NativeSpecFunctionL
+
+data HiddenSpecFunctionSignature e l where
+  HiddenSpecFunctionSignature ::
+        e Node HiddenFunctionIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Node FunctionParametersL ->
+        e Node RetTypeL ->
+        HiddenSpecFunctionSignature HiddenSpecFunctionSignatureL
+
+data UninterpretedSpecFunction e l where
+  UninterpretedSpecFunction ::
+        e Node HiddenSpecFunctionSignatureL ->
+        UninterpretedSpecFunction UninterpretedSpecFunctionL
+
+data UsualSpecFunction e l where
+  UsualSpecFunction ::
+        e Node HiddenSpecFunctionSignatureL ->
+        e Node BlockL ->
+        UsualSpecFunction UsualSpecFunctionL
+
+data SpecBody e l where
+  SpecBody ::
+        e [Node UseDeclarationL] ->
+        e [Node HiddenSpecBlockMemeberL] ->
+        SpecBody SpecBodyL
+
+data HiddenSpecBlockMemeber e l where
+  HiddenSpecBlockMemeber ::
+        e Either (Node HiddenSpecFunctionL) (Either (Node SpecConditionL) (Either (Node SpecIncludeL) (Either (Node SpecApplyL) (Either (Node SpecPragmaL) (Either (Node SpecVariableL) (Either (Node SpecLetL) (Node SpecInvariantL))))))) ->
+        HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
+
+data SpecApply e l where
+  SpecApply ::
+        e Node HiddenExpressionL ->
+        e ([Node SpecApplyPatternL], Node SpecApplyPatternL) ->
+        e Maybe ([Node SpecApplyPatternL], Node SpecApplyPatternL) ->
+        SpecApply SpecApplyL
+
+data SpecApplyPattern e l where
+  SpecApplyPattern ::
+        e Node SpecApplyNamePatternL ->
+        e Maybe (Node TypeParametersL) ->
+        SpecApplyPattern SpecApplyPatternL
+
+data SpecApplyNamePattern e l where
+  SpecApplyNamePattern ::
+        e () ->
+        SpecApplyNamePattern SpecApplyNamePatternL
+
+data SpecCondition e l where
+  SpecCondition ::
+        e Either (Node HiddenSpecAbortIfL) (Either (Node HiddenSpecAbortWithOrModifiesL) (Node HiddenSpecConditionL)) ->
+        SpecCondition SpecConditionL
+
+data HiddenSpecAbortIf e l where
+  HiddenSpecAbortIf ::
+        e Maybe (Node ConditionPropertiesL) ->
+        e Node HiddenExpressionL ->
+        e Maybe (Node HiddenExpressionL) ->
+        HiddenSpecAbortIf HiddenSpecAbortIfL
+
+data ConditionProperties e l where
+  ConditionProperties ::
+        e (Maybe (Node SpecPropertyL), [Node SpecPropertyL]) ->
+        ConditionProperties ConditionPropertiesL
+
+data SpecProperty e l where
+  SpecProperty ::
+        e Node IdentifierL ->
+        e Maybe (Node HiddenLiteralValueL) ->
+        SpecProperty SpecPropertyL
+
+data HiddenSpecAbortWithOrModifies e l where
+  HiddenSpecAbortWithOrModifies ::
+        e Maybe (Node ConditionPropertiesL) ->
+        e ([Node HiddenExpressionL], Node HiddenExpressionL) ->
+        HiddenSpecAbortWithOrModifies HiddenSpecAbortWithOrModifiesL
+
+data HiddenSpecCondition e l where
+  HiddenSpecCondition ::
+        e Maybe (Node HiddenSpecConditionKindL) ->
+        e Maybe (Node ConditionPropertiesL) ->
+        e Node HiddenExpressionL ->
+        HiddenSpecCondition HiddenSpecConditionL
+
+data HiddenSpecConditionKind e l where
+  HiddenSpecConditionKind ::
+        e () ->
+        HiddenSpecConditionKind HiddenSpecConditionKindL
+
+data SpecInclude e l where
+  SpecInclude ::
+        e Node HiddenExpressionL ->
+        SpecInclude SpecIncludeL
+
+data SpecInvariant e l where
+  SpecInvariant ::
+        e Maybe (Node ConditionPropertiesL) ->
+        e Node HiddenExpressionL ->
+        SpecInvariant SpecInvariantL
+
+data SpecLet e l where
+  SpecLet ::
+        e Node IdentifierL ->
+        e Node HiddenExpressionL ->
+        SpecLet SpecLetL
+
+data SpecPragma e l where
+  SpecPragma ::
+        e (Maybe (Node SpecPropertyL), [Node SpecPropertyL]) ->
+        SpecPragma SpecPragmaL
+
+data SpecVariable e l where
+  SpecVariable ::
+        e Node IdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Node HiddenTypeL ->
+        SpecVariable SpecVariableL
+
+data UseDeclaration e l where
+  UseDeclaration ::
+        e Either (Node UseModuleL) (Either (Node UseModuleMemberL) (Either (Node UseModuleMembersL) (Node UseFunL))) ->
+        UseDeclaration UseDeclarationL
+
+data UseFun e l where
+  UseFun ::
+        e Node ModuleAccessL ->
+        e (Node HiddenFunctionIdentifierL, Node ModuleAccessL) ->
+        UseFun UseFunL
+
+data UseModule e l where
+  UseModule ::
+        e Node ModuleIdentityL ->
+        e Maybe (Node HiddenModuleIdentifierL) ->
+        UseModule UseModuleL
+
+data UseModuleMember e l where
+  UseModuleMember ::
+        e Node ModuleIdentityL ->
+        e Node UseMemberL ->
+        UseModuleMember UseModuleMemberL
+
+data UseMember e l where
+  UseMember ::
+        e Either (Node IdentifierL, (Maybe (Node IdentifierL), Node IdentifierL)) (Either (Maybe (Node IdentifierL), Node IdentifierL) (([Node UseMemberL], Node UseMemberL), Node IdentifierL)) ->
+        UseMember UseMemberL
+
+data UseModuleMembers e l where
+  UseModuleMembers ::
+        e Either (([Node UseMemberL], Node UseMemberL), Node ModuleIdentityL) (([Node UseMemberL], Node UseMemberL), Either (Node HiddenModuleIdentifierL) (Node NumLiteralL)) ->
+        UseModuleMembers UseModuleMembersL
+
+data UnitExpression e l where
+  UnitExpression ::
+        UnitExpression UnitExpressionL
+
+data VectorExpression e l where
+  VectorExpression ::
+        e Maybe ([Node HiddenTypeL], Node HiddenTypeL) ->
+        e (Maybe (Node HiddenExpressionL), [Node HiddenExpressionL]) ->
+        VectorExpression VectorExpressionL
+
+data BorrowExpression e l where
+  BorrowExpression ::
+        e (Node HiddenExpressionL, Node HiddenReferenceL) ->
+        BorrowExpression BorrowExpressionL
+
+data DereferenceExpression e l where
+  DereferenceExpression ::
+        e Node HiddenExpressionL ->
+        DereferenceExpression DereferenceExpressionL
+
+data MoveOrCopyExpression e l where
+  MoveOrCopyExpression ::
+        e Node HiddenExpressionL ->
+        MoveOrCopyExpression MoveOrCopyExpressionL
+
+data UnaryExpression e l where
+  UnaryExpression ::
+        e Node UnaryOpL ->
+        e Node HiddenExpressionL ->
+        UnaryExpression UnaryExpressionL
+
+data UnaryOp e l where
+  UnaryOp ::
+        e () ->
+        UnaryOp UnaryOpL
+
+data AbortExpression e l where
+  AbortExpression ::
+        e Maybe (Node HiddenExpressionL) ->
+        AbortExpression AbortExpressionL
+
+data AssignExpression e l where
+  AssignExpression ::
+        e (Node HiddenExpressionL, Node HiddenUnaryExpressionL) ->
+        AssignExpression AssignExpressionL
+
+data BinaryExpression e l where
+  BinaryExpression ::
+        e Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Either (Node HiddenExpressionL, Node HiddenExpressionL) (Node HiddenExpressionL, Node HiddenExpressionL))))))))))))))))))) ->
+        BinaryExpression BinaryExpressionL
+
+data CastExpression e l where
+  CastExpression ::
+        e (Node HiddenTypeL, Node HiddenExpressionL) ->
+        CastExpression CastExpressionL
+
+data IdentifiedExpression e l where
+  IdentifiedExpression ::
+        e Node BlockIdentifierL ->
+        e Node HiddenExpressionL ->
+        IdentifiedExpression IdentifiedExpressionL
+
+data BlockIdentifier e l where
+  BlockIdentifier ::
+        e Node LabelL ->
+        BlockIdentifier BlockIdentifierL
+
+data LambdaExpression e l where
+  LambdaExpression ::
+        e Node LambdaBindingsL ->
+        e Maybe (Node HiddenTypeL) ->
+        e Node HiddenExpressionL ->
+        LambdaExpression LambdaExpressionL
+
+data LambdaBindings e l where
+  LambdaBindings ::
+        e (Maybe (Node LambdaBindingL), [Node LambdaBindingL]) ->
+        LambdaBindings LambdaBindingsL
+
+data LambdaBinding e l where
+  LambdaBinding ::
+        e Either (Node HiddenBindL) (Either (Maybe (Node HiddenTypeL), Node HiddenBindL) (Node CommaBindListL)) ->
+        LambdaBinding LambdaBindingL
+
+data LoopExpression e l where
+  LoopExpression ::
+        e Node HiddenExpressionL ->
+        LoopExpression LoopExpressionL
+
+data QuantifierExpression e l where
+  QuantifierExpression ::
+        e (Node QuantifierBindingsL, (Maybe (Node HiddenExpressionL), (Node HiddenExpressionL, Either (Node HiddenExistsL) (Node HiddenForallL)))) ->
+        QuantifierExpression QuantifierExpressionL
+
+data QuantifierBindings e l where
+  QuantifierBindings ::
+        e Node QuantifierBindingL ->
+        e [Node QuantifierBindingL] ->
+        QuantifierBindings QuantifierBindingsL
+
+data QuantifierBinding e l where
+  QuantifierBinding ::
+        e Either (Node HiddenExpressionL, Node IdentifierL) (Node HiddenTypeL, Node IdentifierL) ->
+        QuantifierBinding QuantifierBindingL
+
+data ReturnExpression e l where
+  ReturnExpression ::
+        e Either (Maybe (Node LabelL)) (Maybe (Node LabelL), Node HiddenExpressionL) ->
+        ReturnExpression ReturnExpressionL
+
+data WhileExpression e l where
+  WhileExpression ::
+        e Node HiddenExpressionL ->
+        e Node HiddenExpressionL ->
+        WhileExpression WhileExpressionL
+
+data BlockItem e l where
+  BlockItem ::
+        e Either (Node LetStatementL) (Node HiddenExpressionL) ->
+        BlockItem BlockItemL
+
+data LetStatement e l where
+  LetStatement ::
+        e Node BindListL ->
+        e Maybe (Node HiddenTypeL) ->
+        e Maybe (Node HiddenExpressionL) ->
+        LetStatement LetStatementL
+
+data MacroFunctionDefinition e l where
+  MacroFunctionDefinition ::
+        e Maybe (Node ModifierL) ->
+        e Node HiddenMacroSignatureL ->
+        e Node BlockL ->
+        MacroFunctionDefinition MacroFunctionDefinitionL
+
+data HiddenMacroSignature e l where
+  HiddenMacroSignature ::
+        e Maybe (Node ModifierL) ->
+        e Node HiddenFunctionIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Node FunctionParametersL ->
+        e Maybe (Node RetTypeL) ->
+        HiddenMacroSignature HiddenMacroSignatureL
+
+data NativeFunctionDefinition e l where
+  NativeFunctionDefinition ::
+        e Node HiddenFunctionSignatureL ->
+        NativeFunctionDefinition NativeFunctionDefinitionL
+
+data HiddenStructItem e l where
+  HiddenStructItem ::
+        e Either (Node StructDefinitionL) (Node NativeStructDefinitionL) ->
+        HiddenStructItem HiddenStructItemL
+
+data NativeStructDefinition e l where
+  NativeStructDefinition ::
+        e Node HiddenStructSignatureL ->
+        NativeStructDefinition NativeStructDefinitionL
+
+data HiddenStructSignature e l where
+  HiddenStructSignature ::
+        e Node HiddenStructIdentifierL ->
+        e Maybe (Node TypeParametersL) ->
+        e Maybe (Node AbilityDeclsL) ->
+        HiddenStructSignature HiddenStructSignatureL
+
+data StructDefinition e l where
+  StructDefinition ::
+        e Node HiddenStructSignatureL ->
+        e Node DatatypeFieldsL ->
+        e Maybe (Node PostfixAbilityDeclsL) ->
+        StructDefinition StructDefinitionL
+
+data Constant e l where
+  Constant ::
+        e Node IdentifierL ->
+        e Node HiddenTypeL ->
+        e Node HiddenExpressionL ->
+        Constant ConstantL
+
+data FriendDeclaration e l where
+  FriendDeclaration ::
+        e Node FriendAccessL ->
+        FriendDeclaration FriendDeclarationL
+
+data FriendAccess e l where
+  FriendAccess ::
+        e Either (Node ModuleIdentityL) (Node IdentifierL) ->
+        FriendAccess FriendAccessL
