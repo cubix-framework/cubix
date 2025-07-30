@@ -11,6 +11,9 @@ maintainer:    jakub@up-to-speed.ai
 build-type:    Simple
 bug-reports:   https://github.com/cubix-framework/cubix/issues
 
+extra-source-files:
+  gen-ast/data/Ast.hs.template
+
 tested-with:
   GHC == 9.8.4
 
@@ -97,3 +100,22 @@ executable gen-syntax
     , neat-interpolation ^>= 0.5
     , optparse-applicative
     , optparse-generic ^>= 1.5
+
+executable gen-ast
+  import: language
+  import: dependencies
+  import: ghc-options
+  import: rts-options
+  main-is: Main.hs
+  other-modules:
+    TreeSitter.GenerateAst.Internal.CodeGen
+    TreeSitter.GenerateAst.Internal.Data
+    TreeSitter.GenerateAst.Internal.Grammar
+
+  hs-source-dirs: gen-ast/app
+  build-depends:
+    , doclayout ^>= 0.5
+    , doctemplates ^>= 0.11
+    , fgl ^>= 5.8
+    , file-embed ^>= 0.0
+    , optparse-applicative ^>= 0.18

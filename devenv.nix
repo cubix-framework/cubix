@@ -34,13 +34,13 @@
   };
 
   scripts = {
-    gen-sui-move.exec = ''
+    gen-sui-ast.exec = ''
       pushd $DEVENV_ROOT
-      cabal run cubix-tree-sitter:exe:gen-syntax -- \
-        --language SuiMove \
-        --nodes tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/node-types.json \
-        | fourmolu --stdin-input-file cubix-sui-move/cubix-move.cabal \
-        > cubix-sui-move/src/Language/SuiMove/Syntax.hs
+      cabal run gen-ast -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Language.SuiMove.Syntax \
+        -o cubix-sui-move/src/Language/SuiMove/Syntax.hs
       popd
     '';
   };
