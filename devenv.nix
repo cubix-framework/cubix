@@ -43,6 +43,16 @@
         -o cubix-sui-move/src/Language/SuiMove/Syntax.hs
       popd
     '';
+
+    gen-sui-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Cubix.Language.SuiMove.Modularized \
+        -o cubix-sui-move/src/Cubix/Language/SuiMove/Modularized.hs
+      popd
+    '';
   };
 
   env = {
