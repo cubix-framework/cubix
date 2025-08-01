@@ -147,7 +147,7 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
     go :: [Rule] -> [Maybe Constr]
     go [] = []
     go (r : rest) = case r of
-      SymbolRule sr -> Just (Constr (Name s) [ruleToField (rule sr)]) : go rest
+      SymbolRule sr -> Just (Constr (Name sr) [ruleToField (rule sr)]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
       StringRule{} -> go rest
@@ -155,7 +155,7 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
       TokenRule tr -> go (tr : rest)
       ImmediateTokenRule tr -> go (tr : rest)
       FieldRule n fr -> Just (Constr (Name n) [ruleToField fr]) : go rest
-      PrecRule _ _ r -> go (r : rest)
+      PrecRule _ _ pr -> go (pr : rest)
     -- The following constructors constitute faillure:
       PatternRule{} -> []
       RepeatRule{} -> []
