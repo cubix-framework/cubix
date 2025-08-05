@@ -2,21 +2,16 @@
 
 module Main (main) where
 
-import Data.Text
-       ( Text )
+import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.IO qualified as Text.IO
-import Foreign
-       ( Ptr )
-import Language.Haskell.TH
-       ( pprint )
+import Foreign (Ptr)
+import Language.Haskell.TH (mkName, pprint, runQ)
 import NeatInterpolation
-import Options
-       ( Options (..) )
+import Options (Options (..))
 import Options.Generic qualified as Opt
 import Path qualified
-import System.IO
-       ( IOMode (..), stdout )
+import System.IO (IOMode (..), stdout)
 import System.IO qualified
 import TreeSitter.Language qualified
 import TreeSitter.SuiMove qualified as SuiMove

@@ -119,3 +119,22 @@ executable gen-ast
     , fgl ^>= 5.8
     , file-embed ^>= 0.0
     , optparse-applicative ^>= 0.18
+
+executable gen-mod
+  import: language
+  import: dependencies
+  import: ghc-options
+  import: rts-options
+  main-is: Main.hs
+  other-modules:
+    TreeSitter.GenerateAst.Internal.CodeGen
+    TreeSitter.GenerateAst.Internal.Data
+    TreeSitter.GenerateAst.Internal.Grammar
+
+  hs-source-dirs: gen-mod/app
+  build-depends:
+    , doclayout ^>= 0.5
+    , doctemplates ^>= 0.11
+    , fgl ^>= 5.8
+    , file-embed ^>= 0.0
+    , optparse-applicative ^>= 0.18

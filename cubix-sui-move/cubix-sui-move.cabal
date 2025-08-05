@@ -64,7 +64,7 @@ library
     Cubix.Language.SuiMove.ParsePretty
     Cubix.Language.SuiMove.IPS
     Cubix.Language.SuiMove.Modularized
-    Language.SuiMove.Syntax
+    -- Language.SuiMove.Syntax
   -- other-modules:
   --   Cubix.Language.Move.IPS.Trans
   --   Cubix.Language.Move.IPS.Types

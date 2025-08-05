@@ -49,7 +49,21 @@ ${endif}
 import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 
-import Data.Comp.Multi.Kinds (type Sort)
+import Cubix.Language.Info (TermLab)
+import Cubix.ParsePretty (type RootSort)
+import Data.Comp.Multi (Term)
+import Data.Comp.Multi.Kinds qualified as Kinds
+
+--------------------------------------------------------------------------------
+-- Sort
+--------------------------------------------------------------------------------
+
+type data Sort :: Kinds.Sort where
+{-+}
+${for(dataTypes)}
+data ${it.name.camelCase}L
+${endfor}
+{+-}
 
 --------------------------------------------------------------------------------
 -- Modularized syntax
@@ -59,11 +73,9 @@ import Data.Comp.Multi.Kinds (type Sort)
 ${for(dataTypes)}
 data ${it.name.camelCase} e l where
 ${for(it.constrs)}
-  ${it.name.camelCase} ::
-  ${for(it.fields)}
-  ${it.type} ->
-  ${endfor}
-  ${dataTypes.name.camelCase} ${it.sort.camelCase}L
+  ${it.name.camelCase}
+    :: ${if(it.hasChildren)}${for(it.fields)}${it.type}
+    -> ${endfor}${endif}${dataTypes.name.camelCase} e ${it.sort.camelCase}L
 ${endfor}
 
 ${endfor}
@@ -74,10 +86,13 @@ ${endfor}
 --------------------------------------------------------------------------------
 
 {-+}
-type ${grammarName}Sig = '[]
+type ${grammarName}Sig =
+  '[ ${for(dataTypes)}${it.name.camelCase}${sep}
+   , ${endfor}
+   ]
 
-type ${grammarName}Term      = Term LuaSig
-type ${grammarName}TermLab l = TermLab LuaSig l
+type ${grammarName}Term      = Term ${grammarName}Sig
+type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
 {+-}
 
 --------------------------------------------------------------------------------
@@ -85,5 +100,5 @@ type ${grammarName}TermLab l = TermLab LuaSig l
 --------------------------------------------------------------------------------
 
 {-+}
-type RootSort ${grammarName}Sig = ${startSort.camelCase}L
+type instance RootSort ${grammarName}Sig = ${startSort.camelCase}L
 {+-}

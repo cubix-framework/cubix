@@ -49,6 +49,7 @@ data Type
   | List Type
   | NonEmpty Type
   | Unit
+  -- | Token Text
   | Tuple Type Type
   | Either Type Type
   | Maybe Type
@@ -144,17 +145,18 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
   rulesToConstrs :: RuleName -> Vector Rule -> [Constr]
   rulesToConstrs s = catMaybes . go . V.toList
    where
+    suffix name = Name $ name <> "_" <> s
     go :: [Rule] -> [Maybe Constr]
     go [] = []
     go (r : rest) = case r of
-      SymbolRule sr -> Just (Constr (Name sr) [ruleToField (rule sr)]) : go rest
+      SymbolRule sr -> Just (Constr (suffix sr) [ruleToField (rule sr)]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
       StringRule{} -> go rest
-      AliasRule n _ ar -> Just (Constr (Name n) [ruleToField ar]) : go rest
+      AliasRule n _ ar -> Just (Constr (suffix n) [ruleToField ar]) : go rest
       TokenRule tr -> go (tr : rest)
       ImmediateTokenRule tr -> go (tr : rest)
-      FieldRule n fr -> Just (Constr (Name n) [ruleToField fr]) : go rest
+      FieldRule n fr -> Just (Constr (suffix n) [ruleToField fr]) : go rest
       PrecRule _ _ pr -> go (pr : rest)
     -- The following constructors constitute faillure:
       PatternRule{} -> []
@@ -242,6 +244,7 @@ depsOfType = \case
   List t -> depsOfType t
   NonEmpty t -> depsOfType t
   Unit -> []
+  -- Token _ -> []
   Tuple t1 t2 -> depsOfType t1 <> depsOfType t2
   Either t1 t2 -> depsOfType t1 <> depsOfType t2
   Maybe t -> depsOfType t
