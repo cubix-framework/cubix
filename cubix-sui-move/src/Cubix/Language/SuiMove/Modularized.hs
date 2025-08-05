@@ -39,762 +39,967 @@ import Prettyprinter (Doc, Pretty (..), nest, parens, sep)
 import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 
-import Data.Comp.Multi.Kinds (type Sort)
+import Cubix.Language.Info (TermLab)
+import Cubix.ParsePretty (type RootSort)
+import Data.Comp.Multi (Term)
+import Data.Comp.Multi.Kinds qualified as Kinds
+
+--------------------------------------------------------------------------------
+-- Sort
+--------------------------------------------------------------------------------
+
+type data Sort :: Kinds.Sort where
+data SourceFileL
+data ModuleDefinitionL
+data ModuleBodyL
+data HiddenEnumItemL
+data HiddenEnumSignatureL
+data HiddenEnumIdentifierL
+data IdentifierL
+data AbilityDeclsL
+data AbilityL
+data TypeParametersL
+data TypeParameterL
+data HiddenTypeParameterIdentifierL
+data EnumVariantsL
+data VariantL
+data HiddenVariantIdentifierL
+data DatatypeFieldsL
+data HiddenTypeL
+data HiddenReferenceL
+data FunctionTypeParametersL
+data ModuleAccessL
+data TypeArgumentsL
+data FieldAnnotationL
+data HiddenFieldIdentifierL
+data PostfixAbilityDeclsL
+data HiddenFunctionItemL
+data HiddenFunctionSignatureL
+data HiddenFunctionIdentifierL
+data FunctionParametersL
+data FunctionParameterL
+data HiddenVariableIdentifierL
+data MutFunctionParameterL
+data ModifierL
+data RetTypeL
+data HiddenMacroSignatureL
+data BlockL
+data HiddenExpressionL
+data HiddenExistsL
+data HiddenExpressionTermL
+data HiddenMatchBodyL
+data MatchArmL
+data BindListL
+data HiddenBindL
+data AddressLiteralL
+data BindFieldsL
+data BindFieldL
+data MutBindFieldL
+data BoolLiteralL
+data ByteStringLiteralL
+data HexStringLiteralL
+data NameExpressionL
+data NumLiteralL
+data HiddenLiteralValueL
+data AtBindL
+data BindUnpackL
+data MutBindVarL
+data MatchConditionL
+data HiddenSpecBlockTargetL
+data HiddenStructIdentifierL
+data HiddenSpecFunctionL
+data HiddenSpecFunctionSignatureL
+data ArgListL
+data BlockItemL
+data LetStatementL
+data FieldInitializeListL
+data ExpFieldL
+data LabelL
+data MacroModuleAccessL
+data SpecBodyL
+data HiddenSpecBlockMemeberL
+data HiddenSpecAbortIfL
+data ConditionPropertiesL
+data SpecPropertyL
+data HiddenSpecAbortWithOrModifiesL
+data HiddenSpecConditionL
+data HiddenSpecConditionKindL
+data NativeSpecFunctionL
+data SpecApplyPatternL
+data SpecApplyNamePatternL
+data UninterpretedSpecFunctionL
+data UsualSpecFunctionL
+data UseDeclarationL
+data UseFunL
+data UseModuleL
+data HiddenModuleIdentifierL
+data ModuleIdentityL
+data UseModuleMemberL
+data UseMemberL
+data UseModuleMembersL
+data HiddenForallL
+data HiddenUnaryExpressionL
+data BorrowExpressionL
+data DereferenceExpressionL
+data MoveOrCopyExpressionL
+data UnaryExpressionL
+data UnaryOpL
+data BlockIdentifierL
+data LambdaBindingsL
+data LambdaBindingL
+data QuantifierBindingsL
+data QuantifierBindingL
+data HiddenStructItemL
+data HiddenStructSignatureL
+data ConstantL
+data FriendDeclarationL
+data FriendAccessL
+data SpecBlockL
 
 --------------------------------------------------------------------------------
 -- Modularized syntax
 --------------------------------------------------------------------------------
 
 data SourceFile e l where
-  SourceFile ::
-    [e ModuleDefinitionL] ->
-    SourceFile SourceFileL
+  SourceFile
+    :: [e ModuleDefinitionL]
+    -> SourceFile e SourceFileL
 
 data ModuleDefinition e l where
-  ModuleDefinition ::
-    e ModuleIdentityL ->
-    e ModuleBodyL ->
-    ModuleDefinition ModuleDefinitionL
+  ModuleDefinition
+    :: e ModuleIdentityL
+    -> e ModuleBodyL
+    -> ModuleDefinition e ModuleDefinitionL
 
 data ModuleBody e l where
-  ModuleBody ::
-    [Either (e FriendDeclarationL) (Either (e ConstantL) (Either (e HiddenFunctionItemL) (Either (e HiddenStructItemL) (Either (e HiddenEnumItemL) (Either (e SpecBlockL) (e UseDeclarationL))))))] ->
-    ModuleBody ModuleBodyL
+  ModuleBody
+    :: [Either (e FriendDeclarationL) (Either (e ConstantL) (Either (e HiddenFunctionItemL) (Either (e HiddenStructItemL) (Either (e HiddenEnumItemL) (Either (e SpecBlockL) (e UseDeclarationL))))))]
+    -> ModuleBody e ModuleBodyL
 
 data HiddenEnumItem e l where
-  EnumDefinition ::
-    e HiddenEnumSignatureL -> e EnumVariantsL -> Maybe (e PostfixAbilityDeclsL) ->
-    HiddenEnumItem HiddenEnumItemL
+  EnumDefinitionEnumItem
+    :: e HiddenEnumSignatureL -> e EnumVariantsL -> Maybe (e PostfixAbilityDeclsL)
+    -> HiddenEnumItem e HiddenEnumItemL
 
 data HiddenEnumSignature e l where
-  HiddenEnumSignature ::
-    e HiddenEnumIdentifierL ->
-    Maybe (e TypeParametersL) ->
-    Maybe (e AbilityDeclsL) ->
-    HiddenEnumSignature HiddenEnumSignatureL
+  HiddenEnumSignature
+    :: e HiddenEnumIdentifierL
+    -> Maybe (e TypeParametersL)
+    -> Maybe (e AbilityDeclsL)
+    -> HiddenEnumSignature e HiddenEnumSignatureL
 
 data HiddenEnumIdentifier e l where
-  HiddenEnumIdentifier ::
-    e IdentifierL ->
-    HiddenEnumIdentifier HiddenEnumIdentifierL
+  HiddenEnumIdentifier
+    :: e IdentifierL
+    -> HiddenEnumIdentifier e HiddenEnumIdentifierL
 
 data Identifier e l where
-  Identifier ::
-     ->
-    Identifier IdentifierL
+  Identifier
+    :: Identifier e IdentifierL
 
 data AbilityDecls e l where
-  AbilityDecls ::
-    Maybe (e AbilityL) -> [e AbilityL] ->
-    AbilityDecls AbilityDeclsL
+  AbilityDecls
+    :: Maybe (e AbilityL) -> [e AbilityL]
+    -> AbilityDecls e AbilityDeclsL
 
 data Ability e l where
 
 data TypeParameters e l where
-  TypeParameters ::
-    [e TypeParameterL] -> e TypeParameterL ->
-    TypeParameters TypeParametersL
+  TypeParameters
+    :: [e TypeParameterL] -> e TypeParameterL
+    -> TypeParameters e TypeParametersL
 
 data TypeParameter e l where
-  TypeParameter ::
-    e HiddenTypeParameterIdentifierL ->
-    Maybe [e AbilityL] -> e AbilityL ->
-    TypeParameter TypeParameterL
+  TypeParameter
+    :: e HiddenTypeParameterIdentifierL
+    -> Maybe ([e AbilityL] -> e AbilityL)
+    -> TypeParameter e TypeParameterL
 
 data HiddenTypeParameterIdentifier e l where
-  HiddenTypeParameterIdentifier ::
-    e IdentifierL ->
-    HiddenTypeParameterIdentifier HiddenTypeParameterIdentifierL
+  HiddenTypeParameterIdentifier
+    :: e IdentifierL
+    -> HiddenTypeParameterIdentifier e HiddenTypeParameterIdentifierL
 
 data EnumVariants e l where
-  EnumVariants ::
-    Maybe (e VariantL) -> [e VariantL] ->
-    EnumVariants EnumVariantsL
+  EnumVariants
+    :: Maybe (e VariantL) -> [e VariantL]
+    -> EnumVariants e EnumVariantsL
 
 data Variant e l where
-  Variant ::
-    e HiddenVariantIdentifierL ->
-    Maybe (e DatatypeFieldsL) ->
-    Variant VariantL
+  Variant
+    :: e HiddenVariantIdentifierL
+    -> Maybe (e DatatypeFieldsL)
+    -> Variant e VariantL
 
 data HiddenVariantIdentifier e l where
-  HiddenVariantIdentifier ::
-    e IdentifierL ->
-    HiddenVariantIdentifier HiddenVariantIdentifierL
+  HiddenVariantIdentifier
+    :: e IdentifierL
+    -> HiddenVariantIdentifier e HiddenVariantIdentifierL
 
 data DatatypeFields e l where
-  PositionalFields ::
-    Maybe (e HiddenTypeL) -> [e HiddenTypeL] ->
-    DatatypeFields DatatypeFieldsL
-  NamedFields ::
-    Maybe (e FieldAnnotationL) -> [e FieldAnnotationL] ->
-    DatatypeFields DatatypeFieldsL
+  PositionalFieldsDatatypeFields
+    :: Maybe (e HiddenTypeL) -> [e HiddenTypeL]
+    -> DatatypeFields e DatatypeFieldsL
+  NamedFieldsDatatypeFields
+    :: Maybe (e FieldAnnotationL) -> [e FieldAnnotationL]
+    -> DatatypeFields e DatatypeFieldsL
 
 data HiddenType e l where
-  ApplyType ::
-    Maybe (e TypeArgumentsL) -> e ModuleAccessL ->
-    HiddenType HiddenTypeL
-  RefType ::
-    e HiddenTypeL -> e HiddenReferenceL ->
-    HiddenType HiddenTypeL
-  TupleType ::
-    Maybe (e HiddenTypeL) -> [e HiddenTypeL] ->
-    HiddenType HiddenTypeL
-  FunctionType ::
-    Maybe (e HiddenTypeL) -> e FunctionTypeParametersL ->
-    HiddenType HiddenTypeL
-  PrimitiveType ::
-     ->
-    HiddenType HiddenTypeL
+  ApplyTypeType
+    :: Maybe (e TypeArgumentsL) -> e ModuleAccessL
+    -> HiddenType e HiddenTypeL
+  RefTypeType
+    :: e HiddenTypeL -> e HiddenReferenceL
+    -> HiddenType e HiddenTypeL
+  TupleTypeType
+    :: Maybe (e HiddenTypeL) -> [e HiddenTypeL]
+    -> HiddenType e HiddenTypeL
+  FunctionTypeType
+    :: Maybe (e HiddenTypeL) -> e FunctionTypeParametersL
+    -> HiddenType e HiddenTypeL
+  PrimitiveTypeType
+    :: HiddenType e HiddenTypeL
 
 data HiddenReference e l where
-  ImmRef ::
-     ->
-    HiddenReference HiddenReferenceL
-  MutRef ::
-     ->
-    HiddenReference HiddenReferenceL
+  ImmRefReference
+    :: HiddenReference e HiddenReferenceL
+  MutRefReference
+    :: HiddenReference e HiddenReferenceL
 
 data FunctionTypeParameters e l where
-  FunctionTypeParameters ::
-    Maybe (e HiddenTypeL) -> [e HiddenTypeL] ->
-    FunctionTypeParameters FunctionTypeParametersL
+  FunctionTypeParameters
+    :: Maybe (e HiddenTypeL) -> [e HiddenTypeL]
+    -> FunctionTypeParameters e FunctionTypeParametersL
 
 data ModuleAccess e l where
 
 data TypeArguments e l where
-  TypeArguments ::
-    [e HiddenTypeL] -> e HiddenTypeL ->
-    TypeArguments TypeArgumentsL
+  TypeArguments
+    :: [e HiddenTypeL] -> e HiddenTypeL
+    -> TypeArguments e TypeArgumentsL
 
 data FieldAnnotation e l where
-  FieldAnnotation ::
-    e HiddenFieldIdentifierL ->
-    e HiddenTypeL ->
-    FieldAnnotation FieldAnnotationL
+  FieldAnnotation
+    :: e HiddenFieldIdentifierL
+    -> e HiddenTypeL
+    -> FieldAnnotation e FieldAnnotationL
 
 data HiddenFieldIdentifier e l where
-  HiddenFieldIdentifier ::
-    e IdentifierL ->
-    HiddenFieldIdentifier HiddenFieldIdentifierL
+  HiddenFieldIdentifier
+    :: e IdentifierL
+    -> HiddenFieldIdentifier e HiddenFieldIdentifierL
 
 data PostfixAbilityDecls e l where
-  PostfixAbilityDecls ::
-    Maybe (e AbilityL) -> [e AbilityL] ->
-    PostfixAbilityDecls PostfixAbilityDeclsL
+  PostfixAbilityDecls
+    :: Maybe (e AbilityL) -> [e AbilityL]
+    -> PostfixAbilityDecls e PostfixAbilityDeclsL
 
 data HiddenFunctionItem e l where
-  NativeFunctionDefinition ::
-    e HiddenFunctionSignatureL ->
-    HiddenFunctionItem HiddenFunctionItemL
-  MacroFunctionDefinition ::
-    e HiddenMacroSignatureL -> e BlockL -> Maybe (e ModifierL) ->
-    HiddenFunctionItem HiddenFunctionItemL
-  FunctionDefinition ::
-    e BlockL -> e HiddenFunctionSignatureL ->
-    HiddenFunctionItem HiddenFunctionItemL
+  NativeFunctionDefinitionFunctionItem
+    :: e HiddenFunctionSignatureL
+    -> HiddenFunctionItem e HiddenFunctionItemL
+  MacroFunctionDefinitionFunctionItem
+    :: e HiddenMacroSignatureL -> e BlockL -> Maybe (e ModifierL)
+    -> HiddenFunctionItem e HiddenFunctionItemL
+  FunctionDefinitionFunctionItem
+    :: e BlockL -> e HiddenFunctionSignatureL
+    -> HiddenFunctionItem e HiddenFunctionItemL
 
 data HiddenFunctionSignature e l where
-  HiddenFunctionSignature ::
-    Maybe (e ModifierL) ->
-    Maybe (e ModifierL) ->
-    Maybe (e ModifierL) ->
-    e HiddenFunctionIdentifierL ->
-    Maybe (e TypeParametersL) ->
-    e FunctionParametersL ->
-    Maybe (e RetTypeL) ->
-    HiddenFunctionSignature HiddenFunctionSignatureL
+  HiddenFunctionSignature
+    :: Maybe (e ModifierL)
+    -> Maybe (e ModifierL)
+    -> Maybe (e ModifierL)
+    -> e HiddenFunctionIdentifierL
+    -> Maybe (e TypeParametersL)
+    -> e FunctionParametersL
+    -> Maybe (e RetTypeL)
+    -> HiddenFunctionSignature e HiddenFunctionSignatureL
 
 data HiddenFunctionIdentifier e l where
-  HiddenFunctionIdentifier ::
-    e IdentifierL ->
-    HiddenFunctionIdentifier HiddenFunctionIdentifierL
+  HiddenFunctionIdentifier
+    :: e IdentifierL
+    -> HiddenFunctionIdentifier e HiddenFunctionIdentifierL
 
 data FunctionParameters e l where
-  FunctionParameters ::
-    Maybe (Either (e FunctionParameterL) (e MutFunctionParameterL)) -> [Either (e FunctionParameterL) (e MutFunctionParameterL)] ->
-    FunctionParameters FunctionParametersL
+  FunctionParameters
+    :: Maybe (Either (e FunctionParameterL) (e MutFunctionParameterL)) -> [Either (e FunctionParameterL) (e MutFunctionParameterL)]
+    -> FunctionParameters e FunctionParametersL
 
 data FunctionParameter e l where
-  FunctionParameter ::
-    Either (e HiddenVariableIdentifierL) (e HiddenVariableIdentifierL) ->
-    e HiddenTypeL ->
-    FunctionParameter FunctionParameterL
+  FunctionParameter
+    :: Either (e HiddenVariableIdentifierL) (e HiddenVariableIdentifierL)
+    -> e HiddenTypeL
+    -> FunctionParameter e FunctionParameterL
 
 data HiddenVariableIdentifier e l where
-  HiddenVariableIdentifier ::
-    e IdentifierL ->
-    HiddenVariableIdentifier HiddenVariableIdentifierL
+  HiddenVariableIdentifier
+    :: e IdentifierL
+    -> HiddenVariableIdentifier e HiddenVariableIdentifierL
 
 data MutFunctionParameter e l where
-  MutFunctionParameter ::
-    e FunctionParameterL ->
-    MutFunctionParameter MutFunctionParameterL
+  MutFunctionParameter
+    :: e FunctionParameterL
+    -> MutFunctionParameter e MutFunctionParameterL
 
 data Modifier e l where
 
 data RetType e l where
-  RetType ::
-    e HiddenTypeL ->
-    RetType RetTypeL
+  RetType
+    :: e HiddenTypeL
+    -> RetType e RetTypeL
 
 data HiddenMacroSignature e l where
-  HiddenMacroSignature ::
-    Maybe (e ModifierL) ->
-    e HiddenFunctionIdentifierL ->
-    Maybe (e TypeParametersL) ->
-    e FunctionParametersL ->
-    Maybe (e RetTypeL) ->
-    HiddenMacroSignature HiddenMacroSignatureL
+  HiddenMacroSignature
+    :: Maybe (e ModifierL)
+    -> e HiddenFunctionIdentifierL
+    -> Maybe (e TypeParametersL)
+    -> e FunctionParametersL
+    -> Maybe (e RetTypeL)
+    -> HiddenMacroSignature e HiddenMacroSignatureL
 
 data Block e l where
-  Block ::
-    [e UseDeclarationL] ->
-    [e BlockItemL] ->
-    Maybe (e HiddenExpressionL) ->
-    Block BlockL
+  Block
+    :: [e UseDeclarationL]
+    -> [e BlockItemL]
+    -> Maybe (e HiddenExpressionL)
+    -> Block e BlockL
 
 data HiddenExpression e l where
-  CallExpression ::
-    e ArgListL -> e NameExpressionL ->
-    HiddenExpression HiddenExpressionL
-  MacroCallExpression ::
-    Maybe (e TypeArgumentsL) -> e ArgListL -> e MacroModuleAccessL ->
-    HiddenExpression HiddenExpressionL
-  LambdaExpression ::
-    Maybe (e HiddenTypeL) -> e HiddenExpressionL -> e LambdaBindingsL ->
-    HiddenExpression HiddenExpressionL
-  IfExpression ::
-    e HiddenExpressionL -> e HiddenExpressionL -> Maybe (e HiddenExpressionL) ->
-    HiddenExpression HiddenExpressionL
-  WhileExpression ::
-    e HiddenExpressionL -> e HiddenExpressionL ->
-    HiddenExpression HiddenExpressionL
-  ReturnExpression ::
-    Either (Maybe (e LabelL)) Maybe (e LabelL) -> e HiddenExpressionL ->
-    HiddenExpression HiddenExpressionL
-  AbortExpression ::
-    Maybe (e HiddenExpressionL) ->
-    HiddenExpression HiddenExpressionL
-  AssignExpression ::
-    e HiddenExpressionL -> e HiddenUnaryExpressionL ->
-    HiddenExpression HiddenExpressionL
-  HiddenUnaryExpression ::
-    Either (e BorrowExpressionL) (Either (e DereferenceExpressionL) (Either (e MoveOrCopyExpressionL) (Either (e HiddenExpressionTermL) (e UnaryExpressionL)))) ->
-    HiddenExpression HiddenExpressionL
-  BinaryExpression ::
-    Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL (Either e HiddenExpressionL -> e HiddenExpressionL e HiddenExpressionL -> e HiddenExpressionL)))))))))))))))))) ->
-    HiddenExpression HiddenExpressionL
-  CastExpression ::
-    e HiddenTypeL -> e HiddenExpressionL ->
-    HiddenExpression HiddenExpressionL
-  QuantifierExpression ::
-    e QuantifierBindingsL -> Maybe (e HiddenExpressionL) -> e HiddenExpressionL -> Either (e HiddenExistsL) (e HiddenForallL) ->
-    HiddenExpression HiddenExpressionL
-  MatchExpression ::
-    e HiddenExpressionL -> e HiddenMatchBodyL ->
-    HiddenExpression HiddenExpressionL
-  VectorExpression ::
-    Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> Maybe [e HiddenTypeL] -> e HiddenTypeL ->
-    HiddenExpression HiddenExpressionL
-  LoopExpression ::
-    e HiddenExpressionL ->
-    HiddenExpression HiddenExpressionL
-  IdentifiedExpression ::
-    e HiddenExpressionL -> e BlockIdentifierL ->
-    HiddenExpression HiddenExpressionL
+  CallExpressionExpression
+    :: e ArgListL -> e NameExpressionL
+    -> HiddenExpression e HiddenExpressionL
+  MacroCallExpressionExpression
+    :: Maybe (e TypeArgumentsL) -> e ArgListL -> e MacroModuleAccessL
+    -> HiddenExpression e HiddenExpressionL
+  LambdaExpressionExpression
+    :: Maybe (e HiddenTypeL) -> e HiddenExpressionL -> e LambdaBindingsL
+    -> HiddenExpression e HiddenExpressionL
+  IfExpressionExpression
+    :: e HiddenExpressionL -> e HiddenExpressionL -> Maybe (e HiddenExpressionL)
+    -> HiddenExpression e HiddenExpressionL
+  WhileExpressionExpression
+    :: e HiddenExpressionL -> e HiddenExpressionL
+    -> HiddenExpression e HiddenExpressionL
+  ReturnExpressionExpression
+    :: Either (Maybe (e LabelL)) (Maybe (e LabelL) -> e HiddenExpressionL)
+    -> HiddenExpression e HiddenExpressionL
+  AbortExpressionExpression
+    :: Maybe (e HiddenExpressionL)
+    -> HiddenExpression e HiddenExpressionL
+  AssignExpressionExpression
+    :: e HiddenExpressionL -> e HiddenUnaryExpressionL
+    -> HiddenExpression e HiddenExpressionL
+  HiddenUnaryExpressionExpression
+    :: Either (e BorrowExpressionL) (Either (e DereferenceExpressionL) (Either (e MoveOrCopyExpressionL) (Either (e HiddenExpressionTermL) (e UnaryExpressionL))))
+    -> HiddenExpression e HiddenExpressionL
+  BinaryExpressionExpression
+    :: Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (Either (e HiddenExpressionL -> e HiddenExpressionL) (e HiddenExpressionL -> e HiddenExpressionL)))))))))))))))))))
+    -> HiddenExpression e HiddenExpressionL
+  CastExpressionExpression
+    :: e HiddenTypeL -> e HiddenExpressionL
+    -> HiddenExpression e HiddenExpressionL
+  QuantifierExpressionExpression
+    :: e QuantifierBindingsL -> Maybe (e HiddenExpressionL) -> e HiddenExpressionL -> Either (e HiddenExistsL) (e HiddenForallL)
+    -> HiddenExpression e HiddenExpressionL
+  MatchExpressionExpression
+    :: e HiddenExpressionL -> e HiddenMatchBodyL
+    -> HiddenExpression e HiddenExpressionL
+  VectorExpressionExpression
+    :: Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> Maybe ([e HiddenTypeL] -> e HiddenTypeL)
+    -> HiddenExpression e HiddenExpressionL
+  LoopExpressionExpression
+    :: e HiddenExpressionL
+    -> HiddenExpression e HiddenExpressionL
+  IdentifiedExpressionExpression
+    :: e HiddenExpressionL -> e BlockIdentifierL
+    -> HiddenExpression e HiddenExpressionL
 
 data HiddenExists e l where
-  HiddenExists ::
-     ->
-    HiddenExists HiddenExistsL
+  HiddenExists
+    :: HiddenExists e HiddenExistsL
 
 data HiddenExpressionTerm e l where
-  CallExpression ::
-    e ArgListL -> e NameExpressionL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  BreakExpression ::
-    Maybe (e LabelL) -> Maybe (e HiddenExpressionL) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  ContinueExpression ::
-    Maybe (e LabelL) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  NameExpression ::
-    e ModuleAccessL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  MacroCallExpression ::
-    Maybe (e TypeArgumentsL) -> e ArgListL -> e MacroModuleAccessL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  PackExpression ::
-    e FieldInitializeListL -> e NameExpressionL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  HiddenLiteralValue ::
-    Either (e BoolLiteralL) (Either (e NumLiteralL) (Either (e HexStringLiteralL) (Either (e ByteStringLiteralL) (e AddressLiteralL)))) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  UnitExpression ::
-     ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  ExpressionList ::
-    [e HiddenExpressionL] -> e HiddenExpressionL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  AnnotationExpression ::
-    e HiddenExpressionL -> e HiddenTypeL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  Block ::
-    [e UseDeclarationL] -> [e BlockItemL] -> Maybe (e HiddenExpressionL) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  SpecBlock ::
-    Either (e HiddenSpecFunctionL) e SpecBodyL -> Maybe (e HiddenSpecBlockTargetL) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  IfExpression ::
-    e HiddenExpressionL -> e HiddenExpressionL -> Maybe (e HiddenExpressionL) ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  DotExpression ::
-    e HiddenExpressionTermL -> e HiddenExpressionTermL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  IndexExpression ::
-    Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> e HiddenExpressionTermL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  VectorExpression ::
-    Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> Maybe [e HiddenTypeL] -> e HiddenTypeL ->
-    HiddenExpressionTerm HiddenExpressionTermL
-  MatchExpression ::
-    e HiddenExpressionL -> e HiddenMatchBodyL ->
-    HiddenExpressionTerm HiddenExpressionTermL
+  CallExpressionExpressionTerm
+    :: e ArgListL -> e NameExpressionL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  BreakExpressionExpressionTerm
+    :: Maybe (e LabelL) -> Maybe (e HiddenExpressionL)
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  ContinueExpressionExpressionTerm
+    :: Maybe (e LabelL)
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  NameExpressionExpressionTerm
+    :: e ModuleAccessL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  MacroCallExpressionExpressionTerm
+    :: Maybe (e TypeArgumentsL) -> e ArgListL -> e MacroModuleAccessL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  PackExpressionExpressionTerm
+    :: e FieldInitializeListL -> e NameExpressionL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  HiddenLiteralValueExpressionTerm
+    :: Either (e BoolLiteralL) (Either (e NumLiteralL) (Either (e HexStringLiteralL) (Either (e ByteStringLiteralL) (e AddressLiteralL))))
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  UnitExpressionExpressionTerm
+    :: HiddenExpressionTerm e HiddenExpressionTermL
+  ExpressionListExpressionTerm
+    :: [e HiddenExpressionL] -> e HiddenExpressionL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  AnnotationExpressionExpressionTerm
+    :: e HiddenExpressionL -> e HiddenTypeL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  BlockExpressionTerm
+    :: [e UseDeclarationL] -> [e BlockItemL] -> Maybe (e HiddenExpressionL)
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  SpecBlockExpressionTerm
+    :: Either (e HiddenSpecFunctionL) (e SpecBodyL -> Maybe (e HiddenSpecBlockTargetL))
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  IfExpressionExpressionTerm
+    :: e HiddenExpressionL -> e HiddenExpressionL -> Maybe (e HiddenExpressionL)
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  DotExpressionExpressionTerm
+    :: e HiddenExpressionTermL -> e HiddenExpressionTermL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  IndexExpressionExpressionTerm
+    :: Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> e HiddenExpressionTermL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  VectorExpressionExpressionTerm
+    :: Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] -> Maybe ([e HiddenTypeL] -> e HiddenTypeL)
+    -> HiddenExpressionTerm e HiddenExpressionTermL
+  MatchExpressionExpressionTerm
+    :: e HiddenExpressionL -> e HiddenMatchBodyL
+    -> HiddenExpressionTerm e HiddenExpressionTermL
 
 data HiddenMatchBody e l where
-  HiddenMatchBody ::
-    Maybe (e MatchArmL) -> [e MatchArmL] ->
-    HiddenMatchBody HiddenMatchBodyL
+  HiddenMatchBody
+    :: Maybe (e MatchArmL) -> [e MatchArmL]
+    -> HiddenMatchBody e HiddenMatchBodyL
 
 data MatchArm e l where
-  MatchArm ::
-    e BindListL ->
-    Maybe (e MatchConditionL) ->
-    e HiddenExpressionL ->
-    MatchArm MatchArmL
+  MatchArm
+    :: e BindListL
+    -> Maybe (e MatchConditionL)
+    -> e HiddenExpressionL
+    -> MatchArm e MatchArmL
 
 data BindList e l where
-  HiddenBind ::
-    Either (e BindUnpackL) (Either (e AtBindL) (Either (e HiddenLiteralValueL) (Either (e HiddenVariableIdentifierL) (e MutBindVarL)))) ->
-    BindList BindListL
-  CommaBindList ::
-    Maybe (e HiddenBindL) -> [e HiddenBindL] ->
-    BindList BindListL
-  OrBindList ::
-    [e HiddenBindL] -> e HiddenBindL ->
-    BindList BindListL
+  HiddenBindBindList
+    :: Either (e BindUnpackL) (Either (e AtBindL) (Either (e HiddenLiteralValueL) (Either (e HiddenVariableIdentifierL) (e MutBindVarL))))
+    -> BindList e BindListL
+  CommaBindListBindList
+    :: Maybe (e HiddenBindL) -> [e HiddenBindL]
+    -> BindList e BindListL
+  OrBindListBindList
+    :: [e HiddenBindL] -> e HiddenBindL
+    -> BindList e BindListL
 
 data HiddenBind e l where
-  MutBindVar ::
-    e HiddenVariableIdentifierL ->
-    HiddenBind HiddenBindL
-  BindVar ::
-    e HiddenVariableIdentifierL ->
-    HiddenBind HiddenBindL
-  BindUnpack ::
-    Maybe (e BindFieldsL) -> e NameExpressionL ->
-    HiddenBind HiddenBindL
-  AtBind ::
-    e BindListL -> e HiddenVariableIdentifierL ->
-    HiddenBind HiddenBindL
-  HiddenLiteralValue ::
-    Either (e BoolLiteralL) (Either (e NumLiteralL) (Either (e HexStringLiteralL) (Either (e ByteStringLiteralL) (e AddressLiteralL)))) ->
-    HiddenBind HiddenBindL
+  MutBindVarBind
+    :: e HiddenVariableIdentifierL
+    -> HiddenBind e HiddenBindL
+  BindVarBind
+    :: e HiddenVariableIdentifierL
+    -> HiddenBind e HiddenBindL
+  BindUnpackBind
+    :: Maybe (e BindFieldsL) -> e NameExpressionL
+    -> HiddenBind e HiddenBindL
+  AtBindBind
+    :: e BindListL -> e HiddenVariableIdentifierL
+    -> HiddenBind e HiddenBindL
+  HiddenLiteralValueBind
+    :: Either (e BoolLiteralL) (Either (e NumLiteralL) (Either (e HexStringLiteralL) (Either (e ByteStringLiteralL) (e AddressLiteralL))))
+    -> HiddenBind e HiddenBindL
 
 data AddressLiteral e l where
-  AddressLiteral ::
-     ->
-    AddressLiteral AddressLiteralL
+  AddressLiteral
+    :: AddressLiteral e AddressLiteralL
 
 data BindFields e l where
-  BindPositionalFields ::
-    Maybe (Either (e MutBindFieldL) (e BindFieldL)) -> [Either (e MutBindFieldL) (e BindFieldL)] ->
-    BindFields BindFieldsL
-  BindNamedFields ::
-    Maybe (Either (e MutBindFieldL) (e BindFieldL)) -> [Either (e MutBindFieldL) (e BindFieldL)] ->
-    BindFields BindFieldsL
+  BindPositionalFieldsBindFields
+    :: Maybe (Either (e MutBindFieldL) (e BindFieldL)) -> [Either (e MutBindFieldL) (e BindFieldL)]
+    -> BindFields e BindFieldsL
+  BindNamedFieldsBindFields
+    :: Maybe (Either (e MutBindFieldL) (e BindFieldL)) -> [Either (e MutBindFieldL) (e BindFieldL)]
+    -> BindFields e BindFieldsL
 
 data BindField e l where
 
 data MutBindField e l where
-  MutBindField ::
-    e BindFieldL ->
-    MutBindField MutBindFieldL
+  MutBindField
+    :: e BindFieldL
+    -> MutBindField e MutBindFieldL
 
 data BoolLiteral e l where
 
 data ByteStringLiteral e l where
-  ByteStringLiteral ::
-     ->
-    ByteStringLiteral ByteStringLiteralL
+  ByteStringLiteral
+    :: ByteStringLiteral e ByteStringLiteralL
 
 data HexStringLiteral e l where
-  HexStringLiteral ::
-     ->
-    HexStringLiteral HexStringLiteralL
+  HexStringLiteral
+    :: HexStringLiteral e HexStringLiteralL
 
 data NameExpression e l where
-  NameExpression ::
-    e ModuleAccessL ->
-    NameExpression NameExpressionL
+  NameExpression
+    :: e ModuleAccessL
+    -> NameExpression e NameExpressionL
 
 data NumLiteral e l where
-  NumLiteral ::
-    NumLiteral NumLiteralL
+  NumLiteral
+    :: NumLiteral e NumLiteralL
 
 data HiddenLiteralValue e l where
-  AddressLiteral ::
-     ->
-    HiddenLiteralValue HiddenLiteralValueL
-  BoolLiteral ::
-     ->
-    HiddenLiteralValue HiddenLiteralValueL
-  NumLiteral ::
-     ->
-    HiddenLiteralValue HiddenLiteralValueL
-  HexStringLiteral ::
-     ->
-    HiddenLiteralValue HiddenLiteralValueL
-  ByteStringLiteral ::
-     ->
-    HiddenLiteralValue HiddenLiteralValueL
+  AddressLiteralLiteralValue
+    :: HiddenLiteralValue e HiddenLiteralValueL
+  BoolLiteralLiteralValue
+    :: HiddenLiteralValue e HiddenLiteralValueL
+  NumLiteralLiteralValue
+    :: HiddenLiteralValue e HiddenLiteralValueL
+  HexStringLiteralLiteralValue
+    :: HiddenLiteralValue e HiddenLiteralValueL
+  ByteStringLiteralLiteralValue
+    :: HiddenLiteralValue e HiddenLiteralValueL
 
 data AtBind e l where
-  AtBind ::
-    e HiddenVariableIdentifierL ->
-    e BindListL ->
-    AtBind AtBindL
+  AtBind
+    :: e HiddenVariableIdentifierL
+    -> e BindListL
+    -> AtBind e AtBindL
 
 data BindUnpack e l where
-  BindUnpack ::
-    e NameExpressionL ->
-    Maybe (e BindFieldsL) ->
-    BindUnpack BindUnpackL
+  BindUnpack
+    :: e NameExpressionL
+    -> Maybe (e BindFieldsL)
+    -> BindUnpack e BindUnpackL
 
 data MutBindVar e l where
-  MutBindVar ::
-    e HiddenVariableIdentifierL ->
-    MutBindVar MutBindVarL
+  MutBindVar
+    :: e HiddenVariableIdentifierL
+    -> MutBindVar e MutBindVarL
 
 data MatchCondition e l where
-  MatchCondition ::
-    e HiddenExpressionL ->
-    MatchCondition MatchConditionL
+  MatchCondition
+    :: e HiddenExpressionL
+    -> MatchCondition e MatchConditionL
 
 data HiddenSpecBlockTarget e l where
-  HiddenSpecBlockIdentifier ::
-    e IdentifierL ->
-    HiddenSpecBlockTarget HiddenSpecBlockTargetL
-  SpecBlockTargetModule ::
-     ->
-    HiddenSpecBlockTarget HiddenSpecBlockTargetL
-  SpecBlockTargetSchema ::
-    e HiddenStructIdentifierL -> Maybe (e TypeParametersL) ->
-    HiddenSpecBlockTarget HiddenSpecBlockTargetL
+  HiddenSpecBlockIdentifierSpecBlockTarget
+    :: e IdentifierL
+    -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
+  SpecBlockTargetModuleSpecBlockTarget
+    :: HiddenSpecBlockTarget e HiddenSpecBlockTargetL
+  SpecBlockTargetSchemaSpecBlockTarget
+    :: e HiddenStructIdentifierL -> Maybe (e TypeParametersL)
+    -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
 
 data HiddenStructIdentifier e l where
-  HiddenStructIdentifier ::
-    e IdentifierL ->
-    HiddenStructIdentifier HiddenStructIdentifierL
+  HiddenStructIdentifier
+    :: e IdentifierL
+    -> HiddenStructIdentifier e HiddenStructIdentifierL
 
 data HiddenSpecFunction e l where
-  NativeSpecFunction ::
-    e HiddenSpecFunctionSignatureL ->
-    HiddenSpecFunction HiddenSpecFunctionL
-  UsualSpecFunction ::
-    e HiddenSpecFunctionSignatureL -> e BlockL ->
-    HiddenSpecFunction HiddenSpecFunctionL
-  UninterpretedSpecFunction ::
-    e HiddenSpecFunctionSignatureL ->
-    HiddenSpecFunction HiddenSpecFunctionL
+  NativeSpecFunctionSpecFunction
+    :: e HiddenSpecFunctionSignatureL
+    -> HiddenSpecFunction e HiddenSpecFunctionL
+  UsualSpecFunctionSpecFunction
+    :: e HiddenSpecFunctionSignatureL -> e BlockL
+    -> HiddenSpecFunction e HiddenSpecFunctionL
+  UninterpretedSpecFunctionSpecFunction
+    :: e HiddenSpecFunctionSignatureL
+    -> HiddenSpecFunction e HiddenSpecFunctionL
 
 data HiddenSpecFunctionSignature e l where
-  HiddenSpecFunctionSignature ::
-    e HiddenFunctionIdentifierL ->
-    Maybe (e TypeParametersL) ->
-    e FunctionParametersL ->
-    e RetTypeL ->
-    HiddenSpecFunctionSignature HiddenSpecFunctionSignatureL
+  HiddenSpecFunctionSignature
+    :: e HiddenFunctionIdentifierL
+    -> Maybe (e TypeParametersL)
+    -> e FunctionParametersL
+    -> e RetTypeL
+    -> HiddenSpecFunctionSignature e HiddenSpecFunctionSignatureL
 
 data ArgList e l where
-  ArgList ::
-    Maybe (e HiddenExpressionL) -> [e HiddenExpressionL] ->
-    ArgList ArgListL
+  ArgList
+    :: Maybe (e HiddenExpressionL) -> [e HiddenExpressionL]
+    -> ArgList e ArgListL
 
 data BlockItem e l where
-  BlockItem ::
-    Either (e LetStatementL) (e HiddenExpressionL) ->
-    BlockItem BlockItemL
+  BlockItem
+    :: Either (e LetStatementL) (e HiddenExpressionL)
+    -> BlockItem e BlockItemL
 
 data LetStatement e l where
-  LetStatement ::
-    e BindListL ->
-    Maybe (e HiddenTypeL) ->
-    Maybe (e HiddenExpressionL) ->
-    LetStatement LetStatementL
+  LetStatement
+    :: e BindListL
+    -> Maybe (e HiddenTypeL)
+    -> Maybe (e HiddenExpressionL)
+    -> LetStatement e LetStatementL
 
 data FieldInitializeList e l where
-  FieldInitializeList ::
-    Maybe (e ExpFieldL) -> [e ExpFieldL] ->
-    FieldInitializeList FieldInitializeListL
+  FieldInitializeList
+    :: Maybe (e ExpFieldL) -> [e ExpFieldL]
+    -> FieldInitializeList e FieldInitializeListL
 
 data ExpField e l where
-  ExpField ::
-    e HiddenFieldIdentifierL ->
-    Maybe (e HiddenExpressionL) ->
-    ExpField ExpFieldL
+  ExpField
+    :: e HiddenFieldIdentifierL
+    -> Maybe (e HiddenExpressionL)
+    -> ExpField e ExpFieldL
 
 data Label e l where
-  Label ::
-    e IdentifierL ->
-    Label LabelL
+  Label
+    :: e IdentifierL
+    -> Label e LabelL
 
 data MacroModuleAccess e l where
-  MacroModuleAccess ::
-    e ModuleAccessL ->
-    MacroModuleAccess MacroModuleAccessL
+  MacroModuleAccess
+    :: e ModuleAccessL
+    -> MacroModuleAccess e MacroModuleAccessL
 
 data SpecBody e l where
-  SpecBody ::
-    [e UseDeclarationL] ->
-    [e HiddenSpecBlockMemeberL] ->
-    SpecBody SpecBodyL
+  SpecBody
+    :: [e UseDeclarationL]
+    -> [e HiddenSpecBlockMemeberL]
+    -> SpecBody e SpecBodyL
 
 data HiddenSpecBlockMemeber e l where
-  SpecInvariant ::
-    Maybe (e ConditionPropertiesL) -> e HiddenExpressionL ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  HiddenSpecFunction ::
-    Either (e UsualSpecFunctionL) (Either (e UninterpretedSpecFunctionL) (e NativeSpecFunctionL)) ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecCondition ::
-    Either (e HiddenSpecAbortIfL) (Either (e HiddenSpecAbortWithOrModifiesL) (e HiddenSpecConditionL)) ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecInclude ::
-    e HiddenExpressionL ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecApply ::
-    e HiddenExpressionL -> [e SpecApplyPatternL] -> e SpecApplyPatternL -> Maybe [e SpecApplyPatternL] -> e SpecApplyPatternL ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecPragma ::
-    Maybe (e SpecPropertyL) -> [e SpecPropertyL] ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecVariable ::
-    e IdentifierL -> Maybe (e TypeParametersL) -> e HiddenTypeL ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
-  SpecLet ::
-    e IdentifierL -> e HiddenExpressionL ->
-    HiddenSpecBlockMemeber HiddenSpecBlockMemeberL
+  SpecInvariantSpecBlockMemeber
+    :: Maybe (e ConditionPropertiesL) -> e HiddenExpressionL
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  HiddenSpecFunctionSpecBlockMemeber
+    :: Either (e UsualSpecFunctionL) (Either (e UninterpretedSpecFunctionL) (e NativeSpecFunctionL))
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecConditionSpecBlockMemeber
+    :: Either (e HiddenSpecAbortIfL) (Either (e HiddenSpecAbortWithOrModifiesL) (e HiddenSpecConditionL))
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecIncludeSpecBlockMemeber
+    :: e HiddenExpressionL
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecApplySpecBlockMemeber
+    :: e HiddenExpressionL -> [e SpecApplyPatternL] -> e SpecApplyPatternL -> Maybe ([e SpecApplyPatternL] -> e SpecApplyPatternL)
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecPragmaSpecBlockMemeber
+    :: Maybe (e SpecPropertyL) -> [e SpecPropertyL]
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecVariableSpecBlockMemeber
+    :: e IdentifierL -> Maybe (e TypeParametersL) -> e HiddenTypeL
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
+  SpecLetSpecBlockMemeber
+    :: e IdentifierL -> e HiddenExpressionL
+    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
 
 data HiddenSpecAbortIf e l where
-  HiddenSpecAbortIf ::
-    Maybe (e ConditionPropertiesL) ->
-    e HiddenExpressionL ->
-    Maybe (e HiddenExpressionL) ->
-    HiddenSpecAbortIf HiddenSpecAbortIfL
+  HiddenSpecAbortIf
+    :: Maybe (e ConditionPropertiesL)
+    -> e HiddenExpressionL
+    -> Maybe (e HiddenExpressionL)
+    -> HiddenSpecAbortIf e HiddenSpecAbortIfL
 
 data ConditionProperties e l where
-  ConditionProperties ::
-    Maybe (e SpecPropertyL) -> [e SpecPropertyL] ->
-    ConditionProperties ConditionPropertiesL
+  ConditionProperties
+    :: Maybe (e SpecPropertyL) -> [e SpecPropertyL]
+    -> ConditionProperties e ConditionPropertiesL
 
 data SpecProperty e l where
-  SpecProperty ::
-    e IdentifierL ->
-    Maybe (e HiddenLiteralValueL) ->
-    SpecProperty SpecPropertyL
+  SpecProperty
+    :: e IdentifierL
+    -> Maybe (e HiddenLiteralValueL)
+    -> SpecProperty e SpecPropertyL
 
 data HiddenSpecAbortWithOrModifies e l where
-  HiddenSpecAbortWithOrModifies ::
-    Maybe (e ConditionPropertiesL) ->
-    [e HiddenExpressionL] -> e HiddenExpressionL ->
-    HiddenSpecAbortWithOrModifies HiddenSpecAbortWithOrModifiesL
+  HiddenSpecAbortWithOrModifies
+    :: Maybe (e ConditionPropertiesL)
+    -> [e HiddenExpressionL] -> e HiddenExpressionL
+    -> HiddenSpecAbortWithOrModifies e HiddenSpecAbortWithOrModifiesL
 
 data HiddenSpecCondition e l where
-  HiddenSpecCondition ::
-    Maybe (e HiddenSpecConditionKindL) ->
-    Maybe (e ConditionPropertiesL) ->
-    e HiddenExpressionL ->
-    HiddenSpecCondition HiddenSpecConditionL
+  HiddenSpecCondition
+    :: Maybe (e HiddenSpecConditionKindL)
+    -> Maybe (e ConditionPropertiesL)
+    -> e HiddenExpressionL
+    -> HiddenSpecCondition e HiddenSpecConditionL
 
 data HiddenSpecConditionKind e l where
 
 data NativeSpecFunction e l where
-  NativeSpecFunction ::
-    e HiddenSpecFunctionSignatureL ->
-    NativeSpecFunction NativeSpecFunctionL
+  NativeSpecFunction
+    :: e HiddenSpecFunctionSignatureL
+    -> NativeSpecFunction e NativeSpecFunctionL
 
 data SpecApplyPattern e l where
-  SpecApplyPattern ::
-    e SpecApplyNamePatternL ->
-    Maybe (e TypeParametersL) ->
-    SpecApplyPattern SpecApplyPatternL
+  SpecApplyPattern
+    :: e SpecApplyNamePatternL
+    -> Maybe (e TypeParametersL)
+    -> SpecApplyPattern e SpecApplyPatternL
 
 data SpecApplyNamePattern e l where
-  SpecApplyNamePattern ::
-     ->
-    SpecApplyNamePattern SpecApplyNamePatternL
+  SpecApplyNamePattern
+    :: SpecApplyNamePattern e SpecApplyNamePatternL
 
 data UninterpretedSpecFunction e l where
-  UninterpretedSpecFunction ::
-    e HiddenSpecFunctionSignatureL ->
-    UninterpretedSpecFunction UninterpretedSpecFunctionL
+  UninterpretedSpecFunction
+    :: e HiddenSpecFunctionSignatureL
+    -> UninterpretedSpecFunction e UninterpretedSpecFunctionL
 
 data UsualSpecFunction e l where
-  UsualSpecFunction ::
-    e HiddenSpecFunctionSignatureL ->
-    e BlockL ->
-    UsualSpecFunction UsualSpecFunctionL
+  UsualSpecFunction
+    :: e HiddenSpecFunctionSignatureL
+    -> e BlockL
+    -> UsualSpecFunction e UsualSpecFunctionL
 
 data UseDeclaration e l where
-  UseDeclaration ::
-    Either (e UseModuleL) (Either (e UseModuleMemberL) (Either (e UseModuleMembersL) (e UseFunL))) ->
-    UseDeclaration UseDeclarationL
+  UseDeclaration
+    :: Either (e UseModuleL) (Either (e UseModuleMemberL) (Either (e UseModuleMembersL) (e UseFunL)))
+    -> UseDeclaration e UseDeclarationL
 
 data UseFun e l where
-  UseFun ::
-    e ModuleAccessL ->
-    e HiddenFunctionIdentifierL -> e ModuleAccessL ->
-    UseFun UseFunL
+  UseFun
+    :: e ModuleAccessL
+    -> e HiddenFunctionIdentifierL -> e ModuleAccessL
+    -> UseFun e UseFunL
 
 data UseModule e l where
-  UseModule ::
-    e ModuleIdentityL ->
-    Maybe (e HiddenModuleIdentifierL) ->
-    UseModule UseModuleL
+  UseModule
+    :: e ModuleIdentityL
+    -> Maybe (e HiddenModuleIdentifierL)
+    -> UseModule e UseModuleL
 
 data HiddenModuleIdentifier e l where
-  HiddenModuleIdentifier ::
-    e IdentifierL ->
-    HiddenModuleIdentifier HiddenModuleIdentifierL
+  HiddenModuleIdentifier
+    :: e IdentifierL
+    -> HiddenModuleIdentifier e HiddenModuleIdentifierL
 
 data ModuleIdentity e l where
-  ModuleIdentity ::
-    Either (e HiddenModuleIdentifierL) (e NumLiteralL) ->
-    e HiddenModuleIdentifierL ->
-    ModuleIdentity ModuleIdentityL
+  ModuleIdentity
+    :: Either (e HiddenModuleIdentifierL) (e NumLiteralL)
+    -> e HiddenModuleIdentifierL
+    -> ModuleIdentity e ModuleIdentityL
 
 data UseModuleMember e l where
-  UseModuleMember ::
-    e ModuleIdentityL ->
-    e UseMemberL ->
-    UseModuleMember UseModuleMemberL
+  UseModuleMember
+    :: e ModuleIdentityL
+    -> e UseMemberL
+    -> UseModuleMember e UseModuleMemberL
 
 data UseMember e l where
 
 data UseModuleMembers e l where
 
 data HiddenForall e l where
-  HiddenForall ::
-     ->
-    HiddenForall HiddenForallL
+  HiddenForall
+    :: HiddenForall e HiddenForallL
 
 data HiddenUnaryExpression e l where
-  HiddenUnaryExpression ::
-    Either (e BorrowExpressionL) (Either (e DereferenceExpressionL) (Either (e MoveOrCopyExpressionL) (Either (e HiddenExpressionTermL) (e UnaryExpressionL)))) ->
-    HiddenUnaryExpression HiddenUnaryExpressionL
+  HiddenUnaryExpression
+    :: Either (e BorrowExpressionL) (Either (e DereferenceExpressionL) (Either (e MoveOrCopyExpressionL) (Either (e HiddenExpressionTermL) (e UnaryExpressionL))))
+    -> HiddenUnaryExpression e HiddenUnaryExpressionL
 
 data BorrowExpression e l where
-  BorrowExpression ::
-    e HiddenExpressionL -> e HiddenReferenceL ->
-    BorrowExpression BorrowExpressionL
+  BorrowExpression
+    :: e HiddenExpressionL -> e HiddenReferenceL
+    -> BorrowExpression e BorrowExpressionL
 
 data DereferenceExpression e l where
-  DereferenceExpression ::
-    e HiddenExpressionL ->
-    DereferenceExpression DereferenceExpressionL
+  DereferenceExpression
+    :: e HiddenExpressionL
+    -> DereferenceExpression e DereferenceExpressionL
 
 data MoveOrCopyExpression e l where
-  MoveOrCopyExpression ::
-    e HiddenExpressionL ->
-    MoveOrCopyExpression MoveOrCopyExpressionL
+  MoveOrCopyExpression
+    :: e HiddenExpressionL
+    -> MoveOrCopyExpression e MoveOrCopyExpressionL
 
 data UnaryExpression e l where
-  UnaryExpression ::
-    e UnaryOpL ->
-    e HiddenExpressionL ->
-    UnaryExpression UnaryExpressionL
+  UnaryExpression
+    :: e UnaryOpL
+    -> e HiddenExpressionL
+    -> UnaryExpression e UnaryExpressionL
 
 data UnaryOp e l where
 
 data BlockIdentifier e l where
-  BlockIdentifier ::
-    e LabelL ->
-    BlockIdentifier BlockIdentifierL
+  BlockIdentifier
+    :: e LabelL
+    -> BlockIdentifier e BlockIdentifierL
 
 data LambdaBindings e l where
-  LambdaBindings ::
-    Maybe (e LambdaBindingL) -> [e LambdaBindingL] ->
-    LambdaBindings LambdaBindingsL
+  LambdaBindings
+    :: Maybe (e LambdaBindingL) -> [e LambdaBindingL]
+    -> LambdaBindings e LambdaBindingsL
 
 data LambdaBinding e l where
-  CommaBindList ::
-    Maybe (e HiddenBindL) -> [e HiddenBindL] ->
-    LambdaBinding LambdaBindingL
-  Bind ::
-    e HiddenBindL ->
-    LambdaBinding LambdaBindingL
+  CommaBindListLambdaBinding
+    :: Maybe (e HiddenBindL) -> [e HiddenBindL]
+    -> LambdaBinding e LambdaBindingL
+  BindLambdaBinding
+    :: e HiddenBindL
+    -> LambdaBinding e LambdaBindingL
 
 data QuantifierBindings e l where
-  QuantifierBindings ::
-    e QuantifierBindingL ->
-    [e QuantifierBindingL] ->
-    QuantifierBindings QuantifierBindingsL
+  QuantifierBindings
+    :: e QuantifierBindingL
+    -> [e QuantifierBindingL]
+    -> QuantifierBindings e QuantifierBindingsL
 
 data QuantifierBinding e l where
 
 data HiddenStructItem e l where
-  NativeStructDefinition ::
-    e HiddenStructSignatureL ->
-    HiddenStructItem HiddenStructItemL
-  StructDefinition ::
-    e HiddenStructSignatureL -> e DatatypeFieldsL -> Maybe (e PostfixAbilityDeclsL) ->
-    HiddenStructItem HiddenStructItemL
+  NativeStructDefinitionStructItem
+    :: e HiddenStructSignatureL
+    -> HiddenStructItem e HiddenStructItemL
+  StructDefinitionStructItem
+    :: e HiddenStructSignatureL -> e DatatypeFieldsL -> Maybe (e PostfixAbilityDeclsL)
+    -> HiddenStructItem e HiddenStructItemL
 
 data HiddenStructSignature e l where
-  HiddenStructSignature ::
-    e HiddenStructIdentifierL ->
-    Maybe (e TypeParametersL) ->
-    Maybe (e AbilityDeclsL) ->
-    HiddenStructSignature HiddenStructSignatureL
+  HiddenStructSignature
+    :: e HiddenStructIdentifierL
+    -> Maybe (e TypeParametersL)
+    -> Maybe (e AbilityDeclsL)
+    -> HiddenStructSignature e HiddenStructSignatureL
 
 data Constant e l where
-  Constant ::
-    e IdentifierL ->
-    e HiddenTypeL ->
-    e HiddenExpressionL ->
-    Constant ConstantL
+  Constant
+    :: e IdentifierL
+    -> e HiddenTypeL
+    -> e HiddenExpressionL
+    -> Constant e ConstantL
 
 data FriendDeclaration e l where
-  FriendDeclaration ::
-    e FriendAccessL ->
-    FriendDeclaration FriendDeclarationL
+  FriendDeclaration
+    :: e FriendAccessL
+    -> FriendDeclaration e FriendDeclarationL
 
 data FriendAccess e l where
-  LocalModule ::
-    e IdentifierL ->
-    FriendAccess FriendAccessL
-  FullyQualifiedModule ::
-    e ModuleIdentityL ->
-    FriendAccess FriendAccessL
+  LocalModuleFriendAccess
+    :: e IdentifierL
+    -> FriendAccess e FriendAccessL
+  FullyQualifiedModuleFriendAccess
+    :: e ModuleIdentityL
+    -> FriendAccess e FriendAccessL
 
 data SpecBlock e l where
-  SpecBlock ::
-    Either (e HiddenSpecFunctionL) e SpecBodyL -> Maybe (e HiddenSpecBlockTargetL) ->
-    SpecBlock SpecBlockL
+  SpecBlock
+    :: Either (e HiddenSpecFunctionL) (e SpecBodyL -> Maybe (e HiddenSpecBlockTargetL))
+    -> SpecBlock e SpecBlockL
 
 --------------------------------------------------------------------------------
 -- Signature
 --------------------------------------------------------------------------------
 
-type MoveSig = '[]
+type MoveSig =
+  '[ SourceFile
+   , ModuleDefinition
+   , ModuleBody
+   , HiddenEnumItem
+   , HiddenEnumSignature
+   , HiddenEnumIdentifier
+   , Identifier
+   , AbilityDecls
+   , Ability
+   , TypeParameters
+   , TypeParameter
+   , HiddenTypeParameterIdentifier
+   , EnumVariants
+   , Variant
+   , HiddenVariantIdentifier
+   , DatatypeFields
+   , HiddenType
+   , HiddenReference
+   , FunctionTypeParameters
+   , ModuleAccess
+   , TypeArguments
+   , FieldAnnotation
+   , HiddenFieldIdentifier
+   , PostfixAbilityDecls
+   , HiddenFunctionItem
+   , HiddenFunctionSignature
+   , HiddenFunctionIdentifier
+   , FunctionParameters
+   , FunctionParameter
+   , HiddenVariableIdentifier
+   , MutFunctionParameter
+   , Modifier
+   , RetType
+   , HiddenMacroSignature
+   , Block
+   , HiddenExpression
+   , HiddenExists
+   , HiddenExpressionTerm
+   , HiddenMatchBody
+   , MatchArm
+   , BindList
+   , HiddenBind
+   , AddressLiteral
+   , BindFields
+   , BindField
+   , MutBindField
+   , BoolLiteral
+   , ByteStringLiteral
+   , HexStringLiteral
+   , NameExpression
+   , NumLiteral
+   , HiddenLiteralValue
+   , AtBind
+   , BindUnpack
+   , MutBindVar
+   , MatchCondition
+   , HiddenSpecBlockTarget
+   , HiddenStructIdentifier
+   , HiddenSpecFunction
+   , HiddenSpecFunctionSignature
+   , ArgList
+   , BlockItem
+   , LetStatement
+   , FieldInitializeList
+   , ExpField
+   , Label
+   , MacroModuleAccess
+   , SpecBody
+   , HiddenSpecBlockMemeber
+   , HiddenSpecAbortIf
+   , ConditionProperties
+   , SpecProperty
+   , HiddenSpecAbortWithOrModifies
+   , HiddenSpecCondition
+   , HiddenSpecConditionKind
+   , NativeSpecFunction
+   , SpecApplyPattern
+   , SpecApplyNamePattern
+   , UninterpretedSpecFunction
+   , UsualSpecFunction
+   , UseDeclaration
+   , UseFun
+   , UseModule
+   , HiddenModuleIdentifier
+   , ModuleIdentity
+   , UseModuleMember
+   , UseMember
+   , UseModuleMembers
+   , HiddenForall
+   , HiddenUnaryExpression
+   , BorrowExpression
+   , DereferenceExpression
+   , MoveOrCopyExpression
+   , UnaryExpression
+   , UnaryOp
+   , BlockIdentifier
+   , LambdaBindings
+   , LambdaBinding
+   , QuantifierBindings
+   , QuantifierBinding
+   , HiddenStructItem
+   , HiddenStructSignature
+   , Constant
+   , FriendDeclaration
+   , FriendAccess
+   , SpecBlock
+   ]
 
-type MoveTerm      = Term LuaSig
-type MoveTermLab l = TermLab LuaSig l
+type MoveTerm      = Term MoveSig
+type MoveTermLab l = TermLab MoveSig l
 
 --------------------------------------------------------------------------------
 -- Entry point
 --------------------------------------------------------------------------------
 
-type RootSort MoveSig = SourceFileL
+type instance RootSort MoveSig = SourceFileL

@@ -173,8 +173,9 @@ instance ToContext Text Type where
       Node name -> par p ("e" <> " " <> TLB.fromText (snakeToCase Upper (unName name) <> "L"))
       List a -> "[" <> t2t False a <> "]"
       NonEmpty a -> par p ("NonEmpty" <> " " <> t2t True a)
-      Unit -> "()"
-      Tuple a b -> "(" <> t2t False a <> ", " <> t2t False b <> ")"
+      -- Token t -> "Token \"" <> TLB.fromText t <> "\""
+      Unit -> mempty
+      Tuple a b -> par p (t2t False a <> " -> " <> t2t False b)
       Either a b -> par p ("Either" <> " " <> t2t True a <> " " <> t2t True b)
       Maybe a -> par p ("Maybe" <> " " <> t2t True a)
 
