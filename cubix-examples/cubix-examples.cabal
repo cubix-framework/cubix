@@ -139,7 +139,7 @@ executable language-javascript
 --   build-depends:
 --     , cubix-examples
 --     , lens >= 5.3.4
---     , text >= 2.1.1
+--     , text >= 2.1.2
 
 executable language-python
   import: language
