@@ -57,6 +57,7 @@ in {
         tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
         --start-rule-name source_file \
         --module-name Cubix.Language.SuiMove.Modularized \
+        --token-map cubix-sui-move/preserved_tokens.json \
         -o cubix-sui-move/src/Cubix/Language/SuiMove/Modularized.hs
       popd
     '';

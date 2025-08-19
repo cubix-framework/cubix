@@ -28,7 +28,7 @@ import Data.Text.Lazy.Builder qualified as TLB
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
-import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), fieldName, toDataTypes, unName)
+import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, toDataTypes, unName)
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
 
 {- Note [One AstCache per syntax tree]
@@ -70,8 +70,8 @@ data Metadata = Metadata
   , pretty :: Bool
   }
 
-generateAst :: Metadata -> Grammar -> FilePath -> Text -> Either String Text
-generateAst Metadata{..} grammar templateFile template = errorOrModule
+generateAst :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
+generateAst Metadata{..} grammar templateFile template tokenMap = errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
@@ -81,13 +81,21 @@ generateAst Metadata{..} grammar templateFile template = errorOrModule
       , ("moduleName", textToVal $ fromMaybe defaultModuleName moduleName)
       , ("pretty", BoolVal pretty)
       ]
+  datatypes = dataTypes tokenMap
+  tokens = M.mapWithKey
+    (\k v -> MapVal . Context . M.fromList $
+      [ ("name", toVal . Name $ fromMaybe k v)
+      , ("symbol", textToVal k)])
+    tokenMap
+  tokensContext = Context . M.singleton "tokens" . toVal $
+    M.elems tokens
   dataTypesContext =
     Context . M.fromList $
-      [ ("dataTypes", toVal dataTypes)
-      , ("startSort", maybe NullVal (\(Data name _, _) -> toVal name) (uncons dataTypes))
+      [ ("dataTypes", toVal datatypes)
+      , ("startSort", maybe NullVal (\(Data name _, _) -> toVal name) (uncons datatypes))
       ]
   dataTypes = toDataTypes startRuleName grammar
-  context = metadataContext <> dataTypesContext
+  context = metadataContext <> dataTypesContext <> tokensContext
   errorOrModule = renderTemplate templateFile template context
 
 data RenderState = InText | InTemplate [Text]
@@ -125,6 +133,7 @@ isNodeLike = \case
   NonEmpty a -> isNodeLike a
   Unit -> False
   Tuple a b -> isNodeLike a && isNodeLike b
+  Token _ -> False
   Either a b -> isNodeLike a && isNodeLike b
   Maybe a -> isNodeLike a
 
@@ -166,16 +175,16 @@ instance ToContext Text (Int, Field) where
 
 instance ToContext Text Type where
   toVal :: Type -> Val Text
-  toVal = textToVal . TL.toStrict . TLB.toLazyText . t2t False
+  toVal = textToVal . TL.toStrict . TLB.toLazyText . ("e " <>) . t2t True
    where
     par b t = if b then "(" <> t <> ")" else t
     t2t p = \case
-      Node name -> par p ("e" <> " " <> TLB.fromText (snakeToCase Upper (unName name) <> "L"))
+      Node name -> TLB.fromText (snakeToCase Upper (unName name) <> "L")
       List a -> "[" <> t2t False a <> "]"
-      NonEmpty a -> par p ("NonEmpty" <> " " <> t2t True a)
-      -- Token t -> "Token \"" <> TLB.fromText t <> "\""
+      NonEmpty a -> "NonEmpty" <> " " <> t2t True a
+      Token t -> TLB.fromText (snakeToCase Upper t) <> "TokL"
       Unit -> mempty
-      Tuple a b -> par p (t2t False a <> " -> " <> t2t False b)
+      Tuple a b -> par True (t2t False a <> ", " <> t2t False b)
       Either a b -> par p ("Either" <> " " <> t2t True a <> " " <> t2t True b)
       Maybe a -> par p ("Maybe" <> " " <> t2t True a)
 

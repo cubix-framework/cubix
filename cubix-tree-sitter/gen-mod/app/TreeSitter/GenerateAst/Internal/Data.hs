@@ -17,6 +17,7 @@ module TreeSitter.GenerateAst.Internal.Data (
   fieldName,
   GrammarError (..),
   toDataTypes,
+  type TokenMap
 ) where
 
 import Control.Applicative (Alternative (..))
@@ -34,6 +35,9 @@ import Data.Vector (Vector)
 import Data.Vector qualified as V
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), Rule (..), RuleName)
 
+-- | Preserves tokens used as keys, and renames them to value
+type TokenMap = Map Text (Maybe Text)
+
 newtype Name = Name {getName :: Text}
   deriving newtype (Eq, Ord, Show, IsString)
 
@@ -49,7 +53,7 @@ data Type
   | List Type
   | NonEmpty Type
   | Unit
-  -- | Token Text
+  | Token Text
   | Tuple Type Type
   | Either Type Type
   | Maybe Type
@@ -88,8 +92,8 @@ newtype GrammarError
 
 instance Exception GrammarError
 
-toDataTypes :: RuleName -> Grammar -> [Data]
-toDataTypes start grammar = dataTypes `reachableFrom` startName
+toDataTypes :: RuleName -> Grammar -> TokenMap -> [Data]
+toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
  where
   startName :: Name
   startName = Name start
@@ -104,9 +108,6 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
       SymbolRule ruleName -> M.singleton ruleName BlankRule
       _ -> mempty
 
-  isSuperType :: RuleName -> Bool
-  isSuperType s = maybe False (s `V.elem`) grammar.supertypes
-
   rule :: RuleName -> Rule
   rule ruleName = fromMaybe failUnknownRule (tryRules <|> tryExternals)
    where
@@ -120,27 +121,23 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
     ruleToData :: Rule -> Data
     ruleToData = \case
       -- ... if the rule is a choice rule, it becomes a sum type:
-      ChoiceRule rs -> -- (rulesToRuleNames -> Just cs) ->
-        -- | isSuperType s ->
-            Data (Name s) $ rulesToConstrs s rs
+      ChoiceRule rs ->
+        let constrs = rulesToConstrs s rs
+        in Data (Name s) $ renameAnonymousConstr s constrs
       -- ... if the rule is a seq rule, it becomes a product type:
       SeqRule rs ->
         Data (Name s) [Constr (Name s) [f | r <- V.toList rs, let f = ruleToField r, f.type_ /= Unit]]
+      -- ignored rules
+      PrecRule _ _ r -> ruleToData r
       -- ... otherwise, it becomes a newtype wrapper:
       r -> Data (Name s) [Constr (Name s) [ruleToField r]]
 
-  ruleToConstr :: Name -> Rule -> Constr
-  ruleToConstr c = \case
-    SeqRule rs -> Constr c [f | r <- V.toList rs, let f = ruleToField r, f.type_ /= Unit]
-    -- Use field as constructor name
-    FieldRule n (ruleToField -> f) -> Constr (Name n) [f | f.type_ /= Unit]
-    -- The following constructors are transparent:
-    AliasRule _ _ r -> ruleToConstr c r
-    TokenRule r -> ruleToConstr c r
-    ImmediateTokenRule r -> ruleToConstr c r
-    PrecRule _ _ r -> ruleToConstr c r
-    -- The remaining rules become single-field constructors:
-    (ruleToField -> f) -> Constr c [f | f.type_ /= Unit]
+  renameAnonymousConstr :: Text -> [Constr] -> [Constr]
+  renameAnonymousConstr typeName constrs = go <$> zip constrs [1..]
+    where go :: (Constr, Int) -> Constr
+          go (ctor@(Constr (Name name) fields), ord) = if name == typeName
+            then Constr (Name $ name <> Text.show ord) fields
+            else ctor
 
   rulesToConstrs :: RuleName -> Vector Rule -> [Constr]
   rulesToConstrs s = catMaybes . go . V.toList
@@ -152,57 +149,26 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
       SymbolRule sr -> Just (Constr (suffix sr) [ruleToField (rule sr)]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
-      StringRule{} -> go rest
+      StringRule str -> Just (Constr (suffix str) []) : go rest
       AliasRule n _ ar -> Just (Constr (suffix n) [ruleToField ar]) : go rest
       TokenRule tr -> go (tr : rest)
       ImmediateTokenRule tr -> go (tr : rest)
       FieldRule n fr -> Just (Constr (suffix n) [ruleToField fr]) : go rest
       PrecRule _ _ pr -> go (pr : rest)
+      SeqRule rs ->
+        Just (Constr (Name s) [ f
+                              | item <- V.toList rs
+                              , let f = ruleToField item
+                              , f.type_ /= Unit ]) : go rest
     -- The following constructors constitute faillure:
       PatternRule{} -> []
       RepeatRule{} -> []
       Repeat1Rule{} -> []
-      SeqRule{} -> []
-    
-  -- choiceConstrs :: RuleName -> Rule -> Maybe Constr
-  -- choiceConstrs s = \case
-  --   SymbolRule r -> Just $ Constr (Name s) [ruleToField (rule r)]
-  --   ChoiceRule r -> ruleToConstrs s r
-
-  constrName :: RuleName -> Rule -> Name
-  constrName s = \case
-    FieldRule n _ -> Name n
-    AliasRule n _ _ -> Name n
-    TokenRule r -> constrName s r
-    ImmediateTokenRule r -> constrName s r
-    _ -> Name s
-  
-  rulesToRuleNames :: Vector Rule -> Maybe [RuleName]
-  rulesToRuleNames = fmap catMaybes . go . V.toList
-   where
-    go :: [Rule] -> Maybe [Maybe RuleName]
-    go [] = Just []
-    go (SymbolRule s : rest) = (Just s :) <$> go rest
-    -- Nested choice rules are unfolded:
-    go (ChoiceRule rs : rest) = go (V.toList rs <> rest)
-    -- The following constructors are ignored:
-    go (BlankRule : rest) = go rest
-    go (StringRule{} : rest) = go rest
-    go (AliasRule _ _ r : rest) = go (r : rest)
-    go (TokenRule r : rest) = go (r : rest)
-    go (ImmediateTokenRule r : rest) = go (r : rest)
-    go (FieldRule _ r : rest) = go (r : rest)
-    go (PrecRule _ _ r : rest) = go (r : rest)
-    -- The following constructors constitute faillure:
-    go (PatternRule{} : _rest) = Nothing
-    go (RepeatRule{} : _rest) = Nothing
-    go (Repeat1Rule{} : _rest) = Nothing
-    go (SeqRule{} : _rest) = Nothing
 
   ruleToType :: Rule -> Type
   ruleToType = \case
     BlankRule -> Unit
-    StringRule{} -> Unit
+    StringRule s -> maybe Unit (Token . fromMaybe s) (M.lookup s tokenMap)
     PatternRule{} -> Unit
     SymbolRule s -> Node (Name s)
     SeqRule rs -> foldr1Or mkTuple Unit [t | r <- V.toList rs, let t = ruleToType r]
@@ -221,10 +187,6 @@ toDataTypes start grammar = dataTypes `reachableFrom` startName
     -- Nested field rules are ignored:
     FieldRule n r -> Named (Name n) (ruleToType r)
     AliasRule _ _ r -> ruleToField r
-    -- AliasRule n True r -> Named (Name n) (ruleToType r)
-    -- AliasRule n named r -> if named
-    --   then Named (Name n) (ruleToType r)
-    --   else Unnamed (ruleToType r)
     -- The following constructors are transparent:
     TokenRule r -> ruleToField r
     ImmediateTokenRule r -> ruleToField r
@@ -244,7 +206,7 @@ depsOfType = \case
   List t -> depsOfType t
   NonEmpty t -> depsOfType t
   Unit -> []
-  -- Token _ -> []
+  Token _ -> []
   Tuple t1 t2 -> depsOfType t1 <> depsOfType t2
   Either t1 t2 -> depsOfType t1 <> depsOfType t2
   Maybe t -> depsOfType t
