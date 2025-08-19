@@ -13,6 +13,7 @@ bug-reports:   https://github.com/cubix-framework/cubix/issues
 
 extra-source-files:
   gen-ast/data/Ast.hs.template
+  gen-mod/data/Modularized.hs.template
 
 tested-with:
   GHC == 9.8.4
@@ -74,51 +75,52 @@ common dependencies
     , unordered-containers ^>= 0.2
     , vector >= 0.13.2.0
     , tree-sitter-sui-move
+    , pretty-simple
 
-library
-  import: language
-  import: ghc-options
-  import: dependencies
-  hs-source-dirs: src
-  exposed-modules:
-    AST.Deserialize
-    AST.GenerateSyntax
-    AST.Token
+-- library
+--   import: language
+--   import: ghc-options
+--   import: dependencies
+--   hs-source-dirs: src
+--   exposed-modules:
+--     AST.Deserialize
+--     AST.GenerateSyntax
+--     AST.Token
   
-executable gen-syntax
-  import: language
-  import: dependencies
-  import: ghc-options
-  import: rts-options
-  main-is: Main.hs
-  hs-source-dirs:
-    gen-syntax
-  other-modules:
-    Options
-  build-depends:
-    , cubix-tree-sitter
-    , neat-interpolation ^>= 0.5
-    , optparse-applicative
-    , optparse-generic ^>= 1.5
+-- executable gen-syntax
+--   import: language
+--   import: dependencies
+--   import: ghc-options
+--   import: rts-options
+--   main-is: Main.hs
+--   hs-source-dirs:
+--     gen-syntax
+--   other-modules:
+--     Options
+--   build-depends:
+--     , cubix-tree-sitter
+--     , neat-interpolation ^>= 0.5
+--     , optparse-applicative
+--     , optparse-generic ^>= 1.5
 
-executable gen-ast
-  import: language
-  import: dependencies
-  import: ghc-options
-  import: rts-options
-  main-is: Main.hs
-  other-modules:
-    TreeSitter.GenerateAst.Internal.CodeGen
-    TreeSitter.GenerateAst.Internal.Data
-    TreeSitter.GenerateAst.Internal.Grammar
+-- executable gen-ast
+--   import: language
+--   import: dependencies
+--   import: ghc-options
+--   import: rts-options
+--   main-is: Main.hs
+--   other-modules:
+--     TreeSitter.GenerateAst.Internal.CodeGen
+--     TreeSitter.GenerateAst.Internal.Data
+--     TreeSitter.GenerateAst.Internal.Grammar
 
-  hs-source-dirs: gen-ast/app
-  build-depends:
-    , doclayout ^>= 0.5
-    , doctemplates ^>= 0.11
-    , fgl ^>= 5.8
-    , file-embed ^>= 0.0
-    , optparse-applicative ^>= 0.18
+--   hs-source-dirs: gen-ast/app
+--   build-depends:
+--     , doclayout ^>= 0.5
+--     , doctemplates ^>= 0.11
+--     , fgl ^>= 5.8
+--     , file-embed ^>= 0.0
+--     , optparse-applicative ^>= 0.18
 
 executable gen-mod
   import: language

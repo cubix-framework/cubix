@@ -6,11 +6,13 @@ module Main (main) where
 import Control.Applicative (Alternative (..))
 import Data.Aeson (eitherDecodeFileStrict)
 import Data.FileEmbed (embedFileRelative)
+import Data.Map qualified as Map
 import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Data.Text.IO qualified as T
 import Options.Applicative (Parser, ParserInfo, execParser, flag', fullDesc, help, helper, info, long, metavar, optional, progDesc, short, strArgument, strOption, (<**>))
 import TreeSitter.GenerateAst.Internal.CodeGen (Metadata (..), generateAst)
+-- import Text.Pretty.Simple (pPrint)
 
 template :: Text
 template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/Modularized.hs.template")
@@ -18,6 +20,7 @@ template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/Modularized.hs.templat
 data Options = Options
   { inputFile :: FilePath
   , outputFile :: Maybe FilePath
+  , tokenMapFile :: Maybe FilePath
   , metadata :: Metadata
   }
 
@@ -69,6 +72,14 @@ parserOptions =
               <> help "Output file."
           )
       )
+    <*> optional
+      ( strOption
+          ( short 't'
+              <> long "token-map"
+              <> metavar "JSON_FILE"
+              <> help "Hint which token to preserve in the syntax."
+          )
+      )
     <*> parserMetadata
 
 optionsInfo :: ParserInfo Options
@@ -81,6 +92,8 @@ main :: IO ()
 main = do
   Options{..} <- execParser optionsInfo
   grammar <- either fail pure =<< eitherDecodeFileStrict inputFile
-  result <- either fail pure (generateAst metadata grammar "Ast.hs.template" template)
+  tokenMap <- either fail pure =<< maybe (pure $ Right Map.empty) eitherDecodeFileStrict tokenMapFile
+  -- pPrint (grammar :: Grammar)
+  result <- either fail pure (generateAst metadata grammar "Ast.hs.template" template tokenMap)
   maybe T.putStrLn T.writeFile outputFile result
 

@@ -19,14 +19,15 @@ ${endif}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-+}
-module ${moduleName} (
+module ${moduleName}
 {+-}
-) where
+  where
 
 import Control.Applicative (Alternative (..), optional)
 import Control.Monad (MonadPlus (..))
@@ -40,7 +41,9 @@ import Data.IntMap.Strict qualified as IM
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isJust)
+import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import GHC.TypeLits (Symbol)
 {-+}
 ${if(pretty)}
 import Prettyprinter (Doc, Pretty (..), nest, parens, sep)
@@ -50,6 +53,7 @@ import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 
 import Cubix.Language.Info (TermLab)
+import Cubix.Language.Parametric.Derive
 import Cubix.ParsePretty (type RootSort)
 import Data.Comp.Multi (Term)
 import Data.Comp.Multi.Kinds qualified as Kinds
@@ -58,7 +62,6 @@ import Data.Comp.Multi.Kinds qualified as Kinds
 -- Sort
 --------------------------------------------------------------------------------
 
-type data Sort :: Kinds.Sort where
 {-+}
 ${for(dataTypes)}
 data ${it.name.camelCase}L
@@ -70,6 +73,19 @@ ${endfor}
 --------------------------------------------------------------------------------
 
 {-+}
+${for(tokens)}
+data ${it.name.camelCase}TokL
+${endfor}
+
+data Token e l where
+${for(tokens)}
+  ${it.name.camelCase} :: Token e ${it.name.camelCase}TokL
+${endfor}
+{+-}
+
+deriveAll [''Token]
+
+{-+}
 ${for(dataTypes)}
 data ${it.name.camelCase} e l where
 ${for(it.constrs)}
@@ -79,6 +95,16 @@ ${for(it.constrs)}
 ${endfor}
 
 ${endfor}
+{+-}
+
+--------------------------------------------------------------------------------
+-- Compdata derivation
+
+{-+}
+deriveAll
+  [ ''${for(dataTypes)}${it.name.camelCase}${sep}
+  , ''${endfor}
+  ]
 {+-}
 
 --------------------------------------------------------------------------------
