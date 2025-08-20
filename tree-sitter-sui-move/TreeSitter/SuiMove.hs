@@ -19,9 +19,9 @@ getTestDir = getDataFileName
   "vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/tests"
 
 data
-  {-# CTYPE "tree-sitter-move.h" "TSLanguage" #-}
+  {-# CTYPE "tree_sitter/tree-sitter-move.h" "TSLanguage" #-}
   TSLanguage
 
-foreign import capi unsafe "tree-sitter-move.h tree_sitter_move"
+foreign import capi unsafe "tree_sitter/tree-sitter-move.h tree_sitter_move"
   tree_sitter_sui_move ::
     IO (ConstPtr TSLanguage)

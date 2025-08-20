@@ -61,9 +61,10 @@ library
     , base-compat-constptr  >=0.1  && <0.2
   build-tool-depends: hsc2hs:hsc2hs
   include-dirs:
-    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/bindings/c/tree_sitter
+    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/bindings/c
+    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src
   includes:
-    tree-sitter-move.h
+    tree_sitter/tree-sitter-move.h
   c-sources:
     vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c
 
