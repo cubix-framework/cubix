@@ -10,7 +10,10 @@ in {
   packages = with pkgs; [
     fourmolu
     ghcid
-    tree-sitter
+    # Jakub 2025.08.20: right now hs-tree-sitter supports ABI version
+    # up to 14. Cli in nixpkgs will generate too new parser, that is
+    # incompatible
+    # tree-sitter
     unstable.claude-code
   ];
 
@@ -29,7 +32,11 @@ in {
     #                  one are needed
     c.enable = true;
     java.enable = true;
-    javascript.enable = true;
+    javascript = {
+      enable = true;
+      # For generating tree-sitter grammars
+      npm.enable = true;
+    };
     lua = {
       enable = true;
       package = pkgs.lua53Packages.lua;
