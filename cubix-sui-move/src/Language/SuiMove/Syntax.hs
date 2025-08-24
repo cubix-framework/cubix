@@ -5517,18 +5517,6 @@ instance HasParser Range where
   p :: P Range
   p = liftIO . TS.nodeRange =<< getCurrentNode
 
-instance (HasParser a, HasParser b) => HasParser (a, b) where
-  p :: P (a, b)
-  p = (,) <$> p <*> p
-
-instance (HasParser a, HasParser b) => HasParser (Either a b) where
-  p :: P (Either a b)
-  p = do
-    some <- optional (p :: P a)
-    case some of
-      Just a  -> pure (Left a)
-      Nothing -> Right <$> p
-
 pPostFence :: P a -> P () -> P [a]
 pPostFence post fence = postFence
  where
