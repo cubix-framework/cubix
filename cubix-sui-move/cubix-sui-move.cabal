@@ -53,7 +53,20 @@ common dependencies
     , template-haskell >= 2.21.0.0
     , text >= 2.1.2
     , transformers ^>= 0.6
+    , tree-sitter-sui-move
     , vector >= 0.13.2.0
+
+executable parse
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: app
+  main-is: Main.hs
+  ghc-options:
+    -rtsopts -freduction-depth=400
+  build-depends:
+    , cubix-sui-move
+    , optparse-applicative ^>= 0.18
 
 library
   import: language
