@@ -33,7 +33,7 @@ import Control.Applicative (Alternative (..), optional)
 import Control.Monad (MonadPlus (..))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
-import Control.Monad.State.Strict (MonadState (..), StateT (..), gets, modify')
+import Control.Monad.State.Strict (MonadState (..), StateT (..), evalStateT, gets, modify')
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.ByteString.Char8 qualified as BSC
 import Data.IntMap.Strict (IntMap)
@@ -43,7 +43,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
-import GHC.TypeLits (Symbol)
+import GHC.TypeLits qualified as TypeLits
 {-+}
 ${if(pretty)}
 import Prettyprinter (Doc, Pretty (..), nest, parens, sep)
@@ -54,8 +54,9 @@ import TreeSitter qualified as TS
 
 import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive
+import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Term)
+import Data.Comp.Multi (Sort, Term)
 import Data.Comp.Multi.Kinds qualified as Kinds
 
 --------------------------------------------------------------------------------
@@ -68,14 +69,73 @@ data ${it.name.camelCase}L
 ${endfor}
 {+-}
 
---------------------------------------------------------------------------------
--- Modularized syntax
---------------------------------------------------------------------------------
-
 {-+}
 ${for(tokens)}
 data ${it.name.camelCase}TokL
 ${endfor}
+
+data LabelSing (sort :: Sort) where
+${for(dataTypes)}
+  S${it.name.camelCase}L :: LabelSing ${it.name.camelCase}L
+${endfor}
+${for(tokens)}
+  S${it.name.camelCase}TokL :: LabelSing ${it.name.camelCase}TokL
+${endfor}
+
+deriving instance Eq (LabelSing sort)
+
+deriving instance Show (LabelSing sort)
+
+decLabelSing :: LabelSing sort1 -> LabelSing sort2 -> Maybe (sort1 :~: sort2)
+${for(dataTypes)}
+decLabelSing S${it.name.camelCase}L S${it.name.camelCase}L = Just Refl
+${endfor}
+${for(tokens)}
+decLabelSing S${it.name.camelCase}TokL S${it.name.camelCase}TokL = Just Refl
+${endfor}
+decLabelSing _ _ = Nothing
+
+--------------------------------------------------------------------------------
+-- SymbolType
+--------------------------------------------------------------------------------
+
+type data SymbolType where
+  Regular :: SymbolType
+  Auxiliary :: SymbolType
+  Virtual :: SymbolType
+
+data SymbolTypeSing (symbolType :: SymbolType) where
+  SRegular :: SymbolTypeSing Regular
+  SAuxiliary :: SymbolTypeSing Auxiliary
+  SVirtual :: SymbolTypeSing Virtual
+
+deriving instance Eq (SymbolTypeSing symbolType)
+
+deriving instance Show (SymbolTypeSing symbolType)
+
+decSymbolTypeSing :: SymbolTypeSing symbolType1 -> SymbolTypeSing symbolType2 -> Maybe (symbolType1 :~: symbolType2)
+decSymbolTypeSing SRegular SRegular = Just Refl
+decSymbolTypeSing SAuxiliary SAuxiliary = Just Refl
+decSymbolTypeSing SVirtual SVirtual = Just Refl
+decSymbolTypeSing _ _ = Nothing
+
+data IsReal (symbolType :: SymbolType) where
+  RegularIsReal :: IsReal Regular
+  AuxiliaryIsReal :: IsReal Auxiliary
+
+deriving instance Eq (IsReal symbolType)
+
+deriving instance Show (IsReal symbolType)
+
+symbolTypeIsReal :: SymbolTypeSing symbolType -> Either (IsReal symbolType) (symbolType :~: Virtual)
+symbolTypeIsReal = \case
+  SRegular -> Left RegularIsReal
+  SAuxiliary -> Left AuxiliaryIsReal
+  SVirtual -> Right Refl
+
+--------------------------------------------------------------------------------
+-- Modularized syntax
+--------------------------------------------------------------------------------
 
 data Token e l where
 ${for(tokens)}
@@ -115,6 +175,10 @@ deriveAll
 type ${grammarName}Sig =
   '[ ${for(dataTypes)}${it.name.camelCase}${sep}
    , ${endfor}
+   , Syntax.PairF
+   , Syntax.MaybeF
+   , Syntax.ListF
+   , Syntax.UnitF
    ]
 
 type ${grammarName}Term      = Term ${grammarName}Sig
@@ -127,4 +191,201 @@ type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
 
 {-+}
 type instance RootSort ${grammarName}Sig = ${startSort.camelCase}L
+
+parseAst :: SymbolTable -> TS.Tree -> IO (Maybe (MoveTerm (RootSort ${grammarName}Sig)))
+parseAst symbolTable tree = do
+  rootNode <- TS.treeRootNode tree
+  treeCursor <- TS.treeCursorNew rootNode
+  let pEnv = PEnv symbolTable treeCursor
+  let pState = PState rootNode
+  evalStateT (runReaderT (runMaybeT (unP p)) pEnv) pState
 {+-}
+
+--------------------------------------------------------------------------------
+-- Symbol
+--------------------------------------------------------------------------------
+
+type data Symbol (symbolType :: SymbolType) where
+{-+}
+${for(dataTypes)}
+  ${it.name.camelCase}Symbol :: (symbolType ~ Regular) => Symbol symbolType
+${endfor}
+${for(tokens)}
+  ${it.name.camelCase}TokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+${endfor}
+{+-}
+  ErrorSymbol :: (symbolType ~ Auxiliary) => Symbol symbolType
+  MissingSymbol :: (symbolType ~ Auxiliary) => Symbol symbolType
+  SortMismatchSymbol :: (symbolType ~ Virtual) => Symbol symbolType
+
+data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
+{-+}
+${for(dataTypes)}
+  S${it.name.camelCase}Symbol :: SymbolSing Regular ${it.name.camelCase}Symbol
+${endfor}
+${for(tokens)}
+  S${it.name.camelCase}TokSymbol :: SymbolSing Regular ${it.name.camelCase}TokSymbol
+${endfor}
+{+-}
+  SErrorSymbol :: SymbolSing Auxiliary ErrorSymbol
+  SMissingSymbol :: SymbolSing Auxiliary MissingSymbol
+  SSortMismatchSymbol :: SymbolSing Virtual SortMismatchSymbol
+
+deriving instance Eq (SymbolSing sort symbol)
+
+deriving instance Show (SymbolSing sort symbol)
+
+decSymbolSing :: SymbolSing symbolType1 symbol1 -> SymbolSing symbolType2 symbol2 -> Maybe (symbolType1 :~: symbolType2, symbol1 :~~: symbol2)
+{-+}
+${for(dataTypes)}
+decSymbolSing S${it.name.camelCase}Symbol S${it.name.camelCase}Symbol = Just (Refl, HRefl)
+${endfor}
+${for(tokens)}
+decSymbolSing S${it.name.camelCase}TokSymbol S${it.name.camelCase}TokSymbol = Just (Refl, HRefl)
+${endfor}
+{+-}
+decSymbolSing SErrorSymbol SErrorSymbol = Just (Refl, HRefl)
+decSymbolSing SMissingSymbol SMissingSymbol = Just (Refl, HRefl)
+decSymbolSing SSortMismatchSymbol SSortMismatchSymbol = Just (Refl, HRefl)
+decSymbolSing _ _ = Nothing
+
+data SomeSymbolSing
+  = forall (symbolType :: SymbolType) (symbol :: Symbol symbolType).
+    SomeSymbolSing !(IsReal symbolType) !(SymbolSing symbolType symbol)
+
+instance Eq SomeSymbolSing where
+  (==) :: SomeSymbolSing -> SomeSymbolSing -> Bool
+  SomeSymbolSing _isReal1 symbolSing1 == SomeSymbolSing _isReal2 symbolSing2 =
+    isJust (decSymbolSing symbolSing1 symbolSing2)
+
+deriving instance Show SomeSymbolSing
+
+pattern SomeRegularSymbolSing :: () => (symbolType ~ Regular) => SymbolSing symbolType symbol -> SomeSymbolSing
+pattern SomeRegularSymbolSing symbolSing = SomeSymbolSing RegularIsReal symbolSing
+
+pattern SomeAuxiliarySymbolSing :: () => (symbolType ~ Auxiliary) => SymbolSing symbolType symbol -> SomeSymbolSing
+pattern SomeAuxiliarySymbolSing symbolSing = SomeSymbolSing AuxiliaryIsReal symbolSing
+
+--------------------------------------------------------------------------------
+-- Symbol Table
+--------------------------------------------------------------------------------
+
+newtype SymbolTable = SymbolTable {unSymbolTable :: IntMap SomeSymbolSing}
+
+mkSymbolTable :: TS.Language -> IO SymbolTable
+mkSymbolTable language =
+  fmap (SymbolTable . IM.fromList) . sequence $
+{-+}
+${for(dataTypes/first)}
+    [ mkEntry "${it.name.text}" (SomeRegularSymbolSing S${it.name.camelCase}Symbol)
+${endfor}
+${for(dataTypes/rest)}
+    , mkEntry "${it.name.text}" (SomeRegularSymbolSing S${it.name.camelCase}Symbol)
+${endfor}
+{+-}
+    ]
+ where
+  mkEntry :: String -> SomeSymbolSing -> IO (Int, SomeSymbolSing)
+  mkEntry grammarType someSymbol = do
+    (,someSymbol) . fromIntegral <$> TS.languageSymbolForGrammarType language (BSC.pack grammarType) True
+
+-- --------------------------------------------------------------------------------
+-- -- Parser Monad
+-- --------------------------------------------------------------------------------
+
+data PState = PState
+  { currentNode :: {-# UNPACK #-} !TS.Node
+  -- , newCache :: {-# NOUNPACK #-} !AstCache
+  }
+
+data PEnv = PEnv
+  { symbolTable :: {-# UNPACK #-} !SymbolTable
+  , treeCursor :: {-# UNPACK #-} !TS.TreeCursor
+  -- , oldCache :: {-# UNPACK #-} !AstCache
+  }
+
+newtype P a = P {unP :: MaybeT (ReaderT PEnv (StateT PState IO)) a}
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader PEnv, MonadState PState, Alternative, MonadPlus)
+
+getCurrentNode :: P TS.Node
+getCurrentNode = gets currentNode
+
+putCurrentNode :: TS.Node -> P ()
+putCurrentNode node = modify' (\pstate -> pstate{currentNode = node})
+
+-- getSymbol :: TS.Node -> P _
+-- getSymbol node = do
+--   currentNodeIsError <- liftIO (TS.nodeIsError node)
+--   if currentNodeIsError
+--     then mzero -- pure (SomeAuxiliarySymbolSing SErrorSymbol)
+--     else do
+--       currentNodeIsMissing <- liftIO (TS.nodeIsMissing node)
+--       if currentNodeIsMissing
+--         then mzero -- pure (SomeAuxiliarySymbolSing SMissingSymbol)
+--         else do
+--           symbol <- liftIO (TS.nodeSymbol node)
+--           asks ((IM.! fromIntegral symbol) . unSymbolTable . symbolTable)
+
+-- cacheSomeNode :: SomeNode -> P SomeNode
+-- cacheSomeNode someNode = modify' updatePState >> pure someNode
+--  where
+--   nodeId = someNodeToNodeId someNode
+--   updateAstCache = AstCache . IM.insert (unWrapTSNodeId nodeId) someNode . unAstCache
+--   updatePState pstate = pstate{newCache = updateAstCache (newCache pstate)}
+
+-- findOldSomeNodeInCache :: P SomeNode
+-- findOldSomeNodeInCache =
+--   gets (TS.nodeId . currentNode) >>= \nodeId -> do
+--     asks (IM.lookup (unWrapTSNodeId nodeId) . unAstCache . oldCache)
+--       >>= maybe mzero pure
+
+gotoParent :: P ()
+gotoParent = do
+  treeCursor <- asks treeCursor
+  success <- liftIO (TS.treeCursorGotoParent treeCursor)
+  if not success
+    then mzero
+    else do
+      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
+      putCurrentNode currentNode
+
+gotoFirstNamedChild :: P ()
+gotoFirstNamedChild = do
+  treeCursor <- asks treeCursor
+  success <- liftIO (TS.treeCursorGotoFirstChild treeCursor)
+  if not success
+    then mzero
+    else do
+      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
+      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
+      if currentNodeIsNamed
+        then putCurrentNode currentNode
+        else gotoNextNamedSibling
+
+gotoNextNamedSibling :: P ()
+gotoNextNamedSibling = do
+  treeCursor <- asks treeCursor
+  success <- liftIO (TS.treeCursorGotoNextSibling treeCursor)
+  if not success
+    then mzero
+    else do
+      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
+      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
+      if currentNodeIsNamed
+        then putCurrentNode currentNode
+        else gotoNextNamedSibling
+
+-- --------------------------------------------------------------------------------
+-- -- Parser Class
+-- --------------------------------------------------------------------------------
+
+class HasParser a where
+  p :: P a
+
+instance HasParser (MoveTerm SourceFileL) where
+  p = do -- pSomeNode >>= \someNode -> do
+    -- let symbol = getSymbolForNode someNode
+    -- check if symbol is SourceFile?
+    -- parse children
+    children <- pure []
+    pure $ iSourceFile (Syntax.insertF children)
