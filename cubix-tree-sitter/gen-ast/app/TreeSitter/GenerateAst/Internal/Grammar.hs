@@ -34,7 +34,7 @@ data Grammar = Grammar
   , rules :: !(Map RuleName Rule)
   , extras :: !(Vector Rule)
   , precedences :: !(Maybe (Vector (Vector PrecSpec)))
-  , reserved :: !(Map RuleName Rule)
+  , reserved :: !(Maybe (Map RuleName Rule))
   , externals :: !(Maybe (Vector Rule))
   , inline :: !(Maybe (Vector RuleName))
   , conflicts :: !(Maybe (Vector (Vector RuleName)))

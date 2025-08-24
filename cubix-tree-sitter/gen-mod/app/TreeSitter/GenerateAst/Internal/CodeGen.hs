@@ -28,7 +28,7 @@ import Data.Text.Lazy.Builder qualified as TLB
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
-import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, toDataTypes, unName)
+import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, toDataTypes, unName, prefixedName)
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
 
 {- Note [One AstCache per syntax tree]
@@ -179,7 +179,7 @@ instance ToContext Text Type where
    where
     par b t = if b then "(" <> t <> ")" else t
     t2t p = \case
-      Node name -> TLB.fromText (snakeToCase Upper (unName name) <> "L")
+      Node name -> TLB.fromText (snakeToCase Upper (prefixedName name) <> "L")
       List a -> "[" <> t2t False a <> "]"
       NonEmpty a -> "NonEmpty" <> " " <> t2t True a
       Token t -> TLB.fromText (snakeToCase Upper t) <> "TokL"
@@ -193,7 +193,7 @@ instance ToContext Text Name where
   toVal name =
     MapVal . Context . M.fromList $
       [ ("text", textToVal (unName name))
-      , ("camelCase", textToVal (snakeToCase Upper (unName name)))
+      , ("camelCase", textToVal (snakeToCase Upper (prefixedName name)))
       ]
 
 --------------------------------------------------------------------------------

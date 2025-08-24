@@ -10,6 +10,7 @@
 module TreeSitter.GenerateAst.Internal.Data (
   Name (..),
   unName,
+  prefixedName,
   Type (..),
   Constr (..),
   Data (..),
@@ -44,7 +45,10 @@ newtype Name = Name {getName :: Text}
 -- | If we have rules named: "rule" and "_rule" it will produce a
 -- conflict
 unName :: Name -> Text
-unName (Name n) = case Text.head n of
+unName (Name n) = n
+
+prefixedName :: Name -> Text
+prefixedName (Name n) = case Text.head n of
   '_'        -> "hidden" <> n
   _otherwise -> n
 
@@ -146,7 +150,7 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     go :: [Rule] -> [Maybe Constr]
     go [] = []
     go (r : rest) = case r of
-      SymbolRule sr -> Just (Constr (suffix sr) [ruleToField (rule sr)]) : go rest
+      SymbolRule sr -> Just (Constr (suffix sr) [ruleToField r]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
       StringRule str -> Just (Constr (suffix str) []) : go rest
@@ -187,6 +191,7 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     -- Nested field rules are ignored:
     FieldRule n r -> Named (Name n) (ruleToType r)
     AliasRule _ _ r -> ruleToField r
+    -- SymbolRule r -> ruleToField r
     -- The following constructors are transparent:
     TokenRule r -> ruleToField r
     ImmediateTokenRule r -> ruleToField r
