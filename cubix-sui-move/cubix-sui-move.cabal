@@ -46,10 +46,13 @@ common dependencies
     , comptrans >= 0.1.0.7
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2
+    , cubix-tree-sitter
     , ghc-prim >= 0.11.0
     , hs-tree-sitter ^>= 13
     , mtl ^>= 2.3
     , prettyprinter ^>= 1.7
+    , resourcet ^>= 1.3
+    , streaming ^>= 0.2.4
     , template-haskell >= 2.21.0.0
     , text >= 2.1.2
     , transformers ^>= 0.6

@@ -6,16 +6,22 @@
 module Cubix.Language.Info
   (
     -- ** SourcePos
-    SourcePos
+    SourcePos (..)
   , sourceFile
   , sourceRow
   , sourceCol
 
     -- ** SourceSpan
-  , SourceSpan
+  , SourceSpan (..)
   , sourceStart
   , sourceEnd
   , mkSourceSpan
+
+    -- ** SourceRange
+  , SourceRange (..)
+  , rangeStart
+  , rangeEnd
+  , rangeLength
 
     -- ** Attrs
   , Attrs
@@ -128,6 +134,38 @@ makeClassy ''SourceSpan
 mkSourceSpan :: String -> (Int, Int ) -> (Int, Int) -> SourceSpan
 mkSourceSpan fileName (sRow, sCol) (eRow, eCol) = SourceSpan (SourcePos fileName sRow sCol)
                                                              (SourcePos fileName eRow eCol)
+
+
+--------------------------------------------------------------------------------
+--------------------------------- SourceSpan -----------------------------------
+--------------------------------------------------------------------------------
+
+data SourceRange = SourceRange
+  { _rangeStart :: !Int
+  , _rangeEnd   :: !Int
+  }
+  deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
+
+instance NFData SourceRange where rnf = genericRnf
+instance Hashable SourceRange
+instance ToJSON SourceRange
+instance FromJSON SourceRange
+
+instance Semigroup SourceRange where
+  SourceRange start1 end1 <> SourceRange start2 end2 = SourceRange (min start1 start2) (max end1 end2)
+
+makeClassy ''SourceRange
+
+point :: Int -> SourceRange
+point i = SourceRange i i
+
+-- | Return the length of the range.
+rangeLength :: SourceRange -> Int
+rangeLength range = _rangeEnd range - _rangeStart range
+
+subtractRange :: SourceRange -> SourceRange -> SourceRange
+subtractRange (SourceRange start1 end1) (SourceRange start2 end2) =
+  SourceRange start1 (end1 - rangeLength (SourceRange start2 (max end1 end2)))
 
 
 --------------------------------------------------------------------------------
