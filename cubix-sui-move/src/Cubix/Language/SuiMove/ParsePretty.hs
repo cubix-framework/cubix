@@ -29,9 +29,10 @@ import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
 parse :: FilePath -> IO (Maybe (MoveTerm SourceFileL))
-parse path = runResourceT $ do
-  Streaming.print $ Streaming.mapM
-    (liftIO . TS.nodeGrammarTypeAsString . tokenValue)
-    $ lexer tree_sitter_sui_move path
+parse path = runResourceT $
+  withLanguage tree_sitter_sui_move $ \lang -> do
+  Streaming.print
+    $ Streaming.mapM (liftIO . TS.nodeGrammarTypeAsString . tokenValue)
+    $ lexer lang path
 
   pure undefined
