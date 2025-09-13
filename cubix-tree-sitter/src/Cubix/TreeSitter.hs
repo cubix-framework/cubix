@@ -3,7 +3,7 @@ module Cubix.TreeSitter where
 import Data.ByteString qualified as BS
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Resource (MonadResource (..))
+import Control.Monad.Trans.Resource (MonadResource (..), allocate)
 import Foreign.C.ConstPtr.Compat (ConstPtr (..))
 import Streaming (Stream, Of (..))
 import Streaming.Prelude qualified as Streaming
@@ -82,11 +82,18 @@ annotatedSymbols path treeCursor = flip Streaming.mapM (annotated path treeCurso
   name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
   pure tok{ tokenValue = name }
 
-lexer :: MonadResource m => IO (ConstPtr lang) -> FilePath -> TokenStream TS.Node m ()
-lexer getLang file = Streaming.bracket
+withLanguage :: MonadResource m => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
+withLanguage getLang action = do
+  (_key, lang) <- allocate alloc free
+  action lang
+  where
+    alloc = TS.unsafeToLanguage =<< getLang
+    free = TS.unsafeLanguageDelete
+
+lexer :: MonadResource m => TS.Language -> FilePath -> TokenStream TS.Node m ()
+lexer lang file = Streaming.bracket
   (do
     parser  <- TS.parserNew
-    lang    <- TS.unsafeToLanguage =<< getLang
     success <- TS.parserSetLanguage parser lang
     unless success $
       error "failed to set parser language"
@@ -97,10 +104,8 @@ lexer getLang file = Streaming.bracket
     rootNode <- TS.treeRootNode tree
     treeCursor <- TS.treeCursorNew rootNode
 
-    pure (lang, parser, treeCursor))
-  (\(lang, parser, _) -> do
-    TS.unsafeParserDelete parser
-    TS.unsafeLanguageDelete lang)
+    pure (parser, treeCursor))
+  (TS.unsafeParserDelete . fst)
 
-  (\(_, _, treeCursor) ->
+  (\(_, treeCursor) ->
     annotated file treeCursor)
