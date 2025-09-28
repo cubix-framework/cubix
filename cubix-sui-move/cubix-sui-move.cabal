@@ -49,7 +49,9 @@ common dependencies
     , cubix-tree-sitter
     , ghc-prim >= 0.11.0
     , hs-tree-sitter ^>= 13
+    , megaparsec ^>= 9.6
     , mtl ^>= 2.3
+    , parser-combinators ^>= 1.3
     , prettyprinter ^>= 1.7
     , resourcet ^>= 1.3
     , streaming ^>= 0.2.4
