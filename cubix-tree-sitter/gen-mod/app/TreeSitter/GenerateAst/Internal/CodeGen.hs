@@ -145,6 +145,7 @@ instance ToContext Text Data where
     Context . M.fromList $
       [ ("name", toVal name)
       , ("constrs", ListVal (toVal . (name,) <$> constrs))
+      , ("isSum", toVal (length constrs /= 1))
       ]
 
 instance ToContext Text (Name, Constr) where

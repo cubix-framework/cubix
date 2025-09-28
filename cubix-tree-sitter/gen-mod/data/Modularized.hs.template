@@ -36,8 +36,12 @@ import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import Control.Monad.State.Strict (MonadState (..), StateT (..), evalStateT, gets, modify')
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.ByteString.Char8 qualified as BSC
+import Data.Foldable (foldrM)
+import Data.Functor (($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isJust)
@@ -52,12 +56,13 @@ ${endif}
 import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 
-import Cubix.Language.Info (TermLab)
+import Cubix.Language.Info (SourceSpan, TermLab)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Sort, Term)
-import Data.Comp.Multi.Kinds qualified as Kinds
+import Cubix.TreeSitter qualified
+import Data.Comp.Multi (AnnTerm, Sort, Term)
+import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 
 --------------------------------------------------------------------------------
 -- Sort
@@ -101,11 +106,13 @@ decLabelSing _ _ = Nothing
 
 type data SymbolType where
   Regular :: SymbolType
+  Anonymous :: SymbolType
   Auxiliary :: SymbolType
   Virtual :: SymbolType
 
 data SymbolTypeSing (symbolType :: SymbolType) where
   SRegular :: SymbolTypeSing Regular
+  SAnonymous :: SymbolTypeSing Anonymous
   SAuxiliary :: SymbolTypeSing Auxiliary
   SVirtual :: SymbolTypeSing Virtual
 
@@ -115,12 +122,14 @@ deriving instance Show (SymbolTypeSing symbolType)
 
 decSymbolTypeSing :: SymbolTypeSing symbolType1 -> SymbolTypeSing symbolType2 -> Maybe (symbolType1 :~: symbolType2)
 decSymbolTypeSing SRegular SRegular = Just Refl
+decSymbolTypeSing SAnonymous SAnonymous = Just Refl
 decSymbolTypeSing SAuxiliary SAuxiliary = Just Refl
 decSymbolTypeSing SVirtual SVirtual = Just Refl
 decSymbolTypeSing _ _ = Nothing
 
 data IsReal (symbolType :: SymbolType) where
   RegularIsReal :: IsReal Regular
+  AnonymousIsReal :: IsReal Anonymous
   AuxiliaryIsReal :: IsReal Auxiliary
 
 deriving instance Eq (IsReal symbolType)
@@ -130,6 +139,7 @@ deriving instance Show (IsReal symbolType)
 symbolTypeIsReal :: SymbolTypeSing symbolType -> Either (IsReal symbolType) (symbolType :~: Virtual)
 symbolTypeIsReal = \case
   SRegular -> Left RegularIsReal
+  SAnonymous -> Left AnonymousIsReal
   SAuxiliary -> Left AuxiliaryIsReal
   SVirtual -> Right Refl
 
@@ -175,6 +185,7 @@ deriveAll
 type ${grammarName}Sig =
   '[ ${for(dataTypes)}${it.name.camelCase}${sep}
    , ${endfor}
+   , Token
    , Syntax.PairF
    , Syntax.MaybeF
    , Syntax.ListF
@@ -191,14 +202,6 @@ type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
 
 {-+}
 type instance RootSort ${grammarName}Sig = ${startSort.camelCase}L
-
-parseAst :: SymbolTable -> TS.Tree -> IO (Maybe (MoveTerm (RootSort ${grammarName}Sig)))
-parseAst symbolTable tree = do
-  rootNode <- TS.treeRootNode tree
-  treeCursor <- TS.treeCursorNew rootNode
-  let pEnv = PEnv symbolTable treeCursor
-  let pState = PState rootNode
-  evalStateT (runReaderT (runMaybeT (unP p)) pEnv) pState
 {+-}
 
 --------------------------------------------------------------------------------
@@ -224,7 +227,7 @@ ${for(dataTypes)}
   S${it.name.camelCase}Symbol :: SymbolSing Regular ${it.name.camelCase}Symbol
 ${endfor}
 ${for(tokens)}
-  S${it.name.camelCase}TokSymbol :: SymbolSing Regular ${it.name.camelCase}TokSymbol
+  S${it.name.camelCase}TokSymbol :: SymbolSing Anonymous ${it.name.camelCase}TokSymbol
 ${endfor}
 {+-}
   SErrorSymbol :: SymbolSing Auxiliary ErrorSymbol
@@ -232,7 +235,7 @@ ${endfor}
   SSortMismatchSymbol :: SymbolSing Virtual SortMismatchSymbol
 
 deriving instance Eq (SymbolSing sort symbol)
-
+deriving instance Ord (SymbolSing sort symbol)
 deriving instance Show (SymbolSing sort symbol)
 
 decSymbolSing :: SymbolSing symbolType1 symbol1 -> SymbolSing symbolType2 symbol2 -> Maybe (symbolType1 :~: symbolType2, symbol1 :~~: symbol2)
@@ -263,6 +266,9 @@ deriving instance Show SomeSymbolSing
 pattern SomeRegularSymbolSing :: () => (symbolType ~ Regular) => SymbolSing symbolType symbol -> SomeSymbolSing
 pattern SomeRegularSymbolSing symbolSing = SomeSymbolSing RegularIsReal symbolSing
 
+pattern SomeAnonymousSymbolSing :: () => (symbolType ~ Anonymous) => SymbolSing symbolType symbol -> SomeSymbolSing
+pattern SomeAnonymousSymbolSing symbolSing = SomeSymbolSing AnonymousIsReal symbolSing
+
 pattern SomeAuxiliarySymbolSing :: () => (symbolType ~ Auxiliary) => SymbolSing symbolType symbol -> SomeSymbolSing
 pattern SomeAuxiliarySymbolSing symbolSing = SomeSymbolSing AuxiliaryIsReal symbolSing
 
@@ -282,6 +288,9 @@ ${endfor}
 ${for(dataTypes/rest)}
     , mkEntry "${it.name.text}" (SomeRegularSymbolSing S${it.name.camelCase}Symbol)
 ${endfor}
+${for(tokens)}
+    , mkEntry "${it.symbol}" (SomeAnonymousSymbolSing S${it.name.camelCase}TokSymbol)
+${endfor}
 {+-}
     ]
  where
@@ -289,103 +298,87 @@ ${endfor}
   mkEntry grammarType someSymbol = do
     (,someSymbol) . fromIntegral <$> TS.languageSymbolForGrammarType language (BSC.pack grammarType) True
 
--- --------------------------------------------------------------------------------
--- -- Parser Monad
--- --------------------------------------------------------------------------------
+symbolMap :: Map String SomeSymbolSing
+symbolMap = Map.fromList
+{-+}
+${for(dataTypes/first)}
+    [ ("${it.name.text}", SomeRegularSymbolSing S${it.name.camelCase}Symbol)
+${endfor}
+${for(dataTypes/rest)}
+    , ("${it.name.text}", SomeRegularSymbolSing S${it.name.camelCase}Symbol)
+${endfor}
+${for(tokens)}
+    , ("${it.symbol}", SomeAnonymousSymbolSing S${it.name.camelCase}TokSymbol)
+${endfor}
+    ]
+{+-}
 
-data PState = PState
-  { currentNode :: {-# UNPACK #-} !TS.Node
-  -- , newCache :: {-# NOUNPACK #-} !AstCache
-  }
-
-data PEnv = PEnv
-  { symbolTable :: {-# UNPACK #-} !SymbolTable
-  , treeCursor :: {-# UNPACK #-} !TS.TreeCursor
-  -- , oldCache :: {-# UNPACK #-} !AstCache
-  }
-
-newtype P a = P {unP :: MaybeT (ReaderT PEnv (StateT PState IO)) a}
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader PEnv, MonadState PState, Alternative, MonadPlus)
-
-getCurrentNode :: P TS.Node
-getCurrentNode = gets currentNode
-
-putCurrentNode :: TS.Node -> P ()
-putCurrentNode node = modify' (\pstate -> pstate{currentNode = node})
-
--- getSymbol :: TS.Node -> P _
--- getSymbol node = do
---   currentNodeIsError <- liftIO (TS.nodeIsError node)
---   if currentNodeIsError
---     then mzero -- pure (SomeAuxiliarySymbolSing SErrorSymbol)
---     else do
---       currentNodeIsMissing <- liftIO (TS.nodeIsMissing node)
---       if currentNodeIsMissing
---         then mzero -- pure (SomeAuxiliarySymbolSing SMissingSymbol)
---         else do
---           symbol <- liftIO (TS.nodeSymbol node)
---           asks ((IM.! fromIntegral symbol) . unSymbolTable . symbolTable)
-
--- cacheSomeNode :: SomeNode -> P SomeNode
--- cacheSomeNode someNode = modify' updatePState >> pure someNode
---  where
---   nodeId = someNodeToNodeId someNode
---   updateAstCache = AstCache . IM.insert (unWrapTSNodeId nodeId) someNode . unAstCache
---   updatePState pstate = pstate{newCache = updateAstCache (newCache pstate)}
-
--- findOldSomeNodeInCache :: P SomeNode
--- findOldSomeNodeInCache =
---   gets (TS.nodeId . currentNode) >>= \nodeId -> do
---     asks (IM.lookup (unWrapTSNodeId nodeId) . unAstCache . oldCache)
---       >>= maybe mzero pure
-
-gotoParent :: P ()
-gotoParent = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoParent treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      putCurrentNode currentNode
-
-gotoFirstNamedChild :: P ()
-gotoFirstNamedChild = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoFirstChild treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
-      if currentNodeIsNamed
-        then putCurrentNode currentNode
-        else gotoNextNamedSibling
-
-gotoNextNamedSibling :: P ()
-gotoNextNamedSibling = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoNextSibling treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
-      if currentNodeIsNamed
-        then putCurrentNode currentNode
-        else gotoNextNamedSibling
+mkSymbolTable' :: TS.Language -> IO SymbolTable
+mkSymbolTable' lang = do
+  count <- fromIntegral <$> TS.languageSymbolCount lang
+  SymbolTable <$> foldrM
+    (\id acc -> do
+      symName <- TS.languageSymbolName lang id
+      let mSymSing = Map.lookup (BSC.unpack symName) symbolMap
+      pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
+    )
+    (IM.empty :: IntMap SomeSymbolSing)
+    [0..count-1]
 
 -- --------------------------------------------------------------------------------
--- -- Parser Class
+-- -- Parser 
 -- --------------------------------------------------------------------------------
+-- type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
-class HasParser a where
-  p :: P a
+-- type ParseError = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
-instance HasParser (MoveTerm SourceFileL) where
-  p = do -- pSomeNode >>= \someNode -> do
-    -- let symbol = getSymbolForNode someNode
-    -- check if symbol is SourceFile?
-    -- parse children
-    children <- pure []
-    pure $ iSourceFile (Syntax.insertF children)
+-- pSourceFile :: Parser (MoveTerm SourceFileL)
+-- pSourceFile = do
+--   _sym <- pSymbol SSourceFileSymbol
+--   children <- Syntax.insertF <$> many pModuleDefinition
+--   pure $ iSourceFile children
+
+-- pModuleDefinition :: Parser (MoveTerm ModuleDefinitionL)
+-- pModuleDefinition = do
+--   tok <- pModuleTok
+--   identity <- pModuleIdentity
+--   body <- pModuleBody
+--   pure $ iModuleDefinition tok identity body
+
+-- pModuleTok :: Parser (MoveTerm ModuleTokL)
+-- pModuleTok = do
+--   _ <- pSymbol SModuleTokSymbol
+--   pure iModule
+
+-- pModuleBody :: Parser (MoveTerm ModuleBodyL)
+-- pModuleBody = do
+--   _sym <- pSymbol SModuleBodySymbol
+--   undefined
+  
+-- pModuleIdentity :: Parser (MoveTerm ModuleIdentityL)
+-- pModuleIdentity = do
+--   _sym <- pSymbol SModuleIdentitySymbol
+--   undefined
+
+-- pSymbol
+--   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
+--    . SymbolSing symbolType symbol
+--   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
+-- pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
+--   SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
+--     Just (Refl, HRefl) -> Just symSing
+--     Nothing -> Nothing
+
+-- pSymbol'
+--   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
+--    . SymbolSing symbolType symbol
+--   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
+-- pSymbol' sym = do
+--   Megaparsec.token
+--     test
+--     Set.empty
+--   where
+--     test tok = case Cubix.TreeSitter.tokenValue tok of
+--       SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
+--         Just (Refl, HRefl) -> Just (tok $> symSing)
+--         Nothing -> Nothing

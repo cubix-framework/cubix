@@ -30,8 +30,12 @@ import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import Control.Monad.State.Strict (MonadState (..), StateT (..), evalStateT, gets, modify')
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.ByteString.Char8 qualified as BSC
+import Data.Foldable (foldrM)
+import Data.Functor (($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isJust)
@@ -42,12 +46,13 @@ import Prettyprinter (Doc, Pretty (..), nest, parens, sep)
 import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 
-import Cubix.Language.Info (TermLab)
+import Cubix.Language.Info (SourceSpan, TermLab)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Sort, Term)
-import Data.Comp.Multi.Kinds qualified as Kinds
+import Cubix.TreeSitter qualified
+import Data.Comp.Multi (AnnTerm, Sort, Term)
+import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 
 --------------------------------------------------------------------------------
 -- Sort
@@ -147,7 +152,6 @@ data FieldInitializeListL
 data ExpFieldL
 data SpecBlockL
 data HiddenSpecBlockTargetL
-data HiddenSpecBlockIdentifierL
 data SpecBlockTargetSchemaL
 data HiddenStructIdentifierL
 data HiddenSpecFunctionL
@@ -366,7 +370,6 @@ data LabelSing (sort :: Sort) where
   SExpFieldL :: LabelSing ExpFieldL
   SSpecBlockL :: LabelSing SpecBlockL
   SHiddenSpecBlockTargetL :: LabelSing HiddenSpecBlockTargetL
-  SHiddenSpecBlockIdentifierL :: LabelSing HiddenSpecBlockIdentifierL
   SSpecBlockTargetSchemaL :: LabelSing SpecBlockTargetSchemaL
   SHiddenStructIdentifierL :: LabelSing HiddenStructIdentifierL
   SHiddenSpecFunctionL :: LabelSing HiddenSpecFunctionL
@@ -588,7 +591,6 @@ decLabelSing SFieldInitializeListL SFieldInitializeListL = Just Refl
 decLabelSing SExpFieldL SExpFieldL = Just Refl
 decLabelSing SSpecBlockL SSpecBlockL = Just Refl
 decLabelSing SHiddenSpecBlockTargetL SHiddenSpecBlockTargetL = Just Refl
-decLabelSing SHiddenSpecBlockIdentifierL SHiddenSpecBlockIdentifierL = Just Refl
 decLabelSing SSpecBlockTargetSchemaL SSpecBlockTargetSchemaL = Just Refl
 decLabelSing SHiddenStructIdentifierL SHiddenStructIdentifierL = Just Refl
 decLabelSing SHiddenSpecFunctionL SHiddenSpecFunctionL = Just Refl
@@ -718,11 +720,13 @@ decLabelSing _ _ = Nothing
 
 type data SymbolType where
   Regular :: SymbolType
+  Anonymous :: SymbolType
   Auxiliary :: SymbolType
   Virtual :: SymbolType
 
 data SymbolTypeSing (symbolType :: SymbolType) where
   SRegular :: SymbolTypeSing Regular
+  SAnonymous :: SymbolTypeSing Anonymous
   SAuxiliary :: SymbolTypeSing Auxiliary
   SVirtual :: SymbolTypeSing Virtual
 
@@ -732,12 +736,14 @@ deriving instance Show (SymbolTypeSing symbolType)
 
 decSymbolTypeSing :: SymbolTypeSing symbolType1 -> SymbolTypeSing symbolType2 -> Maybe (symbolType1 :~: symbolType2)
 decSymbolTypeSing SRegular SRegular = Just Refl
+decSymbolTypeSing SAnonymous SAnonymous = Just Refl
 decSymbolTypeSing SAuxiliary SAuxiliary = Just Refl
 decSymbolTypeSing SVirtual SVirtual = Just Refl
 decSymbolTypeSing _ _ = Nothing
 
 data IsReal (symbolType :: SymbolType) where
   RegularIsReal :: IsReal Regular
+  AnonymousIsReal :: IsReal Anonymous
   AuxiliaryIsReal :: IsReal Auxiliary
 
 deriving instance Eq (IsReal symbolType)
@@ -747,6 +753,7 @@ deriving instance Show (IsReal symbolType)
 symbolTypeIsReal :: SymbolTypeSing symbolType -> Either (IsReal symbolType) (symbolType :~: Virtual)
 symbolTypeIsReal = \case
   SRegular -> Left RegularIsReal
+  SAnonymous -> Left AnonymousIsReal
   SAuxiliary -> Left AuxiliaryIsReal
   SVirtual -> Right Refl
 
@@ -1550,19 +1557,14 @@ data SpecBlock e l where
     -> SpecBlock e SpecBlockL
 
 data HiddenSpecBlockTarget e l where
-  HiddenSpecBlockIdentifierSpecBlockTarget
-    :: e HiddenSpecBlockIdentifierL
+  IdentifierSpecBlockTarget
+    :: e IdentifierL
     -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
   SpecBlockTargetModuleSpecBlockTarget
     :: HiddenSpecBlockTarget e HiddenSpecBlockTargetL
   SpecBlockTargetSchemaSpecBlockTarget
     :: e SpecBlockTargetSchemaL
     -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
-
-data HiddenSpecBlockIdentifier e l where
-  HiddenSpecBlockIdentifier
-    :: e IdentifierL
-    -> HiddenSpecBlockIdentifier e HiddenSpecBlockIdentifierL
 
 data SpecBlockTargetSchema e l where
   SpecBlockTargetSchema
@@ -2218,7 +2220,6 @@ deriveAll
   , ''ExpField
   , ''SpecBlock
   , ''HiddenSpecBlockTarget
-  , ''HiddenSpecBlockIdentifier
   , ''SpecBlockTargetSchema
   , ''HiddenStructIdentifier
   , ''HiddenSpecFunction
@@ -2384,7 +2385,6 @@ type MoveSig =
    , ExpField
    , SpecBlock
    , HiddenSpecBlockTarget
-   , HiddenSpecBlockIdentifier
    , SpecBlockTargetSchema
    , HiddenStructIdentifier
    , HiddenSpecFunction
@@ -2449,6 +2449,7 @@ type MoveSig =
    , Constant
    , FriendDeclaration
    , FriendAccess
+   , Token
    , Syntax.PairF
    , Syntax.MaybeF
    , Syntax.ListF
@@ -2463,14 +2464,6 @@ type MoveTermLab l = TermLab MoveSig l
 --------------------------------------------------------------------------------
 
 type instance RootSort MoveSig = SourceFileL
-
-parseAst :: SymbolTable -> TS.Tree -> IO (Maybe (MoveTerm (RootSort MoveSig)))
-parseAst symbolTable tree = do
-  rootNode <- TS.treeRootNode tree
-  treeCursor <- TS.treeCursorNew rootNode
-  let pEnv = PEnv symbolTable treeCursor
-  let pState = PState rootNode
-  evalStateT (runReaderT (runMaybeT (unP p)) pEnv) pState
 
 --------------------------------------------------------------------------------
 -- Symbol
@@ -2571,7 +2564,6 @@ type data Symbol (symbolType :: SymbolType) where
   ExpFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HiddenSpecBlockTargetSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecBlockIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockTargetSchemaSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HiddenStructIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HiddenSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2792,7 +2784,6 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SExpFieldSymbol :: SymbolSing Regular ExpFieldSymbol
   SSpecBlockSymbol :: SymbolSing Regular SpecBlockSymbol
   SHiddenSpecBlockTargetSymbol :: SymbolSing Regular HiddenSpecBlockTargetSymbol
-  SHiddenSpecBlockIdentifierSymbol :: SymbolSing Regular HiddenSpecBlockIdentifierSymbol
   SSpecBlockTargetSchemaSymbol :: SymbolSing Regular SpecBlockTargetSchemaSymbol
   SHiddenStructIdentifierSymbol :: SymbolSing Regular HiddenStructIdentifierSymbol
   SHiddenSpecFunctionSymbol :: SymbolSing Regular HiddenSpecFunctionSymbol
@@ -2857,69 +2848,69 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SConstantSymbol :: SymbolSing Regular ConstantSymbol
   SFriendDeclarationSymbol :: SymbolSing Regular FriendDeclarationSymbol
   SFriendAccessSymbol :: SymbolSing Regular FriendAccessSymbol
-  SBangTokSymbol :: SymbolSing Regular BangTokSymbol
-  SNeqTokSymbol :: SymbolSing Regular NeqTokSymbol
-  SDollarTokSymbol :: SymbolSing Regular DollarTokSymbol
-  SModTokSymbol :: SymbolSing Regular ModTokSymbol
-  SBitandTokSymbol :: SymbolSing Regular BitandTokSymbol
-  SAndTokSymbol :: SymbolSing Regular AndTokSymbol
-  SMulTokSymbol :: SymbolSing Regular MulTokSymbol
-  SAddTokSymbol :: SymbolSing Regular AddTokSymbol
-  SSubTokSymbol :: SymbolSing Regular SubTokSymbol
-  SRangeTokSymbol :: SymbolSing Regular RangeTokSymbol
-  SDivTokSymbol :: SymbolSing Regular DivTokSymbol
-  SLtTokSymbol :: SymbolSing Regular LtTokSymbol
-  SShlTokSymbol :: SymbolSing Regular ShlTokSymbol
-  SLeTokSymbol :: SymbolSing Regular LeTokSymbol
-  SAssignTokSymbol :: SymbolSing Regular AssignTokSymbol
-  SEqTokSymbol :: SymbolSing Regular EqTokSymbol
-  SImpliesTokSymbol :: SymbolSing Regular ImpliesTokSymbol
-  SGtTokSymbol :: SymbolSing Regular GtTokSymbol
-  SGeTokSymbol :: SymbolSing Regular GeTokSymbol
-  SShrTokSymbol :: SymbolSing Regular ShrTokSymbol
-  SXorTokSymbol :: SymbolSing Regular XorTokSymbol
-  SAbortsWithTokSymbol :: SymbolSing Regular AbortsWithTokSymbol
-  SAddressTokSymbol :: SymbolSing Regular AddressTokSymbol
-  SAssertTokSymbol :: SymbolSing Regular AssertTokSymbol
-  SAssumeTokSymbol :: SymbolSing Regular AssumeTokSymbol
-  SBoolTokSymbol :: SymbolSing Regular BoolTokSymbol
-  SBytearrayTokSymbol :: SymbolSing Regular BytearrayTokSymbol
-  SCopyTokSymbol :: SymbolSing Regular CopyTokSymbol
-  SDecreasesTokSymbol :: SymbolSing Regular DecreasesTokSymbol
-  SDropTokSymbol :: SymbolSing Regular DropTokSymbol
-  SEnsuresTokSymbol :: SymbolSing Regular EnsuresTokSymbol
-  SFriendTokSymbol :: SymbolSing Regular FriendTokSymbol
-  SGlobalTokSymbol :: SymbolSing Regular GlobalTokSymbol
-  SInternalTokSymbol :: SymbolSing Regular InternalTokSymbol
-  SKeyTokSymbol :: SymbolSing Regular KeyTokSymbol
-  SLocalTokSymbol :: SymbolSing Regular LocalTokSymbol
-  SModifiesTokSymbol :: SymbolSing Regular ModifiesTokSymbol
-  SModuleTokSymbol :: SymbolSing Regular ModuleTokSymbol
-  SMoveTokSymbol :: SymbolSing Regular MoveTokSymbol
-  SPackTokSymbol :: SymbolSing Regular PackTokSymbol
-  SPackageTokSymbol :: SymbolSing Regular PackageTokSymbol
-  SPhantomTokSymbol :: SymbolSing Regular PhantomTokSymbol
-  SPostTokSymbol :: SymbolSing Regular PostTokSymbol
-  SPublicTokSymbol :: SymbolSing Regular PublicTokSymbol
-  SSignerTokSymbol :: SymbolSing Regular SignerTokSymbol
-  SStoreTokSymbol :: SymbolSing Regular StoreTokSymbol
-  SSucceedsIfTokSymbol :: SymbolSing Regular SucceedsIfTokSymbol
-  SU128TokSymbol :: SymbolSing Regular U128TokSymbol
-  SU16TokSymbol :: SymbolSing Regular U16TokSymbol
-  SU256TokSymbol :: SymbolSing Regular U256TokSymbol
-  SU32TokSymbol :: SymbolSing Regular U32TokSymbol
-  SU64TokSymbol :: SymbolSing Regular U64TokSymbol
-  SU8TokSymbol :: SymbolSing Regular U8TokSymbol
-  SUnpackTokSymbol :: SymbolSing Regular UnpackTokSymbol
-  SUpdateTokSymbol :: SymbolSing Regular UpdateTokSymbol
-  SBitorTokSymbol :: SymbolSing Regular BitorTokSymbol
-  SOrTokSymbol :: SymbolSing Regular OrTokSymbol
+  SBangTokSymbol :: SymbolSing Anonymous BangTokSymbol
+  SNeqTokSymbol :: SymbolSing Anonymous NeqTokSymbol
+  SDollarTokSymbol :: SymbolSing Anonymous DollarTokSymbol
+  SModTokSymbol :: SymbolSing Anonymous ModTokSymbol
+  SBitandTokSymbol :: SymbolSing Anonymous BitandTokSymbol
+  SAndTokSymbol :: SymbolSing Anonymous AndTokSymbol
+  SMulTokSymbol :: SymbolSing Anonymous MulTokSymbol
+  SAddTokSymbol :: SymbolSing Anonymous AddTokSymbol
+  SSubTokSymbol :: SymbolSing Anonymous SubTokSymbol
+  SRangeTokSymbol :: SymbolSing Anonymous RangeTokSymbol
+  SDivTokSymbol :: SymbolSing Anonymous DivTokSymbol
+  SLtTokSymbol :: SymbolSing Anonymous LtTokSymbol
+  SShlTokSymbol :: SymbolSing Anonymous ShlTokSymbol
+  SLeTokSymbol :: SymbolSing Anonymous LeTokSymbol
+  SAssignTokSymbol :: SymbolSing Anonymous AssignTokSymbol
+  SEqTokSymbol :: SymbolSing Anonymous EqTokSymbol
+  SImpliesTokSymbol :: SymbolSing Anonymous ImpliesTokSymbol
+  SGtTokSymbol :: SymbolSing Anonymous GtTokSymbol
+  SGeTokSymbol :: SymbolSing Anonymous GeTokSymbol
+  SShrTokSymbol :: SymbolSing Anonymous ShrTokSymbol
+  SXorTokSymbol :: SymbolSing Anonymous XorTokSymbol
+  SAbortsWithTokSymbol :: SymbolSing Anonymous AbortsWithTokSymbol
+  SAddressTokSymbol :: SymbolSing Anonymous AddressTokSymbol
+  SAssertTokSymbol :: SymbolSing Anonymous AssertTokSymbol
+  SAssumeTokSymbol :: SymbolSing Anonymous AssumeTokSymbol
+  SBoolTokSymbol :: SymbolSing Anonymous BoolTokSymbol
+  SBytearrayTokSymbol :: SymbolSing Anonymous BytearrayTokSymbol
+  SCopyTokSymbol :: SymbolSing Anonymous CopyTokSymbol
+  SDecreasesTokSymbol :: SymbolSing Anonymous DecreasesTokSymbol
+  SDropTokSymbol :: SymbolSing Anonymous DropTokSymbol
+  SEnsuresTokSymbol :: SymbolSing Anonymous EnsuresTokSymbol
+  SFriendTokSymbol :: SymbolSing Anonymous FriendTokSymbol
+  SGlobalTokSymbol :: SymbolSing Anonymous GlobalTokSymbol
+  SInternalTokSymbol :: SymbolSing Anonymous InternalTokSymbol
+  SKeyTokSymbol :: SymbolSing Anonymous KeyTokSymbol
+  SLocalTokSymbol :: SymbolSing Anonymous LocalTokSymbol
+  SModifiesTokSymbol :: SymbolSing Anonymous ModifiesTokSymbol
+  SModuleTokSymbol :: SymbolSing Anonymous ModuleTokSymbol
+  SMoveTokSymbol :: SymbolSing Anonymous MoveTokSymbol
+  SPackTokSymbol :: SymbolSing Anonymous PackTokSymbol
+  SPackageTokSymbol :: SymbolSing Anonymous PackageTokSymbol
+  SPhantomTokSymbol :: SymbolSing Anonymous PhantomTokSymbol
+  SPostTokSymbol :: SymbolSing Anonymous PostTokSymbol
+  SPublicTokSymbol :: SymbolSing Anonymous PublicTokSymbol
+  SSignerTokSymbol :: SymbolSing Anonymous SignerTokSymbol
+  SStoreTokSymbol :: SymbolSing Anonymous StoreTokSymbol
+  SSucceedsIfTokSymbol :: SymbolSing Anonymous SucceedsIfTokSymbol
+  SU128TokSymbol :: SymbolSing Anonymous U128TokSymbol
+  SU16TokSymbol :: SymbolSing Anonymous U16TokSymbol
+  SU256TokSymbol :: SymbolSing Anonymous U256TokSymbol
+  SU32TokSymbol :: SymbolSing Anonymous U32TokSymbol
+  SU64TokSymbol :: SymbolSing Anonymous U64TokSymbol
+  SU8TokSymbol :: SymbolSing Anonymous U8TokSymbol
+  SUnpackTokSymbol :: SymbolSing Anonymous UnpackTokSymbol
+  SUpdateTokSymbol :: SymbolSing Anonymous UpdateTokSymbol
+  SBitorTokSymbol :: SymbolSing Anonymous BitorTokSymbol
+  SOrTokSymbol :: SymbolSing Anonymous OrTokSymbol
   SErrorSymbol :: SymbolSing Auxiliary ErrorSymbol
   SMissingSymbol :: SymbolSing Auxiliary MissingSymbol
   SSortMismatchSymbol :: SymbolSing Virtual SortMismatchSymbol
 
 deriving instance Eq (SymbolSing sort symbol)
-
+deriving instance Ord (SymbolSing sort symbol)
 deriving instance Show (SymbolSing sort symbol)
 
 decSymbolSing :: SymbolSing symbolType1 symbol1 -> SymbolSing symbolType2 symbol2 -> Maybe (symbolType1 :~: symbolType2, symbol1 :~~: symbol2)
@@ -3017,7 +3008,6 @@ decSymbolSing SFieldInitializeListSymbol SFieldInitializeListSymbol = Just (Refl
 decSymbolSing SExpFieldSymbol SExpFieldSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockSymbol SSpecBlockSymbol = Just (Refl, HRefl)
 decSymbolSing SHiddenSpecBlockTargetSymbol SHiddenSpecBlockTargetSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecBlockIdentifierSymbol SHiddenSpecBlockIdentifierSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockTargetSchemaSymbol SSpecBlockTargetSchemaSymbol = Just (Refl, HRefl)
 decSymbolSing SHiddenStructIdentifierSymbol SHiddenStructIdentifierSymbol = Just (Refl, HRefl)
 decSymbolSing SHiddenSpecFunctionSymbol SHiddenSpecFunctionSymbol = Just (Refl, HRefl)
@@ -3158,6 +3148,9 @@ deriving instance Show SomeSymbolSing
 pattern SomeRegularSymbolSing :: () => (symbolType ~ Regular) => SymbolSing symbolType symbol -> SomeSymbolSing
 pattern SomeRegularSymbolSing symbolSing = SomeSymbolSing RegularIsReal symbolSing
 
+pattern SomeAnonymousSymbolSing :: () => (symbolType ~ Anonymous) => SymbolSing symbolType symbol -> SomeSymbolSing
+pattern SomeAnonymousSymbolSing symbolSing = SomeSymbolSing AnonymousIsReal symbolSing
+
 pattern SomeAuxiliarySymbolSing :: () => (symbolType ~ Auxiliary) => SymbolSing symbolType symbol -> SomeSymbolSing
 pattern SomeAuxiliarySymbolSing symbolSing = SomeSymbolSing AuxiliaryIsReal symbolSing
 
@@ -3264,7 +3257,6 @@ mkSymbolTable language =
     , mkEntry "exp_field" (SomeRegularSymbolSing SExpFieldSymbol)
     , mkEntry "spec_block" (SomeRegularSymbolSing SSpecBlockSymbol)
     , mkEntry "_spec_block_target" (SomeRegularSymbolSing SHiddenSpecBlockTargetSymbol)
-    , mkEntry "_spec_block_identifier" (SomeRegularSymbolSing SHiddenSpecBlockIdentifierSymbol)
     , mkEntry "spec_block_target_schema" (SomeRegularSymbolSing SSpecBlockTargetSchemaSymbol)
     , mkEntry "_struct_identifier" (SomeRegularSymbolSing SHiddenStructIdentifierSymbol)
     , mkEntry "_spec_function" (SomeRegularSymbolSing SHiddenSpecFunctionSymbol)
@@ -3329,109 +3321,354 @@ mkSymbolTable language =
     , mkEntry "constant" (SomeRegularSymbolSing SConstantSymbol)
     , mkEntry "friend_declaration" (SomeRegularSymbolSing SFriendDeclarationSymbol)
     , mkEntry "friend_access" (SomeRegularSymbolSing SFriendAccessSymbol)
+    , mkEntry "!" (SomeAnonymousSymbolSing SBangTokSymbol)
+    , mkEntry "!=" (SomeAnonymousSymbolSing SNeqTokSymbol)
+    , mkEntry "$" (SomeAnonymousSymbolSing SDollarTokSymbol)
+    , mkEntry "%" (SomeAnonymousSymbolSing SModTokSymbol)
+    , mkEntry "&" (SomeAnonymousSymbolSing SBitandTokSymbol)
+    , mkEntry "&&" (SomeAnonymousSymbolSing SAndTokSymbol)
+    , mkEntry "*" (SomeAnonymousSymbolSing SMulTokSymbol)
+    , mkEntry "+" (SomeAnonymousSymbolSing SAddTokSymbol)
+    , mkEntry "-" (SomeAnonymousSymbolSing SSubTokSymbol)
+    , mkEntry ".." (SomeAnonymousSymbolSing SRangeTokSymbol)
+    , mkEntry "/" (SomeAnonymousSymbolSing SDivTokSymbol)
+    , mkEntry "<" (SomeAnonymousSymbolSing SLtTokSymbol)
+    , mkEntry "<<" (SomeAnonymousSymbolSing SShlTokSymbol)
+    , mkEntry "<=" (SomeAnonymousSymbolSing SLeTokSymbol)
+    , mkEntry "=" (SomeAnonymousSymbolSing SAssignTokSymbol)
+    , mkEntry "==" (SomeAnonymousSymbolSing SEqTokSymbol)
+    , mkEntry "==>" (SomeAnonymousSymbolSing SImpliesTokSymbol)
+    , mkEntry ">" (SomeAnonymousSymbolSing SGtTokSymbol)
+    , mkEntry ">=" (SomeAnonymousSymbolSing SGeTokSymbol)
+    , mkEntry ">>" (SomeAnonymousSymbolSing SShrTokSymbol)
+    , mkEntry "^" (SomeAnonymousSymbolSing SXorTokSymbol)
+    , mkEntry "aborts_with" (SomeAnonymousSymbolSing SAbortsWithTokSymbol)
+    , mkEntry "address" (SomeAnonymousSymbolSing SAddressTokSymbol)
+    , mkEntry "assert" (SomeAnonymousSymbolSing SAssertTokSymbol)
+    , mkEntry "assume" (SomeAnonymousSymbolSing SAssumeTokSymbol)
+    , mkEntry "bool" (SomeAnonymousSymbolSing SBoolTokSymbol)
+    , mkEntry "bytearray" (SomeAnonymousSymbolSing SBytearrayTokSymbol)
+    , mkEntry "copy" (SomeAnonymousSymbolSing SCopyTokSymbol)
+    , mkEntry "decreases" (SomeAnonymousSymbolSing SDecreasesTokSymbol)
+    , mkEntry "drop" (SomeAnonymousSymbolSing SDropTokSymbol)
+    , mkEntry "ensures" (SomeAnonymousSymbolSing SEnsuresTokSymbol)
+    , mkEntry "friend" (SomeAnonymousSymbolSing SFriendTokSymbol)
+    , mkEntry "global" (SomeAnonymousSymbolSing SGlobalTokSymbol)
+    , mkEntry "internal" (SomeAnonymousSymbolSing SInternalTokSymbol)
+    , mkEntry "key" (SomeAnonymousSymbolSing SKeyTokSymbol)
+    , mkEntry "local" (SomeAnonymousSymbolSing SLocalTokSymbol)
+    , mkEntry "modifies" (SomeAnonymousSymbolSing SModifiesTokSymbol)
+    , mkEntry "module" (SomeAnonymousSymbolSing SModuleTokSymbol)
+    , mkEntry "move" (SomeAnonymousSymbolSing SMoveTokSymbol)
+    , mkEntry "pack" (SomeAnonymousSymbolSing SPackTokSymbol)
+    , mkEntry "package" (SomeAnonymousSymbolSing SPackageTokSymbol)
+    , mkEntry "phantom" (SomeAnonymousSymbolSing SPhantomTokSymbol)
+    , mkEntry "post" (SomeAnonymousSymbolSing SPostTokSymbol)
+    , mkEntry "public" (SomeAnonymousSymbolSing SPublicTokSymbol)
+    , mkEntry "signer" (SomeAnonymousSymbolSing SSignerTokSymbol)
+    , mkEntry "store" (SomeAnonymousSymbolSing SStoreTokSymbol)
+    , mkEntry "succeeds_if" (SomeAnonymousSymbolSing SSucceedsIfTokSymbol)
+    , mkEntry "u128" (SomeAnonymousSymbolSing SU128TokSymbol)
+    , mkEntry "u16" (SomeAnonymousSymbolSing SU16TokSymbol)
+    , mkEntry "u256" (SomeAnonymousSymbolSing SU256TokSymbol)
+    , mkEntry "u32" (SomeAnonymousSymbolSing SU32TokSymbol)
+    , mkEntry "u64" (SomeAnonymousSymbolSing SU64TokSymbol)
+    , mkEntry "u8" (SomeAnonymousSymbolSing SU8TokSymbol)
+    , mkEntry "unpack" (SomeAnonymousSymbolSing SUnpackTokSymbol)
+    , mkEntry "update" (SomeAnonymousSymbolSing SUpdateTokSymbol)
+    , mkEntry "|" (SomeAnonymousSymbolSing SBitorTokSymbol)
+    , mkEntry "||" (SomeAnonymousSymbolSing SOrTokSymbol)
     ]
  where
   mkEntry :: String -> SomeSymbolSing -> IO (Int, SomeSymbolSing)
   mkEntry grammarType someSymbol = do
     (,someSymbol) . fromIntegral <$> TS.languageSymbolForGrammarType language (BSC.pack grammarType) True
 
+symbolMap :: Map String SomeSymbolSing
+symbolMap = Map.fromList
+    [ ("source_file", SomeRegularSymbolSing SSourceFileSymbol)
+    , ("module_definition", SomeRegularSymbolSing SModuleDefinitionSymbol)
+    , ("module_body", SomeRegularSymbolSing SModuleBodySymbol)
+    , ("_enum_item", SomeRegularSymbolSing SHiddenEnumItemSymbol)
+    , ("enum_definition", SomeRegularSymbolSing SEnumDefinitionSymbol)
+    , ("_enum_signature", SomeRegularSymbolSing SHiddenEnumSignatureSymbol)
+    , ("_enum_identifier", SomeRegularSymbolSing SHiddenEnumIdentifierSymbol)
+    , ("identifier", SomeRegularSymbolSing SIdentifierSymbol)
+    , ("ability_decls", SomeRegularSymbolSing SAbilityDeclsSymbol)
+    , ("ability", SomeRegularSymbolSing SAbilitySymbol)
+    , ("type_parameters", SomeRegularSymbolSing STypeParametersSymbol)
+    , ("type_parameter", SomeRegularSymbolSing STypeParameterSymbol)
+    , ("_type_parameter_identifier", SomeRegularSymbolSing SHiddenTypeParameterIdentifierSymbol)
+    , ("enum_variants", SomeRegularSymbolSing SEnumVariantsSymbol)
+    , ("variant", SomeRegularSymbolSing SVariantSymbol)
+    , ("_variant_identifier", SomeRegularSymbolSing SHiddenVariantIdentifierSymbol)
+    , ("datatype_fields", SomeRegularSymbolSing SDatatypeFieldsSymbol)
+    , ("named_fields", SomeRegularSymbolSing SNamedFieldsSymbol)
+    , ("field_annotation", SomeRegularSymbolSing SFieldAnnotationSymbol)
+    , ("_field_identifier", SomeRegularSymbolSing SHiddenFieldIdentifierSymbol)
+    , ("_type", SomeRegularSymbolSing SHiddenTypeSymbol)
+    , ("apply_type", SomeRegularSymbolSing SApplyTypeSymbol)
+    , ("module_access", SomeRegularSymbolSing SModuleAccessSymbol)
+    , ("_module_identifier", SomeRegularSymbolSing SHiddenModuleIdentifierSymbol)
+    , ("_reserved_identifier", SomeRegularSymbolSing SHiddenReservedIdentifierSymbol)
+    , ("_exists", SomeRegularSymbolSing SHiddenExistsSymbol)
+    , ("_forall", SomeRegularSymbolSing SHiddenForallSymbol)
+    , ("module_identity", SomeRegularSymbolSing SModuleIdentitySymbol)
+    , ("num_literal", SomeRegularSymbolSing SNumLiteralSymbol)
+    , ("type_arguments", SomeRegularSymbolSing STypeArgumentsSymbol)
+    , ("function_type", SomeRegularSymbolSing SFunctionTypeSymbol)
+    , ("function_type_parameters", SomeRegularSymbolSing SFunctionTypeParametersSymbol)
+    , ("primitive_type", SomeRegularSymbolSing SPrimitiveTypeSymbol)
+    , ("ref_type", SomeRegularSymbolSing SRefTypeSymbol)
+    , ("_reference", SomeRegularSymbolSing SHiddenReferenceSymbol)
+    , ("imm_ref", SomeRegularSymbolSing SImmRefSymbol)
+    , ("mut_ref", SomeRegularSymbolSing SMutRefSymbol)
+    , ("tuple_type", SomeRegularSymbolSing STupleTypeSymbol)
+    , ("positional_fields", SomeRegularSymbolSing SPositionalFieldsSymbol)
+    , ("postfix_ability_decls", SomeRegularSymbolSing SPostfixAbilityDeclsSymbol)
+    , ("_function_item", SomeRegularSymbolSing SHiddenFunctionItemSymbol)
+    , ("function_definition", SomeRegularSymbolSing SFunctionDefinitionSymbol)
+    , ("_function_signature", SomeRegularSymbolSing SHiddenFunctionSignatureSymbol)
+    , ("_function_identifier", SomeRegularSymbolSing SHiddenFunctionIdentifierSymbol)
+    , ("function_parameters", SomeRegularSymbolSing SFunctionParametersSymbol)
+    , ("function_parameter", SomeRegularSymbolSing SFunctionParameterSymbol)
+    , ("_variable_identifier", SomeRegularSymbolSing SHiddenVariableIdentifierSymbol)
+    , ("mut_function_parameter", SomeRegularSymbolSing SMutFunctionParameterSymbol)
+    , ("modifier", SomeRegularSymbolSing SModifierSymbol)
+    , ("ret_type", SomeRegularSymbolSing SRetTypeSymbol)
+    , ("block", SomeRegularSymbolSing SBlockSymbol)
+    , ("_expression", SomeRegularSymbolSing SHiddenExpressionSymbol)
+    , ("_unary_expression", SomeRegularSymbolSing SHiddenUnaryExpressionSymbol)
+    , ("_expression_term", SomeRegularSymbolSing SHiddenExpressionTermSymbol)
+    , ("_literal_value", SomeRegularSymbolSing SHiddenLiteralValueSymbol)
+    , ("address_literal", SomeRegularSymbolSing SAddressLiteralSymbol)
+    , ("bool_literal", SomeRegularSymbolSing SBoolLiteralSymbol)
+    , ("byte_string_literal", SomeRegularSymbolSing SByteStringLiteralSymbol)
+    , ("hex_string_literal", SomeRegularSymbolSing SHexStringLiteralSymbol)
+    , ("annotation_expression", SomeRegularSymbolSing SAnnotationExpressionSymbol)
+    , ("break_expression", SomeRegularSymbolSing SBreakExpressionSymbol)
+    , ("label", SomeRegularSymbolSing SLabelSymbol)
+    , ("call_expression", SomeRegularSymbolSing SCallExpressionSymbol)
+    , ("arg_list", SomeRegularSymbolSing SArgListSymbol)
+    , ("name_expression", SomeRegularSymbolSing SNameExpressionSymbol)
+    , ("continue_expression", SomeRegularSymbolSing SContinueExpressionSymbol)
+    , ("dot_expression", SomeRegularSymbolSing SDotExpressionSymbol)
+    , ("expression_list", SomeRegularSymbolSing SExpressionListSymbol)
+    , ("if_expression", SomeRegularSymbolSing SIfExpressionSymbol)
+    , ("index_expression", SomeRegularSymbolSing SIndexExpressionSymbol)
+    , ("macro_call_expression", SomeRegularSymbolSing SMacroCallExpressionSymbol)
+    , ("macro_module_access", SomeRegularSymbolSing SMacroModuleAccessSymbol)
+    , ("match_expression", SomeRegularSymbolSing SMatchExpressionSymbol)
+    , ("_match_body", SomeRegularSymbolSing SHiddenMatchBodySymbol)
+    , ("match_arm", SomeRegularSymbolSing SMatchArmSymbol)
+    , ("bind_list", SomeRegularSymbolSing SBindListSymbol)
+    , ("_bind", SomeRegularSymbolSing SHiddenBindSymbol)
+    , ("at_bind", SomeRegularSymbolSing SAtBindSymbol)
+    , ("bind_unpack", SomeRegularSymbolSing SBindUnpackSymbol)
+    , ("bind_fields", SomeRegularSymbolSing SBindFieldsSymbol)
+    , ("bind_named_fields", SomeRegularSymbolSing SBindNamedFieldsSymbol)
+    , ("bind_field", SomeRegularSymbolSing SBindFieldSymbol)
+    , ("_spread_operator", SomeRegularSymbolSing SHiddenSpreadOperatorSymbol)
+    , ("mut_bind_field", SomeRegularSymbolSing SMutBindFieldSymbol)
+    , ("bind_positional_fields", SomeRegularSymbolSing SBindPositionalFieldsSymbol)
+    , ("mut_bind_var", SomeRegularSymbolSing SMutBindVarSymbol)
+    , ("comma_bind_list", SomeRegularSymbolSing SCommaBindListSymbol)
+    , ("or_bind_list", SomeRegularSymbolSing SOrBindListSymbol)
+    , ("match_condition", SomeRegularSymbolSing SMatchConditionSymbol)
+    , ("pack_expression", SomeRegularSymbolSing SPackExpressionSymbol)
+    , ("field_initialize_list", SomeRegularSymbolSing SFieldInitializeListSymbol)
+    , ("exp_field", SomeRegularSymbolSing SExpFieldSymbol)
+    , ("spec_block", SomeRegularSymbolSing SSpecBlockSymbol)
+    , ("_spec_block_target", SomeRegularSymbolSing SHiddenSpecBlockTargetSymbol)
+    , ("spec_block_target_schema", SomeRegularSymbolSing SSpecBlockTargetSchemaSymbol)
+    , ("_struct_identifier", SomeRegularSymbolSing SHiddenStructIdentifierSymbol)
+    , ("_spec_function", SomeRegularSymbolSing SHiddenSpecFunctionSymbol)
+    , ("native_spec_function", SomeRegularSymbolSing SNativeSpecFunctionSymbol)
+    , ("_spec_function_signature", SomeRegularSymbolSing SHiddenSpecFunctionSignatureSymbol)
+    , ("uninterpreted_spec_function", SomeRegularSymbolSing SUninterpretedSpecFunctionSymbol)
+    , ("usual_spec_function", SomeRegularSymbolSing SUsualSpecFunctionSymbol)
+    , ("spec_body", SomeRegularSymbolSing SSpecBodySymbol)
+    , ("_spec_block_memeber", SomeRegularSymbolSing SHiddenSpecBlockMemeberSymbol)
+    , ("spec_apply", SomeRegularSymbolSing SSpecApplySymbol)
+    , ("spec_apply_pattern", SomeRegularSymbolSing SSpecApplyPatternSymbol)
+    , ("spec_apply_name_pattern", SomeRegularSymbolSing SSpecApplyNamePatternSymbol)
+    , ("spec_condition", SomeRegularSymbolSing SSpecConditionSymbol)
+    , ("_spec_abort_if", SomeRegularSymbolSing SHiddenSpecAbortIfSymbol)
+    , ("condition_properties", SomeRegularSymbolSing SConditionPropertiesSymbol)
+    , ("spec_property", SomeRegularSymbolSing SSpecPropertySymbol)
+    , ("_spec_abort_with_or_modifies", SomeRegularSymbolSing SHiddenSpecAbortWithOrModifiesSymbol)
+    , ("_spec_condition", SomeRegularSymbolSing SHiddenSpecConditionSymbol)
+    , ("_spec_condition_kind", SomeRegularSymbolSing SHiddenSpecConditionKindSymbol)
+    , ("spec_include", SomeRegularSymbolSing SSpecIncludeSymbol)
+    , ("spec_invariant", SomeRegularSymbolSing SSpecInvariantSymbol)
+    , ("spec_let", SomeRegularSymbolSing SSpecLetSymbol)
+    , ("spec_pragma", SomeRegularSymbolSing SSpecPragmaSymbol)
+    , ("spec_variable", SomeRegularSymbolSing SSpecVariableSymbol)
+    , ("use_declaration", SomeRegularSymbolSing SUseDeclarationSymbol)
+    , ("use_fun", SomeRegularSymbolSing SUseFunSymbol)
+    , ("use_module", SomeRegularSymbolSing SUseModuleSymbol)
+    , ("use_module_member", SomeRegularSymbolSing SUseModuleMemberSymbol)
+    , ("use_member", SomeRegularSymbolSing SUseMemberSymbol)
+    , ("use_module_members", SomeRegularSymbolSing SUseModuleMembersSymbol)
+    , ("unit_expression", SomeRegularSymbolSing SUnitExpressionSymbol)
+    , ("vector_expression", SomeRegularSymbolSing SVectorExpressionSymbol)
+    , ("borrow_expression", SomeRegularSymbolSing SBorrowExpressionSymbol)
+    , ("dereference_expression", SomeRegularSymbolSing SDereferenceExpressionSymbol)
+    , ("move_or_copy_expression", SomeRegularSymbolSing SMoveOrCopyExpressionSymbol)
+    , ("unary_expression", SomeRegularSymbolSing SUnaryExpressionSymbol)
+    , ("unary_op", SomeRegularSymbolSing SUnaryOpSymbol)
+    , ("abort_expression", SomeRegularSymbolSing SAbortExpressionSymbol)
+    , ("assign_expression", SomeRegularSymbolSing SAssignExpressionSymbol)
+    , ("binary_expression", SomeRegularSymbolSing SBinaryExpressionSymbol)
+    , ("cast_expression", SomeRegularSymbolSing SCastExpressionSymbol)
+    , ("identified_expression", SomeRegularSymbolSing SIdentifiedExpressionSymbol)
+    , ("block_identifier", SomeRegularSymbolSing SBlockIdentifierSymbol)
+    , ("lambda_expression", SomeRegularSymbolSing SLambdaExpressionSymbol)
+    , ("lambda_bindings", SomeRegularSymbolSing SLambdaBindingsSymbol)
+    , ("lambda_binding", SomeRegularSymbolSing SLambdaBindingSymbol)
+    , ("loop_expression", SomeRegularSymbolSing SLoopExpressionSymbol)
+    , ("quantifier_expression", SomeRegularSymbolSing SQuantifierExpressionSymbol)
+    , ("quantifier_bindings", SomeRegularSymbolSing SQuantifierBindingsSymbol)
+    , ("quantifier_binding", SomeRegularSymbolSing SQuantifierBindingSymbol)
+    , ("return_expression", SomeRegularSymbolSing SReturnExpressionSymbol)
+    , ("while_expression", SomeRegularSymbolSing SWhileExpressionSymbol)
+    , ("block_item", SomeRegularSymbolSing SBlockItemSymbol)
+    , ("let_statement", SomeRegularSymbolSing SLetStatementSymbol)
+    , ("macro_function_definition", SomeRegularSymbolSing SMacroFunctionDefinitionSymbol)
+    , ("_macro_signature", SomeRegularSymbolSing SHiddenMacroSignatureSymbol)
+    , ("native_function_definition", SomeRegularSymbolSing SNativeFunctionDefinitionSymbol)
+    , ("_struct_item", SomeRegularSymbolSing SHiddenStructItemSymbol)
+    , ("native_struct_definition", SomeRegularSymbolSing SNativeStructDefinitionSymbol)
+    , ("_struct_signature", SomeRegularSymbolSing SHiddenStructSignatureSymbol)
+    , ("struct_definition", SomeRegularSymbolSing SStructDefinitionSymbol)
+    , ("constant", SomeRegularSymbolSing SConstantSymbol)
+    , ("friend_declaration", SomeRegularSymbolSing SFriendDeclarationSymbol)
+    , ("friend_access", SomeRegularSymbolSing SFriendAccessSymbol)
+    , ("!", SomeAnonymousSymbolSing SBangTokSymbol)
+    , ("!=", SomeAnonymousSymbolSing SNeqTokSymbol)
+    , ("$", SomeAnonymousSymbolSing SDollarTokSymbol)
+    , ("%", SomeAnonymousSymbolSing SModTokSymbol)
+    , ("&", SomeAnonymousSymbolSing SBitandTokSymbol)
+    , ("&&", SomeAnonymousSymbolSing SAndTokSymbol)
+    , ("*", SomeAnonymousSymbolSing SMulTokSymbol)
+    , ("+", SomeAnonymousSymbolSing SAddTokSymbol)
+    , ("-", SomeAnonymousSymbolSing SSubTokSymbol)
+    , ("..", SomeAnonymousSymbolSing SRangeTokSymbol)
+    , ("/", SomeAnonymousSymbolSing SDivTokSymbol)
+    , ("<", SomeAnonymousSymbolSing SLtTokSymbol)
+    , ("<<", SomeAnonymousSymbolSing SShlTokSymbol)
+    , ("<=", SomeAnonymousSymbolSing SLeTokSymbol)
+    , ("=", SomeAnonymousSymbolSing SAssignTokSymbol)
+    , ("==", SomeAnonymousSymbolSing SEqTokSymbol)
+    , ("==>", SomeAnonymousSymbolSing SImpliesTokSymbol)
+    , (">", SomeAnonymousSymbolSing SGtTokSymbol)
+    , (">=", SomeAnonymousSymbolSing SGeTokSymbol)
+    , (">>", SomeAnonymousSymbolSing SShrTokSymbol)
+    , ("^", SomeAnonymousSymbolSing SXorTokSymbol)
+    , ("aborts_with", SomeAnonymousSymbolSing SAbortsWithTokSymbol)
+    , ("address", SomeAnonymousSymbolSing SAddressTokSymbol)
+    , ("assert", SomeAnonymousSymbolSing SAssertTokSymbol)
+    , ("assume", SomeAnonymousSymbolSing SAssumeTokSymbol)
+    , ("bool", SomeAnonymousSymbolSing SBoolTokSymbol)
+    , ("bytearray", SomeAnonymousSymbolSing SBytearrayTokSymbol)
+    , ("copy", SomeAnonymousSymbolSing SCopyTokSymbol)
+    , ("decreases", SomeAnonymousSymbolSing SDecreasesTokSymbol)
+    , ("drop", SomeAnonymousSymbolSing SDropTokSymbol)
+    , ("ensures", SomeAnonymousSymbolSing SEnsuresTokSymbol)
+    , ("friend", SomeAnonymousSymbolSing SFriendTokSymbol)
+    , ("global", SomeAnonymousSymbolSing SGlobalTokSymbol)
+    , ("internal", SomeAnonymousSymbolSing SInternalTokSymbol)
+    , ("key", SomeAnonymousSymbolSing SKeyTokSymbol)
+    , ("local", SomeAnonymousSymbolSing SLocalTokSymbol)
+    , ("modifies", SomeAnonymousSymbolSing SModifiesTokSymbol)
+    , ("module", SomeAnonymousSymbolSing SModuleTokSymbol)
+    , ("move", SomeAnonymousSymbolSing SMoveTokSymbol)
+    , ("pack", SomeAnonymousSymbolSing SPackTokSymbol)
+    , ("package", SomeAnonymousSymbolSing SPackageTokSymbol)
+    , ("phantom", SomeAnonymousSymbolSing SPhantomTokSymbol)
+    , ("post", SomeAnonymousSymbolSing SPostTokSymbol)
+    , ("public", SomeAnonymousSymbolSing SPublicTokSymbol)
+    , ("signer", SomeAnonymousSymbolSing SSignerTokSymbol)
+    , ("store", SomeAnonymousSymbolSing SStoreTokSymbol)
+    , ("succeeds_if", SomeAnonymousSymbolSing SSucceedsIfTokSymbol)
+    , ("u128", SomeAnonymousSymbolSing SU128TokSymbol)
+    , ("u16", SomeAnonymousSymbolSing SU16TokSymbol)
+    , ("u256", SomeAnonymousSymbolSing SU256TokSymbol)
+    , ("u32", SomeAnonymousSymbolSing SU32TokSymbol)
+    , ("u64", SomeAnonymousSymbolSing SU64TokSymbol)
+    , ("u8", SomeAnonymousSymbolSing SU8TokSymbol)
+    , ("unpack", SomeAnonymousSymbolSing SUnpackTokSymbol)
+    , ("update", SomeAnonymousSymbolSing SUpdateTokSymbol)
+    , ("|", SomeAnonymousSymbolSing SBitorTokSymbol)
+    , ("||", SomeAnonymousSymbolSing SOrTokSymbol)
+    ]
+
+mkSymbolTable' :: TS.Language -> IO SymbolTable
+mkSymbolTable' lang = do
+  count <- fromIntegral <$> TS.languageSymbolCount lang
+  SymbolTable <$> foldrM
+    (\id acc -> do
+      symName <- TS.languageSymbolName lang id
+      let mSymSing = Map.lookup (BSC.unpack symName) symbolMap
+      pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
+    )
+    (IM.empty :: IntMap SomeSymbolSing)
+    [0..count-1]
+
 -- --------------------------------------------------------------------------------
--- -- Parser Monad
+-- -- Parser 
 -- --------------------------------------------------------------------------------
+-- type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
-data PState = PState
-  { currentNode :: {-# UNPACK #-} !TS.Node
-  -- , newCache :: {-# NOUNPACK #-} !AstCache
-  }
+-- type ParseError = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
-data PEnv = PEnv
-  { symbolTable :: {-# UNPACK #-} !SymbolTable
-  , treeCursor :: {-# UNPACK #-} !TS.TreeCursor
-  -- , oldCache :: {-# UNPACK #-} !AstCache
-  }
+-- pSourceFile :: Parser (MoveTerm SourceFileL)
+-- pSourceFile = do
+--   _sym <- pSymbol SSourceFileSymbol
+--   children <- Syntax.insertF <$> many pModuleDefinition
+--   pure $ iSourceFile children
 
-newtype P a = P {unP :: MaybeT (ReaderT PEnv (StateT PState IO)) a}
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader PEnv, MonadState PState, Alternative, MonadPlus)
+-- pModuleDefinition :: Parser (MoveTerm ModuleDefinitionL)
+-- pModuleDefinition = do
+--   tok <- pModuleTok
+--   identity <- pModuleIdentity
+--   body <- pModuleBody
+--   pure $ iModuleDefinition tok identity body
 
-getCurrentNode :: P TS.Node
-getCurrentNode = gets currentNode
+-- pModuleTok :: Parser (MoveTerm ModuleTokL)
+-- pModuleTok = do
+--   _ <- pSymbol SModuleTokSymbol
+--   pure iModule
 
-putCurrentNode :: TS.Node -> P ()
-putCurrentNode node = modify' (\pstate -> pstate{currentNode = node})
+-- pModuleBody :: Parser (MoveTerm ModuleBodyL)
+-- pModuleBody = do
+--   _sym <- pSymbol SModuleBodySymbol
+--   undefined
+  
+-- pModuleIdentity :: Parser (MoveTerm ModuleIdentityL)
+-- pModuleIdentity = do
+--   _sym <- pSymbol SModuleIdentitySymbol
+--   undefined
 
-getSymbol :: TS.Node -> P SomeSymbolSing
-getSymbol node = do
-  currentNodeIsError <- liftIO (TS.nodeIsError node)
-  if currentNodeIsError
-    then mzero -- pure (SomeAuxiliarySymbolSing SErrorSymbol)
-    else do
-      currentNodeIsMissing <- liftIO (TS.nodeIsMissing node)
-      if currentNodeIsMissing
-        then mzero -- pure (SomeAuxiliarySymbolSing SMissingSymbol)
-        else do
-          symbol <- liftIO (TS.nodeSymbol node)
-          asks ((IM.! fromIntegral symbol) . unSymbolTable . symbolTable)
+-- pSymbol
+--   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
+--    . SymbolSing symbolType symbol
+--   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
+-- pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
+--   SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
+--     Just (Refl, HRefl) -> Just symSing
+--     Nothing -> Nothing
 
--- cacheSomeNode :: SomeNode -> P SomeNode
--- cacheSomeNode someNode = modify' updatePState >> pure someNode
---  where
---   nodeId = someNodeToNodeId someNode
---   updateAstCache = AstCache . IM.insert (unWrapTSNodeId nodeId) someNode . unAstCache
---   updatePState pstate = pstate{newCache = updateAstCache (newCache pstate)}
-
--- findOldSomeNodeInCache :: P SomeNode
--- findOldSomeNodeInCache =
---   gets (TS.nodeId . currentNode) >>= \nodeId -> do
---     asks (IM.lookup (unWrapTSNodeId nodeId) . unAstCache . oldCache)
---       >>= maybe mzero pure
-
-gotoParent :: P ()
-gotoParent = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoParent treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      putCurrentNode currentNode
-
-gotoFirstNamedChild :: P ()
-gotoFirstNamedChild = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoFirstChild treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
-      if currentNodeIsNamed
-        then putCurrentNode currentNode
-        else gotoNextNamedSibling
-
-gotoNextNamedSibling :: P ()
-gotoNextNamedSibling = do
-  treeCursor <- asks treeCursor
-  success <- liftIO (TS.treeCursorGotoNextSibling treeCursor)
-  if not success
-    then mzero
-    else do
-      currentNode <- liftIO (TS.treeCursorCurrentNode treeCursor)
-      currentNodeIsNamed <- liftIO (TS.nodeIsNamed currentNode)
-      if currentNodeIsNamed
-        then putCurrentNode currentNode
-        else gotoNextNamedSibling
-
--- --------------------------------------------------------------------------------
--- -- Parser Class
--- --------------------------------------------------------------------------------
-
-class HasParser a where
-  p :: P a
-
-instance HasParser (MoveTerm SourceFileL) where
-  p = do -- pSomeNode >>= \someNode -> do
-    -- let symbol = getSymbolForNode someNode
-    -- check if symbol is SourceFile?
-    -- parse children
-    children <- pure []
-    pure $ iSourceFile (Syntax.insertF children)
+-- pSymbol'
+--   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
+--    . SymbolSing symbolType symbol
+--   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
+-- pSymbol' sym = do
+--   Megaparsec.token
+--     test
+--     Set.empty
+--   where
+--     test tok = case Cubix.TreeSitter.tokenValue tok of
+--       SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
+--         Just (Refl, HRefl) -> Just (tok $> symSing)
+--         Nothing -> Nothing

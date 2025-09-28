@@ -1,0 +1,106 @@
+{-+}
+module ${moduleName} where
+{+-}
+
+import Control.Applicative (Alternative (..), optional)
+import Control.Monad (MonadPlus (..), forM_, unless, when)
+import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import Control.Monad.State.Strict (MonadState (..), StateT (..), gets, modify')
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import Control.Monad.Trans.Resource (runResourceT)
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Data.ByteString.Char8 qualified as BSC
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
+import Data.IORef qualified as IORef
+import Data.Kind (Type)
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Maybe (isJust)
+import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import Streaming qualified
+import Streaming.Prelude qualified as Streaming
+
+import TreeSitter (NodeId (..), Range (..))
+import TreeSitter qualified as TS
+import TreeSitter.SuiMove (tree_sitter_sui_move)
+
+import Cubix.ParsePretty
+import Cubix.Language.SuiMove.Modularized
+import Cubix.TreeSitter
+
+getSymbol :: SymbolTable -> TS.Node -> IO (Maybe SomeSymbolSing)
+getSymbol map node = do
+  symbol <- TS.nodeSymbol node
+  pure $ IM.lookup (fromIntegral symbol) (unSymbolTable map)
+
+parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse path = runResourceT $
+  withLanguage tree_sitter_sui_move $ \lang -> do
+  --count <- fromIntegral <$> liftIO (TS.languageSymbolCount lang)
+  -- foldrM _ Map.empty [0..count]
+  -- forM_ [0..count] $ \id -> do
+  --   symName <- liftIO $ TS.languageSymbolName lang id
+  --   liftIO $ print symName
+
+  symbolTable <- liftIO (mkSymbolTable' lang)
+  Streaming.print
+    $ Streaming.filter (isJust . tokenValue)
+    $ Streaming.mapM
+      (\tok -> do
+          sym <- liftIO $ getSymbol symbolTable (tokenValue tok)
+          pure $ tok { tokenValue = sym }
+      )
+    -- $ Streaming.mapM (liftIO . TS.nodeGrammarTypeAsString . tokenValue)
+    $ lexer lang path
+
+  pure undefined
+
+-- --------------------------------------------------------------------------------
+-- -- Parser 
+-- --------------------------------------------------------------------------------
+type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
+
+pSymbol
+  :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
+   . SymbolSing symbolType symbol
+  -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
+pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
+  SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
+    Just (Refl, HRefl) -> Just symSing
+    Nothing -> Nothing
+
+{-+}
+pRoot :: Parser (MoveTerm (RootSort MoveSig))
+pRoot = p${startSort.camelCase}L
+{+-}
+
+{-+}
+${for(tokens)}
+p${it.name.camelCase} :: Parser (MoveTerm ${it.name.camelCase}TokL)
+p${it.name.camelCase} = pSymbol S${it.name.camelCase}TokSymbol $$> i${it.name.camelCase}
+
+${endfor}
+{+-}
+
+{-+}
+${for(dataTypes)}
+p${it.name.camelCase} :: Parser (MoveTerm ${it.sort.camelCase}L)
+p${it.name.camelCase} = do
+  _sym <- pSymbol S${it.name.camelCase}Symbol
+${if(it.isSum)}
+
+${endif}  
+  pure undefined
+${if(it.isSum)}
+  where
+${for(it.constrs)}
+    p${it.name.camelCase} :: Parser (MoveTerm ${it.sort.camelCase}L)
+    p${it.name.camelCase} = do
+      pure undefined
+${endfor}
+${endif}
+
+${endfor}
+{+-}

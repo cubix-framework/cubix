@@ -4,10 +4,7 @@
   packages = with pkgs; [
     fourmolu
     ghcid
-    # Jakub 2025.08.20: right now hs-tree-sitter supports ABI version
-    # up to 14. Cli in nixpkgs will generate too new parser, that is
-    # incompatible
-    # tree-sitter
+    tree-sitter
   ];
 
   # This sets gcc version brought into env by languages.c option
@@ -25,11 +22,8 @@
     #                  one are needed
     c.enable = true;
     java.enable = true;
-    javascript = {
-      enable = true;
-      # For generating tree-sitter grammars
-      npm.enable = true;
-    };
+    # tree-sitter needs node in path
+    javascript.enable = true;
     lua = {
       enable = true;
       package = pkgs.lua53Packages.lua;
@@ -61,6 +55,18 @@
         -o cubix-sui-move/src/Cubix/Language/SuiMove/Modularized.hs
       popd
     '';
+
+    gen-sui-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Cubix.Language.SuiMove.ParsePretty \
+        --token-map cubix-sui-move/preserved_tokens.json \
+        -o cubix-sui-move/src/Cubix/Language/SuiMove/ParsePretty.hs
+      popd
+    '';
+
   };
 
   env = {

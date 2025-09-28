@@ -1,6 +1,7 @@
 module Cubix.TreeSitter where
 
 import Data.ByteString qualified as BS
+
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Resource (MonadResource (..), allocate)
@@ -21,12 +22,16 @@ data Token a = MkToken
   , tokenSpan :: {-# UNPACK #-} !SourceSpan
   , tokenRange :: {-# UNPACK #-} !SourceRange
   }
-  deriving (Ord, Show)
+  deriving (Show, Functor)
 
 -- Two tokens are equal if their grammar symbol is the same,
 -- no matter the location
 instance Eq a => Eq (Token a) where
   (==) l r = tokenValue l == tokenValue r
+
+-- Work around getting Ord for ts generated symbol
+instance Eq a => Ord (Token a) where
+  compare a b = compare (tokenSpan a) (tokenSpan b)
 
 nodeRange :: TS.Node -> IO SourceRange
 nodeRange node = do
