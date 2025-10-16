@@ -28,39 +28,11 @@ import Data.Text.Lazy.Builder qualified as TLB
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
-import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, toDataTypes, unName, prefixedName)
+import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, isHidden, toDataTypes, unName, prefixedName)
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
+import TreeSitter.GenerateAst.Internal.Parser (Parser (..), mkParser)
 
-{- Note [One AstCache per syntax tree]
-
-  We create one AstCache per syntax tree, which contains a mapping from NodeIds
-  to nodes. It seems like an alluring idea to traverse the old and new trees in
-  parallel. This works for strictly specified ASTs, where each node has a known
-  number of children, but breaks down when nodes are allowed optional children,
-  children that contain lists of nodes, etc.
--}
-
--- TODO:
---
--- 1. Restructure parser to parse children as '[SomeNode]' and only then attempt to unpack
---    that list to the appropriate instance of 'ChildList' so that any mismatch at this point
---    can result in a 'VirtualError' as opposed to a 'SortMismatch'.
---
--- 2. Add `Extra` type to represent extra nodes; `Extra sort` wraps a `Node sort` and a proof that
---    the `sort` is an "extra" sort. Permit occurances of `Extra` nodes before, after, and between
---    all child nodes.
---
--- 3. Add callbacks for error and missing nodes. Distinguish between missing nodes and missing text.
---    (The latter is not represented in the ast, but certainly constitutes a parsing failure.)
---    Refine traversal functions, e.g., `gotoNextSibling`, to invoke these callbacks for all error
---    and missing nodes. This requires changing `gotoNextSibling` to not call `gotoParent` until the
---    end of the list of siblings is reached. The contract for these callbacks is that they are only
---    called when the node has changes.
---
--- 4. Analyse the current tree traversal to see whether it is bottom-up or top-down, since the former
---    is desirable with regards to memory usage.
-
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Template Parser and Renderer
 --------------------------------------------------------------------------------
 
@@ -81,7 +53,7 @@ generateAst Metadata{..} grammar templateFile template tokenMap = errorOrModule
       , ("moduleName", textToVal $ fromMaybe defaultModuleName moduleName)
       , ("pretty", BoolVal pretty)
       ]
-  datatypes = dataTypes tokenMap
+  datatypes = toDataTypes startRuleName grammar tokenMap
   tokens = M.mapWithKey
     (\k v -> MapVal . Context . M.fromList $
       [ ("name", toVal . Name $ fromMaybe k v)
@@ -94,7 +66,6 @@ generateAst Metadata{..} grammar templateFile template tokenMap = errorOrModule
       [ ("dataTypes", toVal datatypes)
       , ("startSort", maybe NullVal (\(Data name _, _) -> toVal name) (uncons datatypes))
       ]
-  dataTypes = toDataTypes startRuleName grammar
   context = metadataContext <> dataTypesContext <> tokensContext
   errorOrModule = renderTemplate templateFile template context
 
@@ -133,7 +104,7 @@ isNodeLike = \case
   NonEmpty a -> isNodeLike a
   Unit -> False
   Tuple a b -> isNodeLike a && isNodeLike b
-  Token _ -> False
+  Token _ -> True
   Either a b -> isNodeLike a && isNodeLike b
   Maybe a -> isNodeLike a
 
@@ -146,6 +117,7 @@ instance ToContext Text Data where
       [ ("name", toVal name)
       , ("constrs", ListVal (toVal . (name,) <$> constrs))
       , ("isSum", toVal (length constrs /= 1))
+      , ("hidden", toVal $ isHidden name)
       ]
 
 instance ToContext Text (Name, Constr) where
@@ -171,6 +143,7 @@ instance ToContext Text (Int, Field) where
     Context . M.fromList $
       [ ("name", maybe NullVal toVal (fieldName field))
       , ("type", toVal (type_ field))
+      , ("parser", toVal (mkParser (type_ field)))
       , ("index", SimpleVal . fromString . show $ index)
       ]
 
@@ -196,6 +169,21 @@ instance ToContext Text Name where
       [ ("text", textToVal (unName name))
       , ("camelCase", textToVal (snakeToCase Upper (prefixedName name)))
       ]
+
+instance ToContext Text Parser where
+  toVal :: Parser -> Val Text
+  toVal = textToVal . TL.toStrict . TLB.toLazyText . p2t False
+   where
+    par b t = if b then "(" <> t <> ")" else t
+    p2t p = \case
+      Symbol name -> TLB.fromText ("p" <> snakeToCase Upper (prefixedName name))
+      Alt a b -> par p ("pEither " <> p2t True a <> " " <> p2t True b)
+      -- Choice ps -> "
+      Optional a -> par p ("pMaybe " <> p2t True a)
+      Many ps -> par p ("pMany " <> p2t True ps)
+      Some ps -> par p ("pSome " <> p2t True ps)
+      Pair a b -> par p ("pPair " <> p2t True a <> " " <> p2t True b)
+      Skip -> TLB.fromText "pure ()"
 
 --------------------------------------------------------------------------------
 -- Helper functions for case conversion
