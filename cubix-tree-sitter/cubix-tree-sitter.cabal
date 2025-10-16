@@ -12,7 +12,6 @@ build-type:    Simple
 bug-reports:   https://github.com/cubix-framework/cubix/issues
 
 extra-source-files:
-  gen-ast/data/Ast.hs.template
   gen-mod/data/Modularized.hs.template
   gen-mod/data/ParsePretty.hs.template
 
