@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module TreeSitter.GenerateAst.Internal.Data (
   Name (..),
@@ -16,6 +17,7 @@ module TreeSitter.GenerateAst.Internal.Data (
   Data (..),
   Field (..),
   fieldName,
+  isHidden,
   GrammarError (..),
   toDataTypes,
   type TokenMap
@@ -47,10 +49,13 @@ newtype Name = Name {getName :: Text}
 unName :: Name -> Text
 unName (Name n) = n
 
+isHidden :: Name -> Bool
+isHidden (Name n) = Text.head n == '_'
+
 prefixedName :: Name -> Text
-prefixedName (Name n) = case Text.head n of
-  '_'        -> "hidden" <> n
-  _otherwise -> n
+prefixedName n
+  | isHidden n = "hidden" <> unName n
+  | otherwise  = unName n
 
 data Type
   = Node Name
@@ -102,8 +107,10 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
   startName :: Name
   startName = Name start
 
+  aliases = foldr (\r a -> a <> gatherAliases r) M.empty grammar.rules
+
   dataTypes :: [Data]
-  dataTypes = ruleNameToData <$> M.keys (grammar.rules <> externals)
+  dataTypes = ruleNameToData <$> M.keys (grammar.rules <> externals <> aliases)
 
   externals :: Map RuleName Rule
   externals = foldMap (foldMap ruleToRuleMap . toList) grammar.externals
@@ -113,11 +120,34 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
       _ -> mempty
 
   rule :: RuleName -> Rule
-  rule ruleName = fromMaybe failUnknownRule (tryRules <|> tryExternals)
+  rule ruleName = fromMaybe failUnknownRule (tryRules <|> tryExternals <|> tryAliases)
    where
     tryRules = M.lookup ruleName grammar.rules
     tryExternals = M.lookup ruleName externals
+    tryAliases = M.lookup ruleName aliases
     failUnknownRule = throw $ GrammarErrorUnknownRule ruleName
+
+  gatherAliases :: Rule -> Map RuleName Rule
+  gatherAliases = go M.empty
+    where go :: Map RuleName Rule -> Rule -> Map RuleName Rule
+          go acc = \case
+            AliasRule n _ r -> case r of
+              SymbolRule sr -> M.insert n (rule sr) acc
+              _ -> go (M.insert n r acc) r
+            SeqRule rs -> foldr (flip go) acc rs
+            ChoiceRule rs -> foldr (flip go) acc rs
+
+            RepeatRule r -> go acc r
+            Repeat1Rule r -> go acc r
+            TokenRule r -> go acc r
+            ImmediateTokenRule r -> go acc r
+            FieldRule _ r -> go acc r
+            PrecRule _ _ r -> go acc r
+
+            BlankRule -> acc
+            StringRule _ -> acc
+            PatternRule _ _ -> acc
+            SymbolRule _ -> acc
 
   ruleNameToData :: RuleName -> Data
   ruleNameToData s = ruleToData (rule s)
@@ -134,7 +164,7 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
       -- ignored rules
       PrecRule _ _ r -> ruleToData r
       -- ... otherwise, it becomes a newtype wrapper:
-      r -> Data (Name s) [Constr (Name s) [ruleToField r]]
+      (ruleToField -> f) -> Data (Name s) [Constr (Name s) [f | f.type_ /= Unit]]
 
   renameAnonymousConstr :: Text -> [Constr] -> [Constr]
   renameAnonymousConstr typeName constrs = go <$> zip constrs [1..]
@@ -150,14 +180,17 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     go :: [Rule] -> [Maybe Constr]
     go [] = []
     go (r : rest) = case r of
-      SymbolRule sr -> Just (Constr (suffix sr) [ruleToField r]) : go rest
+      SymbolRule sr -> Just (Constr (suffix sr) [f | let f = ruleToField r, f.type_ /= Unit]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
-      StringRule str -> Just (Constr (suffix str) []) : go rest
-      AliasRule n _ ar -> Just (Constr (suffix n) [ruleToField ar]) : go rest
+      StringRule str -> case M.lookup str tokenMap of
+        Just (fromMaybe str -> tok) -> Just (Constr (suffix tok) [ Unnamed (Token tok) ]) : go rest
+        Nothing  -> go rest
+      AliasRule n _ (ruleToField -> f) ->
+        Just (Constr (suffix n) [f | f.type_ /= Unit]) : go rest
       TokenRule tr -> go (tr : rest)
       ImmediateTokenRule tr -> go (tr : rest)
-      FieldRule n fr -> Just (Constr (suffix n) [ruleToField fr]) : go rest
+      FieldRule n (ruleToField -> f) -> Just (Constr (suffix n) [f | f.type_ /= Unit]) : go rest
       PrecRule _ _ pr -> go (pr : rest)
       SeqRule rs ->
         Just (Constr (Name s) [ f
@@ -179,8 +212,9 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     ChoiceRule rs -> foldr1Or mkEither Unit [t | r <- V.toList rs, let t = ruleToType r]
     RepeatRule r -> List (ruleToType r)
     Repeat1Rule r -> NonEmpty (ruleToType r)
+    AliasRule n True _ -> Node (Name n)
+    AliasRule _ False r -> ruleToType r
     -- The following constructors are transparent:
-    AliasRule _ _ r -> ruleToType r
     TokenRule r -> ruleToType r
     ImmediateTokenRule r -> ruleToType r
     FieldRule _ r -> ruleToType r
@@ -190,8 +224,8 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
   ruleToField = \case
     -- Nested field rules are ignored:
     FieldRule n r -> Named (Name n) (ruleToType r)
-    AliasRule _ _ r -> ruleToField r
-    -- SymbolRule r -> ruleToField r
+    AliasRule n True  _ -> Named (Name n) (Node (Name n))
+    AliasRule _ False r -> ruleToField r
     -- The following constructors are transparent:
     TokenRule r -> ruleToField r
     ImmediateTokenRule r -> ruleToField r

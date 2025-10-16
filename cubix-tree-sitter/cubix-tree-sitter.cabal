@@ -96,40 +96,20 @@ library
     Text.Megaparsec.TreeSitter
     Text.Megaparsec.Cubix
   
--- executable gen-syntax
---   import: language
---   import: dependencies
---   import: ghc-options
---   import: rts-options
---   main-is: Main.hs
---   hs-source-dirs:
---     gen-syntax
---   other-modules:
---     Options
---   build-depends:
---     , cubix-tree-sitter
---     , neat-interpolation ^>= 0.5
---     , optparse-applicative
---     , optparse-generic ^>= 1.5
-
-executable gen-ast
+library gen-internal
   import: language
   import: dependencies
   import: ghc-options
-  import: rts-options
-  main-is: Main.hs
-  other-modules:
-    TreeSitter.GenerateAst.Internal.CodeGen
-    TreeSitter.GenerateAst.Internal.Data
-    TreeSitter.GenerateAst.Internal.Grammar
-
-  hs-source-dirs: gen-ast/app
+  hs-source-dirs: gen-mod/src
   build-depends:
     , doclayout ^>= 0.5
     , doctemplates ^>= 0.11
     , fgl ^>= 5.8
-    , file-embed ^>= 0.0
-    , optparse-applicative ^>= 0.18
+  exposed-modules:
+    TreeSitter.GenerateAst.Internal.CodeGen
+    TreeSitter.GenerateAst.Internal.Data
+    TreeSitter.GenerateAst.Internal.Grammar
+    TreeSitter.GenerateAst.Internal.Parser
 
 executable gen-mod
   import: language
@@ -137,17 +117,11 @@ executable gen-mod
   import: ghc-options
   import: rts-options
   main-is: Main.hs
-  other-modules:
-    TreeSitter.GenerateAst.Internal.CodeGen
-    TreeSitter.GenerateAst.Internal.Data
-    TreeSitter.GenerateAst.Internal.Grammar
 
   hs-source-dirs: gen-mod/app
   build-depends:
-    , doclayout ^>= 0.5
-    , doctemplates ^>= 0.11
-    , fgl ^>= 5.8
     , file-embed ^>= 0.0
+    , cubix-tree-sitter:gen-internal
     , optparse-applicative ^>= 0.18
 
 executable gen-parser
@@ -156,15 +130,9 @@ executable gen-parser
   import: ghc-options
   import: rts-options
   main-is: Parser.hs
-  other-modules:
-    TreeSitter.GenerateAst.Internal.CodeGen
-    TreeSitter.GenerateAst.Internal.Data
-    TreeSitter.GenerateAst.Internal.Grammar
 
   hs-source-dirs: gen-mod/app
   build-depends:
-    , doclayout ^>= 0.5
-    , doctemplates ^>= 0.11
-    , fgl ^>= 5.8
     , file-embed ^>= 0.0
+    , cubix-tree-sitter:gen-internal
     , optparse-applicative ^>= 0.18
