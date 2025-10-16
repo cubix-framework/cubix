@@ -3,7 +3,6 @@ module Text.Megaparsec.TreeSitter
   ( Lexed (..)
   , Parser
   , pToken
-  -- , ParseError
   ) where
 
 import Data.ByteString (ByteString)
@@ -33,8 +32,6 @@ instance Eq t => Ord (Lexed t) where
 
 -- | Parser for tree-sitter generated token streams.
 type Parser t = Text.Megaparsec.Parsec Void (Lexed t)
-
--- type ParseError t = Text.Megaparsec.ParseError (Lexed t) Void
 
 instance Eq t => Text.Megaparsec.Stream (Lexed t) where
   type Token (Lexed t) = Token t
@@ -116,5 +113,4 @@ pToken f = do
     test
     Set.empty
   where
-    -- test :: Token symbol -> Maybe (Token a)
     test tok = fmap (\a -> tok {tokenValue = a}) (f (tokenValue tok))
