@@ -1,28 +1,25 @@
 module Cubix.TreeSitter where
 
-import Data.ByteString qualified as BS
-
-import Control.Monad (unless, when)
+import Control.Monad (unless)
+import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Resource (MonadResource (..), allocate)
 import Foreign.C.ConstPtr.Compat (ConstPtr (..))
-import Streaming (Stream, Of (..))
+import Streaming (Stream, Of (..), effect, wrap)
 import Streaming.Prelude qualified as Streaming
-import Streaming.Extra qualified as Streaming
 import TreeSitter qualified as TS
 
 import Cubix.Language.Info
   ( SourcePos (..)
   , SourceSpan (..)
   , SourceRange (..)
+  , mkSourceSpan
   )
 
 data Token a = MkToken
   { tokenValue :: !a
-  , tokenSpan :: {-# UNPACK #-} !SourceSpan
-  , tokenRange :: {-# UNPACK #-} !SourceRange
-  }
-  deriving (Show, Functor)
+  , tokenSpan  :: !SourceSpan
+  , tokenRange :: !SourceRange
+  } deriving (Show, Functor)
 
 -- Two tokens are equal if their grammar symbol is the same,
 -- no matter the location
@@ -42,75 +39,63 @@ nodeRange node = do
 pointToPos :: FilePath -> TS.Point -> SourcePos
 pointToPos path (TS.Point line column) = SourcePos path (fromIntegral line) (fromIntegral column)
 
+pointToPos' :: TS.Point -> (Int, Int)
+pointToPos' (TS.Point line column) = (fromIntegral line, fromIntegral column)
+
 nodeSpan :: FilePath -> TS.Node -> IO SourceSpan
 nodeSpan path node = do
-  start <- pointToPos path <$> TS.nodeStartPoint node
-  end <- pointToPos path <$> TS.nodeEndPoint node
-  pure $ SourceSpan start end
+  start <- pointToPos' <$> TS.nodeStartPoint node
+  end <- pointToPos' <$> TS.nodeEndPoint node
+  pure $ mkSourceSpan path start end
 
-nodes :: MonadIO m => TS.TreeCursor -> Stream (Of TS.Node) m ()
+nodes :: TS.Node -> Stream (Of TS.Node) IO ()
 nodes = go
   where
-    go treeCursor = do
-      node <- liftIO $ TS.treeCursorCurrentNode treeCursor
-      Streaming.yield node
+    go :: TS.Node -> Stream (Of TS.Node) IO ()
+    go root = wrap (root :> children root)
 
-      hasChildren <-
-        liftIO $ TS.treeCursorGotoFirstChild treeCursor
-      when hasChildren $ do
-        go treeCursor
-        _ <- liftIO $ TS.treeCursorGotoParent treeCursor
-        pure ()
+    children :: TS.Node -> Stream (Of TS.Node) IO ()
+    children n = effect $ do
+      childNo <- TS.nodeChildCount n
+      let childNums = if childNo == 0 then [] else [0..childNo - 1]
+          childs = Streaming.mapM (TS.nodeChild n)
+            $ Streaming.each childNums
+      pure $ Streaming.for childs go
+{-# INLINE nodes #-}
 
-      hasSiblings <-
-        liftIO $ TS.treeCursorGotoNextSibling treeCursor
-      when hasSiblings $
-        go treeCursor
+significantNodes :: TS.Node -> Stream (Of TS.Node) IO ()
+significantNodes = Streaming.filterM (fmap not . TS.nodeIsError) . nodes
+{-# INLINE significantNodes #-}
 
--- | without comments and newline tokens
-significantNodes :: MonadIO m => TS.TreeCursor -> Stream (Of TS.Node) m ()
-significantNodes = Streaming.filterM (liftIO . fmap not . TS.nodeIsExtra) . nodes
-
-symbols :: MonadIO m => TS.TreeCursor -> Stream (Of String) m ()
-symbols = Streaming.mapM (liftIO . TS.nodeGrammarTypeAsString) . significantNodes
+symbols :: TS.Node -> Stream (Of String) IO ()
+symbols = Streaming.mapM TS.nodeGrammarTypeAsString . significantNodes
 
 type TokenStream a m r = Stream (Of (Token a)) m r
 
 annotate :: FilePath -> TS.Node -> IO (Token TS.Node)
 annotate path node = MkToken node <$> nodeSpan path node <*> nodeRange node
+{-# INLINE annotate #-}
 
-annotated :: MonadIO m => FilePath -> TS.TreeCursor -> TokenStream TS.Node m ()
-annotated path = Streaming.mapM (liftIO . annotate path) . significantNodes
+annotated :: FilePath -> TS.Node -> TokenStream TS.Node IO ()
+annotated path = Streaming.mapM (annotate path) . significantNodes
+{-# INLINE annotated #-}
 
-annotatedSymbols :: MonadIO m => FilePath -> TS.TreeCursor -> TokenStream String m ()
-annotatedSymbols path treeCursor = flip Streaming.mapM (annotated path treeCursor) $ \tok -> do
+annotatedSymbols :: FilePath -> TS.Node -> TokenStream String IO ()
+annotatedSymbols path node = flip Streaming.mapM (annotated path node) $ \tok -> do
   name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
   pure tok{ tokenValue = name }
 
-withLanguage :: MonadResource m => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
-withLanguage getLang action = do
-  (_key, lang) <- allocate alloc free
-  action lang
-  where
-    alloc = TS.unsafeToLanguage =<< getLang
-    free = TS.unsafeLanguageDelete
+withLanguage :: (MonadMask m, MonadIO m) => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
+withLanguage getLang = bracket
+  (liftIO $ TS.unsafeToLanguage =<< getLang)
+  (liftIO . TS.unsafeLanguageDelete)
 
-lexer :: MonadResource m => TS.Language -> FilePath -> TokenStream TS.Node m ()
-lexer lang file = Streaming.bracket
+withParser :: (MonadMask m, MonadIO m) => TS.Language -> (TS.Parser -> m a) -> m a
+withParser lang = bracket
   (do
-    parser  <- TS.parserNew
-    success <- TS.parserSetLanguage parser lang
+    parser  <- liftIO TS.parserNew
+    success <- liftIO $ TS.parserSetLanguage parser lang
     unless success $
       error "failed to set parser language"
-
-    input <- BS.readFile file
-    maybeTree <- TS.parserParseByteString parser Nothing input
-    tree <- maybe (error "failed to parse the program") pure maybeTree
-    rootNode <- TS.treeRootNode tree
-    treeCursor <- TS.treeCursorNew rootNode
-
-    pure (parser, treeCursor))
-  (TS.unsafeParserDelete . fst)
-
-  (\(_, treeCursor) ->
-    annotated file treeCursor)
+    pure parser)
+  (liftIO . TS.unsafeParserDelete)  

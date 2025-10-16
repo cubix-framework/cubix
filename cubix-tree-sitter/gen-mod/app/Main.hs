@@ -12,7 +12,6 @@ import Data.Text.Encoding qualified as T
 import Data.Text.IO qualified as T
 import Options.Applicative (Parser, ParserInfo, execParser, flag', fullDesc, help, helper, info, long, metavar, optional, progDesc, short, strArgument, strOption, (<**>))
 import TreeSitter.GenerateAst.Internal.CodeGen (Metadata (..), generateAst)
--- import Text.Pretty.Simple (pPrint)
 
 template :: Text
 template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/Modularized.hs.template")
@@ -86,14 +85,13 @@ optionsInfo :: ParserInfo Options
 optionsInfo =
   info
     (parserOptions <**> helper)
-    (fullDesc <> progDesc "Generate a Haskell module with an Ast for a tree-sitter grammar.")
+    (fullDesc <> progDesc "Generate a Haskell module with Cubix Modularized Syntax for a tree-sitter grammar.")
 
 main :: IO ()
 main = do
   Options{..} <- execParser optionsInfo
   grammar <- either fail pure =<< eitherDecodeFileStrict inputFile
   tokenMap <- either fail pure =<< maybe (pure $ Right Map.empty) eitherDecodeFileStrict tokenMapFile
-  -- pPrint (grammar :: Grammar)
   result <- either fail pure (generateAst metadata grammar "Ast.hs.template" template tokenMap)
   maybe T.putStrLn T.writeFile outputFile result
 
