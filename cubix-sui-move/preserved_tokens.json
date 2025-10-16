@@ -21,6 +21,8 @@
   "/": "div",
   "%": "mod",
   "!": "bang",
+  "true": null,
+  "false": null,
   "public": null,
   "post": null,
   "assert": null,

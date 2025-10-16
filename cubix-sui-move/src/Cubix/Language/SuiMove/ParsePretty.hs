@@ -1,28 +1,19 @@
 module Cubix.Language.SuiMove.ParsePretty where
 
-import Control.Applicative (Alternative (..), optional)
-import Control.Monad (MonadPlus (..), forM_, unless, when)
+import Control.Applicative.Combinators
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
-import Control.Monad.State.Strict (MonadState (..), StateT (..), gets, modify')
-import Control.Monad.Trans.Maybe (MaybeT (..))
-import Control.Monad.Trans.Resource (runResourceT)
-import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
-import Data.ByteString.Char8 qualified as BSC
-import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Data.IORef qualified as IORef
-import Data.Kind (Type)
-import Data.List.NonEmpty (NonEmpty (..))
-import Data.Maybe (isJust)
+import Data.Functor (($>))
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
-import Streaming qualified
+import Data.Typeable (Typeable)
 import Streaming.Prelude qualified as Streaming
 
-import TreeSitter (NodeId (..), Range (..))
 import TreeSitter qualified as TS
 import TreeSitter.SuiMove (tree_sitter_sui_move)
+import Text.Megaparsec qualified as Megaparsec
+import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
+import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
 import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
@@ -34,26 +25,33 @@ getSymbol map node = do
   pure $ IM.lookup (fromIntegral symbol) (unSymbolTable map)
 
 parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
-parse path = runResourceT $
+parse path = do
+  input <- BS.readFile path
+
   withLanguage tree_sitter_sui_move $ \lang -> do
-  --count <- fromIntegral <$> liftIO (TS.languageSymbolCount lang)
-  -- foldrM _ Map.empty [0..count]
-  -- forM_ [0..count] $ \id -> do
-  --   symName <- liftIO $ TS.languageSymbolName lang id
-  --   liftIO $ print symName
+    symbolTable <- liftIO (mkSymbolTable lang)
 
-  symbolTable <- liftIO (mkSymbolTable' lang)
-  Streaming.print
-    $ Streaming.filter (isJust . tokenValue)
-    $ Streaming.mapM
-      (\tok -> do
-          sym <- liftIO $ getSymbol symbolTable (tokenValue tok)
-          pure $ tok { tokenValue = sym }
-      )
-    -- $ Streaming.mapM (liftIO . TS.nodeGrammarTypeAsString . tokenValue)
-    $ lexer lang path
+    withParser lang $ \parser -> do
+      maybeTree <- TS.parserParseByteString parser Nothing input
+      tree <- maybe (error "failed to parse the program") pure maybeTree
+      rootNode <- TS.treeRootNode tree
 
-  pure undefined
+      toks <- Streaming.toList_
+        $ Streaming.mapMaybeM
+            (\tok ->
+              fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol symbolTable (tokenValue tok))
+              -- pure $ case msym of
+              --   Just sym -> Just $ ann { tokenValue = sym }
+              --   Nothing -> Nothing)
+                                 
+        $ annotated path rootNode
+
+      let lexed = Megaparsec.TreeSitter.Lexed input toks
+      case Megaparsec.parse pRoot path lexed of
+        Right ast -> pure $ Just ast
+        Left err -> do
+          putStrLn $ Megaparsec.errorBundlePretty err
+          pure Nothing
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 
@@ -69,8 +67,24 @@ pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
     Just (Refl, HRefl) -> Just symSing
     Nothing -> Nothing
 
+-- reify the types to aid inference, that might get broken
+pMaybe :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm (Maybe a))
+pMaybe = Megaparsec.Cubix.pMaybe
+
+pPair :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (a , b))
+pPair = Megaparsec.Cubix.pPair
+
+pEither :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (Either a b))
+pEither = Megaparsec.Cubix.pEither
+
+pSome :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
+pSome = Megaparsec.Cubix.pSome
+
+pMany :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
+pMany = Megaparsec.Cubix.pMany
+
 pRoot :: Parser (MoveTerm (RootSort MoveSig))
-pRoot = pSourceFileL
+pRoot = pSourceFile
 
 pBang :: Parser (MoveTerm BangTokL)
 pBang = pSymbol SBangTokSymbol $> iBang
@@ -165,6 +179,9 @@ pDrop = pSymbol SDropTokSymbol $> iDrop
 pEnsures :: Parser (MoveTerm EnsuresTokL)
 pEnsures = pSymbol SEnsuresTokSymbol $> iEnsures
 
+pFalse :: Parser (MoveTerm FalseTokL)
+pFalse = pSymbol SFalseTokSymbol $> iFalse
+
 pFriend :: Parser (MoveTerm FriendTokL)
 pFriend = pSymbol SFriendTokSymbol $> iFriend
 
@@ -213,6 +230,9 @@ pStore = pSymbol SStoreTokSymbol $> iStore
 pSucceedsIf :: Parser (MoveTerm SucceedsIfTokL)
 pSucceedsIf = pSymbol SSucceedsIfTokSymbol $> iSucceedsIf
 
+pTrue :: Parser (MoveTerm TrueTokL)
+pTrue = pSymbol STrueTokSymbol $> iTrue
+
 pU128 :: Parser (MoveTerm U128TokL)
 pU128 = pSymbol SU128TokSymbol $> iU128
 
@@ -243,1288 +263,1890 @@ pBitor = pSymbol SBitorTokSymbol $> iBitor
 pOr :: Parser (MoveTerm OrTokL)
 pOr = pSymbol SOrTokSymbol $> iOr
 
-pSourceFile :: Parser (MoveTerm L)
+pSourceFile :: Parser (MoveTerm SourceFileL)
 pSourceFile = do
   _sym <- pSymbol SSourceFileSymbol
-  pure undefined
+  iSourceFile
+    <$> pMany pModuleDefinition
 
-pModuleDefinition :: Parser (MoveTerm L)
+pModuleDefinition :: Parser (MoveTerm ModuleDefinitionL)
 pModuleDefinition = do
   _sym <- pSymbol SModuleDefinitionSymbol
-  pure undefined
+  iModuleDefinition
+    <$> pModule
+    <*> pModuleIdentity
+    <*> pModuleBody
 
-pModuleBody :: Parser (MoveTerm L)
+pModuleBody :: Parser (MoveTerm ModuleBodyL)
 pModuleBody = do
   _sym <- pSymbol SModuleBodySymbol
-  pure undefined
+  iModuleBody
+    <$> pMany (pEither pFriendDeclaration (pEither pConstant (pEither pHiddenFunctionItem (pEither pHiddenStructItem (pEither pHiddenEnumItem (pEither pSpecBlock pUseDeclaration))))))
 
-pHiddenEnumItem :: Parser (MoveTerm L)
+pHiddenEnumItem :: Parser (MoveTerm HiddenEnumItemL)
 pHiddenEnumItem = do
-  _sym <- pSymbol SHiddenEnumItemSymbol
-  pure undefined
+  iEnumDefinitionEnumItem
+    <$> pEnumDefinition
 
-pEnumDefinition :: Parser (MoveTerm L)
+pEnumDefinition :: Parser (MoveTerm EnumDefinitionL)
 pEnumDefinition = do
   _sym <- pSymbol SEnumDefinitionSymbol
-  pure undefined
+  iEnumDefinition
+    <$> pMaybe pPublic
+    <*> pHiddenEnumSignature
+    <*> pEnumVariants
+    <*> pMaybe pPostfixAbilityDecls
 
-pHiddenEnumSignature :: Parser (MoveTerm L)
+pHiddenEnumSignature :: Parser (MoveTerm HiddenEnumSignatureL)
 pHiddenEnumSignature = do
-  _sym <- pSymbol SHiddenEnumSignatureSymbol
-  pure undefined
+  iHiddenEnumSignature
+    <$> pHiddenEnumIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pMaybe pAbilityDecls
 
-pHiddenEnumIdentifier :: Parser (MoveTerm L)
+pHiddenEnumIdentifier :: Parser (MoveTerm HiddenEnumIdentifierL)
 pHiddenEnumIdentifier = do
-  _sym <- pSymbol SHiddenEnumIdentifierSymbol
-  pure undefined
+  iHiddenEnumIdentifier
+    <$> pEnumIdentifier
 
-pIdentifier :: Parser (MoveTerm L)
-pIdentifier = do
-  _sym <- pSymbol SIdentifierSymbol
-  pure undefined
+pEnumIdentifier :: Parser (MoveTerm EnumIdentifierL)
+pEnumIdentifier = do
+  _sym <- pSymbol SEnumIdentifierSymbol
+  pure iEnumIdentifier
 
-pAbilityDecls :: Parser (MoveTerm L)
+pAbilityDecls :: Parser (MoveTerm AbilityDeclsL)
 pAbilityDecls = do
   _sym <- pSymbol SAbilityDeclsSymbol
-  pure undefined
+  iAbilityDecls
+    <$> pPair (pMaybe pAbility) (pMany pAbility)
 
-pAbility :: Parser (MoveTerm L)
+pAbility :: Parser (MoveTerm AbilityL)
 pAbility = do
   _sym <- pSymbol SAbilitySymbol
-  pure undefined
+  choice [ pCopyAbility
+         , pDropAbility
+         , pStoreAbility
+         , pKeyAbility
+         ]
   where
     pCopyAbility :: Parser (MoveTerm AbilityL)
-    pCopyAbility = do
-      pure undefined
+    pCopyAbility =
+      iCopyAbility
+        <$> pCopy
     pDropAbility :: Parser (MoveTerm AbilityL)
-    pDropAbility = do
-      pure undefined
+    pDropAbility =
+      iDropAbility
+        <$> pDrop
     pStoreAbility :: Parser (MoveTerm AbilityL)
-    pStoreAbility = do
-      pure undefined
+    pStoreAbility =
+      iStoreAbility
+        <$> pStore
     pKeyAbility :: Parser (MoveTerm AbilityL)
-    pKeyAbility = do
-      pure undefined
+    pKeyAbility =
+      iKeyAbility
+        <$> pKey
 
-pTypeParameters :: Parser (MoveTerm L)
+pTypeParameters :: Parser (MoveTerm TypeParametersL)
 pTypeParameters = do
   _sym <- pSymbol STypeParametersSymbol
-  pure undefined
+  iTypeParameters
+    <$> pLt
+    <*> pPair (pMany pTypeParameter) pTypeParameter
+    <*> pGt
 
-pTypeParameter :: Parser (MoveTerm L)
+pTypeParameter :: Parser (MoveTerm TypeParameterL)
 pTypeParameter = do
   _sym <- pSymbol STypeParameterSymbol
-  pure undefined
+  iTypeParameter
+    <$> pMaybe pDollar
+    <*> pMaybe pPhantom
+    <*> pHiddenTypeParameterIdentifier
+    <*> pMaybe (pPair (pMany (pPair pAbility pAdd)) (pPair (pMaybe pAdd) pAbility))
 
-pHiddenTypeParameterIdentifier :: Parser (MoveTerm L)
+pHiddenTypeParameterIdentifier :: Parser (MoveTerm HiddenTypeParameterIdentifierL)
 pHiddenTypeParameterIdentifier = do
-  _sym <- pSymbol SHiddenTypeParameterIdentifierSymbol
-  pure undefined
+  iHiddenTypeParameterIdentifier
+    <$> pTypeParameterIdentifier
 
-pEnumVariants :: Parser (MoveTerm L)
+pTypeParameterIdentifier :: Parser (MoveTerm TypeParameterIdentifierL)
+pTypeParameterIdentifier = do
+  _sym <- pSymbol STypeParameterIdentifierSymbol
+  pure iTypeParameterIdentifier
+
+pEnumVariants :: Parser (MoveTerm EnumVariantsL)
 pEnumVariants = do
   _sym <- pSymbol SEnumVariantsSymbol
-  pure undefined
+  iEnumVariants
+    <$> pPair (pMaybe pVariant) (pMany pVariant)
 
-pVariant :: Parser (MoveTerm L)
+pVariant :: Parser (MoveTerm VariantL)
 pVariant = do
   _sym <- pSymbol SVariantSymbol
-  pure undefined
+  iVariant
+    <$> pHiddenVariantIdentifier
+    <*> pMaybe pDatatypeFields
 
-pHiddenVariantIdentifier :: Parser (MoveTerm L)
+pHiddenVariantIdentifier :: Parser (MoveTerm HiddenVariantIdentifierL)
 pHiddenVariantIdentifier = do
-  _sym <- pSymbol SHiddenVariantIdentifierSymbol
-  pure undefined
+  iHiddenVariantIdentifier
+    <$> pVariantIdentifier
 
-pDatatypeFields :: Parser (MoveTerm L)
+pVariantIdentifier :: Parser (MoveTerm VariantIdentifierL)
+pVariantIdentifier = do
+  _sym <- pSymbol SVariantIdentifierSymbol
+  pure iVariantIdentifier
+
+pDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
 pDatatypeFields = do
   _sym <- pSymbol SDatatypeFieldsSymbol
-  pure undefined
+  choice [ pPositionalFieldsDatatypeFields
+         , pNamedFieldsDatatypeFields
+         ]
   where
     pPositionalFieldsDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
-    pPositionalFieldsDatatypeFields = do
-      pure undefined
+    pPositionalFieldsDatatypeFields =
+      iPositionalFieldsDatatypeFields
+        <$> pPositionalFields
     pNamedFieldsDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
-    pNamedFieldsDatatypeFields = do
-      pure undefined
+    pNamedFieldsDatatypeFields =
+      iNamedFieldsDatatypeFields
+        <$> pNamedFields
 
-pNamedFields :: Parser (MoveTerm L)
+pNamedFields :: Parser (MoveTerm NamedFieldsL)
 pNamedFields = do
   _sym <- pSymbol SNamedFieldsSymbol
-  pure undefined
+  iNamedFields
+    <$> pPair (pMaybe pFieldAnnotation) (pMany pFieldAnnotation)
 
-pFieldAnnotation :: Parser (MoveTerm L)
+pFieldAnnotation :: Parser (MoveTerm FieldAnnotationL)
 pFieldAnnotation = do
   _sym <- pSymbol SFieldAnnotationSymbol
-  pure undefined
+  iFieldAnnotation
+    <$> pHiddenFieldIdentifier
+    <*> pHiddenType
 
-pHiddenFieldIdentifier :: Parser (MoveTerm L)
+pHiddenFieldIdentifier :: Parser (MoveTerm HiddenFieldIdentifierL)
 pHiddenFieldIdentifier = do
-  _sym <- pSymbol SHiddenFieldIdentifierSymbol
-  pure undefined
+  iHiddenFieldIdentifier
+    <$> pFieldIdentifier
 
-pHiddenType :: Parser (MoveTerm L)
+pFieldIdentifier :: Parser (MoveTerm FieldIdentifierL)
+pFieldIdentifier = do
+  _sym <- pSymbol SFieldIdentifierSymbol
+  pure iFieldIdentifier
+
+pHiddenType :: Parser (MoveTerm HiddenTypeL)
 pHiddenType = do
-  _sym <- pSymbol SHiddenTypeSymbol
-  pure undefined
+  choice [ pApplyTypeType
+         , pRefTypeType
+         , pTupleTypeType
+         , pFunctionTypeType
+         , pPrimitiveTypeType
+         ]
   where
     pApplyTypeType :: Parser (MoveTerm HiddenTypeL)
-    pApplyTypeType = do
-      pure undefined
+    pApplyTypeType =
+      iApplyTypeType
+        <$> pApplyType
     pRefTypeType :: Parser (MoveTerm HiddenTypeL)
-    pRefTypeType = do
-      pure undefined
+    pRefTypeType =
+      iRefTypeType
+        <$> pRefType
     pTupleTypeType :: Parser (MoveTerm HiddenTypeL)
-    pTupleTypeType = do
-      pure undefined
+    pTupleTypeType =
+      iTupleTypeType
+        <$> pTupleType
     pFunctionTypeType :: Parser (MoveTerm HiddenTypeL)
-    pFunctionTypeType = do
-      pure undefined
+    pFunctionTypeType =
+      iFunctionTypeType
+        <$> pFunctionType
     pPrimitiveTypeType :: Parser (MoveTerm HiddenTypeL)
-    pPrimitiveTypeType = do
-      pure undefined
+    pPrimitiveTypeType =
+      iPrimitiveTypeType
+        <$> pPrimitiveType
 
-pApplyType :: Parser (MoveTerm L)
+pApplyType :: Parser (MoveTerm ApplyTypeL)
 pApplyType = do
   _sym <- pSymbol SApplyTypeSymbol
-  pure undefined
+  iApplyType
+    <$> pModuleAccess
+    <*> pMaybe pTypeArguments
 
-pModuleAccess :: Parser (MoveTerm L)
+pModuleAccess :: Parser (MoveTerm ModuleAccessL)
 pModuleAccess = do
   _sym <- pSymbol SModuleAccessSymbol
-  pure undefined
+  choice [ pModuleAccess1
+         , pModuleAccess2
+         , pMemberModuleAccess
+         , pModuleAccess4
+         , pModuleAccess5
+         , pModuleAccess6
+         , pModuleAccess7
+         , pModuleAccess8
+         , pModuleAccess9
+         ]
   where
     pModuleAccess1 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess1 = do
-      pure undefined
+    pModuleAccess1 =
+      iModuleAccess1
+        <$> pDollar
+        <*> pIdentifier
     pModuleAccess2 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess2 = do
-      pure undefined
+    pModuleAccess2 =
+      iModuleAccess2
+        <$> pIdentifier
     pMemberModuleAccess :: Parser (MoveTerm ModuleAccessL)
-    pMemberModuleAccess = do
-      pure undefined
+    pMemberModuleAccess =
+      iMemberModuleAccess
+        <$> pIdentifier
     pModuleAccess4 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess4 = do
-      pure undefined
+    pModuleAccess4 =
+      iModuleAccess4
+        <$> pIdentifier
+        <*> pMaybe pTypeArguments
     pModuleAccess5 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess5 = do
-      pure undefined
+    pModuleAccess5 =
+      iModuleAccess5
+        <$> pHiddenModuleIdentifier
+        <*> pMaybe pTypeArguments
+        <*> pIdentifier
     pModuleAccess6 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess6 = do
-      pure undefined
+    pModuleAccess6 =
+      iModuleAccess6
+        <$> pModuleIdentity
+        <*> pIdentifier
+        <*> pTypeArguments
     pModuleAccess7 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess7 = do
-      pure undefined
+    pModuleAccess7 =
+      iModuleAccess7
+        <$> pModuleIdentity
+        <*> pMaybe pTypeArguments
     pModuleAccess8 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess8 = do
-      pure undefined
+    pModuleAccess8 =
+      iModuleAccess8
+        <$> pModuleIdentity
+        <*> pMaybe pTypeArguments
+        <*> pIdentifier
     pModuleAccess9 :: Parser (MoveTerm ModuleAccessL)
-    pModuleAccess9 = do
-      pure undefined
+    pModuleAccess9 =
+      iModuleAccess9
+        <$> pModuleIdentity
+        <*> pIdentifier
+        <*> pMaybe pTypeArguments
+        <*> pIdentifier
 
-pHiddenModuleIdentifier :: Parser (MoveTerm L)
+pHiddenModuleIdentifier :: Parser (MoveTerm HiddenModuleIdentifierL)
 pHiddenModuleIdentifier = do
-  _sym <- pSymbol SHiddenModuleIdentifierSymbol
-  pure undefined
+  iHiddenModuleIdentifier
+    <$> pModuleIdentifier
 
-pHiddenReservedIdentifier :: Parser (MoveTerm L)
-pHiddenReservedIdentifier = do
-  _sym <- pSymbol SHiddenReservedIdentifierSymbol
-  pure undefined
-  where
-    pHiddenForallReservedIdentifier :: Parser (MoveTerm HiddenReservedIdentifierL)
-    pHiddenForallReservedIdentifier = do
-      pure undefined
-    pHiddenExistsReservedIdentifier :: Parser (MoveTerm HiddenReservedIdentifierL)
-    pHiddenExistsReservedIdentifier = do
-      pure undefined
+pModuleIdentifier :: Parser (MoveTerm ModuleIdentifierL)
+pModuleIdentifier = do
+  _sym <- pSymbol SModuleIdentifierSymbol
+  pure iModuleIdentifier
 
-pHiddenExists :: Parser (MoveTerm L)
-pHiddenExists = do
-  _sym <- pSymbol SHiddenExistsSymbol
-  pure undefined
+pIdentifier :: Parser (MoveTerm IdentifierL)
+pIdentifier = do
+  _sym <- pSymbol SIdentifierSymbol
+  pure iIdentifier
 
-pHiddenForall :: Parser (MoveTerm L)
-pHiddenForall = do
-  _sym <- pSymbol SHiddenForallSymbol
-  pure undefined
-
-pModuleIdentity :: Parser (MoveTerm L)
+pModuleIdentity :: Parser (MoveTerm ModuleIdentityL)
 pModuleIdentity = do
   _sym <- pSymbol SModuleIdentitySymbol
-  pure undefined
+  iModuleIdentity
+    <$> pEither pHiddenModuleIdentifier pNumLiteral
+    <*> pHiddenModuleIdentifier
 
-pNumLiteral :: Parser (MoveTerm L)
+pNumLiteral :: Parser (MoveTerm NumLiteralL)
 pNumLiteral = do
   _sym <- pSymbol SNumLiteralSymbol
-  pure undefined
+  iNumLiteral
+    <$> pMaybe (pEither pU16 (pEither pU32 (pEither pU64 (pEither pU128 (pEither pU256 pU8)))))
 
-pTypeArguments :: Parser (MoveTerm L)
+pTypeArguments :: Parser (MoveTerm TypeArgumentsL)
 pTypeArguments = do
   _sym <- pSymbol STypeArgumentsSymbol
-  pure undefined
+  iTypeArguments
+    <$> pLt
+    <*> pPair (pMany pHiddenType) pHiddenType
+    <*> pGt
 
-pFunctionType :: Parser (MoveTerm L)
+pFunctionType :: Parser (MoveTerm FunctionTypeL)
 pFunctionType = do
   _sym <- pSymbol SFunctionTypeSymbol
-  pure undefined
+  iFunctionType
+    <$> pFunctionTypeParameters
+    <*> pMaybe pHiddenType
 
-pFunctionTypeParameters :: Parser (MoveTerm L)
+pFunctionTypeParameters :: Parser (MoveTerm FunctionTypeParametersL)
 pFunctionTypeParameters = do
   _sym <- pSymbol SFunctionTypeParametersSymbol
-  pure undefined
+  iFunctionTypeParameters
+    <$> pBitor
+    <*> pPair (pMaybe pHiddenType) (pMany pHiddenType)
+    <*> pBitor
 
-pPrimitiveType :: Parser (MoveTerm L)
+pPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
 pPrimitiveType = do
   _sym <- pSymbol SPrimitiveTypeSymbol
-  pure undefined
+  choice [ pU8PrimitiveType
+         , pU16PrimitiveType
+         , pU32PrimitiveType
+         , pU64PrimitiveType
+         , pU128PrimitiveType
+         , pU256PrimitiveType
+         , pBoolPrimitiveType
+         , pAddressPrimitiveType
+         , pSignerPrimitiveType
+         , pBytearrayPrimitiveType
+         ]
   where
     pU8PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU8PrimitiveType = do
-      pure undefined
+    pU8PrimitiveType =
+      iU8PrimitiveType
+        <$> pU8
     pU16PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU16PrimitiveType = do
-      pure undefined
+    pU16PrimitiveType =
+      iU16PrimitiveType
+        <$> pU16
     pU32PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU32PrimitiveType = do
-      pure undefined
+    pU32PrimitiveType =
+      iU32PrimitiveType
+        <$> pU32
     pU64PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU64PrimitiveType = do
-      pure undefined
+    pU64PrimitiveType =
+      iU64PrimitiveType
+        <$> pU64
     pU128PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU128PrimitiveType = do
-      pure undefined
+    pU128PrimitiveType =
+      iU128PrimitiveType
+        <$> pU128
     pU256PrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pU256PrimitiveType = do
-      pure undefined
+    pU256PrimitiveType =
+      iU256PrimitiveType
+        <$> pU256
     pBoolPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pBoolPrimitiveType = do
-      pure undefined
+    pBoolPrimitiveType =
+      iBoolPrimitiveType
+        <$> pBool
     pAddressPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pAddressPrimitiveType = do
-      pure undefined
+    pAddressPrimitiveType =
+      iAddressPrimitiveType
+        <$> pAddress
     pSignerPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pSignerPrimitiveType = do
-      pure undefined
+    pSignerPrimitiveType =
+      iSignerPrimitiveType
+        <$> pSigner
     pBytearrayPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-    pBytearrayPrimitiveType = do
-      pure undefined
+    pBytearrayPrimitiveType =
+      iBytearrayPrimitiveType
+        <$> pBytearray
 
-pRefType :: Parser (MoveTerm L)
+pRefType :: Parser (MoveTerm RefTypeL)
 pRefType = do
   _sym <- pSymbol SRefTypeSymbol
-  pure undefined
+  iRefType
+    <$> pHiddenReference
+    <*> pHiddenType
 
-pHiddenReference :: Parser (MoveTerm L)
+pHiddenReference :: Parser (MoveTerm HiddenReferenceL)
 pHiddenReference = do
-  _sym <- pSymbol SHiddenReferenceSymbol
-  pure undefined
+  choice [ pImmRefReference
+         , pMutRefReference
+         ]
   where
     pImmRefReference :: Parser (MoveTerm HiddenReferenceL)
-    pImmRefReference = do
-      pure undefined
+    pImmRefReference =
+      iImmRefReference
+        <$> pImmRef
     pMutRefReference :: Parser (MoveTerm HiddenReferenceL)
-    pMutRefReference = do
-      pure undefined
+    pMutRefReference =
+      iMutRefReference
+        <$> pMutRef
 
-pImmRef :: Parser (MoveTerm L)
+pImmRef :: Parser (MoveTerm ImmRefL)
 pImmRef = do
   _sym <- pSymbol SImmRefSymbol
-  pure undefined
+  iImmRef
+    <$> pBitand
 
-pMutRef :: Parser (MoveTerm L)
+pMutRef :: Parser (MoveTerm MutRefL)
 pMutRef = do
   _sym <- pSymbol SMutRefSymbol
-  pure undefined
+  iMutRef
+    <$> pBitand
 
-pTupleType :: Parser (MoveTerm L)
+pTupleType :: Parser (MoveTerm TupleTypeL)
 pTupleType = do
   _sym <- pSymbol STupleTypeSymbol
-  pure undefined
+  iTupleType
+    <$> pPair (pMaybe pHiddenType) (pMany pHiddenType)
 
-pPositionalFields :: Parser (MoveTerm L)
+pPositionalFields :: Parser (MoveTerm PositionalFieldsL)
 pPositionalFields = do
   _sym <- pSymbol SPositionalFieldsSymbol
-  pure undefined
+  iPositionalFields
+    <$> pPair (pMaybe pHiddenType) (pMany pHiddenType)
 
-pPostfixAbilityDecls :: Parser (MoveTerm L)
+pPostfixAbilityDecls :: Parser (MoveTerm PostfixAbilityDeclsL)
 pPostfixAbilityDecls = do
   _sym <- pSymbol SPostfixAbilityDeclsSymbol
-  pure undefined
+  iPostfixAbilityDecls
+    <$> pPair (pMaybe pAbility) (pMany pAbility)
 
-pHiddenFunctionItem :: Parser (MoveTerm L)
+pHiddenFunctionItem :: Parser (MoveTerm HiddenFunctionItemL)
 pHiddenFunctionItem = do
-  _sym <- pSymbol SHiddenFunctionItemSymbol
-  pure undefined
+  choice [ pNativeFunctionDefinitionFunctionItem
+         , pMacroFunctionDefinitionFunctionItem
+         , pFunctionDefinitionFunctionItem
+         ]
   where
     pNativeFunctionDefinitionFunctionItem :: Parser (MoveTerm HiddenFunctionItemL)
-    pNativeFunctionDefinitionFunctionItem = do
-      pure undefined
+    pNativeFunctionDefinitionFunctionItem =
+      iNativeFunctionDefinitionFunctionItem
+        <$> pNativeFunctionDefinition
     pMacroFunctionDefinitionFunctionItem :: Parser (MoveTerm HiddenFunctionItemL)
-    pMacroFunctionDefinitionFunctionItem = do
-      pure undefined
+    pMacroFunctionDefinitionFunctionItem =
+      iMacroFunctionDefinitionFunctionItem
+        <$> pMacroFunctionDefinition
     pFunctionDefinitionFunctionItem :: Parser (MoveTerm HiddenFunctionItemL)
-    pFunctionDefinitionFunctionItem = do
-      pure undefined
+    pFunctionDefinitionFunctionItem =
+      iFunctionDefinitionFunctionItem
+        <$> pFunctionDefinition
 
-pFunctionDefinition :: Parser (MoveTerm L)
+pFunctionDefinition :: Parser (MoveTerm FunctionDefinitionL)
 pFunctionDefinition = do
   _sym <- pSymbol SFunctionDefinitionSymbol
-  pure undefined
+  iFunctionDefinition
+    <$> pHiddenFunctionSignature
+    <*> pBlock
 
-pHiddenFunctionSignature :: Parser (MoveTerm L)
+pHiddenFunctionSignature :: Parser (MoveTerm HiddenFunctionSignatureL)
 pHiddenFunctionSignature = do
-  _sym <- pSymbol SHiddenFunctionSignatureSymbol
-  pure undefined
+  iHiddenFunctionSignature
+    <$> pMaybe pModifier
+    <*> pMaybe pModifier
+    <*> pMaybe pModifier
+    <*> pHiddenFunctionIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pFunctionParameters
+    <*> pMaybe pRetType
 
-pHiddenFunctionIdentifier :: Parser (MoveTerm L)
+pHiddenFunctionIdentifier :: Parser (MoveTerm HiddenFunctionIdentifierL)
 pHiddenFunctionIdentifier = do
-  _sym <- pSymbol SHiddenFunctionIdentifierSymbol
-  pure undefined
+  iHiddenFunctionIdentifier
+    <$> pFunctionIdentifier
 
-pFunctionParameters :: Parser (MoveTerm L)
+pFunctionIdentifier :: Parser (MoveTerm FunctionIdentifierL)
+pFunctionIdentifier = do
+  _sym <- pSymbol SFunctionIdentifierSymbol
+  pure iFunctionIdentifier
+
+pFunctionParameters :: Parser (MoveTerm FunctionParametersL)
 pFunctionParameters = do
   _sym <- pSymbol SFunctionParametersSymbol
-  pure undefined
+  iFunctionParameters
+    <$> pPair (pMaybe (pEither pFunctionParameter pMutFunctionParameter)) (pMany (pEither pFunctionParameter pMutFunctionParameter))
 
-pFunctionParameter :: Parser (MoveTerm L)
+pFunctionParameter :: Parser (MoveTerm FunctionParameterL)
 pFunctionParameter = do
   _sym <- pSymbol SFunctionParameterSymbol
-  pure undefined
+  iFunctionParameter
+    <$> pEither (pPair pHiddenVariableIdentifier pDollar) pHiddenVariableIdentifier
+    <*> pHiddenType
 
-pHiddenVariableIdentifier :: Parser (MoveTerm L)
+pHiddenVariableIdentifier :: Parser (MoveTerm HiddenVariableIdentifierL)
 pHiddenVariableIdentifier = do
-  _sym <- pSymbol SHiddenVariableIdentifierSymbol
-  pure undefined
+  iHiddenVariableIdentifier
+    <$> pVariableIdentifier
 
-pMutFunctionParameter :: Parser (MoveTerm L)
+pVariableIdentifier :: Parser (MoveTerm VariableIdentifierL)
+pVariableIdentifier = do
+  _sym <- pSymbol SVariableIdentifierSymbol
+  pure iVariableIdentifier
+
+pMutFunctionParameter :: Parser (MoveTerm MutFunctionParameterL)
 pMutFunctionParameter = do
   _sym <- pSymbol SMutFunctionParameterSymbol
-  pure undefined
+  iMutFunctionParameter
+    <$> pFunctionParameter
 
-pModifier :: Parser (MoveTerm L)
+pModifier :: Parser (MoveTerm ModifierL)
 pModifier = do
   _sym <- pSymbol SModifierSymbol
-  pure undefined
-  where
-    pModifier1 :: Parser (MoveTerm ModifierL)
-    pModifier1 = do
-      pure undefined
-    pEntryModifier :: Parser (MoveTerm ModifierL)
-    pEntryModifier = do
-      pure undefined
-    pNativeModifier :: Parser (MoveTerm ModifierL)
-    pNativeModifier = do
-      pure undefined
+  iModifier1
+    <$> pPublic
+    <*> pMaybe (pEither pFriend pPackage)
 
-pRetType :: Parser (MoveTerm L)
+pRetType :: Parser (MoveTerm RetTypeL)
 pRetType = do
   _sym <- pSymbol SRetTypeSymbol
-  pure undefined
+  iRetType
+    <$> pHiddenType
 
-pBlock :: Parser (MoveTerm L)
+pBlock :: Parser (MoveTerm BlockL)
 pBlock = do
   _sym <- pSymbol SBlockSymbol
-  pure undefined
+  iBlock
+    <$> pMany pUseDeclaration
+    <*> pMany pBlockItem
+    <*> pMaybe pHiddenExpression
 
-pHiddenExpression :: Parser (MoveTerm L)
+pHiddenExpression :: Parser (MoveTerm HiddenExpressionL)
 pHiddenExpression = do
-  _sym <- pSymbol SHiddenExpressionSymbol
-  pure undefined
+  choice [ pCallExpressionExpression
+         , pMacroCallExpressionExpression
+         , pLambdaExpressionExpression
+         , pIfExpressionExpression
+         , pWhileExpressionExpression
+         , pReturnExpressionExpression
+         , pAbortExpressionExpression
+         , pAssignExpressionExpression
+         , pHiddenUnaryExpressionExpression
+         , pBinaryExpressionExpression
+         , pCastExpressionExpression
+         , pQuantifierExpressionExpression
+         , pMatchExpressionExpression
+         , pVectorExpressionExpression
+         , pLoopExpressionExpression
+         , pIdentifiedExpressionExpression
+         ]
   where
     pCallExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pCallExpressionExpression = do
-      pure undefined
+    pCallExpressionExpression =
+      iCallExpressionExpression
+        <$> pCallExpression
     pMacroCallExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pMacroCallExpressionExpression = do
-      pure undefined
+    pMacroCallExpressionExpression =
+      iMacroCallExpressionExpression
+        <$> pMacroCallExpression
     pLambdaExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pLambdaExpressionExpression = do
-      pure undefined
+    pLambdaExpressionExpression =
+      iLambdaExpressionExpression
+        <$> pLambdaExpression
     pIfExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pIfExpressionExpression = do
-      pure undefined
+    pIfExpressionExpression =
+      iIfExpressionExpression
+        <$> pIfExpression
     pWhileExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pWhileExpressionExpression = do
-      pure undefined
+    pWhileExpressionExpression =
+      iWhileExpressionExpression
+        <$> pWhileExpression
     pReturnExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pReturnExpressionExpression = do
-      pure undefined
+    pReturnExpressionExpression =
+      iReturnExpressionExpression
+        <$> pReturnExpression
     pAbortExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pAbortExpressionExpression = do
-      pure undefined
+    pAbortExpressionExpression =
+      iAbortExpressionExpression
+        <$> pAbortExpression
     pAssignExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pAssignExpressionExpression = do
-      pure undefined
+    pAssignExpressionExpression =
+      iAssignExpressionExpression
+        <$> pAssignExpression
     pHiddenUnaryExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pHiddenUnaryExpressionExpression = do
-      pure undefined
+    pHiddenUnaryExpressionExpression =
+      iHiddenUnaryExpressionExpression
+        <$> pHiddenUnaryExpression
     pBinaryExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pBinaryExpressionExpression = do
-      pure undefined
+    pBinaryExpressionExpression =
+      iBinaryExpressionExpression
+        <$> pBinaryExpression
     pCastExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pCastExpressionExpression = do
-      pure undefined
+    pCastExpressionExpression =
+      iCastExpressionExpression
+        <$> pCastExpression
     pQuantifierExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pQuantifierExpressionExpression = do
-      pure undefined
+    pQuantifierExpressionExpression =
+      iQuantifierExpressionExpression
+        <$> pQuantifierExpression
     pMatchExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pMatchExpressionExpression = do
-      pure undefined
+    pMatchExpressionExpression =
+      iMatchExpressionExpression
+        <$> pMatchExpression
     pVectorExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pVectorExpressionExpression = do
-      pure undefined
+    pVectorExpressionExpression =
+      iVectorExpressionExpression
+        <$> pVectorExpression
     pLoopExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pLoopExpressionExpression = do
-      pure undefined
+    pLoopExpressionExpression =
+      iLoopExpressionExpression
+        <$> pLoopExpression
     pIdentifiedExpressionExpression :: Parser (MoveTerm HiddenExpressionL)
-    pIdentifiedExpressionExpression = do
-      pure undefined
+    pIdentifiedExpressionExpression =
+      iIdentifiedExpressionExpression
+        <$> pIdentifiedExpression
 
-pHiddenUnaryExpression :: Parser (MoveTerm L)
+pHiddenUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
 pHiddenUnaryExpression = do
-  _sym <- pSymbol SHiddenUnaryExpressionSymbol
-  pure undefined
+  choice [ pUnaryExpressionUnaryExpression
+         , pBorrowExpressionUnaryExpression
+         , pDereferenceExpressionUnaryExpression
+         , pMoveOrCopyExpressionUnaryExpression
+         , pHiddenExpressionTermUnaryExpression
+         ]
   where
     pUnaryExpressionUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
-    pUnaryExpressionUnaryExpression = do
-      pure undefined
+    pUnaryExpressionUnaryExpression =
+      iUnaryExpressionUnaryExpression
+        <$> pUnaryExpression
     pBorrowExpressionUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
-    pBorrowExpressionUnaryExpression = do
-      pure undefined
+    pBorrowExpressionUnaryExpression =
+      iBorrowExpressionUnaryExpression
+        <$> pBorrowExpression
     pDereferenceExpressionUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
-    pDereferenceExpressionUnaryExpression = do
-      pure undefined
+    pDereferenceExpressionUnaryExpression =
+      iDereferenceExpressionUnaryExpression
+        <$> pDereferenceExpression
     pMoveOrCopyExpressionUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
-    pMoveOrCopyExpressionUnaryExpression = do
-      pure undefined
+    pMoveOrCopyExpressionUnaryExpression =
+      iMoveOrCopyExpressionUnaryExpression
+        <$> pMoveOrCopyExpression
     pHiddenExpressionTermUnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionL)
-    pHiddenExpressionTermUnaryExpression = do
-      pure undefined
+    pHiddenExpressionTermUnaryExpression =
+      iHiddenExpressionTermUnaryExpression
+        <$> pHiddenExpressionTerm
 
-pHiddenExpressionTerm :: Parser (MoveTerm L)
+pHiddenExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
 pHiddenExpressionTerm = do
-  _sym <- pSymbol SHiddenExpressionTermSymbol
-  pure undefined
+  choice [ pCallExpressionExpressionTerm
+         , pBreakExpressionExpressionTerm
+         , pContinueExpressionExpressionTerm
+         , pNameExpressionExpressionTerm
+         , pMacroCallExpressionExpressionTerm
+         , pPackExpressionExpressionTerm
+         , pHiddenLiteralValueExpressionTerm
+         , pUnitExpressionExpressionTerm
+         , pExpressionListExpressionTerm
+         , pAnnotationExpressionExpressionTerm
+         , pBlockExpressionTerm
+         , pSpecBlockExpressionTerm
+         , pIfExpressionExpressionTerm
+         , pDotExpressionExpressionTerm
+         , pIndexExpressionExpressionTerm
+         , pVectorExpressionExpressionTerm
+         , pMatchExpressionExpressionTerm
+         ]
   where
     pCallExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pCallExpressionExpressionTerm = do
-      pure undefined
+    pCallExpressionExpressionTerm =
+      iCallExpressionExpressionTerm
+        <$> pCallExpression
     pBreakExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pBreakExpressionExpressionTerm = do
-      pure undefined
+    pBreakExpressionExpressionTerm =
+      iBreakExpressionExpressionTerm
+        <$> pBreakExpression
     pContinueExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pContinueExpressionExpressionTerm = do
-      pure undefined
+    pContinueExpressionExpressionTerm =
+      iContinueExpressionExpressionTerm
+        <$> pContinueExpression
     pNameExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pNameExpressionExpressionTerm = do
-      pure undefined
+    pNameExpressionExpressionTerm =
+      iNameExpressionExpressionTerm
+        <$> pNameExpression
     pMacroCallExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pMacroCallExpressionExpressionTerm = do
-      pure undefined
+    pMacroCallExpressionExpressionTerm =
+      iMacroCallExpressionExpressionTerm
+        <$> pMacroCallExpression
     pPackExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pPackExpressionExpressionTerm = do
-      pure undefined
+    pPackExpressionExpressionTerm =
+      iPackExpressionExpressionTerm
+        <$> pPackExpression
     pHiddenLiteralValueExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenLiteralValueExpressionTerm = do
-      pure undefined
+    pHiddenLiteralValueExpressionTerm =
+      iHiddenLiteralValueExpressionTerm
+        <$> pHiddenLiteralValue
     pUnitExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pUnitExpressionExpressionTerm = do
-      pure undefined
+    pUnitExpressionExpressionTerm =
+      iUnitExpressionExpressionTerm
+        <$> pUnitExpression
     pExpressionListExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pExpressionListExpressionTerm = do
-      pure undefined
+    pExpressionListExpressionTerm =
+      iExpressionListExpressionTerm
+        <$> pExpressionList
     pAnnotationExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pAnnotationExpressionExpressionTerm = do
-      pure undefined
+    pAnnotationExpressionExpressionTerm =
+      iAnnotationExpressionExpressionTerm
+        <$> pAnnotationExpression
     pBlockExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pBlockExpressionTerm = do
-      pure undefined
+    pBlockExpressionTerm =
+      iBlockExpressionTerm
+        <$> pBlock
     pSpecBlockExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pSpecBlockExpressionTerm = do
-      pure undefined
+    pSpecBlockExpressionTerm =
+      iSpecBlockExpressionTerm
+        <$> pSpecBlock
     pIfExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pIfExpressionExpressionTerm = do
-      pure undefined
+    pIfExpressionExpressionTerm =
+      iIfExpressionExpressionTerm
+        <$> pIfExpression
     pDotExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pDotExpressionExpressionTerm = do
-      pure undefined
+    pDotExpressionExpressionTerm =
+      iDotExpressionExpressionTerm
+        <$> pDotExpression
     pIndexExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pIndexExpressionExpressionTerm = do
-      pure undefined
+    pIndexExpressionExpressionTerm =
+      iIndexExpressionExpressionTerm
+        <$> pIndexExpression
     pVectorExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pVectorExpressionExpressionTerm = do
-      pure undefined
+    pVectorExpressionExpressionTerm =
+      iVectorExpressionExpressionTerm
+        <$> pVectorExpression
     pMatchExpressionExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
-    pMatchExpressionExpressionTerm = do
-      pure undefined
+    pMatchExpressionExpressionTerm =
+      iMatchExpressionExpressionTerm
+        <$> pMatchExpression
 
-pHiddenLiteralValue :: Parser (MoveTerm L)
+pHiddenLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
 pHiddenLiteralValue = do
-  _sym <- pSymbol SHiddenLiteralValueSymbol
-  pure undefined
+  choice [ pAddressLiteralLiteralValue
+         , pBoolLiteralLiteralValue
+         , pNumLiteralLiteralValue
+         , pHexStringLiteralLiteralValue
+         , pByteStringLiteralLiteralValue
+         ]
   where
     pAddressLiteralLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
-    pAddressLiteralLiteralValue = do
-      pure undefined
+    pAddressLiteralLiteralValue =
+      iAddressLiteralLiteralValue
+        <$> pAddressLiteral
     pBoolLiteralLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
-    pBoolLiteralLiteralValue = do
-      pure undefined
+    pBoolLiteralLiteralValue =
+      iBoolLiteralLiteralValue
+        <$> pBoolLiteral
     pNumLiteralLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
-    pNumLiteralLiteralValue = do
-      pure undefined
+    pNumLiteralLiteralValue =
+      iNumLiteralLiteralValue
+        <$> pNumLiteral
     pHexStringLiteralLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
-    pHexStringLiteralLiteralValue = do
-      pure undefined
+    pHexStringLiteralLiteralValue =
+      iHexStringLiteralLiteralValue
+        <$> pHexStringLiteral
     pByteStringLiteralLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
-    pByteStringLiteralLiteralValue = do
-      pure undefined
+    pByteStringLiteralLiteralValue =
+      iByteStringLiteralLiteralValue
+        <$> pByteStringLiteral
 
-pAddressLiteral :: Parser (MoveTerm L)
+pAddressLiteral :: Parser (MoveTerm AddressLiteralL)
 pAddressLiteral = do
   _sym <- pSymbol SAddressLiteralSymbol
-  pure undefined
+  pure iAddressLiteral
 
-pBoolLiteral :: Parser (MoveTerm L)
+pBoolLiteral :: Parser (MoveTerm BoolLiteralL)
 pBoolLiteral = do
   _sym <- pSymbol SBoolLiteralSymbol
-  pure undefined
+  choice [ pTrueBoolLiteral
+         , pFalseBoolLiteral
+         ]
   where
     pTrueBoolLiteral :: Parser (MoveTerm BoolLiteralL)
-    pTrueBoolLiteral = do
-      pure undefined
+    pTrueBoolLiteral =
+      iTrueBoolLiteral
+        <$> pTrue
     pFalseBoolLiteral :: Parser (MoveTerm BoolLiteralL)
-    pFalseBoolLiteral = do
-      pure undefined
+    pFalseBoolLiteral =
+      iFalseBoolLiteral
+        <$> pFalse
 
-pByteStringLiteral :: Parser (MoveTerm L)
+pByteStringLiteral :: Parser (MoveTerm ByteStringLiteralL)
 pByteStringLiteral = do
   _sym <- pSymbol SByteStringLiteralSymbol
-  pure undefined
+  pure iByteStringLiteral
 
-pHexStringLiteral :: Parser (MoveTerm L)
+pHexStringLiteral :: Parser (MoveTerm HexStringLiteralL)
 pHexStringLiteral = do
   _sym <- pSymbol SHexStringLiteralSymbol
-  pure undefined
+  pure iHexStringLiteral
 
-pAnnotationExpression :: Parser (MoveTerm L)
+pAnnotationExpression :: Parser (MoveTerm AnnotationExpressionL)
 pAnnotationExpression = do
   _sym <- pSymbol SAnnotationExpressionSymbol
-  pure undefined
+  iAnnotationExpression
+    <$> pHiddenExpression
+    <*> pHiddenType
 
-pBreakExpression :: Parser (MoveTerm L)
+pBreakExpression :: Parser (MoveTerm BreakExpressionL)
 pBreakExpression = do
   _sym <- pSymbol SBreakExpressionSymbol
-  pure undefined
+  iBreakExpression
+    <$> pMaybe pLabel
+    <*> pMaybe pHiddenExpression
 
-pLabel :: Parser (MoveTerm L)
+pLabel :: Parser (MoveTerm LabelL)
 pLabel = do
   _sym <- pSymbol SLabelSymbol
-  pure undefined
+  iLabel
+    <$> pIdentifier
 
-pCallExpression :: Parser (MoveTerm L)
+pCallExpression :: Parser (MoveTerm CallExpressionL)
 pCallExpression = do
   _sym <- pSymbol SCallExpressionSymbol
-  pure undefined
+  iCallExpression
+    <$> pNameExpression
+    <*> pArgList
 
-pArgList :: Parser (MoveTerm L)
+pArgList :: Parser (MoveTerm ArgListL)
 pArgList = do
   _sym <- pSymbol SArgListSymbol
-  pure undefined
+  iArgList
+    <$> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
-pNameExpression :: Parser (MoveTerm L)
+pNameExpression :: Parser (MoveTerm NameExpressionL)
 pNameExpression = do
   _sym <- pSymbol SNameExpressionSymbol
-  pure undefined
+  iNameExpression
+    <$> pModuleAccess
 
-pContinueExpression :: Parser (MoveTerm L)
+pContinueExpression :: Parser (MoveTerm ContinueExpressionL)
 pContinueExpression = do
   _sym <- pSymbol SContinueExpressionSymbol
-  pure undefined
+  iContinueExpression
+    <$> pMaybe pLabel
 
-pDotExpression :: Parser (MoveTerm L)
+pDotExpression :: Parser (MoveTerm DotExpressionL)
 pDotExpression = do
   _sym <- pSymbol SDotExpressionSymbol
-  pure undefined
+  iDotExpression
+    <$> pHiddenExpressionTerm
+    <*> pHiddenExpressionTerm
 
-pExpressionList :: Parser (MoveTerm L)
+pExpressionList :: Parser (MoveTerm ExpressionListL)
 pExpressionList = do
   _sym <- pSymbol SExpressionListSymbol
-  pure undefined
+  iExpressionList
+    <$> pPair (pMany pHiddenExpression) pHiddenExpression
 
-pIfExpression :: Parser (MoveTerm L)
+pIfExpression :: Parser (MoveTerm IfExpressionL)
 pIfExpression = do
   _sym <- pSymbol SIfExpressionSymbol
-  pure undefined
+  iIfExpression
+    <$> pHiddenExpression
+    <*> pHiddenExpression
+    <*> pMaybe pHiddenExpression
 
-pIndexExpression :: Parser (MoveTerm L)
+pIndexExpression :: Parser (MoveTerm IndexExpressionL)
 pIndexExpression = do
   _sym <- pSymbol SIndexExpressionSymbol
-  pure undefined
+  iIndexExpression
+    <$> pHiddenExpressionTerm
+    <*> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
-pMacroCallExpression :: Parser (MoveTerm L)
+pMacroCallExpression :: Parser (MoveTerm MacroCallExpressionL)
 pMacroCallExpression = do
   _sym <- pSymbol SMacroCallExpressionSymbol
-  pure undefined
+  iMacroCallExpression
+    <$> pMacroModuleAccess
+    <*> pMaybe pTypeArguments
+    <*> pArgList
 
-pMacroModuleAccess :: Parser (MoveTerm L)
+pMacroModuleAccess :: Parser (MoveTerm MacroModuleAccessL)
 pMacroModuleAccess = do
   _sym <- pSymbol SMacroModuleAccessSymbol
-  pure undefined
+  iMacroModuleAccess
+    <$> pModuleAccess
+    <*> pBang
 
-pMatchExpression :: Parser (MoveTerm L)
+pMatchExpression :: Parser (MoveTerm MatchExpressionL)
 pMatchExpression = do
   _sym <- pSymbol SMatchExpressionSymbol
-  pure undefined
+  iMatchExpression
+    <$> pHiddenExpression
+    <*> pHiddenMatchBody
 
-pHiddenMatchBody :: Parser (MoveTerm L)
+pHiddenMatchBody :: Parser (MoveTerm HiddenMatchBodyL)
 pHiddenMatchBody = do
-  _sym <- pSymbol SHiddenMatchBodySymbol
-  pure undefined
+  iHiddenMatchBody
+    <$> pPair (pMaybe pMatchArm) (pMany pMatchArm)
 
-pMatchArm :: Parser (MoveTerm L)
+pMatchArm :: Parser (MoveTerm MatchArmL)
 pMatchArm = do
   _sym <- pSymbol SMatchArmSymbol
-  pure undefined
+  iMatchArm
+    <$> pBindList
+    <*> pMaybe pMatchCondition
+    <*> pHiddenExpression
 
-pBindList :: Parser (MoveTerm L)
+pBindList :: Parser (MoveTerm BindListL)
 pBindList = do
   _sym <- pSymbol SBindListSymbol
-  pure undefined
+  choice [ pHiddenBindBindList
+         , pCommaBindListBindList
+         , pOrBindListBindList
+         ]
   where
     pHiddenBindBindList :: Parser (MoveTerm BindListL)
-    pHiddenBindBindList = do
-      pure undefined
+    pHiddenBindBindList =
+      iHiddenBindBindList
+        <$> pHiddenBind
     pCommaBindListBindList :: Parser (MoveTerm BindListL)
-    pCommaBindListBindList = do
-      pure undefined
+    pCommaBindListBindList =
+      iCommaBindListBindList
+        <$> pCommaBindList
     pOrBindListBindList :: Parser (MoveTerm BindListL)
-    pOrBindListBindList = do
-      pure undefined
+    pOrBindListBindList =
+      iOrBindListBindList
+        <$> pOrBindList
 
-pHiddenBind :: Parser (MoveTerm L)
+pHiddenBind :: Parser (MoveTerm HiddenBindL)
 pHiddenBind = do
-  _sym <- pSymbol SHiddenBindSymbol
-  pure undefined
+  choice [ pMutBindVarBind
+         , pBindVarBind
+         , pBindUnpackBind
+         , pAtBindBind
+         , pHiddenLiteralValueBind
+         ]
   where
     pMutBindVarBind :: Parser (MoveTerm HiddenBindL)
-    pMutBindVarBind = do
-      pure undefined
+    pMutBindVarBind =
+      iMutBindVarBind
+        <$> pMutBindVar
     pBindVarBind :: Parser (MoveTerm HiddenBindL)
-    pBindVarBind = do
-      pure undefined
+    pBindVarBind =
+      iBindVarBind
+        <$> pHiddenVariableIdentifier
     pBindUnpackBind :: Parser (MoveTerm HiddenBindL)
-    pBindUnpackBind = do
-      pure undefined
+    pBindUnpackBind =
+      iBindUnpackBind
+        <$> pBindUnpack
     pAtBindBind :: Parser (MoveTerm HiddenBindL)
-    pAtBindBind = do
-      pure undefined
+    pAtBindBind =
+      iAtBindBind
+        <$> pAtBind
     pHiddenLiteralValueBind :: Parser (MoveTerm HiddenBindL)
-    pHiddenLiteralValueBind = do
-      pure undefined
+    pHiddenLiteralValueBind =
+      iHiddenLiteralValueBind
+        <$> pHiddenLiteralValue
 
-pAtBind :: Parser (MoveTerm L)
+pAtBind :: Parser (MoveTerm AtBindL)
 pAtBind = do
   _sym <- pSymbol SAtBindSymbol
-  pure undefined
+  iAtBind
+    <$> pHiddenVariableIdentifier
+    <*> pBindList
 
-pBindUnpack :: Parser (MoveTerm L)
+pBindUnpack :: Parser (MoveTerm BindUnpackL)
 pBindUnpack = do
   _sym <- pSymbol SBindUnpackSymbol
-  pure undefined
+  iBindUnpack
+    <$> pNameExpression
+    <*> pMaybe pBindFields
 
-pBindFields :: Parser (MoveTerm L)
+pBindFields :: Parser (MoveTerm BindFieldsL)
 pBindFields = do
   _sym <- pSymbol SBindFieldsSymbol
-  pure undefined
+  choice [ pBindPositionalFieldsBindFields
+         , pBindNamedFieldsBindFields
+         ]
   where
     pBindPositionalFieldsBindFields :: Parser (MoveTerm BindFieldsL)
-    pBindPositionalFieldsBindFields = do
-      pure undefined
+    pBindPositionalFieldsBindFields =
+      iBindPositionalFieldsBindFields
+        <$> pBindPositionalFields
     pBindNamedFieldsBindFields :: Parser (MoveTerm BindFieldsL)
-    pBindNamedFieldsBindFields = do
-      pure undefined
+    pBindNamedFieldsBindFields =
+      iBindNamedFieldsBindFields
+        <$> pBindNamedFields
 
-pBindNamedFields :: Parser (MoveTerm L)
+pBindNamedFields :: Parser (MoveTerm BindNamedFieldsL)
 pBindNamedFields = do
   _sym <- pSymbol SBindNamedFieldsSymbol
-  pure undefined
+  iBindNamedFields
+    <$> pPair (pMaybe (pEither pMutBindField pBindField)) (pMany (pEither pMutBindField pBindField))
 
-pBindField :: Parser (MoveTerm L)
+pBindField :: Parser (MoveTerm BindFieldL)
 pBindField = do
   _sym <- pSymbol SBindFieldSymbol
-  pure undefined
+  choice [ pBindField1
+         , pHiddenSpreadOperatorBindField
+         ]
   where
     pBindField1 :: Parser (MoveTerm BindFieldL)
-    pBindField1 = do
-      pure undefined
+    pBindField1 =
+      iBindField1
+        <$> pBindList
+        <*> pMaybe pBindList
     pHiddenSpreadOperatorBindField :: Parser (MoveTerm BindFieldL)
-    pHiddenSpreadOperatorBindField = do
-      pure undefined
+    pHiddenSpreadOperatorBindField =
+      iHiddenSpreadOperatorBindField
+        <$> pHiddenSpreadOperator
 
-pHiddenSpreadOperator :: Parser (MoveTerm L)
+pHiddenSpreadOperator :: Parser (MoveTerm HiddenSpreadOperatorL)
 pHiddenSpreadOperator = do
-  _sym <- pSymbol SHiddenSpreadOperatorSymbol
-  pure undefined
+  iHiddenSpreadOperator
+    <$> pRange
 
-pMutBindField :: Parser (MoveTerm L)
+pMutBindField :: Parser (MoveTerm MutBindFieldL)
 pMutBindField = do
   _sym <- pSymbol SMutBindFieldSymbol
-  pure undefined
+  iMutBindField
+    <$> pBindField
 
-pBindPositionalFields :: Parser (MoveTerm L)
+pBindPositionalFields :: Parser (MoveTerm BindPositionalFieldsL)
 pBindPositionalFields = do
   _sym <- pSymbol SBindPositionalFieldsSymbol
-  pure undefined
+  iBindPositionalFields
+    <$> pPair (pMaybe (pEither pMutBindField pBindField)) (pMany (pEither pMutBindField pBindField))
 
-pMutBindVar :: Parser (MoveTerm L)
+pMutBindVar :: Parser (MoveTerm MutBindVarL)
 pMutBindVar = do
   _sym <- pSymbol SMutBindVarSymbol
-  pure undefined
+  iMutBindVar
+    <$> pBindVar
 
-pCommaBindList :: Parser (MoveTerm L)
+pBindVar :: Parser (MoveTerm BindVarL)
+pBindVar = do
+  _sym <- pSymbol SBindVarSymbol
+  iBindVar
+    <$> pVariableIdentifier
+
+pCommaBindList :: Parser (MoveTerm CommaBindListL)
 pCommaBindList = do
   _sym <- pSymbol SCommaBindListSymbol
-  pure undefined
+  iCommaBindList
+    <$> pPair (pMaybe pHiddenBind) (pMany pHiddenBind)
 
-pOrBindList :: Parser (MoveTerm L)
+pOrBindList :: Parser (MoveTerm OrBindListL)
 pOrBindList = do
   _sym <- pSymbol SOrBindListSymbol
-  pure undefined
+  iOrBindList
+    <$> pPair (pMany (pPair pHiddenBind pBitor)) (pPair (pMaybe pBitor) pHiddenBind)
 
-pMatchCondition :: Parser (MoveTerm L)
+pMatchCondition :: Parser (MoveTerm MatchConditionL)
 pMatchCondition = do
   _sym <- pSymbol SMatchConditionSymbol
-  pure undefined
+  iMatchCondition
+    <$> pHiddenExpression
 
-pPackExpression :: Parser (MoveTerm L)
+pPackExpression :: Parser (MoveTerm PackExpressionL)
 pPackExpression = do
   _sym <- pSymbol SPackExpressionSymbol
-  pure undefined
+  iPackExpression
+    <$> pNameExpression
+    <*> pFieldInitializeList
 
-pFieldInitializeList :: Parser (MoveTerm L)
+pFieldInitializeList :: Parser (MoveTerm FieldInitializeListL)
 pFieldInitializeList = do
   _sym <- pSymbol SFieldInitializeListSymbol
-  pure undefined
+  iFieldInitializeList
+    <$> pPair (pMaybe pExpField) (pMany pExpField)
 
-pExpField :: Parser (MoveTerm L)
+pExpField :: Parser (MoveTerm ExpFieldL)
 pExpField = do
   _sym <- pSymbol SExpFieldSymbol
-  pure undefined
+  iExpField
+    <$> pHiddenFieldIdentifier
+    <*> pMaybe pHiddenExpression
 
-pSpecBlock :: Parser (MoveTerm L)
+pSpecBlock :: Parser (MoveTerm SpecBlockL)
 pSpecBlock = do
   _sym <- pSymbol SSpecBlockSymbol
-  pure undefined
+  iSpecBlock
+    <$> pEither pHiddenSpecFunction (pPair pSpecBody (pMaybe pHiddenSpecBlockTarget))
 
-pHiddenSpecBlockTarget :: Parser (MoveTerm L)
+pHiddenSpecBlockTarget :: Parser (MoveTerm HiddenSpecBlockTargetL)
 pHiddenSpecBlockTarget = do
-  _sym <- pSymbol SHiddenSpecBlockTargetSymbol
-  pure undefined
+  choice [ pIdentifierSpecBlockTarget
+         , pSpecBlockTargetModuleSpecBlockTarget
+         , pSpecBlockTargetSchemaSpecBlockTarget
+         ]
   where
     pIdentifierSpecBlockTarget :: Parser (MoveTerm HiddenSpecBlockTargetL)
-    pIdentifierSpecBlockTarget = do
-      pure undefined
+    pIdentifierSpecBlockTarget =
+      iIdentifierSpecBlockTarget
+        <$> pIdentifier
     pSpecBlockTargetModuleSpecBlockTarget :: Parser (MoveTerm HiddenSpecBlockTargetL)
-    pSpecBlockTargetModuleSpecBlockTarget = do
-      pure undefined
+    pSpecBlockTargetModuleSpecBlockTarget =
+      iSpecBlockTargetModuleSpecBlockTarget
+        <$> pModule
     pSpecBlockTargetSchemaSpecBlockTarget :: Parser (MoveTerm HiddenSpecBlockTargetL)
-    pSpecBlockTargetSchemaSpecBlockTarget = do
-      pure undefined
+    pSpecBlockTargetSchemaSpecBlockTarget =
+      iSpecBlockTargetSchemaSpecBlockTarget
+        <$> pSpecBlockTargetSchema
 
-pSpecBlockTargetSchema :: Parser (MoveTerm L)
+pSpecBlockTargetSchema :: Parser (MoveTerm SpecBlockTargetSchemaL)
 pSpecBlockTargetSchema = do
   _sym <- pSymbol SSpecBlockTargetSchemaSymbol
-  pure undefined
+  iSpecBlockTargetSchema
+    <$> pHiddenStructIdentifier
+    <*> pMaybe pTypeParameters
 
-pHiddenStructIdentifier :: Parser (MoveTerm L)
+pHiddenStructIdentifier :: Parser (MoveTerm HiddenStructIdentifierL)
 pHiddenStructIdentifier = do
-  _sym <- pSymbol SHiddenStructIdentifierSymbol
-  pure undefined
+  iHiddenStructIdentifier
+    <$> pStructIdentifier
 
-pHiddenSpecFunction :: Parser (MoveTerm L)
+pStructIdentifier :: Parser (MoveTerm StructIdentifierL)
+pStructIdentifier = do
+  _sym <- pSymbol SStructIdentifierSymbol
+  pure iStructIdentifier
+
+pHiddenSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
 pHiddenSpecFunction = do
-  _sym <- pSymbol SHiddenSpecFunctionSymbol
-  pure undefined
+  choice [ pNativeSpecFunctionSpecFunction
+         , pUsualSpecFunctionSpecFunction
+         , pUninterpretedSpecFunctionSpecFunction
+         ]
   where
     pNativeSpecFunctionSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
-    pNativeSpecFunctionSpecFunction = do
-      pure undefined
+    pNativeSpecFunctionSpecFunction =
+      iNativeSpecFunctionSpecFunction
+        <$> pNativeSpecFunction
     pUsualSpecFunctionSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
-    pUsualSpecFunctionSpecFunction = do
-      pure undefined
+    pUsualSpecFunctionSpecFunction =
+      iUsualSpecFunctionSpecFunction
+        <$> pUsualSpecFunction
     pUninterpretedSpecFunctionSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
-    pUninterpretedSpecFunctionSpecFunction = do
-      pure undefined
+    pUninterpretedSpecFunctionSpecFunction =
+      iUninterpretedSpecFunctionSpecFunction
+        <$> pUninterpretedSpecFunction
 
-pNativeSpecFunction :: Parser (MoveTerm L)
+pNativeSpecFunction :: Parser (MoveTerm NativeSpecFunctionL)
 pNativeSpecFunction = do
   _sym <- pSymbol SNativeSpecFunctionSymbol
-  pure undefined
+  iNativeSpecFunction
+    <$> pHiddenSpecFunctionSignature
 
-pHiddenSpecFunctionSignature :: Parser (MoveTerm L)
+pHiddenSpecFunctionSignature :: Parser (MoveTerm HiddenSpecFunctionSignatureL)
 pHiddenSpecFunctionSignature = do
-  _sym <- pSymbol SHiddenSpecFunctionSignatureSymbol
-  pure undefined
+  iHiddenSpecFunctionSignature
+    <$> pHiddenFunctionIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pFunctionParameters
+    <*> pRetType
 
-pUninterpretedSpecFunction :: Parser (MoveTerm L)
+pUninterpretedSpecFunction :: Parser (MoveTerm UninterpretedSpecFunctionL)
 pUninterpretedSpecFunction = do
   _sym <- pSymbol SUninterpretedSpecFunctionSymbol
-  pure undefined
+  iUninterpretedSpecFunction
+    <$> pHiddenSpecFunctionSignature
 
-pUsualSpecFunction :: Parser (MoveTerm L)
+pUsualSpecFunction :: Parser (MoveTerm UsualSpecFunctionL)
 pUsualSpecFunction = do
   _sym <- pSymbol SUsualSpecFunctionSymbol
-  pure undefined
+  iUsualSpecFunction
+    <$> pHiddenSpecFunctionSignature
+    <*> pBlock
 
-pSpecBody :: Parser (MoveTerm L)
+pSpecBody :: Parser (MoveTerm SpecBodyL)
 pSpecBody = do
   _sym <- pSymbol SSpecBodySymbol
-  pure undefined
+  iSpecBody
+    <$> pMany pUseDeclaration
+    <*> pMany pHiddenSpecBlockMemeber
 
-pHiddenSpecBlockMemeber :: Parser (MoveTerm L)
+pHiddenSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
 pHiddenSpecBlockMemeber = do
-  _sym <- pSymbol SHiddenSpecBlockMemeberSymbol
-  pure undefined
+  choice [ pSpecInvariantSpecBlockMemeber
+         , pHiddenSpecFunctionSpecBlockMemeber
+         , pSpecConditionSpecBlockMemeber
+         , pSpecIncludeSpecBlockMemeber
+         , pSpecApplySpecBlockMemeber
+         , pSpecPragmaSpecBlockMemeber
+         , pSpecVariableSpecBlockMemeber
+         , pSpecLetSpecBlockMemeber
+         ]
   where
     pSpecInvariantSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecInvariantSpecBlockMemeber = do
-      pure undefined
+    pSpecInvariantSpecBlockMemeber =
+      iSpecInvariantSpecBlockMemeber
+        <$> pSpecInvariant
     pHiddenSpecFunctionSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecFunctionSpecBlockMemeber = do
-      pure undefined
+    pHiddenSpecFunctionSpecBlockMemeber =
+      iHiddenSpecFunctionSpecBlockMemeber
+        <$> pHiddenSpecFunction
     pSpecConditionSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecConditionSpecBlockMemeber = do
-      pure undefined
+    pSpecConditionSpecBlockMemeber =
+      iSpecConditionSpecBlockMemeber
+        <$> pSpecCondition
     pSpecIncludeSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecIncludeSpecBlockMemeber = do
-      pure undefined
+    pSpecIncludeSpecBlockMemeber =
+      iSpecIncludeSpecBlockMemeber
+        <$> pSpecInclude
     pSpecApplySpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecApplySpecBlockMemeber = do
-      pure undefined
+    pSpecApplySpecBlockMemeber =
+      iSpecApplySpecBlockMemeber
+        <$> pSpecApply
     pSpecPragmaSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecPragmaSpecBlockMemeber = do
-      pure undefined
+    pSpecPragmaSpecBlockMemeber =
+      iSpecPragmaSpecBlockMemeber
+        <$> pSpecPragma
     pSpecVariableSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecVariableSpecBlockMemeber = do
-      pure undefined
+    pSpecVariableSpecBlockMemeber =
+      iSpecVariableSpecBlockMemeber
+        <$> pSpecVariable
     pSpecLetSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pSpecLetSpecBlockMemeber = do
-      pure undefined
+    pSpecLetSpecBlockMemeber =
+      iSpecLetSpecBlockMemeber
+        <$> pSpecLet
 
-pSpecApply :: Parser (MoveTerm L)
+pSpecApply :: Parser (MoveTerm SpecApplyL)
 pSpecApply = do
   _sym <- pSymbol SSpecApplySymbol
-  pure undefined
+  iSpecApply
+    <$> pHiddenExpression
+    <*> pPair (pMany pSpecApplyPattern) pSpecApplyPattern
+    <*> pMaybe (pPair (pMany pSpecApplyPattern) pSpecApplyPattern)
 
-pSpecApplyPattern :: Parser (MoveTerm L)
+pSpecApplyPattern :: Parser (MoveTerm SpecApplyPatternL)
 pSpecApplyPattern = do
   _sym <- pSymbol SSpecApplyPatternSymbol
-  pure undefined
+  iSpecApplyPattern
+    <$> pMaybe (pEither pInternal pPublic)
+    <*> pSpecApplyNamePattern
+    <*> pMaybe pTypeParameters
 
-pSpecApplyNamePattern :: Parser (MoveTerm L)
+pSpecApplyNamePattern :: Parser (MoveTerm SpecApplyNamePatternL)
 pSpecApplyNamePattern = do
   _sym <- pSymbol SSpecApplyNamePatternSymbol
-  pure undefined
+  pure iSpecApplyNamePattern
 
-pSpecCondition :: Parser (MoveTerm L)
+pSpecCondition :: Parser (MoveTerm SpecConditionL)
 pSpecCondition = do
   _sym <- pSymbol SSpecConditionSymbol
-  pure undefined
+  choice [ pHiddenSpecConditionSpecCondition
+         , pHiddenSpecAbortIfSpecCondition
+         , pHiddenSpecAbortWithOrModifiesSpecCondition
+         ]
   where
     pHiddenSpecConditionSpecCondition :: Parser (MoveTerm SpecConditionL)
-    pHiddenSpecConditionSpecCondition = do
-      pure undefined
+    pHiddenSpecConditionSpecCondition =
+      iHiddenSpecConditionSpecCondition
+        <$> pHiddenSpecCondition
     pHiddenSpecAbortIfSpecCondition :: Parser (MoveTerm SpecConditionL)
-    pHiddenSpecAbortIfSpecCondition = do
-      pure undefined
+    pHiddenSpecAbortIfSpecCondition =
+      iHiddenSpecAbortIfSpecCondition
+        <$> pHiddenSpecAbortIf
     pHiddenSpecAbortWithOrModifiesSpecCondition :: Parser (MoveTerm SpecConditionL)
-    pHiddenSpecAbortWithOrModifiesSpecCondition = do
-      pure undefined
+    pHiddenSpecAbortWithOrModifiesSpecCondition =
+      iHiddenSpecAbortWithOrModifiesSpecCondition
+        <$> pHiddenSpecAbortWithOrModifies
 
-pHiddenSpecAbortIf :: Parser (MoveTerm L)
+pHiddenSpecAbortIf :: Parser (MoveTerm HiddenSpecAbortIfL)
 pHiddenSpecAbortIf = do
-  _sym <- pSymbol SHiddenSpecAbortIfSymbol
-  pure undefined
+  iHiddenSpecAbortIf
+    <$> pConditionKind
+    <*> pMaybe pConditionProperties
+    <*> pHiddenExpression
+    <*> pMaybe pHiddenExpression
 
-pConditionProperties :: Parser (MoveTerm L)
+pConditionKind :: Parser (MoveTerm ConditionKindL)
+pConditionKind = do
+  _sym <- pSymbol SConditionKindSymbol
+  pure iConditionKind
+
+pConditionProperties :: Parser (MoveTerm ConditionPropertiesL)
 pConditionProperties = do
   _sym <- pSymbol SConditionPropertiesSymbol
-  pure undefined
+  iConditionProperties
+    <$> pPair (pMaybe pSpecProperty) (pMany pSpecProperty)
 
-pSpecProperty :: Parser (MoveTerm L)
+pSpecProperty :: Parser (MoveTerm SpecPropertyL)
 pSpecProperty = do
   _sym <- pSymbol SSpecPropertySymbol
-  pure undefined
+  iSpecProperty
+    <$> pIdentifier
+    <*> pMaybe (pPair pHiddenLiteralValue pAssign)
 
-pHiddenSpecAbortWithOrModifies :: Parser (MoveTerm L)
+pHiddenSpecAbortWithOrModifies :: Parser (MoveTerm HiddenSpecAbortWithOrModifiesL)
 pHiddenSpecAbortWithOrModifies = do
-  _sym <- pSymbol SHiddenSpecAbortWithOrModifiesSymbol
-  pure undefined
+  iHiddenSpecAbortWithOrModifies
+    <$> pConditionKind
+    <*> pMaybe pConditionProperties
+    <*> pPair (pMany pHiddenExpression) pHiddenExpression
 
-pHiddenSpecCondition :: Parser (MoveTerm L)
+pHiddenSpecCondition :: Parser (MoveTerm HiddenSpecConditionL)
 pHiddenSpecCondition = do
-  _sym <- pSymbol SHiddenSpecConditionSymbol
-  pure undefined
+  iHiddenSpecCondition
+    <$> pEither (pPair (pMaybe pModule) pConditionKind) pConditionKind
+    <*> pMaybe pConditionProperties
+    <*> pHiddenExpression
 
-pHiddenSpecConditionKind :: Parser (MoveTerm L)
-pHiddenSpecConditionKind = do
-  _sym <- pSymbol SHiddenSpecConditionKindSymbol
-  pure undefined
-  where
-    pAssertSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
-    pAssertSpecConditionKind = do
-      pure undefined
-    pAssumeSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
-    pAssumeSpecConditionKind = do
-      pure undefined
-    pDecreasesSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
-    pDecreasesSpecConditionKind = do
-      pure undefined
-    pEnsuresSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
-    pEnsuresSpecConditionKind = do
-      pure undefined
-    pSucceedsIfSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
-    pSucceedsIfSpecConditionKind = do
-      pure undefined
-
-pSpecInclude :: Parser (MoveTerm L)
+pSpecInclude :: Parser (MoveTerm SpecIncludeL)
 pSpecInclude = do
   _sym <- pSymbol SSpecIncludeSymbol
-  pure undefined
+  iSpecInclude
+    <$> pHiddenExpression
 
-pSpecInvariant :: Parser (MoveTerm L)
+pSpecInvariant :: Parser (MoveTerm SpecInvariantL)
 pSpecInvariant = do
   _sym <- pSymbol SSpecInvariantSymbol
-  pure undefined
+  iSpecInvariant
+    <$> pConditionKind
+    <*> pMaybe pInvariantModifier
+    <*> pMaybe pConditionProperties
+    <*> pHiddenExpression
 
-pSpecLet :: Parser (MoveTerm L)
+pInvariantModifier :: Parser (MoveTerm InvariantModifierL)
+pInvariantModifier = do
+  _sym <- pSymbol SInvariantModifierSymbol
+  choice [ pUpdateInvariantModifier
+         , pPackInvariantModifier
+         , pUnpackInvariantModifier
+         , pModuleInvariantModifier
+         ]
+  where
+    pUpdateInvariantModifier :: Parser (MoveTerm InvariantModifierL)
+    pUpdateInvariantModifier =
+      iUpdateInvariantModifier
+        <$> pUpdate
+    pPackInvariantModifier :: Parser (MoveTerm InvariantModifierL)
+    pPackInvariantModifier =
+      iPackInvariantModifier
+        <$> pPack
+    pUnpackInvariantModifier :: Parser (MoveTerm InvariantModifierL)
+    pUnpackInvariantModifier =
+      iUnpackInvariantModifier
+        <$> pUnpack
+    pModuleInvariantModifier :: Parser (MoveTerm InvariantModifierL)
+    pModuleInvariantModifier =
+      iModuleInvariantModifier
+        <$> pModule
+
+pSpecLet :: Parser (MoveTerm SpecLetL)
 pSpecLet = do
   _sym <- pSymbol SSpecLetSymbol
-  pure undefined
+  iSpecLet
+    <$> pMaybe pPost
+    <*> pIdentifier
+    <*> pAssign
+    <*> pHiddenExpression
 
-pSpecPragma :: Parser (MoveTerm L)
+pSpecPragma :: Parser (MoveTerm SpecPragmaL)
 pSpecPragma = do
   _sym <- pSymbol SSpecPragmaSymbol
-  pure undefined
+  iSpecPragma
+    <$> pPair (pMaybe pSpecProperty) (pMany pSpecProperty)
 
-pSpecVariable :: Parser (MoveTerm L)
+pSpecVariable :: Parser (MoveTerm SpecVariableL)
 pSpecVariable = do
   _sym <- pSymbol SSpecVariableSymbol
-  pure undefined
+  iSpecVariable
+    <$> pMaybe (pEither pLocal pGlobal)
+    <*> pIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pHiddenType
 
-pUseDeclaration :: Parser (MoveTerm L)
+pUseDeclaration :: Parser (MoveTerm UseDeclarationL)
 pUseDeclaration = do
   _sym <- pSymbol SUseDeclarationSymbol
-  pure undefined
+  iUseDeclaration
+    <$> pMaybe pPublic
+    <*> pEither pUseModule (pEither pUseModuleMember (pEither pUseModuleMembers pUseFun))
 
-pUseFun :: Parser (MoveTerm L)
+pUseFun :: Parser (MoveTerm UseFunL)
 pUseFun = do
   _sym <- pSymbol SUseFunSymbol
-  pure undefined
+  iUseFun
+    <$> pModuleAccess
+    <*> pPair pHiddenFunctionIdentifier pModuleAccess
 
-pUseModule :: Parser (MoveTerm L)
+pUseModule :: Parser (MoveTerm UseModuleL)
 pUseModule = do
   _sym <- pSymbol SUseModuleSymbol
-  pure undefined
+  iUseModule
+    <$> pModuleIdentity
+    <*> pMaybe pHiddenModuleIdentifier
 
-pUseModuleMember :: Parser (MoveTerm L)
+pUseModuleMember :: Parser (MoveTerm UseModuleMemberL)
 pUseModuleMember = do
   _sym <- pSymbol SUseModuleMemberSymbol
-  pure undefined
+  iUseModuleMember
+    <$> pModuleIdentity
+    <*> pUseMember
 
-pUseMember :: Parser (MoveTerm L)
+pUseMember :: Parser (MoveTerm UseMemberL)
 pUseMember = do
   _sym <- pSymbol SUseMemberSymbol
-  pure undefined
+  choice [ pUseMember1
+         , pUseMember2
+         , pUseMember3
+         ]
   where
     pUseMember1 :: Parser (MoveTerm UseMemberL)
-    pUseMember1 = do
-      pure undefined
+    pUseMember1 =
+      iUseMember1
+        <$> pIdentifier
+        <*> pPair (pMany pUseMember) pUseMember
     pUseMember2 :: Parser (MoveTerm UseMemberL)
-    pUseMember2 = do
-      pure undefined
+    pUseMember2 =
+      iUseMember2
+        <$> pIdentifier
+        <*> pIdentifier
+        <*> pMaybe pIdentifier
     pUseMember3 :: Parser (MoveTerm UseMemberL)
-    pUseMember3 = do
-      pure undefined
+    pUseMember3 =
+      iUseMember3
+        <$> pIdentifier
+        <*> pMaybe pIdentifier
 
-pUseModuleMembers :: Parser (MoveTerm L)
+pUseModuleMembers :: Parser (MoveTerm UseModuleMembersL)
 pUseModuleMembers = do
   _sym <- pSymbol SUseModuleMembersSymbol
-  pure undefined
+  choice [ pUseModuleMembers1
+         , pUseModuleMembers2
+         ]
   where
     pUseModuleMembers1 :: Parser (MoveTerm UseModuleMembersL)
-    pUseModuleMembers1 = do
-      pure undefined
+    pUseModuleMembers1 =
+      iUseModuleMembers1
+        <$> pEither pHiddenModuleIdentifier pNumLiteral
+        <*> pPair (pMany pUseMember) pUseMember
     pUseModuleMembers2 :: Parser (MoveTerm UseModuleMembersL)
-    pUseModuleMembers2 = do
-      pure undefined
+    pUseModuleMembers2 =
+      iUseModuleMembers2
+        <$> pModuleIdentity
+        <*> pPair (pMany pUseMember) pUseMember
 
-pUnitExpression :: Parser (MoveTerm L)
+pUnitExpression :: Parser (MoveTerm UnitExpressionL)
 pUnitExpression = do
   _sym <- pSymbol SUnitExpressionSymbol
-  pure undefined
+  pure iUnitExpression
 
-pVectorExpression :: Parser (MoveTerm L)
+pVectorExpression :: Parser (MoveTerm VectorExpressionL)
 pVectorExpression = do
   _sym <- pSymbol SVectorExpressionSymbol
-  pure undefined
+  iVectorExpression
+    <$> pMaybe (pPair (pPair (pMany pHiddenType) pHiddenType) pGt)
+    <*> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
-pBorrowExpression :: Parser (MoveTerm L)
+pBorrowExpression :: Parser (MoveTerm BorrowExpressionL)
 pBorrowExpression = do
   _sym <- pSymbol SBorrowExpressionSymbol
-  pure undefined
+  iBorrowExpression
+    <$> pHiddenReference
+    <*> pHiddenExpression
 
-pDereferenceExpression :: Parser (MoveTerm L)
+pDereferenceExpression :: Parser (MoveTerm DereferenceExpressionL)
 pDereferenceExpression = do
   _sym <- pSymbol SDereferenceExpressionSymbol
-  pure undefined
+  iDereferenceExpression
+    <$> pMul
+    <*> pHiddenExpression
 
-pMoveOrCopyExpression :: Parser (MoveTerm L)
+pMoveOrCopyExpression :: Parser (MoveTerm MoveOrCopyExpressionL)
 pMoveOrCopyExpression = do
   _sym <- pSymbol SMoveOrCopyExpressionSymbol
-  pure undefined
+  iMoveOrCopyExpression
+    <$> pEither pCopy pMove
+    <*> pHiddenExpression
 
-pUnaryExpression :: Parser (MoveTerm L)
+pUnaryExpression :: Parser (MoveTerm UnaryExpressionL)
 pUnaryExpression = do
   _sym <- pSymbol SUnaryExpressionSymbol
-  pure undefined
+  iUnaryExpression
+    <$> pUnaryOp
+    <*> pHiddenExpression
 
-pUnaryOp :: Parser (MoveTerm L)
+pUnaryOp :: Parser (MoveTerm UnaryOpL)
 pUnaryOp = do
   _sym <- pSymbol SUnaryOpSymbol
-  pure undefined
+  iBangUnaryOp
+    <$> pBang
 
-pAbortExpression :: Parser (MoveTerm L)
+pAbortExpression :: Parser (MoveTerm AbortExpressionL)
 pAbortExpression = do
   _sym <- pSymbol SAbortExpressionSymbol
-  pure undefined
+  iAbortExpression
+    <$> pMaybe pHiddenExpression
 
-pAssignExpression :: Parser (MoveTerm L)
+pAssignExpression :: Parser (MoveTerm AssignExpressionL)
 pAssignExpression = do
   _sym <- pSymbol SAssignExpressionSymbol
-  pure undefined
+  iAssignExpression
+    <$> pHiddenUnaryExpression
+    <*> pAssign
+    <*> pHiddenExpression
 
-pBinaryExpression :: Parser (MoveTerm L)
+pBinaryExpression :: Parser (MoveTerm BinaryExpressionL)
 pBinaryExpression = do
   _sym <- pSymbol SBinaryExpressionSymbol
-  pure undefined
+  choice [ pBinaryExpression1
+         , pBinaryExpression2
+         , pBinaryExpression3
+         , pBinaryExpression4
+         , pBinaryExpression5
+         , pBinaryExpression6
+         , pBinaryExpression7
+         , pBinaryExpression8
+         , pBinaryExpression9
+         , pBinaryExpression10
+         , pBinaryExpression11
+         , pBinaryExpression12
+         , pBinaryExpression13
+         , pBinaryExpression14
+         , pBinaryExpression15
+         , pBinaryExpression16
+         , pBinaryExpression17
+         , pBinaryExpression18
+         , pBinaryExpression19
+         , pBinaryExpression20
+         ]
   where
     pBinaryExpression1 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression1 = do
-      pure undefined
+    pBinaryExpression1 =
+      iBinaryExpression1
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression2 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression2 = do
-      pure undefined
+    pBinaryExpression2 =
+      iBinaryExpression2
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression3 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression3 = do
-      pure undefined
+    pBinaryExpression3 =
+      iBinaryExpression3
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression4 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression4 = do
-      pure undefined
+    pBinaryExpression4 =
+      iBinaryExpression4
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression5 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression5 = do
-      pure undefined
+    pBinaryExpression5 =
+      iBinaryExpression5
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression6 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression6 = do
-      pure undefined
+    pBinaryExpression6 =
+      iBinaryExpression6
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression7 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression7 = do
-      pure undefined
+    pBinaryExpression7 =
+      iBinaryExpression7
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression8 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression8 = do
-      pure undefined
+    pBinaryExpression8 =
+      iBinaryExpression8
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression9 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression9 = do
-      pure undefined
+    pBinaryExpression9 =
+      iBinaryExpression9
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression10 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression10 = do
-      pure undefined
+    pBinaryExpression10 =
+      iBinaryExpression10
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression11 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression11 = do
-      pure undefined
+    pBinaryExpression11 =
+      iBinaryExpression11
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression12 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression12 = do
-      pure undefined
+    pBinaryExpression12 =
+      iBinaryExpression12
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression13 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression13 = do
-      pure undefined
+    pBinaryExpression13 =
+      iBinaryExpression13
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression14 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression14 = do
-      pure undefined
+    pBinaryExpression14 =
+      iBinaryExpression14
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression15 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression15 = do
-      pure undefined
+    pBinaryExpression15 =
+      iBinaryExpression15
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression16 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression16 = do
-      pure undefined
+    pBinaryExpression16 =
+      iBinaryExpression16
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression17 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression17 = do
-      pure undefined
+    pBinaryExpression17 =
+      iBinaryExpression17
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression18 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression18 = do
-      pure undefined
+    pBinaryExpression18 =
+      iBinaryExpression18
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression19 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression19 = do
-      pure undefined
+    pBinaryExpression19 =
+      iBinaryExpression19
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
     pBinaryExpression20 :: Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression20 = do
-      pure undefined
+    pBinaryExpression20 =
+      iBinaryExpression20
+        <$> pHiddenExpression
+        <*> pBinaryOperator
+        <*> pHiddenExpression
 
-pCastExpression :: Parser (MoveTerm L)
+pBinaryOperator :: Parser (MoveTerm BinaryOperatorL)
+pBinaryOperator = do
+  _sym <- pSymbol SBinaryOperatorSymbol
+  iBinaryOperator
+    <$> pImplies
+
+pCastExpression :: Parser (MoveTerm CastExpressionL)
 pCastExpression = do
   _sym <- pSymbol SCastExpressionSymbol
-  pure undefined
+  iCastExpression
+    <$> pHiddenExpression
+    <*> pHiddenType
 
-pIdentifiedExpression :: Parser (MoveTerm L)
+pIdentifiedExpression :: Parser (MoveTerm IdentifiedExpressionL)
 pIdentifiedExpression = do
   _sym <- pSymbol SIdentifiedExpressionSymbol
-  pure undefined
+  iIdentifiedExpression
+    <$> pBlockIdentifier
+    <*> pHiddenExpression
 
-pBlockIdentifier :: Parser (MoveTerm L)
+pBlockIdentifier :: Parser (MoveTerm BlockIdentifierL)
 pBlockIdentifier = do
   _sym <- pSymbol SBlockIdentifierSymbol
-  pure undefined
+  iBlockIdentifier
+    <$> pLabel
 
-pLambdaExpression :: Parser (MoveTerm L)
+pLambdaExpression :: Parser (MoveTerm LambdaExpressionL)
 pLambdaExpression = do
   _sym <- pSymbol SLambdaExpressionSymbol
-  pure undefined
+  iLambdaExpression
+    <$> pLambdaBindings
+    <*> pMaybe pHiddenType
+    <*> pHiddenExpression
 
-pLambdaBindings :: Parser (MoveTerm L)
+pLambdaBindings :: Parser (MoveTerm LambdaBindingsL)
 pLambdaBindings = do
   _sym <- pSymbol SLambdaBindingsSymbol
-  pure undefined
+  iLambdaBindings
+    <$> pBitor
+    <*> pPair (pMaybe pLambdaBinding) (pMany pLambdaBinding)
+    <*> pBitor
 
-pLambdaBinding :: Parser (MoveTerm L)
+pLambdaBinding :: Parser (MoveTerm LambdaBindingL)
 pLambdaBinding = do
   _sym <- pSymbol SLambdaBindingSymbol
-  pure undefined
+  choice [ pCommaBindListLambdaBinding
+         , pBindLambdaBinding
+         , pLambdaBinding3
+         ]
   where
     pCommaBindListLambdaBinding :: Parser (MoveTerm LambdaBindingL)
-    pCommaBindListLambdaBinding = do
-      pure undefined
+    pCommaBindListLambdaBinding =
+      iCommaBindListLambdaBinding
+        <$> pCommaBindList
     pBindLambdaBinding :: Parser (MoveTerm LambdaBindingL)
-    pBindLambdaBinding = do
-      pure undefined
+    pBindLambdaBinding =
+      iBindLambdaBinding
+        <$> pHiddenBind
     pLambdaBinding3 :: Parser (MoveTerm LambdaBindingL)
-    pLambdaBinding3 = do
-      pure undefined
+    pLambdaBinding3 =
+      iLambdaBinding3
+        <$> pHiddenBind
+        <*> pMaybe pHiddenType
 
-pLoopExpression :: Parser (MoveTerm L)
+pLoopExpression :: Parser (MoveTerm LoopExpressionL)
 pLoopExpression = do
   _sym <- pSymbol SLoopExpressionSymbol
-  pure undefined
+  iLoopExpression
+    <$> pHiddenExpression
 
-pQuantifierExpression :: Parser (MoveTerm L)
+pQuantifierExpression :: Parser (MoveTerm QuantifierExpressionL)
 pQuantifierExpression = do
   _sym <- pSymbol SQuantifierExpressionSymbol
-  pure undefined
+  iQuantifierExpression
+    <$> pEither pHiddenExists pHiddenForall
+    <*> pQuantifierBindings
+    <*> pMaybe pHiddenExpression
+    <*> pHiddenExpression
 
-pQuantifierBindings :: Parser (MoveTerm L)
+pHiddenExists :: Parser (MoveTerm HiddenExistsL)
+pHiddenExists = do
+  pure iHiddenExists
+
+pHiddenForall :: Parser (MoveTerm HiddenForallL)
+pHiddenForall = do
+  pure iHiddenForall
+
+pQuantifierBindings :: Parser (MoveTerm QuantifierBindingsL)
 pQuantifierBindings = do
   _sym <- pSymbol SQuantifierBindingsSymbol
-  pure undefined
+  iQuantifierBindings
+    <$> pQuantifierBinding
+    <*> pMany pQuantifierBinding
 
-pQuantifierBinding :: Parser (MoveTerm L)
+pQuantifierBinding :: Parser (MoveTerm QuantifierBindingL)
 pQuantifierBinding = do
   _sym <- pSymbol SQuantifierBindingSymbol
-  pure undefined
+  choice [ pQuantifierBinding1
+         , pQuantifierBinding2
+         ]
   where
     pQuantifierBinding1 :: Parser (MoveTerm QuantifierBindingL)
-    pQuantifierBinding1 = do
-      pure undefined
+    pQuantifierBinding1 =
+      iQuantifierBinding1
+        <$> pIdentifier
+        <*> pHiddenType
     pQuantifierBinding2 :: Parser (MoveTerm QuantifierBindingL)
-    pQuantifierBinding2 = do
-      pure undefined
+    pQuantifierBinding2 =
+      iQuantifierBinding2
+        <$> pIdentifier
+        <*> pHiddenExpression
 
-pReturnExpression :: Parser (MoveTerm L)
+pReturnExpression :: Parser (MoveTerm ReturnExpressionL)
 pReturnExpression = do
   _sym <- pSymbol SReturnExpressionSymbol
-  pure undefined
+  choice [ pReturnExpression1
+         , pReturnExpression2
+         ]
   where
     pReturnExpression1 :: Parser (MoveTerm ReturnExpressionL)
-    pReturnExpression1 = do
-      pure undefined
+    pReturnExpression1 =
+      iReturnExpression1
+        <$> pMaybe pLabel
+        <*> pHiddenExpression
     pReturnExpression2 :: Parser (MoveTerm ReturnExpressionL)
-    pReturnExpression2 = do
-      pure undefined
+    pReturnExpression2 =
+      iReturnExpression2
+        <$> pMaybe pLabel
 
-pWhileExpression :: Parser (MoveTerm L)
+pWhileExpression :: Parser (MoveTerm WhileExpressionL)
 pWhileExpression = do
   _sym <- pSymbol SWhileExpressionSymbol
-  pure undefined
+  iWhileExpression
+    <$> pHiddenExpression
+    <*> pHiddenExpression
 
-pBlockItem :: Parser (MoveTerm L)
+pBlockItem :: Parser (MoveTerm BlockItemL)
 pBlockItem = do
   _sym <- pSymbol SBlockItemSymbol
-  pure undefined
+  iBlockItem
+    <$> pEither pLetStatement pHiddenExpression
 
-pLetStatement :: Parser (MoveTerm L)
+pLetStatement :: Parser (MoveTerm LetStatementL)
 pLetStatement = do
   _sym <- pSymbol SLetStatementSymbol
-  pure undefined
+  iLetStatement
+    <$> pBindList
+    <*> pMaybe pHiddenType
+    <*> pMaybe (pPair pHiddenExpression pAssign)
 
-pMacroFunctionDefinition :: Parser (MoveTerm L)
+pMacroFunctionDefinition :: Parser (MoveTerm MacroFunctionDefinitionL)
 pMacroFunctionDefinition = do
   _sym <- pSymbol SMacroFunctionDefinitionSymbol
-  pure undefined
+  iMacroFunctionDefinition
+    <$> pMaybe pModifier
+    <*> pHiddenMacroSignature
+    <*> pBlock
 
-pHiddenMacroSignature :: Parser (MoveTerm L)
+pHiddenMacroSignature :: Parser (MoveTerm HiddenMacroSignatureL)
 pHiddenMacroSignature = do
-  _sym <- pSymbol SHiddenMacroSignatureSymbol
-  pure undefined
+  iHiddenMacroSignature
+    <$> pMaybe pModifier
+    <*> pHiddenFunctionIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pFunctionParameters
+    <*> pMaybe pRetType
 
-pNativeFunctionDefinition :: Parser (MoveTerm L)
+pNativeFunctionDefinition :: Parser (MoveTerm NativeFunctionDefinitionL)
 pNativeFunctionDefinition = do
   _sym <- pSymbol SNativeFunctionDefinitionSymbol
-  pure undefined
+  iNativeFunctionDefinition
+    <$> pHiddenFunctionSignature
 
-pHiddenStructItem :: Parser (MoveTerm L)
+pHiddenStructItem :: Parser (MoveTerm HiddenStructItemL)
 pHiddenStructItem = do
-  _sym <- pSymbol SHiddenStructItemSymbol
-  pure undefined
+  choice [ pNativeStructDefinitionStructItem
+         , pStructDefinitionStructItem
+         ]
   where
     pNativeStructDefinitionStructItem :: Parser (MoveTerm HiddenStructItemL)
-    pNativeStructDefinitionStructItem = do
-      pure undefined
+    pNativeStructDefinitionStructItem =
+      iNativeStructDefinitionStructItem
+        <$> pNativeStructDefinition
     pStructDefinitionStructItem :: Parser (MoveTerm HiddenStructItemL)
-    pStructDefinitionStructItem = do
-      pure undefined
+    pStructDefinitionStructItem =
+      iStructDefinitionStructItem
+        <$> pStructDefinition
 
-pNativeStructDefinition :: Parser (MoveTerm L)
+pNativeStructDefinition :: Parser (MoveTerm NativeStructDefinitionL)
 pNativeStructDefinition = do
   _sym <- pSymbol SNativeStructDefinitionSymbol
-  pure undefined
+  iNativeStructDefinition
+    <$> pMaybe pPublic
+    <*> pHiddenStructSignature
 
-pHiddenStructSignature :: Parser (MoveTerm L)
+pHiddenStructSignature :: Parser (MoveTerm HiddenStructSignatureL)
 pHiddenStructSignature = do
-  _sym <- pSymbol SHiddenStructSignatureSymbol
-  pure undefined
+  iHiddenStructSignature
+    <$> pHiddenStructIdentifier
+    <*> pMaybe pTypeParameters
+    <*> pMaybe pAbilityDecls
 
-pStructDefinition :: Parser (MoveTerm L)
+pStructDefinition :: Parser (MoveTerm StructDefinitionL)
 pStructDefinition = do
   _sym <- pSymbol SStructDefinitionSymbol
-  pure undefined
+  iStructDefinition
+    <$> pMaybe pPublic
+    <*> pHiddenStructSignature
+    <*> pDatatypeFields
+    <*> pMaybe pPostfixAbilityDecls
 
-pConstant :: Parser (MoveTerm L)
+pConstant :: Parser (MoveTerm ConstantL)
 pConstant = do
   _sym <- pSymbol SConstantSymbol
-  pure undefined
+  iConstant
+    <$> pConstantIdentifier
+    <*> pHiddenType
+    <*> pAssign
+    <*> pHiddenExpression
 
-pFriendDeclaration :: Parser (MoveTerm L)
+pConstantIdentifier :: Parser (MoveTerm ConstantIdentifierL)
+pConstantIdentifier = do
+  _sym <- pSymbol SConstantIdentifierSymbol
+  pure iConstantIdentifier
+
+pFriendDeclaration :: Parser (MoveTerm FriendDeclarationL)
 pFriendDeclaration = do
   _sym <- pSymbol SFriendDeclarationSymbol
-  pure undefined
+  iFriendDeclaration
+    <$> pFriend
+    <*> pFriendAccess
 
-pFriendAccess :: Parser (MoveTerm L)
+pFriendAccess :: Parser (MoveTerm FriendAccessL)
 pFriendAccess = do
   _sym <- pSymbol SFriendAccessSymbol
-  pure undefined
+  choice [ pLocalModuleFriendAccess
+         , pFullyQualifiedModuleFriendAccess
+         ]
   where
     pLocalModuleFriendAccess :: Parser (MoveTerm FriendAccessL)
-    pLocalModuleFriendAccess = do
-      pure undefined
+    pLocalModuleFriendAccess =
+      iLocalModuleFriendAccess
+        <$> pIdentifier
     pFullyQualifiedModuleFriendAccess :: Parser (MoveTerm FriendAccessL)
-    pFullyQualifiedModuleFriendAccess = do
-      pure undefined
+    pFullyQualifiedModuleFriendAccess =
+      iFullyQualifiedModuleFriendAccess
+        <$> pModuleIdentity

@@ -130,7 +130,7 @@ module Language.SuiMove.Syntax (
     FieldInitializeList,
     ExpField,
     SpecBlock,
-    SpecBlockIdentifier,
+    Identifier,
     SpecBlockTargetSchema,
     HiddenStructIdentifier,
     HiddenSpecFunction,
@@ -1503,7 +1503,7 @@ type data Symbol (symbolType :: SymbolType) where
   FieldInitializeListSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExpFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  SpecBlockIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  IdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockTargetSchemaSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HiddenStructIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HiddenSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -1666,7 +1666,7 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SFieldInitializeListSymbol :: SymbolSing Regular FieldInitializeListSymbol
   SExpFieldSymbol :: SymbolSing Regular ExpFieldSymbol
   SSpecBlockSymbol :: SymbolSing Regular SpecBlockSymbol
-  SSpecBlockIdentifierSymbol :: SymbolSing Regular SpecBlockIdentifierSymbol
+  SIdentifierSymbol :: SymbolSing Regular IdentifierSymbol
   SSpecBlockTargetSchemaSymbol :: SymbolSing Regular SpecBlockTargetSchemaSymbol
   SHiddenStructIdentifierSymbol :: SymbolSing Regular HiddenStructIdentifierSymbol
   SHiddenSpecFunctionSymbol :: SymbolSing Regular HiddenSpecFunctionSymbol
@@ -1833,7 +1833,7 @@ decSymbolSing SPackExpressionSymbol SPackExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SFieldInitializeListSymbol SFieldInitializeListSymbol = Just (Refl, HRefl)
 decSymbolSing SExpFieldSymbol SExpFieldSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockSymbol SSpecBlockSymbol = Just (Refl, HRefl)
-decSymbolSing SSpecBlockIdentifierSymbol SSpecBlockIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SIdentifierSymbol SIdentifierSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockTargetSchemaSymbol SSpecBlockTargetSchemaSymbol = Just (Refl, HRefl)
 decSymbolSing SHiddenStructIdentifierSymbol SHiddenStructIdentifierSymbol = Just (Refl, HRefl)
 decSymbolSing SHiddenSpecFunctionSymbol SHiddenSpecFunctionSymbol = Just (Refl, HRefl)
@@ -2019,7 +2019,7 @@ symbolToSymbolType = \case
   SFieldInitializeListSymbol -> SRegular
   SExpFieldSymbol -> SRegular
   SSpecBlockSymbol -> SRegular
-  SSpecBlockIdentifierSymbol -> SRegular
+  SIdentifierSymbol -> SRegular
   SSpecBlockTargetSchemaSymbol -> SRegular
   SHiddenStructIdentifierSymbol -> SRegular
   SHiddenSpecFunctionSymbol -> SRegular
@@ -2186,7 +2186,7 @@ type family SymbolToLabel (symbol :: Symbol Regular) :: Label where
   SymbolToLabel FieldInitializeListSymbol = FieldInitializeListL
   SymbolToLabel ExpFieldSymbol = ExpFieldL
   SymbolToLabel SpecBlockSymbol = SpecBlockL
-  SymbolToLabel SpecBlockIdentifierSymbol = HiddenSpecBlockTargetL
+  SymbolToLabel IdentifierSymbol = HiddenSpecBlockTargetL
   SymbolToLabel SpecBlockTargetSchemaSymbol = HiddenSpecBlockTargetL
   SymbolToLabel HiddenStructIdentifierSymbol = HiddenStructIdentifierL
   SymbolToLabel HiddenSpecFunctionSymbol = HiddenSpecFunctionL
@@ -2347,7 +2347,7 @@ symbolToLabel = \case
   SFieldInitializeListSymbol -> SFieldInitializeListL
   SExpFieldSymbol -> SExpFieldL
   SSpecBlockSymbol -> SSpecBlockL
-  SSpecBlockIdentifierSymbol -> SHiddenSpecBlockTargetL
+  SIdentifierSymbol -> SHiddenSpecBlockTargetL
   SSpecBlockTargetSchemaSymbol -> SHiddenSpecBlockTargetL
   SHiddenStructIdentifierSymbol -> SHiddenStructIdentifierL
   SHiddenSpecFunctionSymbol -> SHiddenSpecFunctionL
@@ -2938,11 +2938,10 @@ data NodeContent (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
     {-# UNPACK #-} !Range ->
     !(Children '[Either (Node HiddenSpecFunctionL) (Node SpecBodyL, Maybe (Node HiddenSpecBlockTargetL))]) ->
     NodeContent Regular SpecBlockSymbol
-  SpecBlockIdentifierContent ::
+  IdentifierContent ::
     {-# UNPACK #-} !NodeId ->
     {-# UNPACK #-} !Range ->
-    !(Children '[Node IdentifierL]) ->
-    NodeContent Regular SpecBlockIdentifierSymbol
+    NodeContent Regular IdentifierSymbol
   SpecBlockTargetSchemaContent ::
     {-# UNPACK #-} !NodeId ->
     {-# UNPACK #-} !Range ->
@@ -3374,7 +3373,7 @@ nodeContentToSymbol = \case
   FieldInitializeListContent{} -> SFieldInitializeListSymbol
   ExpFieldContent{} -> SExpFieldSymbol
   SpecBlockContent{} -> SSpecBlockSymbol
-  SpecBlockIdentifierContent{} -> SSpecBlockIdentifierSymbol
+  IdentifierContent{} -> SIdentifierSymbol
   SpecBlockTargetSchemaContent{} -> SSpecBlockTargetSchemaSymbol
   HiddenStructIdentifierContent{} -> SHiddenStructIdentifierSymbol
   HiddenSpecFunctionContent{} -> SHiddenSpecFunctionSymbol
@@ -3542,7 +3541,7 @@ nodeContentToNodeId RegularIsReal = \case
   FieldInitializeListContent nodeId _range _children -> nodeId
   ExpFieldContent nodeId _range _children -> nodeId
   SpecBlockContent nodeId _range _children -> nodeId
-  SpecBlockIdentifierContent nodeId _range _children -> nodeId
+  IdentifierContent nodeId _range -> nodeId
   SpecBlockTargetSchemaContent nodeId _range _children -> nodeId
   HiddenStructIdentifierContent nodeId _range _children -> nodeId
   HiddenSpecFunctionContent nodeId _range _children -> nodeId
@@ -3710,7 +3709,7 @@ nodeContentToRange RegularIsReal = \case
   FieldInitializeListContent _nodeId range _children -> range
   ExpFieldContent _nodeId range _children -> range
   SpecBlockContent _nodeId range _children -> range
-  SpecBlockIdentifierContent _nodeId range _children -> range
+  IdentifierContent _nodeId range -> range
   SpecBlockTargetSchemaContent _nodeId range _children -> range
   HiddenStructIdentifierContent _nodeId range _children -> range
   HiddenSpecFunctionContent _nodeId range _children -> range
@@ -3996,7 +3995,7 @@ instance HasNodes (NodeContent symbolType symbol) where
     FieldInitializeListContent _nodeId _range _children -> getNodesDList _children
     ExpFieldContent _nodeId _range _children -> getNodesDList _children
     SpecBlockContent _nodeId _range _children -> getNodesDList _children
-    SpecBlockIdentifierContent _nodeId _range _children -> getNodesDList _children
+    IdentifierContent _nodeId _range -> mempty
     SpecBlockTargetSchemaContent _nodeId _range _children -> getNodesDList _children
     HiddenStructIdentifierContent _nodeId _range _children -> getNodesDList _children
     HiddenSpecFunctionContent _nodeId _range _children -> getNodesDList _children
@@ -4441,9 +4440,9 @@ pattern SpecBlock :: () => (sort ~ SpecBlockL) => NodeId -> Range -> Either (Nod
 pattern SpecBlock nodeId range nodeChild0 =
   Node (RegularWellSorted Refl) (SpecBlockContent nodeId range (Children (Cons nodeChild0 Nil)))
 
-pattern SpecBlockIdentifier :: () => (sort ~ HiddenSpecBlockTargetL) => NodeId -> Range -> Node IdentifierL -> Node sort
-pattern SpecBlockIdentifier nodeId range nodeChild0 =
-  Node (RegularWellSorted Refl) (SpecBlockIdentifierContent nodeId range (Children (Cons nodeChild0 Nil)))
+pattern Identifier :: () => (sort ~ HiddenSpecBlockTargetL) => NodeId -> Range -> Node sort
+pattern Identifier nodeId range =
+  Node (RegularWellSorted Refl) (IdentifierContent nodeId range)
 
 pattern SpecBlockTargetSchema :: () => (sort ~ HiddenSpecBlockTargetL) => NodeId -> Range -> Node HiddenStructIdentifierL -> Maybe (Node TypeParametersL) -> Node sort
 pattern SpecBlockTargetSchema nodeId range nodeChild0 nodeChild1 =
@@ -4807,7 +4806,7 @@ pattern SortMismatch nodeChild0 =
   , FieldInitializeList
   , ExpField
   , SpecBlock
-  , SpecBlockIdentifier
+  , Identifier
   , SpecBlockTargetSchema
   , HiddenStructIdentifier
   , HiddenSpecFunction
@@ -5071,8 +5070,8 @@ instance Show (Node sort) where
         showString "ExpField " . showsPrec 11 nodeId . showChar ' ' . showsPrec 11 range  . showChar ' ' . showsPrec 11 nodeChild0 . showChar ' ' . showsPrec 11 nodeChild1
       SpecBlock nodeId range nodeChild0 ->
         showString "SpecBlock " . showsPrec 11 nodeId . showChar ' ' . showsPrec 11 range  . showChar ' ' . showsPrec 11 nodeChild0
-      SpecBlockIdentifier nodeId range nodeChild0 ->
-        showString "SpecBlockIdentifier " . showsPrec 11 nodeId . showChar ' ' . showsPrec 11 range  . showChar ' ' . showsPrec 11 nodeChild0
+      Identifier nodeId range ->
+        showString "Identifier " . showsPrec 11 nodeId . showChar ' ' . showsPrec 11 range 
       SpecBlockTargetSchema nodeId range nodeChild0 nodeChild1 ->
         showString "SpecBlockTargetSchema " . showsPrec 11 nodeId . showChar ' ' . showsPrec 11 range  . showChar ' ' . showsPrec 11 nodeChild0 . showChar ' ' . showsPrec 11 nodeChild1
       HiddenStructIdentifier nodeId range nodeChild0 ->
@@ -5310,7 +5309,7 @@ mkSymbolTable language =
     , mkEntry "field_initialize_list" (SomeRegularSymbolSing SFieldInitializeListSymbol)
     , mkEntry "exp_field" (SomeRegularSymbolSing SExpFieldSymbol)
     , mkEntry "spec_block" (SomeRegularSymbolSing SSpecBlockSymbol)
-    , mkEntry "spec_block_identifier" (SomeRegularSymbolSing SSpecBlockIdentifierSymbol)
+    , mkEntry "identifier" (SomeRegularSymbolSing SIdentifierSymbol)
     , mkEntry "spec_block_target_schema" (SomeRegularSymbolSing SSpecBlockTargetSchemaSymbol)
     , mkEntry "hidden_struct_identifier" (SomeRegularSymbolSing SHiddenStructIdentifierSymbol)
     , mkEntry "hidden_spec_function" (SomeRegularSymbolSing SHiddenSpecFunctionSymbol)
@@ -5661,7 +5660,7 @@ pNodeContent = \case
   SFieldInitializeListSymbol -> FieldInitializeListContent <$> p <*> p <*> p
   SExpFieldSymbol -> ExpFieldContent <$> p <*> p <*> p
   SSpecBlockSymbol -> SpecBlockContent <$> p <*> p <*> p
-  SSpecBlockIdentifierSymbol -> SpecBlockIdentifierContent <$> p <*> p <*> p
+  SIdentifierSymbol -> IdentifierContent <$> p <*> p
   SSpecBlockTargetSchemaSymbol -> SpecBlockTargetSchemaContent <$> p <*> p <*> p
   SHiddenStructIdentifierSymbol -> HiddenStructIdentifierContent <$> p <*> p <*> p
   SHiddenSpecFunctionSymbol -> HiddenSpecFunctionContent <$> p <*> p <*> p
@@ -5845,7 +5844,7 @@ instance Pretty (SymbolSing symbolType symbol) where
     SFieldInitializeListSymbol -> "field_initialize_list"
     SExpFieldSymbol -> "exp_field"
     SSpecBlockSymbol -> "spec_block"
-    SSpecBlockIdentifierSymbol -> "spec_block_identifier"
+    SIdentifierSymbol -> "identifier"
     SSpecBlockTargetSchemaSymbol -> "spec_block_target_schema"
     SHiddenStructIdentifierSymbol -> "hidden_struct_identifier"
     SHiddenSpecFunctionSymbol -> "hidden_spec_function"
