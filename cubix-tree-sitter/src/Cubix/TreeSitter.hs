@@ -64,7 +64,7 @@ nodes = go
 {-# INLINE nodes #-}
 
 significantNodes :: TS.Node -> Stream (Of TS.Node) IO ()
-significantNodes = Streaming.filterM (fmap not . TS.nodeIsError) . nodes
+significantNodes = Streaming.filterM (fmap not . TS.nodeIsExtra) . nodes
 {-# INLINE significantNodes #-}
 
 symbols :: TS.Node -> Stream (Of String) IO ()
