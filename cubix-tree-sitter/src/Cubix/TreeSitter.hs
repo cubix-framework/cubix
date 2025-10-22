@@ -1,8 +1,13 @@
+{-# LANGUAGE RecordWildCards #-}
 module Cubix.TreeSitter where
 
-import Control.Monad (unless)
+import Control.Monad (unless, guard, when)
 import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Trans.Reader (ReaderT, ask, asks)
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
+import Data.IORef (IORef, newIORef, readIORef)
 import Foreign.C.ConstPtr.Compat (ConstPtr (..))
 import Streaming (Stream, Of (..), effect, wrap)
 import Streaming.Prelude qualified as Streaming
@@ -14,6 +19,9 @@ import Cubix.Language.Info
   , SourceRange (..)
   , mkSourceSpan
   )
+import Prelude hiding (span)
+
+import Debug.Trace
 
 data Token a = MkToken
   { tokenValue :: !a
@@ -58,17 +66,24 @@ nodes = go
     children n = effect $ do
       childNo <- TS.nodeChildCount n
       let childNums = if childNo == 0 then [] else [0..childNo - 1]
-          childs = Streaming.mapM (TS.nodeChild n)
+          childs = Streaming.mapMaybeM (\num -> do
+            child <- TS.nodeChild n num
+            isNull <- TS.nodeIsNull child
+            if isNull
+              then do
+                putStrLn $ "null child: " <> show num <> " of: " <> show childNo
+                pure Nothing
+              else pure $ Just child)
             $ Streaming.each childNums
       pure $ Streaming.for childs go
-{-# INLINE nodes #-}
+
 
 significantNodes :: TS.Node -> Stream (Of TS.Node) IO ()
 significantNodes = Streaming.filterM (fmap not . TS.nodeIsExtra) . nodes
 {-# INLINE significantNodes #-}
 
-symbols :: TS.Node -> Stream (Of String) IO ()
-symbols = Streaming.mapM TS.nodeGrammarTypeAsString . significantNodes
+-- symbols :: TS.Node -> Stream (Of String) IO ()
+-- symbols = Streaming.mapM TS.nodeGrammarTypeAsString . significantNodes
 
 type TokenStream a m r = Stream (Of (Token a)) m r
 
@@ -85,6 +100,31 @@ annotatedSymbols path node = flip Streaming.mapM (annotated path node) $ \tok ->
   name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
   pure tok{ tokenValue = name }
 
+symbols :: FilePath -> TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
+symbols path = go
+  where
+    go :: TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
+    go root = effect $ do
+      extra <- liftIO $ TS.nodeIsExtra root
+      when extra $ pure ()
+      range  <- liftIO $ nodeRange root
+      span   <- liftIO $ nodeSpan path root
+      symbol <- liftIO $ TS.nodeSymbol root
+      let tok = MkToken symbol span range
+      childNo <- liftIO $ TS.nodeChildCount root
+      let childNums = if childNo == 0 then [] else [0..childNo - 1]
+          childs = Streaming.mapM (liftIO . TS.nodeChild root)
+            $ Streaming.each childNums
+      pure $ wrap (tok :> Streaming.for childs go)
+
+    -- children :: TS.Node -> TokenStream TS.Symbol IO ()
+    -- children n = effect $ do
+    --   childNo <- TS.nodeChildCount n
+    --   let childNums = if childNo == 0 then [] else [0..childNo - 1]
+    --       childs = Streaming.mapM (TS.nodeChild n)
+    --         $ Streaming.each childNums
+    --   pure $ Streaming.for childs go
+
 withLanguage :: (MonadMask m, MonadIO m) => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
 withLanguage getLang = bracket
   (liftIO $ TS.unsafeToLanguage =<< getLang)
@@ -99,3 +139,41 @@ withParser lang = bracket
       error "failed to set parser language"
     pure parser)
   (liftIO . TS.unsafeParserDelete)  
+
+newParser :: IO (ConstPtr lang) -> IO TS.Parser
+newParser getLang = do
+  parser  <- liftIO TS.parserNew
+  language <- TS.unsafeToLanguage =<< getLang
+  success <- liftIO $ TS.parserSetLanguage parser language
+  unless success $
+    error "failed to set parser language"
+  pure parser
+
+data TreeSitterEnv sym = TreeSitterEnv
+  { tsParser :: IORef TS.Parser
+  , tsLanguage :: IORef TS.Language
+  , tsSymbolTable :: !(IntMap sym)
+  }
+
+newTreeSitterEnv
+  :: IO (ConstPtr lang)
+  -> (TS.Language -> IO (IntMap sym))
+  -> IO (TreeSitterEnv sym)
+newTreeSitterEnv getLang mkSymbolTable = do
+  parser <- newParser getLang
+  tsParser <- newIORef parser
+  language <- TS.parserLanguage parser
+  tsLanguage <- newIORef language
+  tsSymbolTable <- mkSymbolTable language
+  pure $ TreeSitterEnv {..}
+
+getParser :: ReaderT (TreeSitterEnv sym) IO TS.Parser
+getParser = liftIO . readIORef . tsParser =<< ask
+{-# INLINEABLE getParser #-}
+
+getSymbolTable :: ReaderT (TreeSitterEnv sym) IO (IntMap sym)
+getSymbolTable = asks tsSymbolTable
+{-# INLINEABLE getSymbolTable #-}
+
+getSymbol :: Integral a => a -> ReaderT (TreeSitterEnv sym) IO (Maybe sym)
+getSymbol symbol = IM.lookup (fromIntegral symbol) <$> getSymbolTable

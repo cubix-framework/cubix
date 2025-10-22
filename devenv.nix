@@ -3,8 +3,10 @@
 {
   packages = with pkgs; [
     fourmolu
+    gdb
     ghcid
     tree-sitter
+    valgrind
   ];
 
   # This sets gcc version brought into env by languages.c option
@@ -23,7 +25,10 @@
     c.enable = true;
     java.enable = true;
     # tree-sitter needs node in path
-    javascript.enable = true;
+    javascript = {
+      enable = true;
+      npm.enable = true;
+    };
     lua = {
       enable = true;
       package = pkgs.lua53Packages.lua;

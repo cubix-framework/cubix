@@ -1,7 +1,9 @@
 module Cubix.Language.SuiMove.ParsePretty where
 
 import Control.Applicative.Combinators
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString qualified as BS
 import Data.IntMap.Strict qualified as IM
 import Data.Functor (($>))
@@ -19,39 +21,96 @@ import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
-getSymbol :: SymbolTable -> TS.Node -> IO (Maybe SomeSymbolSing)
-getSymbol map node = do
-  symbol <- TS.nodeSymbol node
-  pure $ IM.lookup (fromIntegral symbol) (unSymbolTable map)
+import Text.Pretty.Simple
+import System.Mem
+import Data.IORef (IORef, newIORef, readIORef)
 
-parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
-parse path = do
-  input <- BS.readFile path
+-- getSymbol :: SymbolTable -> TS.Node -> IO (Maybe SomeSymbolSing)
+-- getSymbol map node = do
+--   isNull <- TS.nodeIsNull node
+--   if isNull
+--     then do
+--       putStrLn "null node getSymbol"
+--       pure Nothing
+--     else do
+--       -- putStrLn "getting node for: "
+--       -- s <- TS.nodeGrammarTypeAsString node
+--       -- print (show s)
+--       symbol <- TS.nodeSymbol node
+--       -- print "check"
+--       pure $ IM.lookup (fromIntegral symbol) (unSymbolTable map)
 
-  withLanguage tree_sitter_sui_move $ \lang -> do
-    symbolTable <- liftIO (mkSymbolTable lang)
+getSymbol' :: IM.IntMap SomeSymbolSing -> TS.Symbol -> Maybe SomeSymbolSing
+getSymbol' map symbol = IM.lookup (fromIntegral symbol) map
+{-# INLINABLE getSymbol' #-}
 
-    withParser lang $ \parser -> do
-      maybeTree <- TS.parserParseByteString parser Nothing input
-      tree <- maybe (error "failed to parse the program") pure maybeTree
-      rootNode <- TS.treeRootNode tree
+getSymbol'' :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe SomeSymbolSing)
+getSymbol'' node =
+  getSymbol =<< (liftIO $ TS.nodeSymbol node)
+{-# INLINABLE getSymbol'' #-}
+  
+parse' :: FilePath -> ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse' path = do
+  input <- liftIO $ BS.readFile path
+  parser <- getParser
+  maybeTree <- liftIO $ TS.parserParseByteString parser Nothing input
+  tree <- maybe (error "failed to parse the program") pure maybeTree
+  treeVar <- liftIO $ newIORef tree
+  rootNode <- liftIO $ TS.treeRootNode tree
 
-      toks <- Streaming.toList_
-        $ Streaming.mapMaybeM
-            (\tok ->
-              fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol symbolTable (tokenValue tok))
+  toks <- Streaming.toList_
+    -- $ Streaming.mapMaybeM
+    --     (\tok ->
+    --       fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol' (tokenValue tok))
               -- pure $ case msym of
               --   Just sym -> Just $ ann { tokenValue = sym }
               --   Nothing -> Nothing)
-                                 
-        $ annotated path rootNode
+    -- $ Streaming.mapMaybe (\sym -> (\sing -> sym { tokenValue = sing }) <$> getSymbol'' (tokenValue sym))
+    $ Streaming.mapMaybeM
+        (\tok ->
+           fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
+    -- (\sym -> do
+    --                           symtable <- getSymbolTable
+    --                           let sing = (\s -> sym { tokenValue = s}) <$> getSymbol' symtable (tokenValue sym)
+    --                           pure sing
+    --                       )
+    $ symbols path rootNode
 
-      let lexed = Megaparsec.TreeSitter.Lexed input toks
-      case Megaparsec.parse pRoot path lexed of
-        Right ast -> pure $ Just ast
-        Left err -> do
-          putStrLn $ Megaparsec.errorBundlePretty err
-          pure Nothing
+  pPrintLightBg toks
+  let lexed = Megaparsec.TreeSitter.Lexed input toks
+  case Megaparsec.parse pRoot path lexed of
+    Right ast -> pure $ Just ast
+    Left err -> do
+      liftIO . putStrLn $ Megaparsec.errorBundlePretty err
+      pure Nothing
+    
+parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse path = do
+
+  tsEnv <- newTreeSitterEnv tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
+
+  runReaderT (parse' path) tsEnv
+  -- maybeTree <- TS.parserParseByteString parser Nothing input
+  -- tree <- maybe (error "failed to parse the program") pure maybeTree
+  -- rootNode <- TS.treeRootNode tree
+
+  -- -- performGC
+  -- toks <- Streaming.toList_
+  --   $ Streaming.mapMaybeM
+  --       (\tok ->
+  --         fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol symbolTable (tokenValue tok))
+  --             -- pure $ case msym of
+  --             --   Just sym -> Just $ ann { tokenValue = sym }
+  --             --   Nothing -> Nothing)
+  --   -- $ Streaming.mapMaybe (\sym -> (\sing -> sym { tokenValue = sing }) <$> getSymbol' symbolTable (tokenValue sym))
+  --   $ annotated path rootNode
+
+  -- let lexed = Megaparsec.TreeSitter.Lexed input toks
+  -- case Megaparsec.parse pRoot path lexed of
+  --   Right ast -> pure $ Just ast
+  --   Left err -> do
+  --     putStrLn $ Megaparsec.errorBundlePretty err
+  --     pure Nothing
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 

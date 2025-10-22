@@ -3,7 +3,8 @@ module Main where
 
 import Options.Applicative (Parser, ParserInfo, execParser, fullDesc, help, helper, info, metavar, progDesc, strArgument, (<**>))
 import Text.Pretty.Simple
--- import GHC.Debug.Stub (pause, withGhcDebug)
+import GHC.Debug.Stub (pause, withGhcDebug)
+import Control.Concurrent
 
 import Cubix.Language.SuiMove.ParsePretty qualified as SuiMove
 
@@ -29,7 +30,7 @@ main = -- withGhcDebug $
   do
     Options{..} <- execParser optionsInfo
     -- so that I have time to connect via ghc-debug-brick
-    _ <- getLine
+    -- threadDelay 5000000
     mast <-
       SuiMove.parse inputFile
     case mast of
