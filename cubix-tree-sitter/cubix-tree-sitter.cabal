@@ -55,8 +55,6 @@ common ghc-options
 common rts-options
   ghc-options:
     -rtsopts
-    -threaded
-    -with-rtsopts=-N
 
 common dependencies
   build-depends:
@@ -90,6 +88,8 @@ library
   import: ghc-options
   import: dependencies
   hs-source-dirs: src
+  ghc-options:
+    -O0
   exposed-modules:
     Cubix.TreeSitter
     Text.Megaparsec.TreeSitter

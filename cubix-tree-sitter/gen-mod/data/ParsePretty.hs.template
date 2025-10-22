@@ -4,8 +4,7 @@ module ${moduleName} where
 
 import Control.Applicative.Combinators
 import Control.Monad.IO.Class (MonadIO (..))
-import Data.ByteString qualified as BS
-import Data.IntMap.Strict qualified as IM
+import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Functor (($>))
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
@@ -21,39 +20,31 @@ import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
-getSymbol :: SymbolTable -> TS.Node -> IO (Maybe SomeSymbolSing)
-getSymbol map node = do
-  symbol <- TS.nodeSymbol node
-  pure $ IM.lookup (fromIntegral symbol) (unSymbolTable map)
+import Text.Pretty.Simple
+
+parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse' = do
+  filepath <- getFilePath
+  rootNode <- liftIO . TS.treeRootNode =<< getTree
+  toks <- Streaming.toList_
+    $ Streaming.mapMaybeM
+        (\tok ->
+           fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
+    $ symbols filepath rootNode
+
+  pPrintLightBg (tokenValue <$> toks)
+  source <- getSource
+  let lexed = Megaparsec.TreeSitter.Lexed source toks
+  case Megaparsec.parse pRoot filepath lexed of
+    Right ast -> pure $ Just ast
+    Left err -> do
+      liftIO . putStrLn $ Megaparsec.errorBundlePretty err
+      pure Nothing
 
 parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
-parse path = do
-  input <- BS.readFile path
-
-  withLanguage tree_sitter_sui_move $ \lang -> do
-    symbolTable <- liftIO (mkSymbolTable lang)
-
-    withParser lang $ \parser -> do
-      maybeTree <- TS.parserParseByteString parser Nothing input
-      tree <- maybe (error "failed to parse the program") pure maybeTree
-      rootNode <- TS.treeRootNode tree
-
-      toks <- Streaming.toList_
-        $ Streaming.mapMaybeM
-            (\tok ->
-              fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol symbolTable (tokenValue tok))
-              -- pure $ case msym of
-              --   Just sym -> Just $ ann { tokenValue = sym }
-              --   Nothing -> Nothing)
-                                 
-        $ annotated path rootNode
-
-      let lexed = Megaparsec.TreeSitter.Lexed input toks
-      case Megaparsec.parse pRoot path lexed of
-        Right ast -> pure $ Just ast
-        Left err -> do
-          putStrLn $ Megaparsec.errorBundlePretty err
-          pure Nothing
+parse path =
+  runReaderT parse' =<<
+    newTreeSitterEnv path tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 

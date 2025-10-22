@@ -68,10 +68,11 @@ executable parse
   hs-source-dirs: app
   main-is: Main.hs
   ghc-options:
-    -rtsopts -freduction-depth=400
+    -O0
   build-depends:
     , cubix-sui-move
     , optparse-applicative ^>= 0.18
+    , ghc-debug-stub
 
 library
   import: language

@@ -3,7 +3,7 @@ module Main where
 
 import Options.Applicative (Parser, ParserInfo, execParser, fullDesc, help, helper, info, metavar, progDesc, strArgument, (<**>))
 import Text.Pretty.Simple
--- import GHC.Debug.Stub (pause, withGhcDebug)
+-- import GHC.Debug.Stub (withGhcDebug)
 
 import Cubix.Language.SuiMove.ParsePretty qualified as SuiMove
 
@@ -25,11 +25,10 @@ optionsInfo =
     (fullDesc <> progDesc "Sui Move helper.")
 
 main :: IO ()
+-- Jakub 2025.10.23: uncomment for ghc-debug use
 main = -- withGhcDebug $
   do
     Options{..} <- execParser optionsInfo
-    -- so that I have time to connect via ghc-debug-brick
-    _ <- getLine
     mast <-
       SuiMove.parse inputFile
     case mast of
