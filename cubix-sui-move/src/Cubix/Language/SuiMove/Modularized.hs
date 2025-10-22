@@ -3302,7 +3302,7 @@ pattern SomeAuxiliarySymbolSing symbolSing = SomeSymbolSing AuxiliaryIsReal symb
 -- Symbol Table
 --------------------------------------------------------------------------------
 
-newtype SymbolTable = SymbolTable {unSymbolTable :: IntMap SomeSymbolSing}
+newtype SymbolTable = SymbolTable {unSymbolTable :: IntMap SomeSymbolSing} deriving Show
 
 symbolMap :: Map String SomeSymbolSing
 symbolMap = Map.fromList
