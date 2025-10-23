@@ -21,8 +21,6 @@ import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
-import Text.Pretty.Simple
-
 parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
 parse' = do
   filepath <- getFilePath
@@ -33,7 +31,6 @@ parse' = do
            fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
     $ symbols filepath rootNode
 
-  pPrintLightBg (tokenValue <$> toks)
   source <- getSource
   let lexed = Megaparsec.TreeSitter.Lexed source toks
   case Megaparsec.parse pRoot filepath lexed of
