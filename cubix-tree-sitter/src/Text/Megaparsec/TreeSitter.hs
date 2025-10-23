@@ -9,6 +9,7 @@ import Data.ByteString (ByteString)
 import Data.ByteString qualified as ByteString
 import Data.ByteString.Char8 qualified as ByteString.Char8
 import Data.List qualified as List
+import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Proxy (Proxy (Proxy))
 import Data.Set qualified as Set
@@ -107,10 +108,10 @@ spanToSourcePos (SourceSpan start _end) =
         (Text.Megaparsec.mkPos $ row + 1)
         (Text.Megaparsec.mkPos $ col + 1)
 
-pToken :: Eq symbol => (symbol -> Maybe a) -> Parser symbol (Token a)
-pToken f = do
+pToken :: Eq symbol => NonEmpty Char -> (symbol -> Maybe a) -> Parser symbol (Token a)
+pToken expected f = do
   Text.Megaparsec.token
     test
-    Set.empty
+    (Set.singleton (Text.Megaparsec.Label expected))
   where
     test tok = fmap (\a -> tok {tokenValue = a}) (f (tokenValue tok))

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-+}
 module ${moduleName} where
 {+-}
@@ -6,6 +7,8 @@ import Control.Applicative.Combinators
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Functor (($>))
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.String (IsString (..))
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
 import Streaming.Prelude qualified as Streaming
@@ -51,11 +54,16 @@ parse path =
 -- --------------------------------------------------------------------------------
 type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
+instance IsString (NonEmpty Char) where
+  fromString [] = error "NonEmpty.fromString: empty string"
+  fromString (s:ss) = s :| ss
+
 pSymbol
   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
-   . SymbolSing symbolType symbol
+   . NonEmpty Char
+  -> SymbolSing symbolType symbol
   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
-pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
+pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
   SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
     Just (Refl, HRefl) -> Just symSing
     Nothing -> Nothing
@@ -84,7 +92,7 @@ pRoot = p${startSort.camelCase}
 {-+}
 ${for(tokens)}
 p${it.name.camelCase} :: Parser (MoveTerm ${it.name.camelCase}TokL)
-p${it.name.camelCase} = pSymbol S${it.name.camelCase}TokSymbol $$> i${it.name.camelCase}
+p${it.name.camelCase} = pSymbol "${it.name.text}" S${it.name.camelCase}TokSymbol $$> i${it.name.camelCase}
 
 ${endfor}
 {+-}
@@ -93,7 +101,7 @@ ${endfor}
 ${for(dataTypes)}
 p${it.name.camelCase} :: Parser (MoveTerm ${it.name.camelCase}L)
 p${it.name.camelCase} = do${if(it.hidden)}${else}
-  _sym <- pSymbol S${it.name.camelCase}Symbol${endif}
+  _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol${endif}
 ${if(it.isSum)}
   choice [ ${for(it.constrs)}p${it.name.camelCase}${sep}
          , ${endfor}

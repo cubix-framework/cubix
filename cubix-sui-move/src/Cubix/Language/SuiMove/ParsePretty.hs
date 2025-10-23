@@ -1,9 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Cubix.Language.SuiMove.ParsePretty where
 
 import Control.Applicative.Combinators
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Functor (($>))
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.String (IsString (..))
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
 import Streaming.Prelude qualified as Streaming
@@ -38,7 +41,7 @@ parse' = do
     Left err -> do
       liftIO . putStrLn $ Megaparsec.errorBundlePretty err
       pure Nothing
-    
+
 parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
 parse path =
   runReaderT parse' =<<
@@ -49,11 +52,16 @@ parse path =
 -- --------------------------------------------------------------------------------
 type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
 
+instance IsString (NonEmpty Char) where
+  fromString [] = error "NonEmpty.fromString: empty string"
+  fromString (s:ss) = s :| ss
+
 pSymbol
   :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
-   . SymbolSing symbolType symbol
+   . NonEmpty Char
+  -> SymbolSing symbolType symbol
   -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
-pSymbol sym = Megaparsec.TreeSitter.pToken $ \case
+pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
   SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
     Just (Refl, HRefl) -> Just symSing
     Nothing -> Nothing
@@ -78,191 +86,191 @@ pRoot :: Parser (MoveTerm (RootSort MoveSig))
 pRoot = pSourceFile
 
 pBang :: Parser (MoveTerm BangTokL)
-pBang = pSymbol SBangTokSymbol $> iBang
+pBang = pSymbol "bang" SBangTokSymbol $> iBang
 
 pNeq :: Parser (MoveTerm NeqTokL)
-pNeq = pSymbol SNeqTokSymbol $> iNeq
+pNeq = pSymbol "neq" SNeqTokSymbol $> iNeq
 
 pDollar :: Parser (MoveTerm DollarTokL)
-pDollar = pSymbol SDollarTokSymbol $> iDollar
+pDollar = pSymbol "dollar" SDollarTokSymbol $> iDollar
 
 pMod :: Parser (MoveTerm ModTokL)
-pMod = pSymbol SModTokSymbol $> iMod
+pMod = pSymbol "mod" SModTokSymbol $> iMod
 
 pBitand :: Parser (MoveTerm BitandTokL)
-pBitand = pSymbol SBitandTokSymbol $> iBitand
+pBitand = pSymbol "bitand" SBitandTokSymbol $> iBitand
 
 pAnd :: Parser (MoveTerm AndTokL)
-pAnd = pSymbol SAndTokSymbol $> iAnd
+pAnd = pSymbol "and" SAndTokSymbol $> iAnd
 
 pMul :: Parser (MoveTerm MulTokL)
-pMul = pSymbol SMulTokSymbol $> iMul
+pMul = pSymbol "mul" SMulTokSymbol $> iMul
 
 pAdd :: Parser (MoveTerm AddTokL)
-pAdd = pSymbol SAddTokSymbol $> iAdd
+pAdd = pSymbol "add" SAddTokSymbol $> iAdd
 
 pSub :: Parser (MoveTerm SubTokL)
-pSub = pSymbol SSubTokSymbol $> iSub
+pSub = pSymbol "sub" SSubTokSymbol $> iSub
 
 pRange :: Parser (MoveTerm RangeTokL)
-pRange = pSymbol SRangeTokSymbol $> iRange
+pRange = pSymbol "range" SRangeTokSymbol $> iRange
 
 pDiv :: Parser (MoveTerm DivTokL)
-pDiv = pSymbol SDivTokSymbol $> iDiv
+pDiv = pSymbol "div" SDivTokSymbol $> iDiv
 
 pLt :: Parser (MoveTerm LtTokL)
-pLt = pSymbol SLtTokSymbol $> iLt
+pLt = pSymbol "lt" SLtTokSymbol $> iLt
 
 pShl :: Parser (MoveTerm ShlTokL)
-pShl = pSymbol SShlTokSymbol $> iShl
+pShl = pSymbol "shl" SShlTokSymbol $> iShl
 
 pLe :: Parser (MoveTerm LeTokL)
-pLe = pSymbol SLeTokSymbol $> iLe
+pLe = pSymbol "le" SLeTokSymbol $> iLe
 
 pAssign :: Parser (MoveTerm AssignTokL)
-pAssign = pSymbol SAssignTokSymbol $> iAssign
+pAssign = pSymbol "assign" SAssignTokSymbol $> iAssign
 
 pEq :: Parser (MoveTerm EqTokL)
-pEq = pSymbol SEqTokSymbol $> iEq
+pEq = pSymbol "eq" SEqTokSymbol $> iEq
 
 pImplies :: Parser (MoveTerm ImpliesTokL)
-pImplies = pSymbol SImpliesTokSymbol $> iImplies
+pImplies = pSymbol "implies" SImpliesTokSymbol $> iImplies
 
 pGt :: Parser (MoveTerm GtTokL)
-pGt = pSymbol SGtTokSymbol $> iGt
+pGt = pSymbol "gt" SGtTokSymbol $> iGt
 
 pGe :: Parser (MoveTerm GeTokL)
-pGe = pSymbol SGeTokSymbol $> iGe
+pGe = pSymbol "ge" SGeTokSymbol $> iGe
 
 pShr :: Parser (MoveTerm ShrTokL)
-pShr = pSymbol SShrTokSymbol $> iShr
+pShr = pSymbol "shr" SShrTokSymbol $> iShr
 
 pXor :: Parser (MoveTerm XorTokL)
-pXor = pSymbol SXorTokSymbol $> iXor
+pXor = pSymbol "xor" SXorTokSymbol $> iXor
 
 pAbortsWith :: Parser (MoveTerm AbortsWithTokL)
-pAbortsWith = pSymbol SAbortsWithTokSymbol $> iAbortsWith
+pAbortsWith = pSymbol "aborts_with" SAbortsWithTokSymbol $> iAbortsWith
 
 pAddress :: Parser (MoveTerm AddressTokL)
-pAddress = pSymbol SAddressTokSymbol $> iAddress
+pAddress = pSymbol "address" SAddressTokSymbol $> iAddress
 
 pAssert :: Parser (MoveTerm AssertTokL)
-pAssert = pSymbol SAssertTokSymbol $> iAssert
+pAssert = pSymbol "assert" SAssertTokSymbol $> iAssert
 
 pAssume :: Parser (MoveTerm AssumeTokL)
-pAssume = pSymbol SAssumeTokSymbol $> iAssume
+pAssume = pSymbol "assume" SAssumeTokSymbol $> iAssume
 
 pBool :: Parser (MoveTerm BoolTokL)
-pBool = pSymbol SBoolTokSymbol $> iBool
+pBool = pSymbol "bool" SBoolTokSymbol $> iBool
 
 pBytearray :: Parser (MoveTerm BytearrayTokL)
-pBytearray = pSymbol SBytearrayTokSymbol $> iBytearray
+pBytearray = pSymbol "bytearray" SBytearrayTokSymbol $> iBytearray
 
 pCopy :: Parser (MoveTerm CopyTokL)
-pCopy = pSymbol SCopyTokSymbol $> iCopy
+pCopy = pSymbol "copy" SCopyTokSymbol $> iCopy
 
 pDecreases :: Parser (MoveTerm DecreasesTokL)
-pDecreases = pSymbol SDecreasesTokSymbol $> iDecreases
+pDecreases = pSymbol "decreases" SDecreasesTokSymbol $> iDecreases
 
 pDrop :: Parser (MoveTerm DropTokL)
-pDrop = pSymbol SDropTokSymbol $> iDrop
+pDrop = pSymbol "drop" SDropTokSymbol $> iDrop
 
 pEnsures :: Parser (MoveTerm EnsuresTokL)
-pEnsures = pSymbol SEnsuresTokSymbol $> iEnsures
+pEnsures = pSymbol "ensures" SEnsuresTokSymbol $> iEnsures
 
 pFalse :: Parser (MoveTerm FalseTokL)
-pFalse = pSymbol SFalseTokSymbol $> iFalse
+pFalse = pSymbol "false" SFalseTokSymbol $> iFalse
 
 pFriend :: Parser (MoveTerm FriendTokL)
-pFriend = pSymbol SFriendTokSymbol $> iFriend
+pFriend = pSymbol "friend" SFriendTokSymbol $> iFriend
 
 pGlobal :: Parser (MoveTerm GlobalTokL)
-pGlobal = pSymbol SGlobalTokSymbol $> iGlobal
+pGlobal = pSymbol "global" SGlobalTokSymbol $> iGlobal
 
 pInternal :: Parser (MoveTerm InternalTokL)
-pInternal = pSymbol SInternalTokSymbol $> iInternal
+pInternal = pSymbol "internal" SInternalTokSymbol $> iInternal
 
 pKey :: Parser (MoveTerm KeyTokL)
-pKey = pSymbol SKeyTokSymbol $> iKey
+pKey = pSymbol "key" SKeyTokSymbol $> iKey
 
 pLocal :: Parser (MoveTerm LocalTokL)
-pLocal = pSymbol SLocalTokSymbol $> iLocal
+pLocal = pSymbol "local" SLocalTokSymbol $> iLocal
 
 pModifies :: Parser (MoveTerm ModifiesTokL)
-pModifies = pSymbol SModifiesTokSymbol $> iModifies
+pModifies = pSymbol "modifies" SModifiesTokSymbol $> iModifies
 
 pModule :: Parser (MoveTerm ModuleTokL)
-pModule = pSymbol SModuleTokSymbol $> iModule
+pModule = pSymbol "module" SModuleTokSymbol $> iModule
 
 pMove :: Parser (MoveTerm MoveTokL)
-pMove = pSymbol SMoveTokSymbol $> iMove
+pMove = pSymbol "move" SMoveTokSymbol $> iMove
 
 pPack :: Parser (MoveTerm PackTokL)
-pPack = pSymbol SPackTokSymbol $> iPack
+pPack = pSymbol "pack" SPackTokSymbol $> iPack
 
 pPackage :: Parser (MoveTerm PackageTokL)
-pPackage = pSymbol SPackageTokSymbol $> iPackage
+pPackage = pSymbol "package" SPackageTokSymbol $> iPackage
 
 pPhantom :: Parser (MoveTerm PhantomTokL)
-pPhantom = pSymbol SPhantomTokSymbol $> iPhantom
+pPhantom = pSymbol "phantom" SPhantomTokSymbol $> iPhantom
 
 pPost :: Parser (MoveTerm PostTokL)
-pPost = pSymbol SPostTokSymbol $> iPost
+pPost = pSymbol "post" SPostTokSymbol $> iPost
 
 pPublic :: Parser (MoveTerm PublicTokL)
-pPublic = pSymbol SPublicTokSymbol $> iPublic
+pPublic = pSymbol "public" SPublicTokSymbol $> iPublic
 
 pSigner :: Parser (MoveTerm SignerTokL)
-pSigner = pSymbol SSignerTokSymbol $> iSigner
+pSigner = pSymbol "signer" SSignerTokSymbol $> iSigner
 
 pStore :: Parser (MoveTerm StoreTokL)
-pStore = pSymbol SStoreTokSymbol $> iStore
+pStore = pSymbol "store" SStoreTokSymbol $> iStore
 
 pSucceedsIf :: Parser (MoveTerm SucceedsIfTokL)
-pSucceedsIf = pSymbol SSucceedsIfTokSymbol $> iSucceedsIf
+pSucceedsIf = pSymbol "succeeds_if" SSucceedsIfTokSymbol $> iSucceedsIf
 
 pTrue :: Parser (MoveTerm TrueTokL)
-pTrue = pSymbol STrueTokSymbol $> iTrue
+pTrue = pSymbol "true" STrueTokSymbol $> iTrue
 
 pU128 :: Parser (MoveTerm U128TokL)
-pU128 = pSymbol SU128TokSymbol $> iU128
+pU128 = pSymbol "u128" SU128TokSymbol $> iU128
 
 pU16 :: Parser (MoveTerm U16TokL)
-pU16 = pSymbol SU16TokSymbol $> iU16
+pU16 = pSymbol "u16" SU16TokSymbol $> iU16
 
 pU256 :: Parser (MoveTerm U256TokL)
-pU256 = pSymbol SU256TokSymbol $> iU256
+pU256 = pSymbol "u256" SU256TokSymbol $> iU256
 
 pU32 :: Parser (MoveTerm U32TokL)
-pU32 = pSymbol SU32TokSymbol $> iU32
+pU32 = pSymbol "u32" SU32TokSymbol $> iU32
 
 pU64 :: Parser (MoveTerm U64TokL)
-pU64 = pSymbol SU64TokSymbol $> iU64
+pU64 = pSymbol "u64" SU64TokSymbol $> iU64
 
 pU8 :: Parser (MoveTerm U8TokL)
-pU8 = pSymbol SU8TokSymbol $> iU8
+pU8 = pSymbol "u8" SU8TokSymbol $> iU8
 
 pUnpack :: Parser (MoveTerm UnpackTokL)
-pUnpack = pSymbol SUnpackTokSymbol $> iUnpack
+pUnpack = pSymbol "unpack" SUnpackTokSymbol $> iUnpack
 
 pUpdate :: Parser (MoveTerm UpdateTokL)
-pUpdate = pSymbol SUpdateTokSymbol $> iUpdate
+pUpdate = pSymbol "update" SUpdateTokSymbol $> iUpdate
 
 pBitor :: Parser (MoveTerm BitorTokL)
-pBitor = pSymbol SBitorTokSymbol $> iBitor
+pBitor = pSymbol "bitor" SBitorTokSymbol $> iBitor
 
 pOr :: Parser (MoveTerm OrTokL)
-pOr = pSymbol SOrTokSymbol $> iOr
+pOr = pSymbol "or" SOrTokSymbol $> iOr
 
 pSourceFile :: Parser (MoveTerm SourceFileL)
 pSourceFile = do
-  _sym <- pSymbol SSourceFileSymbol
+  _sym <- pSymbol "source_file" SSourceFileSymbol
   iSourceFile
     <$> pMany pModuleDefinition
 
 pModuleDefinition :: Parser (MoveTerm ModuleDefinitionL)
 pModuleDefinition = do
-  _sym <- pSymbol SModuleDefinitionSymbol
+  _sym <- pSymbol "module_definition" SModuleDefinitionSymbol
   iModuleDefinition
     <$> pModule
     <*> pModuleIdentity
@@ -270,7 +278,7 @@ pModuleDefinition = do
 
 pModuleBody :: Parser (MoveTerm ModuleBodyL)
 pModuleBody = do
-  _sym <- pSymbol SModuleBodySymbol
+  _sym <- pSymbol "module_body" SModuleBodySymbol
   iModuleBody
     <$> pMany (pEither pFriendDeclaration (pEither pConstant (pEither pHiddenFunctionItem (pEither pHiddenStructItem (pEither pHiddenEnumItem (pEither pSpecBlock pUseDeclaration))))))
 
@@ -281,7 +289,7 @@ pHiddenEnumItem = do
 
 pEnumDefinition :: Parser (MoveTerm EnumDefinitionL)
 pEnumDefinition = do
-  _sym <- pSymbol SEnumDefinitionSymbol
+  _sym <- pSymbol "enum_definition" SEnumDefinitionSymbol
   iEnumDefinition
     <$> pMaybe pPublic
     <*> pHiddenEnumSignature
@@ -302,18 +310,18 @@ pHiddenEnumIdentifier = do
 
 pEnumIdentifier :: Parser (MoveTerm EnumIdentifierL)
 pEnumIdentifier = do
-  _sym <- pSymbol SEnumIdentifierSymbol
+  _sym <- pSymbol "enum_identifier" SEnumIdentifierSymbol
   pure iEnumIdentifier
 
 pAbilityDecls :: Parser (MoveTerm AbilityDeclsL)
 pAbilityDecls = do
-  _sym <- pSymbol SAbilityDeclsSymbol
+  _sym <- pSymbol "ability_decls" SAbilityDeclsSymbol
   iAbilityDecls
     <$> pPair (pMaybe pAbility) (pMany pAbility)
 
 pAbility :: Parser (MoveTerm AbilityL)
 pAbility = do
-  _sym <- pSymbol SAbilitySymbol
+  _sym <- pSymbol "ability" SAbilitySymbol
   choice [ pCopyAbility
          , pDropAbility
          , pStoreAbility
@@ -339,7 +347,7 @@ pAbility = do
 
 pTypeParameters :: Parser (MoveTerm TypeParametersL)
 pTypeParameters = do
-  _sym <- pSymbol STypeParametersSymbol
+  _sym <- pSymbol "type_parameters" STypeParametersSymbol
   iTypeParameters
     <$> pLt
     <*> pPair (pMany pTypeParameter) pTypeParameter
@@ -347,7 +355,7 @@ pTypeParameters = do
 
 pTypeParameter :: Parser (MoveTerm TypeParameterL)
 pTypeParameter = do
-  _sym <- pSymbol STypeParameterSymbol
+  _sym <- pSymbol "type_parameter" STypeParameterSymbol
   iTypeParameter
     <$> pMaybe pDollar
     <*> pMaybe pPhantom
@@ -361,18 +369,18 @@ pHiddenTypeParameterIdentifier = do
 
 pTypeParameterIdentifier :: Parser (MoveTerm TypeParameterIdentifierL)
 pTypeParameterIdentifier = do
-  _sym <- pSymbol STypeParameterIdentifierSymbol
+  _sym <- pSymbol "type_parameter_identifier" STypeParameterIdentifierSymbol
   pure iTypeParameterIdentifier
 
 pEnumVariants :: Parser (MoveTerm EnumVariantsL)
 pEnumVariants = do
-  _sym <- pSymbol SEnumVariantsSymbol
+  _sym <- pSymbol "enum_variants" SEnumVariantsSymbol
   iEnumVariants
     <$> pPair (pMaybe pVariant) (pMany pVariant)
 
 pVariant :: Parser (MoveTerm VariantL)
 pVariant = do
-  _sym <- pSymbol SVariantSymbol
+  _sym <- pSymbol "variant" SVariantSymbol
   iVariant
     <$> pHiddenVariantIdentifier
     <*> pMaybe pDatatypeFields
@@ -384,12 +392,12 @@ pHiddenVariantIdentifier = do
 
 pVariantIdentifier :: Parser (MoveTerm VariantIdentifierL)
 pVariantIdentifier = do
-  _sym <- pSymbol SVariantIdentifierSymbol
+  _sym <- pSymbol "variant_identifier" SVariantIdentifierSymbol
   pure iVariantIdentifier
 
 pDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
 pDatatypeFields = do
-  _sym <- pSymbol SDatatypeFieldsSymbol
+  _sym <- pSymbol "datatype_fields" SDatatypeFieldsSymbol
   choice [ pPositionalFieldsDatatypeFields
          , pNamedFieldsDatatypeFields
          ]
@@ -405,13 +413,13 @@ pDatatypeFields = do
 
 pNamedFields :: Parser (MoveTerm NamedFieldsL)
 pNamedFields = do
-  _sym <- pSymbol SNamedFieldsSymbol
+  _sym <- pSymbol "named_fields" SNamedFieldsSymbol
   iNamedFields
     <$> pPair (pMaybe pFieldAnnotation) (pMany pFieldAnnotation)
 
 pFieldAnnotation :: Parser (MoveTerm FieldAnnotationL)
 pFieldAnnotation = do
-  _sym <- pSymbol SFieldAnnotationSymbol
+  _sym <- pSymbol "field_annotation" SFieldAnnotationSymbol
   iFieldAnnotation
     <$> pHiddenFieldIdentifier
     <*> pHiddenType
@@ -423,7 +431,7 @@ pHiddenFieldIdentifier = do
 
 pFieldIdentifier :: Parser (MoveTerm FieldIdentifierL)
 pFieldIdentifier = do
-  _sym <- pSymbol SFieldIdentifierSymbol
+  _sym <- pSymbol "field_identifier" SFieldIdentifierSymbol
   pure iFieldIdentifier
 
 pHiddenType :: Parser (MoveTerm HiddenTypeL)
@@ -458,14 +466,14 @@ pHiddenType = do
 
 pApplyType :: Parser (MoveTerm ApplyTypeL)
 pApplyType = do
-  _sym <- pSymbol SApplyTypeSymbol
+  _sym <- pSymbol "apply_type" SApplyTypeSymbol
   iApplyType
     <$> pModuleAccess
     <*> pMaybe pTypeArguments
 
 pModuleAccess :: Parser (MoveTerm ModuleAccessL)
 pModuleAccess = do
-  _sym <- pSymbol SModuleAccessSymbol
+  _sym <- pSymbol "module_access" SModuleAccessSymbol
   choice [ pModuleAccess1
          , pModuleAccess2
          , pMemberModuleAccess
@@ -533,30 +541,30 @@ pHiddenModuleIdentifier = do
 
 pModuleIdentifier :: Parser (MoveTerm ModuleIdentifierL)
 pModuleIdentifier = do
-  _sym <- pSymbol SModuleIdentifierSymbol
+  _sym <- pSymbol "module_identifier" SModuleIdentifierSymbol
   pure iModuleIdentifier
 
 pIdentifier :: Parser (MoveTerm IdentifierL)
 pIdentifier = do
-  _sym <- pSymbol SIdentifierSymbol
+  _sym <- pSymbol "identifier" SIdentifierSymbol
   pure iIdentifier
 
 pModuleIdentity :: Parser (MoveTerm ModuleIdentityL)
 pModuleIdentity = do
-  _sym <- pSymbol SModuleIdentitySymbol
+  _sym <- pSymbol "module_identity" SModuleIdentitySymbol
   iModuleIdentity
     <$> pEither pHiddenModuleIdentifier pNumLiteral
     <*> pHiddenModuleIdentifier
 
 pNumLiteral :: Parser (MoveTerm NumLiteralL)
 pNumLiteral = do
-  _sym <- pSymbol SNumLiteralSymbol
+  _sym <- pSymbol "num_literal" SNumLiteralSymbol
   iNumLiteral
     <$> pMaybe (pEither pU16 (pEither pU32 (pEither pU64 (pEither pU128 (pEither pU256 pU8)))))
 
 pTypeArguments :: Parser (MoveTerm TypeArgumentsL)
 pTypeArguments = do
-  _sym <- pSymbol STypeArgumentsSymbol
+  _sym <- pSymbol "type_arguments" STypeArgumentsSymbol
   iTypeArguments
     <$> pLt
     <*> pPair (pMany pHiddenType) pHiddenType
@@ -564,14 +572,14 @@ pTypeArguments = do
 
 pFunctionType :: Parser (MoveTerm FunctionTypeL)
 pFunctionType = do
-  _sym <- pSymbol SFunctionTypeSymbol
+  _sym <- pSymbol "function_type" SFunctionTypeSymbol
   iFunctionType
     <$> pFunctionTypeParameters
     <*> pMaybe pHiddenType
 
 pFunctionTypeParameters :: Parser (MoveTerm FunctionTypeParametersL)
 pFunctionTypeParameters = do
-  _sym <- pSymbol SFunctionTypeParametersSymbol
+  _sym <- pSymbol "function_type_parameters" SFunctionTypeParametersSymbol
   iFunctionTypeParameters
     <$> pBitor
     <*> pPair (pMaybe pHiddenType) (pMany pHiddenType)
@@ -579,7 +587,7 @@ pFunctionTypeParameters = do
 
 pPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
 pPrimitiveType = do
-  _sym <- pSymbol SPrimitiveTypeSymbol
+  _sym <- pSymbol "primitive_type" SPrimitiveTypeSymbol
   choice [ pU8PrimitiveType
          , pU16PrimitiveType
          , pU32PrimitiveType
@@ -635,7 +643,7 @@ pPrimitiveType = do
 
 pRefType :: Parser (MoveTerm RefTypeL)
 pRefType = do
-  _sym <- pSymbol SRefTypeSymbol
+  _sym <- pSymbol "ref_type" SRefTypeSymbol
   iRefType
     <$> pHiddenReference
     <*> pHiddenType
@@ -657,31 +665,31 @@ pHiddenReference = do
 
 pImmRef :: Parser (MoveTerm ImmRefL)
 pImmRef = do
-  _sym <- pSymbol SImmRefSymbol
+  _sym <- pSymbol "imm_ref" SImmRefSymbol
   iImmRef
     <$> pBitand
 
 pMutRef :: Parser (MoveTerm MutRefL)
 pMutRef = do
-  _sym <- pSymbol SMutRefSymbol
+  _sym <- pSymbol "mut_ref" SMutRefSymbol
   iMutRef
     <$> pBitand
 
 pTupleType :: Parser (MoveTerm TupleTypeL)
 pTupleType = do
-  _sym <- pSymbol STupleTypeSymbol
+  _sym <- pSymbol "tuple_type" STupleTypeSymbol
   iTupleType
     <$> pPair (pMaybe pHiddenType) (pMany pHiddenType)
 
 pPositionalFields :: Parser (MoveTerm PositionalFieldsL)
 pPositionalFields = do
-  _sym <- pSymbol SPositionalFieldsSymbol
+  _sym <- pSymbol "positional_fields" SPositionalFieldsSymbol
   iPositionalFields
     <$> pPair (pMaybe pHiddenType) (pMany pHiddenType)
 
 pPostfixAbilityDecls :: Parser (MoveTerm PostfixAbilityDeclsL)
 pPostfixAbilityDecls = do
-  _sym <- pSymbol SPostfixAbilityDeclsSymbol
+  _sym <- pSymbol "postfix_ability_decls" SPostfixAbilityDeclsSymbol
   iPostfixAbilityDecls
     <$> pPair (pMaybe pAbility) (pMany pAbility)
 
@@ -707,7 +715,7 @@ pHiddenFunctionItem = do
 
 pFunctionDefinition :: Parser (MoveTerm FunctionDefinitionL)
 pFunctionDefinition = do
-  _sym <- pSymbol SFunctionDefinitionSymbol
+  _sym <- pSymbol "function_definition" SFunctionDefinitionSymbol
   iFunctionDefinition
     <$> pHiddenFunctionSignature
     <*> pBlock
@@ -730,18 +738,18 @@ pHiddenFunctionIdentifier = do
 
 pFunctionIdentifier :: Parser (MoveTerm FunctionIdentifierL)
 pFunctionIdentifier = do
-  _sym <- pSymbol SFunctionIdentifierSymbol
+  _sym <- pSymbol "function_identifier" SFunctionIdentifierSymbol
   pure iFunctionIdentifier
 
 pFunctionParameters :: Parser (MoveTerm FunctionParametersL)
 pFunctionParameters = do
-  _sym <- pSymbol SFunctionParametersSymbol
+  _sym <- pSymbol "function_parameters" SFunctionParametersSymbol
   iFunctionParameters
     <$> pPair (pMaybe (pEither pFunctionParameter pMutFunctionParameter)) (pMany (pEither pFunctionParameter pMutFunctionParameter))
 
 pFunctionParameter :: Parser (MoveTerm FunctionParameterL)
 pFunctionParameter = do
-  _sym <- pSymbol SFunctionParameterSymbol
+  _sym <- pSymbol "function_parameter" SFunctionParameterSymbol
   iFunctionParameter
     <$> pEither (pPair pHiddenVariableIdentifier pDollar) pHiddenVariableIdentifier
     <*> pHiddenType
@@ -753,31 +761,31 @@ pHiddenVariableIdentifier = do
 
 pVariableIdentifier :: Parser (MoveTerm VariableIdentifierL)
 pVariableIdentifier = do
-  _sym <- pSymbol SVariableIdentifierSymbol
+  _sym <- pSymbol "variable_identifier" SVariableIdentifierSymbol
   pure iVariableIdentifier
 
 pMutFunctionParameter :: Parser (MoveTerm MutFunctionParameterL)
 pMutFunctionParameter = do
-  _sym <- pSymbol SMutFunctionParameterSymbol
+  _sym <- pSymbol "mut_function_parameter" SMutFunctionParameterSymbol
   iMutFunctionParameter
     <$> pFunctionParameter
 
 pModifier :: Parser (MoveTerm ModifierL)
 pModifier = do
-  _sym <- pSymbol SModifierSymbol
+  _sym <- pSymbol "modifier" SModifierSymbol
   iModifier1
     <$> pPublic
     <*> pMaybe (pEither pFriend pPackage)
 
 pRetType :: Parser (MoveTerm RetTypeL)
 pRetType = do
-  _sym <- pSymbol SRetTypeSymbol
+  _sym <- pSymbol "ret_type" SRetTypeSymbol
   iRetType
     <$> pHiddenType
 
 pBlock :: Parser (MoveTerm BlockL)
 pBlock = do
-  _sym <- pSymbol SBlockSymbol
+  _sym <- pSymbol "block" SBlockSymbol
   iBlock
     <$> pMany pUseDeclaration
     <*> pMany pBlockItem
@@ -1020,12 +1028,12 @@ pHiddenLiteralValue = do
 
 pAddressLiteral :: Parser (MoveTerm AddressLiteralL)
 pAddressLiteral = do
-  _sym <- pSymbol SAddressLiteralSymbol
+  _sym <- pSymbol "address_literal" SAddressLiteralSymbol
   pure iAddressLiteral
 
 pBoolLiteral :: Parser (MoveTerm BoolLiteralL)
 pBoolLiteral = do
-  _sym <- pSymbol SBoolLiteralSymbol
+  _sym <- pSymbol "bool_literal" SBoolLiteralSymbol
   choice [ pTrueBoolLiteral
          , pFalseBoolLiteral
          ]
@@ -1041,75 +1049,75 @@ pBoolLiteral = do
 
 pByteStringLiteral :: Parser (MoveTerm ByteStringLiteralL)
 pByteStringLiteral = do
-  _sym <- pSymbol SByteStringLiteralSymbol
+  _sym <- pSymbol "byte_string_literal" SByteStringLiteralSymbol
   pure iByteStringLiteral
 
 pHexStringLiteral :: Parser (MoveTerm HexStringLiteralL)
 pHexStringLiteral = do
-  _sym <- pSymbol SHexStringLiteralSymbol
+  _sym <- pSymbol "hex_string_literal" SHexStringLiteralSymbol
   pure iHexStringLiteral
 
 pAnnotationExpression :: Parser (MoveTerm AnnotationExpressionL)
 pAnnotationExpression = do
-  _sym <- pSymbol SAnnotationExpressionSymbol
+  _sym <- pSymbol "annotation_expression" SAnnotationExpressionSymbol
   iAnnotationExpression
     <$> pHiddenExpression
     <*> pHiddenType
 
 pBreakExpression :: Parser (MoveTerm BreakExpressionL)
 pBreakExpression = do
-  _sym <- pSymbol SBreakExpressionSymbol
+  _sym <- pSymbol "break_expression" SBreakExpressionSymbol
   iBreakExpression
     <$> pMaybe pLabel
     <*> pMaybe pHiddenExpression
 
 pLabel :: Parser (MoveTerm LabelL)
 pLabel = do
-  _sym <- pSymbol SLabelSymbol
+  _sym <- pSymbol "label" SLabelSymbol
   iLabel
     <$> pIdentifier
 
 pCallExpression :: Parser (MoveTerm CallExpressionL)
 pCallExpression = do
-  _sym <- pSymbol SCallExpressionSymbol
+  _sym <- pSymbol "call_expression" SCallExpressionSymbol
   iCallExpression
     <$> pNameExpression
     <*> pArgList
 
 pArgList :: Parser (MoveTerm ArgListL)
 pArgList = do
-  _sym <- pSymbol SArgListSymbol
+  _sym <- pSymbol "arg_list" SArgListSymbol
   iArgList
     <$> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
 pNameExpression :: Parser (MoveTerm NameExpressionL)
 pNameExpression = do
-  _sym <- pSymbol SNameExpressionSymbol
+  _sym <- pSymbol "name_expression" SNameExpressionSymbol
   iNameExpression
     <$> pModuleAccess
 
 pContinueExpression :: Parser (MoveTerm ContinueExpressionL)
 pContinueExpression = do
-  _sym <- pSymbol SContinueExpressionSymbol
+  _sym <- pSymbol "continue_expression" SContinueExpressionSymbol
   iContinueExpression
     <$> pMaybe pLabel
 
 pDotExpression :: Parser (MoveTerm DotExpressionL)
 pDotExpression = do
-  _sym <- pSymbol SDotExpressionSymbol
+  _sym <- pSymbol "dot_expression" SDotExpressionSymbol
   iDotExpression
     <$> pHiddenExpressionTerm
     <*> pHiddenExpressionTerm
 
 pExpressionList :: Parser (MoveTerm ExpressionListL)
 pExpressionList = do
-  _sym <- pSymbol SExpressionListSymbol
+  _sym <- pSymbol "expression_list" SExpressionListSymbol
   iExpressionList
     <$> pPair (pMany pHiddenExpression) pHiddenExpression
 
 pIfExpression :: Parser (MoveTerm IfExpressionL)
 pIfExpression = do
-  _sym <- pSymbol SIfExpressionSymbol
+  _sym <- pSymbol "if_expression" SIfExpressionSymbol
   iIfExpression
     <$> pHiddenExpression
     <*> pHiddenExpression
@@ -1117,14 +1125,14 @@ pIfExpression = do
 
 pIndexExpression :: Parser (MoveTerm IndexExpressionL)
 pIndexExpression = do
-  _sym <- pSymbol SIndexExpressionSymbol
+  _sym <- pSymbol "index_expression" SIndexExpressionSymbol
   iIndexExpression
     <$> pHiddenExpressionTerm
     <*> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
 pMacroCallExpression :: Parser (MoveTerm MacroCallExpressionL)
 pMacroCallExpression = do
-  _sym <- pSymbol SMacroCallExpressionSymbol
+  _sym <- pSymbol "macro_call_expression" SMacroCallExpressionSymbol
   iMacroCallExpression
     <$> pMacroModuleAccess
     <*> pMaybe pTypeArguments
@@ -1132,14 +1140,14 @@ pMacroCallExpression = do
 
 pMacroModuleAccess :: Parser (MoveTerm MacroModuleAccessL)
 pMacroModuleAccess = do
-  _sym <- pSymbol SMacroModuleAccessSymbol
+  _sym <- pSymbol "macro_module_access" SMacroModuleAccessSymbol
   iMacroModuleAccess
     <$> pModuleAccess
     <*> pBang
 
 pMatchExpression :: Parser (MoveTerm MatchExpressionL)
 pMatchExpression = do
-  _sym <- pSymbol SMatchExpressionSymbol
+  _sym <- pSymbol "match_expression" SMatchExpressionSymbol
   iMatchExpression
     <$> pHiddenExpression
     <*> pHiddenMatchBody
@@ -1151,7 +1159,7 @@ pHiddenMatchBody = do
 
 pMatchArm :: Parser (MoveTerm MatchArmL)
 pMatchArm = do
-  _sym <- pSymbol SMatchArmSymbol
+  _sym <- pSymbol "match_arm" SMatchArmSymbol
   iMatchArm
     <$> pBindList
     <*> pMaybe pMatchCondition
@@ -1159,7 +1167,7 @@ pMatchArm = do
 
 pBindList :: Parser (MoveTerm BindListL)
 pBindList = do
-  _sym <- pSymbol SBindListSymbol
+  _sym <- pSymbol "bind_list" SBindListSymbol
   choice [ pHiddenBindBindList
          , pCommaBindListBindList
          , pOrBindListBindList
@@ -1210,21 +1218,21 @@ pHiddenBind = do
 
 pAtBind :: Parser (MoveTerm AtBindL)
 pAtBind = do
-  _sym <- pSymbol SAtBindSymbol
+  _sym <- pSymbol "at_bind" SAtBindSymbol
   iAtBind
     <$> pHiddenVariableIdentifier
     <*> pBindList
 
 pBindUnpack :: Parser (MoveTerm BindUnpackL)
 pBindUnpack = do
-  _sym <- pSymbol SBindUnpackSymbol
+  _sym <- pSymbol "bind_unpack" SBindUnpackSymbol
   iBindUnpack
     <$> pNameExpression
     <*> pMaybe pBindFields
 
 pBindFields :: Parser (MoveTerm BindFieldsL)
 pBindFields = do
-  _sym <- pSymbol SBindFieldsSymbol
+  _sym <- pSymbol "bind_fields" SBindFieldsSymbol
   choice [ pBindPositionalFieldsBindFields
          , pBindNamedFieldsBindFields
          ]
@@ -1240,13 +1248,13 @@ pBindFields = do
 
 pBindNamedFields :: Parser (MoveTerm BindNamedFieldsL)
 pBindNamedFields = do
-  _sym <- pSymbol SBindNamedFieldsSymbol
+  _sym <- pSymbol "bind_named_fields" SBindNamedFieldsSymbol
   iBindNamedFields
     <$> pPair (pMaybe (pEither pMutBindField pBindField)) (pMany (pEither pMutBindField pBindField))
 
 pBindField :: Parser (MoveTerm BindFieldL)
 pBindField = do
-  _sym <- pSymbol SBindFieldSymbol
+  _sym <- pSymbol "bind_field" SBindFieldSymbol
   choice [ pBindField1
          , pHiddenSpreadOperatorBindField
          ]
@@ -1268,69 +1276,69 @@ pHiddenSpreadOperator = do
 
 pMutBindField :: Parser (MoveTerm MutBindFieldL)
 pMutBindField = do
-  _sym <- pSymbol SMutBindFieldSymbol
+  _sym <- pSymbol "mut_bind_field" SMutBindFieldSymbol
   iMutBindField
     <$> pBindField
 
 pBindPositionalFields :: Parser (MoveTerm BindPositionalFieldsL)
 pBindPositionalFields = do
-  _sym <- pSymbol SBindPositionalFieldsSymbol
+  _sym <- pSymbol "bind_positional_fields" SBindPositionalFieldsSymbol
   iBindPositionalFields
     <$> pPair (pMaybe (pEither pMutBindField pBindField)) (pMany (pEither pMutBindField pBindField))
 
 pMutBindVar :: Parser (MoveTerm MutBindVarL)
 pMutBindVar = do
-  _sym <- pSymbol SMutBindVarSymbol
+  _sym <- pSymbol "mut_bind_var" SMutBindVarSymbol
   iMutBindVar
     <$> pBindVar
 
 pBindVar :: Parser (MoveTerm BindVarL)
 pBindVar = do
-  _sym <- pSymbol SBindVarSymbol
+  _sym <- pSymbol "bind_var" SBindVarSymbol
   iBindVar
     <$> pVariableIdentifier
 
 pCommaBindList :: Parser (MoveTerm CommaBindListL)
 pCommaBindList = do
-  _sym <- pSymbol SCommaBindListSymbol
+  _sym <- pSymbol "comma_bind_list" SCommaBindListSymbol
   iCommaBindList
     <$> pPair (pMaybe pHiddenBind) (pMany pHiddenBind)
 
 pOrBindList :: Parser (MoveTerm OrBindListL)
 pOrBindList = do
-  _sym <- pSymbol SOrBindListSymbol
+  _sym <- pSymbol "or_bind_list" SOrBindListSymbol
   iOrBindList
     <$> pPair (pMany (pPair pHiddenBind pBitor)) (pPair (pMaybe pBitor) pHiddenBind)
 
 pMatchCondition :: Parser (MoveTerm MatchConditionL)
 pMatchCondition = do
-  _sym <- pSymbol SMatchConditionSymbol
+  _sym <- pSymbol "match_condition" SMatchConditionSymbol
   iMatchCondition
     <$> pHiddenExpression
 
 pPackExpression :: Parser (MoveTerm PackExpressionL)
 pPackExpression = do
-  _sym <- pSymbol SPackExpressionSymbol
+  _sym <- pSymbol "pack_expression" SPackExpressionSymbol
   iPackExpression
     <$> pNameExpression
     <*> pFieldInitializeList
 
 pFieldInitializeList :: Parser (MoveTerm FieldInitializeListL)
 pFieldInitializeList = do
-  _sym <- pSymbol SFieldInitializeListSymbol
+  _sym <- pSymbol "field_initialize_list" SFieldInitializeListSymbol
   iFieldInitializeList
     <$> pPair (pMaybe pExpField) (pMany pExpField)
 
 pExpField :: Parser (MoveTerm ExpFieldL)
 pExpField = do
-  _sym <- pSymbol SExpFieldSymbol
+  _sym <- pSymbol "exp_field" SExpFieldSymbol
   iExpField
     <$> pHiddenFieldIdentifier
     <*> pMaybe pHiddenExpression
 
 pSpecBlock :: Parser (MoveTerm SpecBlockL)
 pSpecBlock = do
-  _sym <- pSymbol SSpecBlockSymbol
+  _sym <- pSymbol "spec_block" SSpecBlockSymbol
   iSpecBlock
     <$> pEither pHiddenSpecFunction (pPair pSpecBody (pMaybe pHiddenSpecBlockTarget))
 
@@ -1356,7 +1364,7 @@ pHiddenSpecBlockTarget = do
 
 pSpecBlockTargetSchema :: Parser (MoveTerm SpecBlockTargetSchemaL)
 pSpecBlockTargetSchema = do
-  _sym <- pSymbol SSpecBlockTargetSchemaSymbol
+  _sym <- pSymbol "spec_block_target_schema" SSpecBlockTargetSchemaSymbol
   iSpecBlockTargetSchema
     <$> pHiddenStructIdentifier
     <*> pMaybe pTypeParameters
@@ -1368,7 +1376,7 @@ pHiddenStructIdentifier = do
 
 pStructIdentifier :: Parser (MoveTerm StructIdentifierL)
 pStructIdentifier = do
-  _sym <- pSymbol SStructIdentifierSymbol
+  _sym <- pSymbol "struct_identifier" SStructIdentifierSymbol
   pure iStructIdentifier
 
 pHiddenSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
@@ -1393,7 +1401,7 @@ pHiddenSpecFunction = do
 
 pNativeSpecFunction :: Parser (MoveTerm NativeSpecFunctionL)
 pNativeSpecFunction = do
-  _sym <- pSymbol SNativeSpecFunctionSymbol
+  _sym <- pSymbol "native_spec_function" SNativeSpecFunctionSymbol
   iNativeSpecFunction
     <$> pHiddenSpecFunctionSignature
 
@@ -1407,20 +1415,20 @@ pHiddenSpecFunctionSignature = do
 
 pUninterpretedSpecFunction :: Parser (MoveTerm UninterpretedSpecFunctionL)
 pUninterpretedSpecFunction = do
-  _sym <- pSymbol SUninterpretedSpecFunctionSymbol
+  _sym <- pSymbol "uninterpreted_spec_function" SUninterpretedSpecFunctionSymbol
   iUninterpretedSpecFunction
     <$> pHiddenSpecFunctionSignature
 
 pUsualSpecFunction :: Parser (MoveTerm UsualSpecFunctionL)
 pUsualSpecFunction = do
-  _sym <- pSymbol SUsualSpecFunctionSymbol
+  _sym <- pSymbol "usual_spec_function" SUsualSpecFunctionSymbol
   iUsualSpecFunction
     <$> pHiddenSpecFunctionSignature
     <*> pBlock
 
 pSpecBody :: Parser (MoveTerm SpecBodyL)
 pSpecBody = do
-  _sym <- pSymbol SSpecBodySymbol
+  _sym <- pSymbol "spec_body" SSpecBodySymbol
   iSpecBody
     <$> pMany pUseDeclaration
     <*> pMany pHiddenSpecBlockMemeber
@@ -1472,7 +1480,7 @@ pHiddenSpecBlockMemeber = do
 
 pSpecApply :: Parser (MoveTerm SpecApplyL)
 pSpecApply = do
-  _sym <- pSymbol SSpecApplySymbol
+  _sym <- pSymbol "spec_apply" SSpecApplySymbol
   iSpecApply
     <$> pHiddenExpression
     <*> pPair (pMany pSpecApplyPattern) pSpecApplyPattern
@@ -1480,7 +1488,7 @@ pSpecApply = do
 
 pSpecApplyPattern :: Parser (MoveTerm SpecApplyPatternL)
 pSpecApplyPattern = do
-  _sym <- pSymbol SSpecApplyPatternSymbol
+  _sym <- pSymbol "spec_apply_pattern" SSpecApplyPatternSymbol
   iSpecApplyPattern
     <$> pMaybe (pEither pInternal pPublic)
     <*> pSpecApplyNamePattern
@@ -1488,12 +1496,12 @@ pSpecApplyPattern = do
 
 pSpecApplyNamePattern :: Parser (MoveTerm SpecApplyNamePatternL)
 pSpecApplyNamePattern = do
-  _sym <- pSymbol SSpecApplyNamePatternSymbol
+  _sym <- pSymbol "spec_apply_name_pattern" SSpecApplyNamePatternSymbol
   pure iSpecApplyNamePattern
 
 pSpecCondition :: Parser (MoveTerm SpecConditionL)
 pSpecCondition = do
-  _sym <- pSymbol SSpecConditionSymbol
+  _sym <- pSymbol "spec_condition" SSpecConditionSymbol
   choice [ pHiddenSpecConditionSpecCondition
          , pHiddenSpecAbortIfSpecCondition
          , pHiddenSpecAbortWithOrModifiesSpecCondition
@@ -1522,18 +1530,18 @@ pHiddenSpecAbortIf = do
 
 pConditionKind :: Parser (MoveTerm ConditionKindL)
 pConditionKind = do
-  _sym <- pSymbol SConditionKindSymbol
+  _sym <- pSymbol "condition_kind" SConditionKindSymbol
   pure iConditionKind
 
 pConditionProperties :: Parser (MoveTerm ConditionPropertiesL)
 pConditionProperties = do
-  _sym <- pSymbol SConditionPropertiesSymbol
+  _sym <- pSymbol "condition_properties" SConditionPropertiesSymbol
   iConditionProperties
     <$> pPair (pMaybe pSpecProperty) (pMany pSpecProperty)
 
 pSpecProperty :: Parser (MoveTerm SpecPropertyL)
 pSpecProperty = do
-  _sym <- pSymbol SSpecPropertySymbol
+  _sym <- pSymbol "spec_property" SSpecPropertySymbol
   iSpecProperty
     <$> pIdentifier
     <*> pMaybe (pPair pHiddenLiteralValue pAssign)
@@ -1554,13 +1562,13 @@ pHiddenSpecCondition = do
 
 pSpecInclude :: Parser (MoveTerm SpecIncludeL)
 pSpecInclude = do
-  _sym <- pSymbol SSpecIncludeSymbol
+  _sym <- pSymbol "spec_include" SSpecIncludeSymbol
   iSpecInclude
     <$> pHiddenExpression
 
 pSpecInvariant :: Parser (MoveTerm SpecInvariantL)
 pSpecInvariant = do
-  _sym <- pSymbol SSpecInvariantSymbol
+  _sym <- pSymbol "spec_invariant" SSpecInvariantSymbol
   iSpecInvariant
     <$> pConditionKind
     <*> pMaybe pInvariantModifier
@@ -1569,7 +1577,7 @@ pSpecInvariant = do
 
 pInvariantModifier :: Parser (MoveTerm InvariantModifierL)
 pInvariantModifier = do
-  _sym <- pSymbol SInvariantModifierSymbol
+  _sym <- pSymbol "invariant_modifier" SInvariantModifierSymbol
   choice [ pUpdateInvariantModifier
          , pPackInvariantModifier
          , pUnpackInvariantModifier
@@ -1595,7 +1603,7 @@ pInvariantModifier = do
 
 pSpecLet :: Parser (MoveTerm SpecLetL)
 pSpecLet = do
-  _sym <- pSymbol SSpecLetSymbol
+  _sym <- pSymbol "spec_let" SSpecLetSymbol
   iSpecLet
     <$> pMaybe pPost
     <*> pIdentifier
@@ -1604,13 +1612,13 @@ pSpecLet = do
 
 pSpecPragma :: Parser (MoveTerm SpecPragmaL)
 pSpecPragma = do
-  _sym <- pSymbol SSpecPragmaSymbol
+  _sym <- pSymbol "spec_pragma" SSpecPragmaSymbol
   iSpecPragma
     <$> pPair (pMaybe pSpecProperty) (pMany pSpecProperty)
 
 pSpecVariable :: Parser (MoveTerm SpecVariableL)
 pSpecVariable = do
-  _sym <- pSymbol SSpecVariableSymbol
+  _sym <- pSymbol "spec_variable" SSpecVariableSymbol
   iSpecVariable
     <$> pMaybe (pEither pLocal pGlobal)
     <*> pIdentifier
@@ -1619,35 +1627,35 @@ pSpecVariable = do
 
 pUseDeclaration :: Parser (MoveTerm UseDeclarationL)
 pUseDeclaration = do
-  _sym <- pSymbol SUseDeclarationSymbol
+  _sym <- pSymbol "use_declaration" SUseDeclarationSymbol
   iUseDeclaration
     <$> pMaybe pPublic
     <*> pEither pUseModule (pEither pUseModuleMember (pEither pUseModuleMembers pUseFun))
 
 pUseFun :: Parser (MoveTerm UseFunL)
 pUseFun = do
-  _sym <- pSymbol SUseFunSymbol
+  _sym <- pSymbol "use_fun" SUseFunSymbol
   iUseFun
     <$> pModuleAccess
     <*> pPair pHiddenFunctionIdentifier pModuleAccess
 
 pUseModule :: Parser (MoveTerm UseModuleL)
 pUseModule = do
-  _sym <- pSymbol SUseModuleSymbol
+  _sym <- pSymbol "use_module" SUseModuleSymbol
   iUseModule
     <$> pModuleIdentity
     <*> pMaybe pHiddenModuleIdentifier
 
 pUseModuleMember :: Parser (MoveTerm UseModuleMemberL)
 pUseModuleMember = do
-  _sym <- pSymbol SUseModuleMemberSymbol
+  _sym <- pSymbol "use_module_member" SUseModuleMemberSymbol
   iUseModuleMember
     <$> pModuleIdentity
     <*> pUseMember
 
 pUseMember :: Parser (MoveTerm UseMemberL)
 pUseMember = do
-  _sym <- pSymbol SUseMemberSymbol
+  _sym <- pSymbol "use_member" SUseMemberSymbol
   choice [ pUseMember1
          , pUseMember2
          , pUseMember3
@@ -1672,7 +1680,7 @@ pUseMember = do
 
 pUseModuleMembers :: Parser (MoveTerm UseModuleMembersL)
 pUseModuleMembers = do
-  _sym <- pSymbol SUseModuleMembersSymbol
+  _sym <- pSymbol "use_module_members" SUseModuleMembersSymbol
   choice [ pUseModuleMembers1
          , pUseModuleMembers2
          ]
@@ -1690,59 +1698,59 @@ pUseModuleMembers = do
 
 pUnitExpression :: Parser (MoveTerm UnitExpressionL)
 pUnitExpression = do
-  _sym <- pSymbol SUnitExpressionSymbol
+  _sym <- pSymbol "unit_expression" SUnitExpressionSymbol
   pure iUnitExpression
 
 pVectorExpression :: Parser (MoveTerm VectorExpressionL)
 pVectorExpression = do
-  _sym <- pSymbol SVectorExpressionSymbol
+  _sym <- pSymbol "vector_expression" SVectorExpressionSymbol
   iVectorExpression
     <$> pMaybe (pPair (pPair (pMany pHiddenType) pHiddenType) pGt)
     <*> pPair (pMaybe pHiddenExpression) (pMany pHiddenExpression)
 
 pBorrowExpression :: Parser (MoveTerm BorrowExpressionL)
 pBorrowExpression = do
-  _sym <- pSymbol SBorrowExpressionSymbol
+  _sym <- pSymbol "borrow_expression" SBorrowExpressionSymbol
   iBorrowExpression
     <$> pHiddenReference
     <*> pHiddenExpression
 
 pDereferenceExpression :: Parser (MoveTerm DereferenceExpressionL)
 pDereferenceExpression = do
-  _sym <- pSymbol SDereferenceExpressionSymbol
+  _sym <- pSymbol "dereference_expression" SDereferenceExpressionSymbol
   iDereferenceExpression
     <$> pMul
     <*> pHiddenExpression
 
 pMoveOrCopyExpression :: Parser (MoveTerm MoveOrCopyExpressionL)
 pMoveOrCopyExpression = do
-  _sym <- pSymbol SMoveOrCopyExpressionSymbol
+  _sym <- pSymbol "move_or_copy_expression" SMoveOrCopyExpressionSymbol
   iMoveOrCopyExpression
     <$> pEither pCopy pMove
     <*> pHiddenExpression
 
 pUnaryExpression :: Parser (MoveTerm UnaryExpressionL)
 pUnaryExpression = do
-  _sym <- pSymbol SUnaryExpressionSymbol
+  _sym <- pSymbol "unary_expression" SUnaryExpressionSymbol
   iUnaryExpression
     <$> pUnaryOp
     <*> pHiddenExpression
 
 pUnaryOp :: Parser (MoveTerm UnaryOpL)
 pUnaryOp = do
-  _sym <- pSymbol SUnaryOpSymbol
+  _sym <- pSymbol "unary_op" SUnaryOpSymbol
   iBangUnaryOp
     <$> pBang
 
 pAbortExpression :: Parser (MoveTerm AbortExpressionL)
 pAbortExpression = do
-  _sym <- pSymbol SAbortExpressionSymbol
+  _sym <- pSymbol "abort_expression" SAbortExpressionSymbol
   iAbortExpression
     <$> pMaybe pHiddenExpression
 
 pAssignExpression :: Parser (MoveTerm AssignExpressionL)
 pAssignExpression = do
-  _sym <- pSymbol SAssignExpressionSymbol
+  _sym <- pSymbol "assign_expression" SAssignExpressionSymbol
   iAssignExpression
     <$> pHiddenUnaryExpression
     <*> pAssign
@@ -1750,7 +1758,7 @@ pAssignExpression = do
 
 pBinaryExpression :: Parser (MoveTerm BinaryExpressionL)
 pBinaryExpression = do
-  _sym <- pSymbol SBinaryExpressionSymbol
+  _sym <- pSymbol "binary_expression" SBinaryExpressionSymbol
   choice [ pBinaryExpression1
          , pBinaryExpression2
          , pBinaryExpression3
@@ -1896,33 +1904,33 @@ pBinaryExpression = do
 
 pBinaryOperator :: Parser (MoveTerm BinaryOperatorL)
 pBinaryOperator = do
-  _sym <- pSymbol SBinaryOperatorSymbol
+  _sym <- pSymbol "binary_operator" SBinaryOperatorSymbol
   iBinaryOperator
     <$> pImplies
 
 pCastExpression :: Parser (MoveTerm CastExpressionL)
 pCastExpression = do
-  _sym <- pSymbol SCastExpressionSymbol
+  _sym <- pSymbol "cast_expression" SCastExpressionSymbol
   iCastExpression
     <$> pHiddenExpression
     <*> pHiddenType
 
 pIdentifiedExpression :: Parser (MoveTerm IdentifiedExpressionL)
 pIdentifiedExpression = do
-  _sym <- pSymbol SIdentifiedExpressionSymbol
+  _sym <- pSymbol "identified_expression" SIdentifiedExpressionSymbol
   iIdentifiedExpression
     <$> pBlockIdentifier
     <*> pHiddenExpression
 
 pBlockIdentifier :: Parser (MoveTerm BlockIdentifierL)
 pBlockIdentifier = do
-  _sym <- pSymbol SBlockIdentifierSymbol
+  _sym <- pSymbol "block_identifier" SBlockIdentifierSymbol
   iBlockIdentifier
     <$> pLabel
 
 pLambdaExpression :: Parser (MoveTerm LambdaExpressionL)
 pLambdaExpression = do
-  _sym <- pSymbol SLambdaExpressionSymbol
+  _sym <- pSymbol "lambda_expression" SLambdaExpressionSymbol
   iLambdaExpression
     <$> pLambdaBindings
     <*> pMaybe pHiddenType
@@ -1930,7 +1938,7 @@ pLambdaExpression = do
 
 pLambdaBindings :: Parser (MoveTerm LambdaBindingsL)
 pLambdaBindings = do
-  _sym <- pSymbol SLambdaBindingsSymbol
+  _sym <- pSymbol "lambda_bindings" SLambdaBindingsSymbol
   iLambdaBindings
     <$> pBitor
     <*> pPair (pMaybe pLambdaBinding) (pMany pLambdaBinding)
@@ -1938,7 +1946,7 @@ pLambdaBindings = do
 
 pLambdaBinding :: Parser (MoveTerm LambdaBindingL)
 pLambdaBinding = do
-  _sym <- pSymbol SLambdaBindingSymbol
+  _sym <- pSymbol "lambda_binding" SLambdaBindingSymbol
   choice [ pCommaBindListLambdaBinding
          , pBindLambdaBinding
          , pLambdaBinding3
@@ -1960,13 +1968,13 @@ pLambdaBinding = do
 
 pLoopExpression :: Parser (MoveTerm LoopExpressionL)
 pLoopExpression = do
-  _sym <- pSymbol SLoopExpressionSymbol
+  _sym <- pSymbol "loop_expression" SLoopExpressionSymbol
   iLoopExpression
     <$> pHiddenExpression
 
 pQuantifierExpression :: Parser (MoveTerm QuantifierExpressionL)
 pQuantifierExpression = do
-  _sym <- pSymbol SQuantifierExpressionSymbol
+  _sym <- pSymbol "quantifier_expression" SQuantifierExpressionSymbol
   iQuantifierExpression
     <$> pEither pHiddenExists pHiddenForall
     <*> pQuantifierBindings
@@ -1983,14 +1991,14 @@ pHiddenForall = do
 
 pQuantifierBindings :: Parser (MoveTerm QuantifierBindingsL)
 pQuantifierBindings = do
-  _sym <- pSymbol SQuantifierBindingsSymbol
+  _sym <- pSymbol "quantifier_bindings" SQuantifierBindingsSymbol
   iQuantifierBindings
     <$> pQuantifierBinding
     <*> pMany pQuantifierBinding
 
 pQuantifierBinding :: Parser (MoveTerm QuantifierBindingL)
 pQuantifierBinding = do
-  _sym <- pSymbol SQuantifierBindingSymbol
+  _sym <- pSymbol "quantifier_binding" SQuantifierBindingSymbol
   choice [ pQuantifierBinding1
          , pQuantifierBinding2
          ]
@@ -2008,7 +2016,7 @@ pQuantifierBinding = do
 
 pReturnExpression :: Parser (MoveTerm ReturnExpressionL)
 pReturnExpression = do
-  _sym <- pSymbol SReturnExpressionSymbol
+  _sym <- pSymbol "return_expression" SReturnExpressionSymbol
   choice [ pReturnExpression1
          , pReturnExpression2
          ]
@@ -2025,20 +2033,20 @@ pReturnExpression = do
 
 pWhileExpression :: Parser (MoveTerm WhileExpressionL)
 pWhileExpression = do
-  _sym <- pSymbol SWhileExpressionSymbol
+  _sym <- pSymbol "while_expression" SWhileExpressionSymbol
   iWhileExpression
     <$> pHiddenExpression
     <*> pHiddenExpression
 
 pBlockItem :: Parser (MoveTerm BlockItemL)
 pBlockItem = do
-  _sym <- pSymbol SBlockItemSymbol
+  _sym <- pSymbol "block_item" SBlockItemSymbol
   iBlockItem
     <$> pEither pLetStatement pHiddenExpression
 
 pLetStatement :: Parser (MoveTerm LetStatementL)
 pLetStatement = do
-  _sym <- pSymbol SLetStatementSymbol
+  _sym <- pSymbol "let_statement" SLetStatementSymbol
   iLetStatement
     <$> pBindList
     <*> pMaybe pHiddenType
@@ -2046,7 +2054,7 @@ pLetStatement = do
 
 pMacroFunctionDefinition :: Parser (MoveTerm MacroFunctionDefinitionL)
 pMacroFunctionDefinition = do
-  _sym <- pSymbol SMacroFunctionDefinitionSymbol
+  _sym <- pSymbol "macro_function_definition" SMacroFunctionDefinitionSymbol
   iMacroFunctionDefinition
     <$> pMaybe pModifier
     <*> pHiddenMacroSignature
@@ -2063,7 +2071,7 @@ pHiddenMacroSignature = do
 
 pNativeFunctionDefinition :: Parser (MoveTerm NativeFunctionDefinitionL)
 pNativeFunctionDefinition = do
-  _sym <- pSymbol SNativeFunctionDefinitionSymbol
+  _sym <- pSymbol "native_function_definition" SNativeFunctionDefinitionSymbol
   iNativeFunctionDefinition
     <$> pHiddenFunctionSignature
 
@@ -2084,7 +2092,7 @@ pHiddenStructItem = do
 
 pNativeStructDefinition :: Parser (MoveTerm NativeStructDefinitionL)
 pNativeStructDefinition = do
-  _sym <- pSymbol SNativeStructDefinitionSymbol
+  _sym <- pSymbol "native_struct_definition" SNativeStructDefinitionSymbol
   iNativeStructDefinition
     <$> pMaybe pPublic
     <*> pHiddenStructSignature
@@ -2098,7 +2106,7 @@ pHiddenStructSignature = do
 
 pStructDefinition :: Parser (MoveTerm StructDefinitionL)
 pStructDefinition = do
-  _sym <- pSymbol SStructDefinitionSymbol
+  _sym <- pSymbol "struct_definition" SStructDefinitionSymbol
   iStructDefinition
     <$> pMaybe pPublic
     <*> pHiddenStructSignature
@@ -2107,7 +2115,7 @@ pStructDefinition = do
 
 pConstant :: Parser (MoveTerm ConstantL)
 pConstant = do
-  _sym <- pSymbol SConstantSymbol
+  _sym <- pSymbol "constant" SConstantSymbol
   iConstant
     <$> pConstantIdentifier
     <*> pHiddenType
@@ -2116,19 +2124,19 @@ pConstant = do
 
 pConstantIdentifier :: Parser (MoveTerm ConstantIdentifierL)
 pConstantIdentifier = do
-  _sym <- pSymbol SConstantIdentifierSymbol
+  _sym <- pSymbol "constant_identifier" SConstantIdentifierSymbol
   pure iConstantIdentifier
 
 pFriendDeclaration :: Parser (MoveTerm FriendDeclarationL)
 pFriendDeclaration = do
-  _sym <- pSymbol SFriendDeclarationSymbol
+  _sym <- pSymbol "friend_declaration" SFriendDeclarationSymbol
   iFriendDeclaration
     <$> pFriend
     <*> pFriendAccess
 
 pFriendAccess :: Parser (MoveTerm FriendAccessL)
 pFriendAccess = do
-  _sym <- pSymbol SFriendAccessSymbol
+  _sym <- pSymbol "friend_access" SFriendAccessSymbol
   choice [ pLocalModuleFriendAccess
          , pFullyQualifiedModuleFriendAccess
          ]
