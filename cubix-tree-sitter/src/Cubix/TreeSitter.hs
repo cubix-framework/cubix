@@ -2,7 +2,7 @@
 module Cubix.TreeSitter where
 
 import Data.ByteString qualified as BS
-import Control.Monad (unless, when)
+import Control.Monad (unless)
 import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, ask, asks)
@@ -104,24 +104,18 @@ symbols path = go
     go :: TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
     go root = effect $ do
       extra <- liftIO $ TS.nodeIsExtra root
-      when extra $ pure ()
-      range  <- liftIO $ nodeRange root
-      span   <- liftIO $ nodeSpan path root
-      symbol <- liftIO $ TS.nodeSymbol root
-      let tok = MkToken symbol span range
-      childNo <- liftIO $ TS.nodeChildCount root
-      let childNums = if childNo == 0 then [] else [0..childNo - 1]
-          childs = Streaming.mapM (liftIO . TS.nodeChild root)
-            $ Streaming.each childNums
-      pure $ wrap (tok :> Streaming.for childs go)
-
-    -- children :: TS.Node -> TokenStream TS.Symbol IO ()
-    -- children n = effect $ do
-    --   childNo <- TS.nodeChildCount n
-    --   let childNums = if childNo == 0 then [] else [0..childNo - 1]
-    --       childs = Streaming.mapM (TS.nodeChild n)
-    --         $ Streaming.each childNums
-    --   pure $ Streaming.for childs go
+      if extra
+        then pure $ pure ()
+        else do
+         range  <- liftIO $ nodeRange root
+         span   <- liftIO $ nodeSpan path root
+         symbol <- liftIO $ TS.nodeSymbol root
+         let tok = MkToken symbol span range
+         childNo <- liftIO $ TS.nodeChildCount root
+         let childNums = if childNo == 0 then [] else [0..childNo - 1]
+             childs = Streaming.mapM (liftIO . TS.nodeChild root)
+               $ Streaming.each childNums
+         pure $ wrap (tok :> Streaming.for childs go)
 
 withLanguage :: (MonadMask m, MonadIO m) => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
 withLanguage getLang = bracket
