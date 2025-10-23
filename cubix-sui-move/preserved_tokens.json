@@ -24,6 +24,8 @@
   "true": null,
   "false": null,
   "public": null,
+  "entry": null,
+  "native": null,
   "post": null,
   "assert": null,
   "assume": null,
