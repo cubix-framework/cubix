@@ -233,6 +233,7 @@ data CopyTokL
 data DecreasesTokL
 data DropTokL
 data EnsuresTokL
+data EntryTokL
 data FalseTokL
 data FriendTokL
 data GlobalTokL
@@ -242,6 +243,7 @@ data LocalTokL
 data ModifiesTokL
 data ModuleTokL
 data MoveTokL
+data NativeTokL
 data PackTokL
 data PackageTokL
 data PhantomTokL
@@ -463,6 +465,7 @@ data LabelSing (sort :: Sort) where
   SDecreasesTokL :: LabelSing DecreasesTokL
   SDropTokL :: LabelSing DropTokL
   SEnsuresTokL :: LabelSing EnsuresTokL
+  SEntryTokL :: LabelSing EntryTokL
   SFalseTokL :: LabelSing FalseTokL
   SFriendTokL :: LabelSing FriendTokL
   SGlobalTokL :: LabelSing GlobalTokL
@@ -472,6 +475,7 @@ data LabelSing (sort :: Sort) where
   SModifiesTokL :: LabelSing ModifiesTokL
   SModuleTokL :: LabelSing ModuleTokL
   SMoveTokL :: LabelSing MoveTokL
+  SNativeTokL :: LabelSing NativeTokL
   SPackTokL :: LabelSing PackTokL
   SPackageTokL :: LabelSing PackageTokL
   SPhantomTokL :: LabelSing PhantomTokL
@@ -697,6 +701,7 @@ decLabelSing SCopyTokL SCopyTokL = Just Refl
 decLabelSing SDecreasesTokL SDecreasesTokL = Just Refl
 decLabelSing SDropTokL SDropTokL = Just Refl
 decLabelSing SEnsuresTokL SEnsuresTokL = Just Refl
+decLabelSing SEntryTokL SEntryTokL = Just Refl
 decLabelSing SFalseTokL SFalseTokL = Just Refl
 decLabelSing SFriendTokL SFriendTokL = Just Refl
 decLabelSing SGlobalTokL SGlobalTokL = Just Refl
@@ -706,6 +711,7 @@ decLabelSing SLocalTokL SLocalTokL = Just Refl
 decLabelSing SModifiesTokL SModifiesTokL = Just Refl
 decLabelSing SModuleTokL SModuleTokL = Just Refl
 decLabelSing SMoveTokL SMoveTokL = Just Refl
+decLabelSing SNativeTokL SNativeTokL = Just Refl
 decLabelSing SPackTokL SPackTokL = Just Refl
 decLabelSing SPackageTokL SPackageTokL = Just Refl
 decLabelSing SPhantomTokL SPhantomTokL = Just Refl
@@ -806,6 +812,7 @@ data Token e l where
   Decreases :: Token e DecreasesTokL
   Drop :: Token e DropTokL
   Ensures :: Token e EnsuresTokL
+  Entry :: Token e EntryTokL
   False :: Token e FalseTokL
   Friend :: Token e FriendTokL
   Global :: Token e GlobalTokL
@@ -815,6 +822,7 @@ data Token e l where
   Modifies :: Token e ModifiesTokL
   Module :: Token e ModuleTokL
   Move :: Token e MoveTokL
+  Native :: Token e NativeTokL
   Pack :: Token e PackTokL
   Package :: Token e PackageTokL
   Phantom :: Token e PhantomTokL
@@ -851,7 +859,7 @@ data ModuleDefinition e l where
 
 data ModuleBody e l where
   ModuleBody
-    :: e [Either FriendDeclarationL (Either ConstantL (Either HiddenFunctionItemL (Either HiddenStructItemL (Either HiddenEnumItemL (Either SpecBlockL UseDeclarationL)))))]
+    :: e [Either (Either (Either (Either (Either (Either UseDeclarationL FriendDeclarationL) ConstantL) HiddenFunctionItemL) HiddenStructItemL) HiddenEnumItemL) SpecBlockL]
     -> ModuleBody e ModuleBodyL
 
 data HiddenEnumItem e l where
@@ -885,7 +893,7 @@ data EnumIdentifier e l where
 
 data AbilityDecls e l where
   AbilityDecls
-    :: e (Maybe AbilityL, [AbilityL])
+    :: e ([AbilityL], Maybe AbilityL)
     -> AbilityDecls e AbilityDeclsL
 
 data Ability e l where
@@ -905,7 +913,7 @@ data Ability e l where
 data TypeParameters e l where
   TypeParameters
     :: e LtTokL
-    -> e ([TypeParameterL], TypeParameterL)
+    -> e (TypeParameterL, [TypeParameterL])
     -> e GtTokL
     -> TypeParameters e TypeParametersL
 
@@ -914,7 +922,7 @@ data TypeParameter e l where
     :: e (Maybe DollarTokL)
     -> e (Maybe PhantomTokL)
     -> e HiddenTypeParameterIdentifierL
-    -> e (Maybe ([(AbilityL, AddTokL)], (Maybe AddTokL, AbilityL)))
+    -> e (Maybe ((AbilityL, [(AddTokL, AbilityL)]), Maybe AddTokL))
     -> TypeParameter e TypeParameterL
 
 data HiddenTypeParameterIdentifier e l where
@@ -928,7 +936,7 @@ data TypeParameterIdentifier e l where
 
 data EnumVariants e l where
   EnumVariants
-    :: e (Maybe VariantL, [VariantL])
+    :: e ([VariantL], Maybe VariantL)
     -> EnumVariants e EnumVariantsL
 
 data Variant e l where
@@ -956,7 +964,7 @@ data DatatypeFields e l where
 
 data NamedFields e l where
   NamedFields
-    :: e (Maybe FieldAnnotationL, [FieldAnnotationL])
+    :: e ([FieldAnnotationL], Maybe FieldAnnotationL)
     -> NamedFields e NamedFieldsL
 
 data FieldAnnotation e l where
@@ -1053,19 +1061,19 @@ data Identifier e l where
 
 data ModuleIdentity e l where
   ModuleIdentity
-    :: e (Either HiddenModuleIdentifierL NumLiteralL)
+    :: e (Either NumLiteralL HiddenModuleIdentifierL)
     -> e HiddenModuleIdentifierL
     -> ModuleIdentity e ModuleIdentityL
 
 data NumLiteral e l where
   NumLiteral
-    :: e (Maybe (Either U16TokL (Either U32TokL (Either U64TokL (Either U128TokL (Either U256TokL U8TokL))))))
+    :: e (Maybe (Either (Either (Either (Either (Either U8TokL U16TokL) U32TokL) U64TokL) U128TokL) U256TokL))
     -> NumLiteral e NumLiteralL
 
 data TypeArguments e l where
   TypeArguments
     :: e LtTokL
-    -> e ([HiddenTypeL], HiddenTypeL)
+    -> e (HiddenTypeL, [HiddenTypeL])
     -> e GtTokL
     -> TypeArguments e TypeArgumentsL
 
@@ -1078,7 +1086,7 @@ data FunctionType e l where
 data FunctionTypeParameters e l where
   FunctionTypeParameters
     :: e BitorTokL
-    -> e (Maybe HiddenTypeL, [HiddenTypeL])
+    -> e ([HiddenTypeL], Maybe HiddenTypeL)
     -> e BitorTokL
     -> FunctionTypeParameters e FunctionTypeParametersL
 
@@ -1140,17 +1148,17 @@ data MutRef e l where
 
 data TupleType e l where
   TupleType
-    :: e (Maybe HiddenTypeL, [HiddenTypeL])
+    :: e ([HiddenTypeL], Maybe HiddenTypeL)
     -> TupleType e TupleTypeL
 
 data PositionalFields e l where
   PositionalFields
-    :: e (Maybe HiddenTypeL, [HiddenTypeL])
+    :: e ([HiddenTypeL], Maybe HiddenTypeL)
     -> PositionalFields e PositionalFieldsL
 
 data PostfixAbilityDecls e l where
   PostfixAbilityDecls
-    :: e (Maybe AbilityL, [AbilityL])
+    :: e ([AbilityL], Maybe AbilityL)
     -> PostfixAbilityDecls e PostfixAbilityDeclsL
 
 data HiddenFunctionItem e l where
@@ -1192,12 +1200,12 @@ data FunctionIdentifier e l where
 
 data FunctionParameters e l where
   FunctionParameters
-    :: e (Maybe (Either FunctionParameterL MutFunctionParameterL), [Either FunctionParameterL MutFunctionParameterL])
+    :: e ([Either MutFunctionParameterL FunctionParameterL], Maybe (Either MutFunctionParameterL FunctionParameterL))
     -> FunctionParameters e FunctionParametersL
 
 data FunctionParameter e l where
   FunctionParameter
-    :: e (Either (HiddenVariableIdentifierL, DollarTokL) HiddenVariableIdentifierL)
+    :: e (Either HiddenVariableIdentifierL (DollarTokL, HiddenVariableIdentifierL))
     -> e HiddenTypeL
     -> FunctionParameter e FunctionParameterL
 
@@ -1218,7 +1226,13 @@ data MutFunctionParameter e l where
 data Modifier e l where
   Modifier1
     :: e PublicTokL
-    -> e (Maybe (Either FriendTokL PackageTokL))
+    -> e (Maybe (Either PackageTokL FriendTokL))
+    -> Modifier e ModifierL
+  EntryModifier
+    :: e EntryTokL
+    -> Modifier e ModifierL
+  NativeModifier
+    :: e NativeTokL
     -> Modifier e ModifierL
 
 data RetType e l where
@@ -1415,7 +1429,7 @@ data CallExpression e l where
 
 data ArgList e l where
   ArgList
-    :: e (Maybe HiddenExpressionL, [HiddenExpressionL])
+    :: e ([HiddenExpressionL], Maybe HiddenExpressionL)
     -> ArgList e ArgListL
 
 data NameExpression e l where
@@ -1436,7 +1450,7 @@ data DotExpression e l where
 
 data ExpressionList e l where
   ExpressionList
-    :: e ([HiddenExpressionL], HiddenExpressionL)
+    :: e (HiddenExpressionL, [HiddenExpressionL])
     -> ExpressionList e ExpressionListL
 
 data IfExpression e l where
@@ -1449,7 +1463,7 @@ data IfExpression e l where
 data IndexExpression e l where
   IndexExpression
     :: e HiddenExpressionTermL
-    -> e (Maybe HiddenExpressionL, [HiddenExpressionL])
+    -> e ([HiddenExpressionL], Maybe HiddenExpressionL)
     -> IndexExpression e IndexExpressionL
 
 data MacroCallExpression e l where
@@ -1473,7 +1487,7 @@ data MatchExpression e l where
 
 data HiddenMatchBody e l where
   HiddenMatchBody
-    :: e (Maybe MatchArmL, [MatchArmL])
+    :: e ([MatchArmL], Maybe MatchArmL)
     -> HiddenMatchBody e HiddenMatchBodyL
 
 data MatchArm e l where
@@ -1533,7 +1547,7 @@ data BindFields e l where
 
 data BindNamedFields e l where
   BindNamedFields
-    :: e (Maybe (Either MutBindFieldL BindFieldL), [Either MutBindFieldL BindFieldL])
+    :: e ([Either BindFieldL MutBindFieldL], Maybe (Either BindFieldL MutBindFieldL))
     -> BindNamedFields e BindNamedFieldsL
 
 data BindField e l where
@@ -1557,7 +1571,7 @@ data MutBindField e l where
 
 data BindPositionalFields e l where
   BindPositionalFields
-    :: e (Maybe (Either MutBindFieldL BindFieldL), [Either MutBindFieldL BindFieldL])
+    :: e ([Either BindFieldL MutBindFieldL], Maybe (Either BindFieldL MutBindFieldL))
     -> BindPositionalFields e BindPositionalFieldsL
 
 data MutBindVar e l where
@@ -1572,12 +1586,12 @@ data BindVar e l where
 
 data CommaBindList e l where
   CommaBindList
-    :: e (Maybe HiddenBindL, [HiddenBindL])
+    :: e ([HiddenBindL], Maybe HiddenBindL)
     -> CommaBindList e CommaBindListL
 
 data OrBindList e l where
   OrBindList
-    :: e ([(HiddenBindL, BitorTokL)], (Maybe BitorTokL, HiddenBindL))
+    :: e ((HiddenBindL, [(BitorTokL, HiddenBindL)]), Maybe BitorTokL)
     -> OrBindList e OrBindListL
 
 data MatchCondition e l where
@@ -1593,7 +1607,7 @@ data PackExpression e l where
 
 data FieldInitializeList e l where
   FieldInitializeList
-    :: e (Maybe ExpFieldL, [ExpFieldL])
+    :: e ([ExpFieldL], Maybe ExpFieldL)
     -> FieldInitializeList e FieldInitializeListL
 
 data ExpField e l where
@@ -1604,7 +1618,7 @@ data ExpField e l where
 
 data SpecBlock e l where
   SpecBlock
-    :: e (Either HiddenSpecFunctionL (SpecBodyL, Maybe HiddenSpecBlockTargetL))
+    :: e (Either (Maybe HiddenSpecBlockTargetL, SpecBodyL) HiddenSpecFunctionL)
     -> SpecBlock e SpecBlockL
 
 data HiddenSpecBlockTarget e l where
@@ -1646,7 +1660,8 @@ data HiddenSpecFunction e l where
 
 data NativeSpecFunction e l where
   NativeSpecFunction
-    :: e HiddenSpecFunctionSignatureL
+    :: e NativeTokL
+    -> e HiddenSpecFunctionSignatureL
     -> NativeSpecFunction e NativeSpecFunctionL
 
 data HiddenSpecFunctionSignature e l where
@@ -1703,13 +1718,13 @@ data HiddenSpecBlockMemeber e l where
 data SpecApply e l where
   SpecApply
     :: e HiddenExpressionL
-    -> e ([SpecApplyPatternL], SpecApplyPatternL)
-    -> e (Maybe ([SpecApplyPatternL], SpecApplyPatternL))
+    -> e (SpecApplyPatternL, [SpecApplyPatternL])
+    -> e (Maybe (SpecApplyPatternL, [SpecApplyPatternL]))
     -> SpecApply e SpecApplyL
 
 data SpecApplyPattern e l where
   SpecApplyPattern
-    :: e (Maybe (Either InternalTokL PublicTokL))
+    :: e (Maybe (Either PublicTokL InternalTokL))
     -> e SpecApplyNamePatternL
     -> e (Maybe TypeParametersL)
     -> SpecApplyPattern e SpecApplyPatternL
@@ -1743,25 +1758,25 @@ data ConditionKind e l where
 
 data ConditionProperties e l where
   ConditionProperties
-    :: e (Maybe SpecPropertyL, [SpecPropertyL])
+    :: e ([SpecPropertyL], Maybe SpecPropertyL)
     -> ConditionProperties e ConditionPropertiesL
 
 data SpecProperty e l where
   SpecProperty
     :: e IdentifierL
-    -> e (Maybe (HiddenLiteralValueL, AssignTokL))
+    -> e (Maybe (AssignTokL, HiddenLiteralValueL))
     -> SpecProperty e SpecPropertyL
 
 data HiddenSpecAbortWithOrModifies e l where
   HiddenSpecAbortWithOrModifies
     :: e ConditionKindL
     -> e (Maybe ConditionPropertiesL)
-    -> e ([HiddenExpressionL], HiddenExpressionL)
+    -> e (HiddenExpressionL, [HiddenExpressionL])
     -> HiddenSpecAbortWithOrModifies e HiddenSpecAbortWithOrModifiesL
 
 data HiddenSpecCondition e l where
   HiddenSpecCondition
-    :: e (Either (Maybe ModuleTokL, ConditionKindL) ConditionKindL)
+    :: e (Either ConditionKindL (ConditionKindL, Maybe ModuleTokL))
     -> e (Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
     -> HiddenSpecCondition e HiddenSpecConditionL
@@ -1803,12 +1818,12 @@ data SpecLet e l where
 
 data SpecPragma e l where
   SpecPragma
-    :: e (Maybe SpecPropertyL, [SpecPropertyL])
+    :: e ([SpecPropertyL], Maybe SpecPropertyL)
     -> SpecPragma e SpecPragmaL
 
 data SpecVariable e l where
   SpecVariable
-    :: e (Maybe (Either LocalTokL GlobalTokL))
+    :: e (Maybe (Either GlobalTokL LocalTokL))
     -> e IdentifierL
     -> e (Maybe TypeParametersL)
     -> e HiddenTypeL
@@ -1817,13 +1832,13 @@ data SpecVariable e l where
 data UseDeclaration e l where
   UseDeclaration
     :: e (Maybe PublicTokL)
-    -> e (Either UseModuleL (Either UseModuleMemberL (Either UseModuleMembersL UseFunL)))
+    -> e (Either (Either (Either UseFunL UseModuleL) UseModuleMemberL) UseModuleMembersL)
     -> UseDeclaration e UseDeclarationL
 
 data UseFun e l where
   UseFun
     :: e ModuleAccessL
-    -> e (HiddenFunctionIdentifierL, ModuleAccessL)
+    -> e (ModuleAccessL, HiddenFunctionIdentifierL)
     -> UseFun e UseFunL
 
 data UseModule e l where
@@ -1841,7 +1856,7 @@ data UseModuleMember e l where
 data UseMember e l where
   UseMember1
     :: e IdentifierL
-    -> e ([UseMemberL], UseMemberL)
+    -> e (UseMemberL, [UseMemberL])
     -> UseMember e UseMemberL
   UseMember2
     :: e IdentifierL
@@ -1855,12 +1870,12 @@ data UseMember e l where
 
 data UseModuleMembers e l where
   UseModuleMembers1
-    :: e (Either HiddenModuleIdentifierL NumLiteralL)
-    -> e ([UseMemberL], UseMemberL)
+    :: e (Either NumLiteralL HiddenModuleIdentifierL)
+    -> e (UseMemberL, [UseMemberL])
     -> UseModuleMembers e UseModuleMembersL
   UseModuleMembers2
     :: e ModuleIdentityL
-    -> e ([UseMemberL], UseMemberL)
+    -> e (UseMemberL, [UseMemberL])
     -> UseModuleMembers e UseModuleMembersL
 
 data UnitExpression e l where
@@ -1869,8 +1884,8 @@ data UnitExpression e l where
 
 data VectorExpression e l where
   VectorExpression
-    :: e (Maybe (([HiddenTypeL], HiddenTypeL), GtTokL))
-    -> e (Maybe HiddenExpressionL, [HiddenExpressionL])
+    :: e (Maybe ((HiddenTypeL, [HiddenTypeL]), GtTokL))
+    -> e ([HiddenExpressionL], Maybe HiddenExpressionL)
     -> VectorExpression e VectorExpressionL
 
 data BorrowExpression e l where
@@ -1887,7 +1902,7 @@ data DereferenceExpression e l where
 
 data MoveOrCopyExpression e l where
   MoveOrCopyExpression
-    :: e (Either CopyTokL MoveTokL)
+    :: e (Either MoveTokL CopyTokL)
     -> e HiddenExpressionL
     -> MoveOrCopyExpression e MoveOrCopyExpressionL
 
@@ -2048,7 +2063,7 @@ data LambdaExpression e l where
 data LambdaBindings e l where
   LambdaBindings
     :: e BitorTokL
-    -> e (Maybe LambdaBindingL, [LambdaBindingL])
+    -> e ([LambdaBindingL], Maybe LambdaBindingL)
     -> e BitorTokL
     -> LambdaBindings e LambdaBindingsL
 
@@ -2071,7 +2086,7 @@ data LoopExpression e l where
 
 data QuantifierExpression e l where
   QuantifierExpression
-    :: e (Either HiddenExistsL HiddenForallL)
+    :: e (Either HiddenForallL HiddenExistsL)
     -> e QuantifierBindingsL
     -> e (Maybe HiddenExpressionL)
     -> e HiddenExpressionL
@@ -2118,14 +2133,14 @@ data WhileExpression e l where
 
 data BlockItem e l where
   BlockItem
-    :: e (Either LetStatementL HiddenExpressionL)
+    :: e (Either HiddenExpressionL LetStatementL)
     -> BlockItem e BlockItemL
 
 data LetStatement e l where
   LetStatement
     :: e BindListL
     -> e (Maybe HiddenTypeL)
-    -> e (Maybe (HiddenExpressionL, AssignTokL))
+    -> e (Maybe (AssignTokL, HiddenExpressionL))
     -> LetStatement e LetStatementL
 
 data MacroFunctionDefinition e l where
@@ -2160,6 +2175,7 @@ data HiddenStructItem e l where
 data NativeStructDefinition e l where
   NativeStructDefinition
     :: e (Maybe PublicTokL)
+    -> e NativeTokL
     -> e HiddenStructSignatureL
     -> NativeStructDefinition e NativeStructDefinitionL
 
@@ -2775,6 +2791,7 @@ type data Symbol (symbolType :: SymbolType) where
   DecreasesTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DropTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   EnsuresTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EntryTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FalseTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   GlobalTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2784,6 +2801,7 @@ type data Symbol (symbolType :: SymbolType) where
   ModifiesTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MoveTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NativeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PackTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PackageTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PhantomTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -3008,6 +3026,7 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SDecreasesTokSymbol :: SymbolSing Anonymous DecreasesTokSymbol
   SDropTokSymbol :: SymbolSing Anonymous DropTokSymbol
   SEnsuresTokSymbol :: SymbolSing Anonymous EnsuresTokSymbol
+  SEntryTokSymbol :: SymbolSing Anonymous EntryTokSymbol
   SFalseTokSymbol :: SymbolSing Anonymous FalseTokSymbol
   SFriendTokSymbol :: SymbolSing Anonymous FriendTokSymbol
   SGlobalTokSymbol :: SymbolSing Anonymous GlobalTokSymbol
@@ -3017,6 +3036,7 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SModifiesTokSymbol :: SymbolSing Anonymous ModifiesTokSymbol
   SModuleTokSymbol :: SymbolSing Anonymous ModuleTokSymbol
   SMoveTokSymbol :: SymbolSing Anonymous MoveTokSymbol
+  SNativeTokSymbol :: SymbolSing Anonymous NativeTokSymbol
   SPackTokSymbol :: SymbolSing Anonymous PackTokSymbol
   SPackageTokSymbol :: SymbolSing Anonymous PackageTokSymbol
   SPhantomTokSymbol :: SymbolSing Anonymous PhantomTokSymbol
@@ -3245,6 +3265,7 @@ decSymbolSing SCopyTokSymbol SCopyTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDecreasesTokSymbol SDecreasesTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDropTokSymbol SDropTokSymbol = Just (Refl, HRefl)
 decSymbolSing SEnsuresTokSymbol SEnsuresTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEntryTokSymbol SEntryTokSymbol = Just (Refl, HRefl)
 decSymbolSing SFalseTokSymbol SFalseTokSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendTokSymbol SFriendTokSymbol = Just (Refl, HRefl)
 decSymbolSing SGlobalTokSymbol SGlobalTokSymbol = Just (Refl, HRefl)
@@ -3254,6 +3275,7 @@ decSymbolSing SLocalTokSymbol SLocalTokSymbol = Just (Refl, HRefl)
 decSymbolSing SModifiesTokSymbol SModifiesTokSymbol = Just (Refl, HRefl)
 decSymbolSing SModuleTokSymbol SModuleTokSymbol = Just (Refl, HRefl)
 decSymbolSing SMoveTokSymbol SMoveTokSymbol = Just (Refl, HRefl)
+decSymbolSing SNativeTokSymbol SNativeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPackTokSymbol SPackTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPackageTokSymbol SPackageTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPhantomTokSymbol SPhantomTokSymbol = Just (Refl, HRefl)
@@ -3507,6 +3529,7 @@ symbolMap = Map.fromList
     , ("decreases", SomeAnonymousSymbolSing SDecreasesTokSymbol)
     , ("drop", SomeAnonymousSymbolSing SDropTokSymbol)
     , ("ensures", SomeAnonymousSymbolSing SEnsuresTokSymbol)
+    , ("entry", SomeAnonymousSymbolSing SEntryTokSymbol)
     , ("false", SomeAnonymousSymbolSing SFalseTokSymbol)
     , ("friend", SomeAnonymousSymbolSing SFriendTokSymbol)
     , ("global", SomeAnonymousSymbolSing SGlobalTokSymbol)
@@ -3516,6 +3539,7 @@ symbolMap = Map.fromList
     , ("modifies", SomeAnonymousSymbolSing SModifiesTokSymbol)
     , ("module", SomeAnonymousSymbolSing SModuleTokSymbol)
     , ("move", SomeAnonymousSymbolSing SMoveTokSymbol)
+    , ("native", SomeAnonymousSymbolSing SNativeTokSymbol)
     , ("pack", SomeAnonymousSymbolSing SPackTokSymbol)
     , ("package", SomeAnonymousSymbolSing SPackageTokSymbol)
     , ("phantom", SomeAnonymousSymbolSing SPhantomTokSymbol)

@@ -208,8 +208,8 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     StringRule s -> maybe Unit (Token . fromMaybe s) (M.lookup s tokenMap)
     PatternRule{} -> Unit
     SymbolRule s -> Node (Name s)
-    SeqRule rs -> foldr1Or mkTuple Unit [t | r <- V.toList rs, let t = ruleToType r]
-    ChoiceRule rs -> foldr1Or mkEither Unit [t | r <- V.toList rs, let t = ruleToType r]
+    SeqRule rs -> foldl1Or mkTuple Unit (ruleToType <$> rs)
+    ChoiceRule rs -> foldl1Or mkEither Unit (ruleToType <$> rs)
     RepeatRule r -> List (ruleToType r)
     Repeat1Rule r -> NonEmpty (ruleToType r)
     AliasRule n True _ -> Node (Name n)
@@ -278,7 +278,8 @@ reachableFrom dataTypes start = usedData
   nameNodeMap :: Map Name Gr.Node
   nameNodeMap = M.fromList [(name, node) | (node, Data name _) <- nodesAndData]
 
--- | @`foldr1Or` f e xs@ returns @e@ if @xs@ is empty and @`foldr1` f xs@ otherwise.
-foldr1Or :: (a -> a -> a) -> a -> [a] -> a
-foldr1Or _ e [] = e
-foldr1Or f _ (x : xs) = foldr f x xs
+-- | @`foldl1Or` f e xs@ returns @e@ if @xs@ is empty and @`foldl1` f xs@ otherwise.
+foldl1Or :: (a -> a -> a) -> a -> Vector a -> a
+foldl1Or f e v
+  | null v = e
+  | otherwise = V.foldl1' f v
