@@ -109,6 +109,8 @@ library gen-internal
     TreeSitter.GenerateAst.Internal.Data
     TreeSitter.GenerateAst.Internal.Grammar
     TreeSitter.GenerateAst.Internal.Parser
+    TreeSitter.GenerateAst.Internal.Transform
+    TreeSitter.GenerateAst.Internal.Transform.HoistChoices
 
 executable gen-mod
   import: language

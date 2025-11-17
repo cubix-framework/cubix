@@ -31,6 +31,11 @@ import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
 import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, isHidden, toDataTypes, unName, prefixedName)
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
 import TreeSitter.GenerateAst.Internal.Parser (Parser (..), mkParser)
+import TreeSitter.GenerateAst.Internal.Transform (transform)
+
+import Debug.Trace
+import Text.Pretty.Simple
+import System.IO.Unsafe
 
 -------------------------------------------------------------------------------
 -- Template Parser and Renderer
@@ -43,7 +48,8 @@ data Metadata = Metadata
   }
 
 generateAst :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
-generateAst Metadata{..} grammar templateFile template tokenMap = errorOrModule
+generateAst Metadata{..} (transform -> grammar) templateFile template tokenMap =
+  {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
