@@ -6,11 +6,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module TreeSitter.GenerateAst.Internal.Grammar where
 
 import Control.Applicative (Alternative (..))
 import Data.Aeson.Types (FromJSON (..), Parser, Value (..), defaultOptions, genericParseJSON, typeMismatch, withObject, (.:), (.:?))
+import Data.Functor.Base.Extra ()
+import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Map (Map)
 import Data.Text (Text)
 import Data.Vector (Vector)
@@ -144,3 +148,5 @@ instance FromJSON Rule where
       "FIELD" -> FieldRule <$> o .: "name" <*> o .: "content"
       (safeReadPrecType -> Just precType) -> PrecRule precType <$> o .: "value" <*> o .: "content"
       _otherwise -> typeMismatch "Rule" (Object o)
+
+makeBaseFunctor ''Rule
