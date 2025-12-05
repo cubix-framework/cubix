@@ -53,6 +53,7 @@
   "signer": null,
   "bytearray": null,
   "$": "dollar",
+  "@": "at",
   "phantom": null,
   "move": null,
   "copy": null,
@@ -60,5 +61,10 @@
   "store": null,
   "key": null,
   "package": null,
-  "friend": null
+  "friend": null,
+  "exists": null,
+  "forall": null,
+  "requires": null,
+  "aborts_if": null,
+  "invariant": null
 }

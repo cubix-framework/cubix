@@ -96,6 +96,14 @@ data Rule
         prec :: !Prec
       , content :: !Rule
       }
+  -- | Artificially introduced rule that will pop in our transformations:
+  -- reference another rule, without parsing additional tree-sitter symbol
+  | RefRule
+      { name :: !RuleName
+      }
+  | Optional
+      { content :: !Rule
+      }
   deriving (Eq, Show, Generic)
 
 data PrecType = Prec | PrecLeft | PrecRight | PrecDynamic

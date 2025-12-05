@@ -22,11 +22,17 @@ stripBlanksAlg (SeqRuleF (Vector.filter (/= BlankRule) -> members))
   | Vector.null members = BlankRule
   | Vector.length members == 1 = Vector.unsafeHead members
   | otherwise = SeqRule members
-    
-stripBlanksAlg (ChoiceRuleF (Vector.filter (/= BlankRule) -> members))
-  | Vector.null members = BlankRule
-  | Vector.length members == 1 = Vector.unsafeHead members
-  | otherwise = ChoiceRule members
+
+stripBlanksAlg (ChoiceRuleF members)
+  | Vector.null members =
+      BlankRule
+  | Vector.elem BlankRule members =
+      let members' = Vector.filter (/= BlankRule) members
+      in if Vector.null members'
+         then BlankRule
+         else Optional (ChoiceRule members')
+  | otherwise =
+      ChoiceRule members
 
 stripBlanksAlg (AliasRuleF _ _ BlankRule) = BlankRule
 stripBlanksAlg (RepeatRuleF BlankRule) = BlankRule

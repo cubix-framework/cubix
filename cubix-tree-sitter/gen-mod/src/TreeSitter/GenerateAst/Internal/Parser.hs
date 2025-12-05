@@ -8,6 +8,8 @@ import TreeSitter.GenerateAst.Internal.Data
 
 data Parser
   = Symbol Name
+  -- | Like symbol but without parsing tree-sitter symbol first
+  | Inline Name
   | Alt Parser Parser
   -- | Choice (NonEmpty Parser)
   | Optional Parser
@@ -18,10 +20,12 @@ data Parser
   | Pair Parser Parser
   | Skip
   -- | Bind Name Parser
+  | Extract
 
 mkParser :: Type -> Parser
 mkParser = \case
   Node name -> Symbol name
+  Ref name -> Inline name
   List a -> Many (mkParser a)
   NonEmpty a -> Some (mkParser a)
   Unit -> Skip
@@ -29,7 +33,7 @@ mkParser = \case
   Token name -> Symbol (Name name)
   Either a b -> Alt (mkParser a) (mkParser b)
   Maybe a -> Optional (mkParser a)
-
+  Content -> Extract
       -- Bind n p -> _
       
       -- Node name -> TLB.fromText (snakeToCase Upper (prefixedName name) <> "L")

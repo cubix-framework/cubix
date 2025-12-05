@@ -28,7 +28,7 @@ import Data.Text.Lazy.Builder qualified as TLB
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
-import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, isHidden, toDataTypes, unName, prefixedName)
+import TreeSitter.GenerateAst.Internal.Data (Constr (..), Data (..), Field (..), Name (..), Type (..), type TokenMap, fieldName, isHidden, isInternal, toDataTypes, unName, prefixedName)
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
 import TreeSitter.GenerateAst.Internal.Parser (Parser (..), mkParser)
 import TreeSitter.GenerateAst.Internal.Transform (transform)
@@ -48,9 +48,10 @@ data Metadata = Metadata
   }
 
 generateAst :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
-generateAst Metadata{..} (transform -> grammar) templateFile template tokenMap =
-  {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
+generateAst Metadata{..} grammar' templateFile template tokenMap =
+  unsafePerformIO (pPrintLightBg (rules grammar)) `seq` errorOrModule
  where
+  grammar = transform tokenMap grammar'
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
     Context . M.fromList $
@@ -106,6 +107,7 @@ textToVal text = SimpleVal (Doc.Text (T.length text) text)
 isNodeLike :: Type -> Bool
 isNodeLike = \case
   Node _name -> True
+  Ref _name -> True
   List a -> isNodeLike a
   NonEmpty a -> isNodeLike a
   Unit -> False
@@ -113,6 +115,7 @@ isNodeLike = \case
   Token _ -> True
   Either a b -> isNodeLike a && isNodeLike b
   Maybe a -> isNodeLike a
+  Content -> True
 
 instance ToContext Text Data where
   toVal :: Data -> Val Text
@@ -123,7 +126,7 @@ instance ToContext Text Data where
       [ ("name", toVal name)
       , ("constrs", ListVal (toVal . (name,) <$> constrs))
       , ("isSum", toVal (length constrs /= 1))
-      , ("hidden", toVal $ isHidden name)
+      , ("hidden", toVal $ isHidden name || isInternal name )
       ]
 
 instance ToContext Text (Name, Constr) where
@@ -155,18 +158,26 @@ instance ToContext Text (Int, Field) where
 
 instance ToContext Text Type where
   toVal :: Type -> Val Text
-  toVal = textToVal . TL.toStrict . TLB.toLazyText . ("e " <>) . t2t True
+  toVal ty = textToVal . TL.toStrict . TLB.toLazyText . label ty $ t2t True ty
    where
+    label = \case
+      Content -> id
+      _ -> ("e " <>)
     par b t = if b then "(" <> t <> ")" else t
     t2t p = \case
       Node name -> TLB.fromText (snakeToCase Upper (prefixedName name) <> "L")
+      Ref name -> TLB.fromText (snakeToCase Upper (prefixedName name) <> "L")
       List a -> "[" <> t2t False a <> "]"
-      NonEmpty a -> "NonEmpty" <> " " <> t2t True a
+      NonEmpty a -> "[" <> t2t False a <> "]"
+        -- TODO: CUBIX_NON_EMPTY
+        -- discuss cubix non empty support first
+        -- par p ("NonEmpty" <> " " <> t2t True a)
       Token t -> TLB.fromText (snakeToCase Upper t) <> "TokL"
       Unit -> mempty
       Tuple a b -> par True (t2t False a <> ", " <> t2t False b)
       Either a b -> par p ("Either" <> " " <> t2t True a <> " " <> t2t True b)
       Maybe a -> par p ("Maybe" <> " " <> t2t True a)
+      Content -> "Text"
 
 instance ToContext Text Name where
   toVal :: Name -> Val Text
@@ -183,6 +194,7 @@ instance ToContext Text Parser where
     par b t = if b then "(" <> t <> ")" else t
     p2t p = \case
       Symbol name -> TLB.fromText ("p" <> snakeToCase Upper (prefixedName name))
+      Inline name -> TLB.fromText ("p" <> snakeToCase Upper (prefixedName name))
       Alt a b -> par p ("pEither " <> p2t True a <> " " <> p2t True b)
       -- Choice ps -> "
       Optional a -> par p ("pMaybe " <> p2t True a)
@@ -190,6 +202,7 @@ instance ToContext Text Parser where
       Some ps -> par p ("pSome " <> p2t True ps)
       Pair a b -> par p ("pPair " <> p2t True a <> " " <> p2t True b)
       Skip -> TLB.fromText "pure ()"
+      Extract -> "pText"
 
 --------------------------------------------------------------------------------
 -- Helper functions for case conversion

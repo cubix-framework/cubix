@@ -18,6 +18,7 @@ module TreeSitter.GenerateAst.Internal.Data (
   Field (..),
   fieldName,
   isHidden,
+  isInternal,
   GrammarError (..),
   toDataTypes,
   type TokenMap
@@ -38,6 +39,8 @@ import Data.Vector (Vector)
 import Data.Vector qualified as V
 import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), Rule (..), RuleName)
 
+import Debug.Trace
+
 -- | Preserves tokens used as keys, and renames them to value
 type TokenMap = Map Text (Maybe Text)
 
@@ -52,6 +55,10 @@ unName (Name n) = n
 isHidden :: Name -> Bool
 isHidden (Name n) = Text.head n == '_'
 
+isInternal :: Name -> Bool
+isInternal (Name n) = let segments = Text.split (== '_') n
+  in any (Text.isPrefixOf "internal") segments
+
 prefixedName :: Name -> Text
 prefixedName n
   | isHidden n = "hidden" <> unName n
@@ -59,6 +66,7 @@ prefixedName n
 
 data Type
   = Node Name
+  | Ref Name
   | List Type
   | NonEmpty Type
   | Unit
@@ -66,6 +74,7 @@ data Type
   | Tuple Type Type
   | Either Type Type
   | Maybe Type
+  | Content
   deriving (Eq, Show)
 
 mkTuple :: Type -> Type -> Type
@@ -107,10 +116,10 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
   startName :: Name
   startName = Name start
 
-  aliases = foldr (\r a -> a <> gatherAliases r) M.empty grammar.rules
+  -- aliases = foldr (\r a -> a <> gatherAliases r) M.empty grammar.rules
 
   dataTypes :: [Data]
-  dataTypes = ruleNameToData <$> M.keys (grammar.rules <> externals <> aliases)
+  dataTypes = ruleNameToData <$> M.keys (grammar.rules <> externals)
 
   externals :: Map RuleName Rule
   externals = foldMap (foldMap ruleToRuleMap . toList) grammar.externals
@@ -120,34 +129,37 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
       _ -> mempty
 
   rule :: RuleName -> Rule
-  rule ruleName = fromMaybe failUnknownRule (tryRules <|> tryExternals <|> tryAliases)
+  rule ruleName = fromMaybe failUnknownRule (tryRules <|> tryExternals) -- <|> tryAliases)
    where
     tryRules = M.lookup ruleName grammar.rules
     tryExternals = M.lookup ruleName externals
-    tryAliases = M.lookup ruleName aliases
+    -- tryAliases = M.lookup ruleName aliases
     failUnknownRule = throw $ GrammarErrorUnknownRule ruleName
 
-  gatherAliases :: Rule -> Map RuleName Rule
-  gatherAliases = go M.empty
-    where go :: Map RuleName Rule -> Rule -> Map RuleName Rule
-          go acc = \case
-            AliasRule n _ r -> case r of
-              SymbolRule sr -> M.insert n (rule sr) acc
-              _ -> go (M.insert n r acc) r
-            SeqRule rs -> foldr (flip go) acc rs
-            ChoiceRule rs -> foldr (flip go) acc rs
+  -- gatherAliases :: Rule -> Map RuleName Rule
+  -- gatherAliases = go M.empty
+  --   where go :: Map RuleName Rule -> Rule -> Map RuleName Rule
+  --         go acc = \case
+  --           AliasRule n _ r -> case r of
+  --             SymbolRule sr -> M.insert n (rule sr) acc
+  --             RefRule sr -> M.insert n (rule sr) acc
+  --             _ -> go (M.insert n r acc) r
+  --           SeqRule rs -> foldr (flip go) acc rs
+  --           ChoiceRule rs -> foldr (flip go) acc rs
 
-            RepeatRule r -> go acc r
-            Repeat1Rule r -> go acc r
-            TokenRule r -> go acc r
-            ImmediateTokenRule r -> go acc r
-            FieldRule _ r -> go acc r
-            PrecRule _ _ r -> go acc r
+  --           RepeatRule r -> go acc r
+  --           Repeat1Rule r -> go acc r
+  --           TokenRule r -> go acc r
+  --           ImmediateTokenRule r -> go acc r
+  --           FieldRule _ r -> go acc r
+  --           PrecRule _ _ r -> go acc r
+  --           Optional r -> go acc r
 
-            BlankRule -> acc
-            StringRule _ -> acc
-            PatternRule _ _ -> acc
-            SymbolRule _ -> acc
+  --           BlankRule -> acc
+  --           StringRule _ -> acc
+  --           PatternRule _ _ -> acc
+  --           SymbolRule _ -> acc
+  --           RefRule _ -> acc
 
   ruleNameToData :: RuleName -> Data
   ruleNameToData s = ruleToData (rule s)
@@ -181,33 +193,39 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     go [] = []
     go (r : rest) = case r of
       SymbolRule sr -> Just (Constr (suffix sr) [f | let f = ruleToField r, f.type_ /= Unit]) : go rest
+      RefRule sr -> Just (Constr (suffix sr) [f | let f = ruleToField r, f.type_ /= Unit]) : go rest
       ChoiceRule rs -> go (V.toList rs <> rest)
       BlankRule -> go rest
       StringRule str -> case M.lookup str tokenMap of
         Just (fromMaybe str -> tok) -> Just (Constr (suffix tok) [ Unnamed (Token tok) ]) : go rest
         Nothing  -> go rest
       AliasRule n _ (ruleToField -> f) ->
-        Just (Constr (suffix n) [f | f.type_ /= Unit]) : go rest
+        Just (Constr (Name n) [f | f.type_ /= Unit]) : go rest
       TokenRule tr -> go (tr : rest)
       ImmediateTokenRule tr -> go (tr : rest)
       FieldRule n (ruleToField -> f) -> Just (Constr (suffix n) [f | f.type_ /= Unit]) : go rest
       PrecRule _ _ pr -> go (pr : rest)
+      Optional opt -> go (opt : rest)
       SeqRule rs ->
         Just (Constr (Name s) [ f
                               | item <- V.toList rs
                               , let f = ruleToField item
                               , f.type_ /= Unit ]) : go rest
-    -- The following constructors constitute faillure:
-      PatternRule{} -> []
+      PatternRule{} -> Just (Constr (Name s) [ f | let f = ruleToField r, f.type_ /= Unit ]) : go rest
+      -- The following constructors constitute faillure:
       RepeatRule{} -> []
       Repeat1Rule{} -> []
+
 
   ruleToType :: Rule -> Type
   ruleToType = \case
     BlankRule -> Unit
     StringRule s -> maybe Unit (Token . fromMaybe s) (M.lookup s tokenMap)
-    PatternRule{} -> Unit
-    SymbolRule s -> Node (Name s)
+    PatternRule{} -> Content
+    SymbolRule (Name -> s) ->  if isHidden s
+      then trace ("looking up: " <> Prelude.show s) $ ruleToType (rule $ unName s) -- Node (Name s)
+      else Node s
+    RefRule s -> Ref (Name s)
     SeqRule rs -> foldl1Or mkTuple Unit (ruleToType <$> rs)
     ChoiceRule rs -> foldl1Or mkEither Unit (ruleToType <$> rs)
     RepeatRule r -> List (ruleToType r)
@@ -219,6 +237,7 @@ toDataTypes start grammar tokenMap = dataTypes `reachableFrom` startName
     ImmediateTokenRule r -> ruleToType r
     FieldRule _ r -> ruleToType r
     PrecRule _ _ r -> ruleToType r
+    Optional r -> Maybe (ruleToType r)
 
   ruleToField :: Rule -> Field
   ruleToField = \case
@@ -242,6 +261,7 @@ depsOfConstr (Constr _ fs) = concatMap (depsOfType . (.type_)) fs
 depsOfType :: Type -> [Name]
 depsOfType = \case
   Node sort -> [sort]
+  Ref sort -> [sort]
   List t -> depsOfType t
   NonEmpty t -> depsOfType t
   Unit -> []
@@ -249,6 +269,7 @@ depsOfType = \case
   Tuple t1 t2 -> depsOfType t1 <> depsOfType t2
   Either t1 t2 -> depsOfType t1 <> depsOfType t2
   Maybe t -> depsOfType t
+  Content -> []
 
 reachableFrom :: [Data] -> Name -> [Data]
 reachableFrom dataTypes start = usedData

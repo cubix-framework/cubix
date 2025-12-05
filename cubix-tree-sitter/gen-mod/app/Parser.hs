@@ -11,7 +11,12 @@ import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Data.Text.IO qualified as T
 import Options.Applicative (Parser, ParserInfo, execParser, flag', fullDesc, help, helper, info, long, metavar, optional, progDesc, short, strArgument, strOption, (<**>))
-import TreeSitter.GenerateAst.Internal.CodeGen (Metadata (..), generateAst)
+import TreeSitter.Generate.Data
+import TreeSitter.Generate.Render
+
+import Text.Pretty.Simple
+import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..))
+import TreeSitter.GenerateAst.Internal.Transform (transform)
 
 template :: Text
 template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/ParsePretty.hs.template")
@@ -92,6 +97,7 @@ main = do
   Options{..} <- execParser optionsInfo
   grammar <- either fail pure =<< eitherDecodeFileStrict inputFile
   tokenMap <- either fail pure =<< maybe (pure $ Right Map.empty) eitherDecodeFileStrict tokenMapFile
-  result <- either fail pure (generateAst metadata grammar "Ast.hs.template" template tokenMap)
-  maybe T.putStrLn T.writeFile outputFile result
+  let grammar' = transform tokenMap grammar
 
+  result <- either fail pure (renderSyntax metadata grammar' "ParsePretty.hs.template" template tokenMap)
+  maybe T.putStrLn T.writeFile outputFile result

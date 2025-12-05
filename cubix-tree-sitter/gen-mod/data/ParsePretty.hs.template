@@ -9,6 +9,7 @@ import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.Functor (($>))
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.String (IsString (..))
+import Data.Text
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
 import Streaming.Prelude qualified as Streaming
@@ -65,6 +66,9 @@ pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
     Just (Refl, HRefl) -> Just symSing
     Nothing -> Nothing
 
+pText :: Parser Text
+pText = pure mempty
+
 -- reify the types to aid inference, that might get broken
 pMaybe :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm (Maybe a))
 pMaybe = Megaparsec.Cubix.pMaybe
@@ -95,16 +99,18 @@ ${endfor}
 {+-}
 
 {-+}
-${for(dataTypes)}
-p${it.name.camelCase} :: Parser (MoveTerm ${it.name.camelCase}L)
-p${it.name.camelCase} = do${if(it.hidden)}${else}
-  _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol${endif}
-${if(it.isSum)}
-  choice [ ${for(it.constrs)}p${it.name.camelCase}${sep}
+${for(data)}
+p${it.name.camelCase} :: Parser (MoveTerm ${it.name.sort})
+p${it.name.camelCase} = do
+${if(it.hasSymbol)}
+  _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol
+${endif}
+${if(it.sum)}
+  choice [ ${for(it.constructors)}p${it.name.camelCase}${sep}
          , ${endfor}
          ]
 ${else}
-${for(it.constrs)}
+${for(it.constructors)}
   ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
 ${for(it.fields/first)}
     <$$> ${it.parser}
@@ -114,10 +120,10 @@ ${for(it.fields/rest)}
 ${endfor}
 ${endfor}
 ${endif}
-${if(it.isSum)}
+${if(it.sum)}
   where
-${for(it.constrs)}
-    p${it.name.camelCase} :: Parser (MoveTerm ${it.sort.camelCase}L)
+${for(it.constructors)}
+    p${it.name.camelCase} :: Parser (MoveTerm ${it.type.sort})
     p${it.name.camelCase} =
       ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
 ${for(it.fields/first)}
