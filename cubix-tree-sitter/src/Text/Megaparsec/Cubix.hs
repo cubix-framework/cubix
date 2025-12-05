@@ -2,7 +2,10 @@ module Text.Megaparsec.Cubix where
 
 import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (eitherP, many, optional, some)
+-- TODO: CUBIX_NON_EMPTY
+-- import Control.Applicative.Combinators.NonEmpty (some)
 import Data.Comp.Multi (Cxt, HFunctor, (:<:))
+import Data.List.NonEmpty (NonEmpty)
 import Data.Typeable (Typeable)
 import Cubix.Language.Parametric.Syntax
        ( EitherF
@@ -34,6 +37,12 @@ pEither
   :: (Alternative m, EitherF :<: fs, Typeable l, Typeable l')
   => m (Cxt h fs a l) -> m (Cxt h fs a l') -> m (Cxt h fs a (Either l l'))
 pEither pa pb = either riLeftF riRightF <$> eitherP pa pb 
+
+-- TODO: CUBIX_NON_EMPTY
+-- pSome
+--   :: (Alternative m, ListF :<: fs, HFunctor fs, Typeable l)
+--   => m (Cxt h fs a l) -> m (Cxt h fs a (NonEmpty l))
+-- pSome = pInsert . some
 
 pSome
   :: (Alternative m, ListF :<: fs, HFunctor fs, Typeable l)

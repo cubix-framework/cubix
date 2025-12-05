@@ -13,6 +13,7 @@ bug-reports:   https://github.com/cubix-framework/cubix/issues
 
 extra-source-files:
   gen-mod/data/Modularized.hs.template
+  gen-mod/data/Mod.hs.template
   gen-mod/data/ParsePretty.hs.template
 
 tested-with:
@@ -108,12 +109,17 @@ library gen-internal
     , fgl ^>= 5.8
   exposed-modules:
     Data.Functor.Base.Extra
+    TreeSitter.Generate.Data
+    TreeSitter.Generate.Parser
+    TreeSitter.Generate.Render
     TreeSitter.GenerateAst.Internal.CodeGen
     TreeSitter.GenerateAst.Internal.Data
     TreeSitter.GenerateAst.Internal.Grammar
     TreeSitter.GenerateAst.Internal.Parser
     TreeSitter.GenerateAst.Internal.Transform
-    TreeSitter.GenerateAst.Internal.Transform.HoistChoices
+    TreeSitter.GenerateAst.Internal.Transform.HoistDefinitions
+    TreeSitter.GenerateAst.Internal.Transform.NonEmpty
+    TreeSitter.GenerateAst.Internal.Transform.RemoveUnusedStrings
     TreeSitter.GenerateAst.Internal.Transform.StripBlanks
 
 executable gen-mod

@@ -21,7 +21,7 @@ import Cubix.Language.Info
   , mkSourceSpan
   )
 import Prelude hiding (span)
-
+import Debug.Trace
 data Token a = MkToken
   { tokenValue :: !a
   , tokenSpan  :: !SourceSpan
@@ -55,30 +55,48 @@ nodeSpan path node = do
   end <- pointToPos' <$> TS.nodeEndPoint node
   pure $ mkSourceSpan path start end
 
-nodes :: TS.Node -> Stream (Of TS.Node) IO ()
-nodes = go
+nodes :: FilePath -> TS.Node -> TokenStream TS.Node (ReaderT (TreeSitterEnv sym) IO) ()
+nodes path = go
+  -- where
+  --   go :: TS.Node -> Stream (Of TS.Node) IO ()
+  --   go root = wrap (root :> children root)
+
+  --   children :: TS.Node -> Stream (Of TS.Node) IO ()
+  --   children n = effect $ do
+  --     childNo <- TS.nodeChildCount n
+  --     let childNums = if childNo == 0 then [] else [0..childNo - 1]
+  --         childs = Streaming.mapMaybeM (\num -> do
+  --           child <- TS.nodeChild n num
+  --           isNull <- TS.nodeIsNull child
+  --           if isNull
+  --             then do
+  --               putStrLn $ "null child: " <> show num <> " of: " <> show childNo
+  --               pure Nothing
+  --             else pure $ Just child)
+  --           $ Streaming.each childNums
+  --     pure $ Streaming.for childs go
+
   where
-    go :: TS.Node -> Stream (Of TS.Node) IO ()
-    go root = wrap (root :> children root)
+    go :: TS.Node -> TokenStream TS.Node (ReaderT (TreeSitterEnv sym) IO) ()
+    go root = effect $ do
+      extra <- liftIO $ TS.nodeIsExtra root
+      if extra
+        then pure $ pure ()
+        else do
+         range  <- liftIO $ nodeRange root
+         span   <- liftIO $ nodeSpan path root
+         -- symbol <- liftIO $ TS.nodeSymbol root
+         -- liftIO $ traceIO =<< TS.nodeTypeAsString root
+         let tok = MkToken root span range
+         childNo <- liftIO $ TS.nodeChildCount root
+         let childNums = if childNo == 0 then [] else [0..childNo - 1]
+             childs = Streaming.mapM (liftIO . TS.nodeChild root)
+               $ Streaming.each childNums
+         pure $ wrap (tok :> Streaming.for childs go)
 
-    children :: TS.Node -> Stream (Of TS.Node) IO ()
-    children n = effect $ do
-      childNo <- TS.nodeChildCount n
-      let childNums = if childNo == 0 then [] else [0..childNo - 1]
-          childs = Streaming.mapMaybeM (\num -> do
-            child <- TS.nodeChild n num
-            isNull <- TS.nodeIsNull child
-            if isNull
-              then do
-                putStrLn $ "null child: " <> show num <> " of: " <> show childNo
-                pure Nothing
-              else pure $ Just child)
-            $ Streaming.each childNums
-      pure $ Streaming.for childs go
-
-significantNodes :: TS.Node -> Stream (Of TS.Node) IO ()
-significantNodes = Streaming.filterM (fmap not . TS.nodeIsExtra) . nodes
-{-# INLINE significantNodes #-}
+-- significantNodes :: TS.Node -> Stream (Of TS.Node) IO ()
+-- significantNodes = Streaming.filterM (fmap not . TS.nodeIsExtra) . nodes
+-- {-# INLINE significantNodes #-}
 
 -- symbols :: TS.Node -> Stream (Of String) IO ()
 -- symbols = Streaming.mapM TS.nodeGrammarTypeAsString . significantNodes
@@ -89,14 +107,14 @@ annotate :: FilePath -> TS.Node -> IO (Token TS.Node)
 annotate path node = MkToken node <$> nodeSpan path node <*> nodeRange node
 {-# INLINE annotate #-}
 
-annotated :: FilePath -> TS.Node -> TokenStream TS.Node IO ()
-annotated path = Streaming.mapM (annotate path) . significantNodes
-{-# INLINE annotated #-}
+-- annotated :: FilePath -> TS.Node -> TokenStream TS.Node IO ()
+-- annotated path = Streaming.mapM (annotate path) . significantNodes
+-- {-# INLINE annotated #-}
 
-annotatedSymbols :: FilePath -> TS.Node -> TokenStream String IO ()
-annotatedSymbols path node = flip Streaming.mapM (annotated path node) $ \tok -> do
-  name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
-  pure tok{ tokenValue = name }
+-- annotatedSymbols :: FilePath -> TS.Node -> TokenStream String IO ()
+-- annotatedSymbols path node = flip Streaming.mapM (annotated path node) $ \tok -> do
+--   name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
+--   pure tok{ tokenValue = name }
 
 symbols :: FilePath -> TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
 symbols path = go
@@ -110,6 +128,7 @@ symbols path = go
          range  <- liftIO $ nodeRange root
          span   <- liftIO $ nodeSpan path root
          symbol <- liftIO $ TS.nodeSymbol root
+         -- liftIO $ traceIO =<< TS.nodeTypeAsString root
          let tok = MkToken symbol span range
          childNo <- liftIO $ TS.nodeChildCount root
          let childNums = if childNo == 0 then [] else [0..childNo - 1]
