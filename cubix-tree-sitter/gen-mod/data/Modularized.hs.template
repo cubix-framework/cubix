@@ -1,13 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeData #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-+}
 module ${moduleName}
@@ -18,7 +10,6 @@ import Data.ByteString.Char8 qualified as BSC
 import Data.Foldable (foldrM)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
@@ -33,12 +24,12 @@ import Cubix.ParsePretty (type RootSort)
 import Data.Comp.Multi (Sort, Term)
 
 --------------------------------------------------------------------------------
--- Sort
+-- Labels
 --------------------------------------------------------------------------------
 
 {-+}
-${for(dataTypes)}${if(it.hidden)}${else}
-data ${it.name.camelCase}L${endif}
+${for(labels)}
+data ${it.sort}
 ${endfor}
 {+-}
 
@@ -46,27 +37,7 @@ ${endfor}
 ${for(tokens)}
 data ${it.name.camelCase}TokL
 ${endfor}
-
-data LabelSing (sort :: Sort) where
-${for(dataTypes)}
-  ${if(it.hidden)}${else}S${it.name.camelCase}L :: LabelSing ${it.name.camelCase}L${endif}
-${endfor}
-${for(tokens)}
-  S${it.name.camelCase}TokL :: LabelSing ${it.name.camelCase}TokL
-${endfor}
-
-deriving instance Eq (LabelSing sort)
-
-deriving instance Show (LabelSing sort)
-
-decLabelSing :: LabelSing sort1 -> LabelSing sort2 -> Maybe (sort1 :~: sort2)
-${for(dataTypes)}
-${if(it.hidden)}${else}decLabelSing S${it.name.camelCase}L S${it.name.camelCase}L = Just Refl${endif}
-${endfor}
-${for(tokens)}
-decLabelSing S${it.name.camelCase}TokL S${it.name.camelCase}TokL = Just Refl
-${endfor}
-decLabelSing _ _ = Nothing
+{+-}
 
 --------------------------------------------------------------------------------
 -- SymbolType
@@ -116,6 +87,7 @@ symbolTypeIsReal = \case
 --------------------------------------------------------------------------------
 
 data Token e l where
+{-+}
 ${for(tokens)}
   ${it.name.camelCase} :: Token e ${it.name.camelCase}TokL
 ${endfor}
@@ -124,27 +96,24 @@ ${endfor}
 deriveAll [''Token]
 
 {-+}
-${for(dataTypes)}
+${for(data)}
 data ${it.name.camelCase} e l where
-${for(it.constrs)}
+${for(it.constructors)}
   ${it.name.camelCase}
     :: ${if(it.hasChildren)}${for(it.fields)}${it.type}
-    -> ${endfor}${endif}${dataTypes.name.camelCase} e ${it.sort.camelCase}L
+    -> ${endfor}${endif}${data.name.camelCase} e ${it.type.sort}
 ${endfor}
 
 ${endfor}
 {+-}
 
---------------------------------------------------------------------------------
--- Compdata derivation
-
 {-+}
 deriveAll
-${for(dataTypes/first)}
+${for(data/first)}
   [ ''${it.name.camelCase/first}
 ${endfor}
-${for(dataTypes/rest)}${if(it.hidden)}${else}
-  , ''${it.name.camelCase}${endif}
+${for(data/rest)}
+  , ''${it.name.camelCase}
 ${endfor}
   ]
 {+-}
@@ -155,11 +124,11 @@ ${endfor}
 
 {-+}
 type ${grammarName}Sig =
-${for(dataTypes/first)}
+${for(data/first)}
   '[ ${it.name.camelCase}
 ${endfor}
-${for(dataTypes/rest)}${if(it.hidden)}${else}
-   , ${it.name.camelCase}${endif}
+${for(data/rest)}
+   , ${it.name.camelCase}
 ${endfor}
    , Token
    , Syntax.PairF
@@ -178,7 +147,7 @@ type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
 --------------------------------------------------------------------------------
 
 {-+}
-type instance RootSort ${grammarName}Sig = ${startSort.camelCase}L
+type instance RootSort ${grammarName}Sig = ${startSort.sort}
 {+-}
 
 --------------------------------------------------------------------------------
@@ -187,8 +156,8 @@ type instance RootSort ${grammarName}Sig = ${startSort.camelCase}L
 
 type data Symbol (symbolType :: SymbolType) where
 {-+}
-${for(dataTypes)}${if(it.hidden)}${else}
-  ${it.name.camelCase}Symbol :: (symbolType ~ Regular) => Symbol symbolType${endif}
+${for(data)}
+  ${it.name.camelCase}Symbol :: (symbolType ~ Regular) => Symbol symbolType
 ${endfor}
 ${for(tokens)}
   ${it.name.camelCase}TokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -200,8 +169,8 @@ ${endfor}
 
 data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
 {-+}
-${for(dataTypes)}
-  ${if(it.hidden)}${else}S${it.name.camelCase}Symbol :: SymbolSing Regular ${it.name.camelCase}Symbol${endif}
+${for(data)}
+  S${it.name.camelCase}Symbol :: SymbolSing Regular ${it.name.camelCase}Symbol
 ${endfor}
 ${for(tokens)}
   S${it.name.camelCase}TokSymbol :: SymbolSing Anonymous ${it.name.camelCase}TokSymbol
@@ -217,8 +186,8 @@ deriving instance Show (SymbolSing sort symbol)
 
 decSymbolSing :: SymbolSing symbolType1 symbol1 -> SymbolSing symbolType2 symbol2 -> Maybe (symbolType1 :~: symbolType2, symbol1 :~~: symbol2)
 {-+}
-${for(dataTypes)}
-${if(it.hidden)}${else}decSymbolSing S${it.name.camelCase}Symbol S${it.name.camelCase}Symbol = Just (Refl, HRefl)${endif}
+${for(data)}
+decSymbolSing S${it.name.camelCase}Symbol S${it.name.camelCase}Symbol = Just (Refl, HRefl)
 ${endfor}
 ${for(tokens)}
 decSymbolSing S${it.name.camelCase}TokSymbol S${it.name.camelCase}TokSymbol = Just (Refl, HRefl)
@@ -259,10 +228,10 @@ newtype SymbolTable = SymbolTable {unSymbolTable :: IntMap SomeSymbolSing}
 symbolMap :: Map String SomeSymbolSing
 symbolMap = Map.fromList
 {-+}
-${for(dataTypes/first)}
+${for(data/first)}
     [ ("${it.name.text}", SomeRegularSymbolSing S${it.name.camelCase}Symbol)
 ${endfor}
-${for(dataTypes/rest)}
+${for(data/rest)}
     , ("${it.name.text}", SomeRegularSymbolSing S${it.name.camelCase}Symbol)
 ${endfor}
 ${for(tokens)}

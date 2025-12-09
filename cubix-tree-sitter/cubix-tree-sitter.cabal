@@ -13,7 +13,6 @@ bug-reports:   https://github.com/cubix-framework/cubix/issues
 
 extra-source-files:
   gen-mod/data/Modularized.hs.template
-  gen-mod/data/Mod.hs.template
   gen-mod/data/ParsePretty.hs.template
 
 tested-with:

@@ -21,7 +21,7 @@ import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..))
 import TreeSitter.GenerateAst.Internal.Transform (transform)
 
 template :: Text
-template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/Mod.hs.template")
+template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/Modularized.hs.template")
 
 data Options = Options
   { inputFile :: FilePath

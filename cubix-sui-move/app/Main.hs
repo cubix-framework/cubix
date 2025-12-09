@@ -33,6 +33,6 @@ main = -- withGhcDebug $
       SuiMove.parse inputFile
     case mast of
       Just ast -> pPrintLightBg ast
-      Nothing -> putStrLn "something wont wrong"
+      Nothing -> putStrLn "something went wrong"
 
     pure ()

@@ -22,8 +22,6 @@ import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
-import Text.Pretty.Simple
-
 parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
 parse' = do
   filepath <- getFilePath
@@ -34,7 +32,6 @@ parse' = do
            fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
     $ symbols filepath rootNode
 
-  pPrintLightBg (tokenValue <$> toks)
   source <- getSource
   let lexed = Megaparsec.TreeSitter.Lexed source toks
   case Megaparsec.parse pRoot filepath lexed of
@@ -312,13 +309,13 @@ pModuleBody = do
 
 pModuleBodyInternal0 :: Parser (MoveTerm ModuleBodyInternal0L)
 pModuleBodyInternal0 = do
-  choice [ pModuleBodyInternal0UseDeclaration
-         , pModuleBodyInternal0FriendDeclaration
-         , pModuleBodyInternal0Constant
-         , pModuleBodyInternal0FunctionItem
-         , pModuleBodyInternal0StructItem
-         , pModuleBodyInternal0EnumItem
-         , pModuleBodyInternal0SpecBlock
+  choice [ Megaparsec.try pModuleBodyInternal0UseDeclaration
+         , Megaparsec.try pModuleBodyInternal0FriendDeclaration
+         , Megaparsec.try pModuleBodyInternal0Constant
+         , Megaparsec.try pModuleBodyInternal0FunctionItem
+         , Megaparsec.try pModuleBodyInternal0StructItem
+         , Megaparsec.try pModuleBodyInternal0EnumItem
+         , Megaparsec.try pModuleBodyInternal0SpecBlock
          ]
   where
     pModuleBodyInternal0UseDeclaration :: Parser (MoveTerm ModuleBodyInternal0L)
@@ -352,9 +349,9 @@ pModuleBodyInternal0 = do
 
 pHiddenFunctionItem :: Parser (MoveTerm HiddenFunctionItemL)
 pHiddenFunctionItem = do
-  choice [ pHiddenFunctionItemNativeFunctionDefinition
-         , pHiddenFunctionItemMacroFunctionDefinition
-         , pHiddenFunctionItemFunctionDefinition
+  choice [ Megaparsec.try pHiddenFunctionItemNativeFunctionDefinition
+         , Megaparsec.try pHiddenFunctionItemMacroFunctionDefinition
+         , Megaparsec.try pHiddenFunctionItemFunctionDefinition
          ]
   where
     pHiddenFunctionItemNativeFunctionDefinition :: Parser (MoveTerm HiddenFunctionItemL)
@@ -387,22 +384,22 @@ pBlock = do
 
 pHiddenExpression :: Parser (MoveTerm HiddenExpressionL)
 pHiddenExpression = do
-  choice [ pHiddenExpressionCallExpression
-         , pHiddenExpressionMacroCallExpression
-         , pHiddenExpressionLambdaExpression
-         , pHiddenExpressionIfExpression
-         , pHiddenExpressionWhileExpression
-         , pHiddenExpressionReturnExpression
-         , pHiddenExpressionAbortExpression
-         , pHiddenExpressionAssignExpression
-         , pHiddenExpressionUnaryExpression
-         , pHiddenExpressionBinaryExpression
-         , pHiddenExpressionCastExpression
-         , pHiddenExpressionQuantifierExpression
-         , pHiddenExpressionMatchExpression
-         , pHiddenExpressionVectorExpression
-         , pHiddenExpressionLoopExpression
-         , pHiddenExpressionIdentifiedExpression
+  choice [ Megaparsec.try pHiddenExpressionCallExpression
+         , Megaparsec.try pHiddenExpressionMacroCallExpression
+         , Megaparsec.try pHiddenExpressionLambdaExpression
+         , Megaparsec.try pHiddenExpressionIfExpression
+         , Megaparsec.try pHiddenExpressionWhileExpression
+         , Megaparsec.try pHiddenExpressionReturnExpression
+         , Megaparsec.try pHiddenExpressionAbortExpression
+         , Megaparsec.try pHiddenExpressionAssignExpression
+         , Megaparsec.try pHiddenExpressionUnaryExpression
+         , Megaparsec.try pHiddenExpressionBinaryExpression
+         , Megaparsec.try pHiddenExpressionCastExpression
+         , Megaparsec.try pHiddenExpressionQuantifierExpression
+         , Megaparsec.try pHiddenExpressionMatchExpression
+         , Megaparsec.try pHiddenExpressionVectorExpression
+         , Megaparsec.try pHiddenExpressionLoopExpression
+         , Megaparsec.try pHiddenExpressionIdentifiedExpression
          ]
   where
     pHiddenExpressionCallExpression :: Parser (MoveTerm HiddenExpressionL)
@@ -472,11 +469,11 @@ pHiddenExpression = do
 
 pHiddenUnaryExpressionInternal0 :: Parser (MoveTerm HiddenUnaryExpressionInternal0L)
 pHiddenUnaryExpressionInternal0 = do
-  choice [ pHiddenUnaryExpressionInternal0UnaryExpression
-         , pHiddenUnaryExpressionInternal0BorrowExpression
-         , pHiddenUnaryExpressionInternal0DereferenceExpression
-         , pHiddenUnaryExpressionInternal0MoveOrCopyExpression
-         , pHiddenUnaryExpressionInternal0ExpressionTerm
+  choice [ Megaparsec.try pHiddenUnaryExpressionInternal0UnaryExpression
+         , Megaparsec.try pHiddenUnaryExpressionInternal0BorrowExpression
+         , Megaparsec.try pHiddenUnaryExpressionInternal0DereferenceExpression
+         , Megaparsec.try pHiddenUnaryExpressionInternal0MoveOrCopyExpression
+         , Megaparsec.try pHiddenUnaryExpressionInternal0ExpressionTerm
          ]
   where
     pHiddenUnaryExpressionInternal0UnaryExpression :: Parser (MoveTerm HiddenUnaryExpressionInternal0L)
@@ -502,23 +499,23 @@ pHiddenUnaryExpressionInternal0 = do
 
 pHiddenExpressionTerm :: Parser (MoveTerm HiddenExpressionTermL)
 pHiddenExpressionTerm = do
-  choice [ pHiddenExpressionTermCallExpression
-         , pHiddenExpressionTermBreakExpression
-         , pHiddenExpressionTermContinueExpression
-         , pHiddenExpressionTermNameExpression
-         , pHiddenExpressionTermMacroCallExpression
-         , pHiddenExpressionTermPackExpression
-         , pHiddenExpressionTermLiteralValue
-         , pHiddenExpressionTermUnitExpression
-         , pHiddenExpressionTermExpressionList
-         , pHiddenExpressionTermAnnotationExpression
-         , pHiddenExpressionTermBlock
-         , pHiddenExpressionTermSpecBlock
-         , pHiddenExpressionTermIfExpression
-         , pHiddenExpressionTermDotExpression
-         , pHiddenExpressionTermIndexExpression
-         , pHiddenExpressionTermVectorExpression
-         , pHiddenExpressionTermMatchExpression
+  choice [ Megaparsec.try pHiddenExpressionTermCallExpression
+         , Megaparsec.try pHiddenExpressionTermBreakExpression
+         , Megaparsec.try pHiddenExpressionTermContinueExpression
+         , Megaparsec.try pHiddenExpressionTermNameExpression
+         , Megaparsec.try pHiddenExpressionTermMacroCallExpression
+         , Megaparsec.try pHiddenExpressionTermPackExpression
+         , Megaparsec.try pHiddenExpressionTermLiteralValue
+         , Megaparsec.try pHiddenExpressionTermUnitExpression
+         , Megaparsec.try pHiddenExpressionTermExpressionList
+         , Megaparsec.try pHiddenExpressionTermAnnotationExpression
+         , Megaparsec.try pHiddenExpressionTermBlock
+         , Megaparsec.try pHiddenExpressionTermSpecBlock
+         , Megaparsec.try pHiddenExpressionTermIfExpression
+         , Megaparsec.try pHiddenExpressionTermDotExpression
+         , Megaparsec.try pHiddenExpressionTermIndexExpression
+         , Megaparsec.try pHiddenExpressionTermVectorExpression
+         , Megaparsec.try pHiddenExpressionTermMatchExpression
          ]
   where
     pHiddenExpressionTermCallExpression :: Parser (MoveTerm HiddenExpressionTermL)
@@ -592,11 +589,11 @@ pHiddenExpressionTerm = do
 
 pHiddenLiteralValue :: Parser (MoveTerm HiddenLiteralValueL)
 pHiddenLiteralValue = do
-  choice [ pHiddenLiteralValueAddressLiteral
-         , pHiddenLiteralValueBoolLiteral
-         , pHiddenLiteralValueNumLiteral
-         , pHiddenLiteralValueHexStringLiteral
-         , pHiddenLiteralValueByteStringLiteral
+  choice [ Megaparsec.try pHiddenLiteralValueAddressLiteral
+         , Megaparsec.try pHiddenLiteralValueBoolLiteral
+         , Megaparsec.try pHiddenLiteralValueNumLiteral
+         , Megaparsec.try pHiddenLiteralValueHexStringLiteral
+         , Megaparsec.try pHiddenLiteralValueByteStringLiteral
          ]
   where
     pHiddenLiteralValueAddressLiteral :: Parser (MoveTerm HiddenLiteralValueL)
@@ -629,8 +626,8 @@ pAddressLiteral = do
 pBoolLiteral :: Parser (MoveTerm BoolLiteralL)
 pBoolLiteral = do
   _sym <- pSymbol "bool_literal" SBoolLiteralSymbol
-  choice [ pBoolLiteralTrue
-         , pBoolLiteralFalse
+  choice [ Megaparsec.try pBoolLiteralTrue
+         , Megaparsec.try pBoolLiteralFalse
          ]
   where
     pBoolLiteralTrue :: Parser (MoveTerm BoolLiteralL)
@@ -663,8 +660,8 @@ pNumLiteral = do
 
 pNumLiteralInternal0 :: Parser (MoveTerm NumLiteralInternal0L)
 pNumLiteralInternal0 = do
-  choice [ pNumLiteralInternal01
-         , pNumLiteralInternal02
+  choice [ Megaparsec.try pNumLiteralInternal01
+         , Megaparsec.try pNumLiteralInternal02
          ]
   where
     pNumLiteralInternal01 :: Parser (MoveTerm NumLiteralInternal0L)
@@ -678,12 +675,12 @@ pNumLiteralInternal0 = do
 
 pNumLiteralInternal1 :: Parser (MoveTerm NumLiteralInternal1L)
 pNumLiteralInternal1 = do
-  choice [ pNumLiteralInternal1U8
-         , pNumLiteralInternal1U16
-         , pNumLiteralInternal1U32
-         , pNumLiteralInternal1U64
-         , pNumLiteralInternal1U128
-         , pNumLiteralInternal1U256
+  choice [ Megaparsec.try pNumLiteralInternal1U8
+         , Megaparsec.try pNumLiteralInternal1U16
+         , Megaparsec.try pNumLiteralInternal1U32
+         , Megaparsec.try pNumLiteralInternal1U64
+         , Megaparsec.try pNumLiteralInternal1U128
+         , Megaparsec.try pNumLiteralInternal1U256
          ]
   where
     pNumLiteralInternal1U8 :: Parser (MoveTerm NumLiteralInternal1L)
@@ -720,11 +717,11 @@ pAnnotationExpression = do
 
 pHiddenType :: Parser (MoveTerm HiddenTypeL)
 pHiddenType = do
-  choice [ pHiddenTypeApplyType
-         , pHiddenTypeRefType
-         , pHiddenTypeTupleType
-         , pHiddenTypeFunctionType
-         , pHiddenTypePrimitiveType
+  choice [ Megaparsec.try pHiddenTypeApplyType
+         , Megaparsec.try pHiddenTypeRefType
+         , Megaparsec.try pHiddenTypeTupleType
+         , Megaparsec.try pHiddenTypeFunctionType
+         , Megaparsec.try pHiddenTypePrimitiveType
          ]
   where
     pHiddenTypeApplyType :: Parser (MoveTerm HiddenTypeL)
@@ -757,15 +754,15 @@ pApplyType = do
 pModuleAccess :: Parser (MoveTerm ModuleAccessL)
 pModuleAccess = do
   _sym <- pSymbol "module_access" SModuleAccessSymbol
-  choice [ pModuleAccess1
-         , pModuleAccess2
-         , pModuleAccessMember
-         , pModuleAccess4
-         , pModuleAccess5
-         , pModuleAccess6
-         , pModuleAccess7
-         , pModuleAccess8
-         , pModuleAccess9
+  choice [ Megaparsec.try pModuleAccess1
+         , Megaparsec.try pModuleAccess2
+         , Megaparsec.try pModuleAccessMember
+         , Megaparsec.try pModuleAccess4
+         , Megaparsec.try pModuleAccess5
+         , Megaparsec.try pModuleAccess6
+         , Megaparsec.try pModuleAccess7
+         , Megaparsec.try pModuleAccess8
+         , Megaparsec.try pModuleAccess9
          ]
   where
     pModuleAccess1 :: Parser (MoveTerm ModuleAccessL)
@@ -820,8 +817,8 @@ pModuleAccess = do
 
 pHiddenReservedIdentifier :: Parser (MoveTerm HiddenReservedIdentifierL)
 pHiddenReservedIdentifier = do
-  choice [ pHiddenReservedIdentifierForall
-         , pHiddenReservedIdentifierExists
+  choice [ Megaparsec.try pHiddenReservedIdentifierForall
+         , Megaparsec.try pHiddenReservedIdentifierExists
          ]
   where
     pHiddenReservedIdentifierForall :: Parser (MoveTerm HiddenReservedIdentifierL)
@@ -848,8 +845,8 @@ pModuleIdentity = do
 
 pModuleIdentityInternal0 :: Parser (MoveTerm ModuleIdentityInternal0L)
 pModuleIdentityInternal0 = do
-  choice [ pModuleIdentityInternal0NumLiteral
-         , pModuleIdentityInternal0ModuleIdentifier
+  choice [ Megaparsec.try pModuleIdentityInternal0NumLiteral
+         , Megaparsec.try pModuleIdentityInternal0ModuleIdentifier
          ]
   where
     pModuleIdentityInternal0NumLiteral :: Parser (MoveTerm ModuleIdentityInternal0L)
@@ -887,16 +884,16 @@ pFunctionTypeParameters = do
 pPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
 pPrimitiveType = do
   _sym <- pSymbol "primitive_type" SPrimitiveTypeSymbol
-  choice [ pPrimitiveTypeU8
-         , pPrimitiveTypeU16
-         , pPrimitiveTypeU32
-         , pPrimitiveTypeU64
-         , pPrimitiveTypeU128
-         , pPrimitiveTypeU256
-         , pPrimitiveTypeBool
-         , pPrimitiveTypeAddress
-         , pPrimitiveTypeSigner
-         , pPrimitiveTypeBytearray
+  choice [ Megaparsec.try pPrimitiveTypeU8
+         , Megaparsec.try pPrimitiveTypeU16
+         , Megaparsec.try pPrimitiveTypeU32
+         , Megaparsec.try pPrimitiveTypeU64
+         , Megaparsec.try pPrimitiveTypeU128
+         , Megaparsec.try pPrimitiveTypeU256
+         , Megaparsec.try pPrimitiveTypeBool
+         , Megaparsec.try pPrimitiveTypeAddress
+         , Megaparsec.try pPrimitiveTypeSigner
+         , Megaparsec.try pPrimitiveTypeBytearray
          ]
   where
     pPrimitiveTypeU8 :: Parser (MoveTerm PrimitiveTypeL)
@@ -949,8 +946,8 @@ pRefType = do
 
 pHiddenReference :: Parser (MoveTerm HiddenReferenceL)
 pHiddenReference = do
-  choice [ pHiddenReferenceImmRef
-         , pHiddenReferenceMutRef
+  choice [ Megaparsec.try pHiddenReferenceImmRef
+         , Megaparsec.try pHiddenReferenceMutRef
          ]
   where
     pHiddenReferenceImmRef :: Parser (MoveTerm HiddenReferenceL)
@@ -1076,9 +1073,9 @@ pMatchArm = do
 pBindList :: Parser (MoveTerm BindListL)
 pBindList = do
   _sym <- pSymbol "bind_list" SBindListSymbol
-  choice [ pBindListBind
-         , pBindListCommaBindList
-         , pBindListOrBindList
+  choice [ Megaparsec.try pBindListBind
+         , Megaparsec.try pBindListCommaBindList
+         , Megaparsec.try pBindListOrBindList
          ]
   where
     pBindListBind :: Parser (MoveTerm BindListL)
@@ -1096,10 +1093,10 @@ pBindList = do
 
 pHiddenBind :: Parser (MoveTerm HiddenBindL)
 pHiddenBind = do
-  choice [ pHiddenBindBindInternal0
-         , pHiddenBindBindUnpack
-         , pHiddenBindAtBind
-         , pHiddenBindLiteralValue
+  choice [ Megaparsec.try pHiddenBindBindInternal0
+         , Megaparsec.try pHiddenBindBindUnpack
+         , Megaparsec.try pHiddenBindAtBind
+         , Megaparsec.try pHiddenBindLiteralValue
          ]
   where
     pHiddenBindBindInternal0 :: Parser (MoveTerm HiddenBindL)
@@ -1121,17 +1118,17 @@ pHiddenBind = do
 
 pHiddenBindInternal0 :: Parser (MoveTerm HiddenBindInternal0L)
 pHiddenBindInternal0 = do
-  choice [ pHiddenBindInternal0MutBindVar
-         , pHiddenBindInternal0BindVarVariableIdentifier
+  choice [ Megaparsec.try pHiddenBindInternal0MutBindVar
+         , Megaparsec.try pHiddenBindInternal0VariableIdentifier
          ]
   where
     pHiddenBindInternal0MutBindVar :: Parser (MoveTerm HiddenBindInternal0L)
     pHiddenBindInternal0MutBindVar =
       iHiddenBindInternal0MutBindVar
         <$> pMutBindVar
-    pHiddenBindInternal0BindVarVariableIdentifier :: Parser (MoveTerm HiddenBindInternal0L)
-    pHiddenBindInternal0BindVarVariableIdentifier =
-      iHiddenBindInternal0BindVarVariableIdentifier
+    pHiddenBindInternal0VariableIdentifier :: Parser (MoveTerm HiddenBindInternal0L)
+    pHiddenBindInternal0VariableIdentifier =
+      iHiddenBindInternal0VariableIdentifier
         <$> pIdentifier
 
 pMutBindVar :: Parser (MoveTerm MutBindVarL)
@@ -1158,8 +1155,8 @@ pBindUnpack = do
 pBindFields :: Parser (MoveTerm BindFieldsL)
 pBindFields = do
   _sym <- pSymbol "bind_fields" SBindFieldsSymbol
-  choice [ pBindFieldsBindPositionalFields
-         , pBindFieldsBindNamedFields
+  choice [ Megaparsec.try pBindFieldsBindPositionalFields
+         , Megaparsec.try pBindFieldsBindNamedFields
          ]
   where
     pBindFieldsBindPositionalFields :: Parser (MoveTerm BindFieldsL)
@@ -1180,8 +1177,8 @@ pBindNamedFields = do
 
 pBindNamedFieldsInternal0 :: Parser (MoveTerm BindNamedFieldsInternal0L)
 pBindNamedFieldsInternal0 = do
-  choice [ pBindNamedFieldsInternal0BindField
-         , pBindNamedFieldsInternal0MutBindField
+  choice [ Megaparsec.try pBindNamedFieldsInternal0BindField
+         , Megaparsec.try pBindNamedFieldsInternal0MutBindField
          ]
   where
     pBindNamedFieldsInternal0BindField :: Parser (MoveTerm BindNamedFieldsInternal0L)
@@ -1196,8 +1193,8 @@ pBindNamedFieldsInternal0 = do
 pBindField :: Parser (MoveTerm BindFieldL)
 pBindField = do
   _sym <- pSymbol "bind_field" SBindFieldSymbol
-  choice [ pBindField1
-         , pBindFieldSpreadOperator
+  choice [ Megaparsec.try pBindField1
+         , Megaparsec.try pBindFieldSpreadOperator
          ]
   where
     pBindField1 :: Parser (MoveTerm BindFieldL)
@@ -1268,8 +1265,8 @@ pExpField = do
 pSpecBlock :: Parser (MoveTerm SpecBlockL)
 pSpecBlock = do
   _sym <- pSymbol "spec_block" SSpecBlockSymbol
-  choice [ pSpecBlock1
-         , pSpecBlockSpecFunction
+  choice [ Megaparsec.try pSpecBlock1
+         , Megaparsec.try pSpecBlockSpecFunction
          ]
   where
     pSpecBlock1 :: Parser (MoveTerm SpecBlockL)
@@ -1284,18 +1281,18 @@ pSpecBlock = do
 
 pHiddenSpecBlockTarget :: Parser (MoveTerm HiddenSpecBlockTargetL)
 pHiddenSpecBlockTarget = do
-  choice [ pHiddenSpecBlockTargetIdentifier
-         , pHiddenSpecBlockTargetSpecBlockTargetModuleModule
-         , pHiddenSpecBlockTargetSpecBlockTargetSchema
+  choice [ Megaparsec.try pHiddenSpecBlockTargetIdentifier
+         , Megaparsec.try pHiddenSpecBlockTargetModule
+         , Megaparsec.try pHiddenSpecBlockTargetSpecBlockTargetSchema
          ]
   where
     pHiddenSpecBlockTargetIdentifier :: Parser (MoveTerm HiddenSpecBlockTargetL)
     pHiddenSpecBlockTargetIdentifier =
       iHiddenSpecBlockTargetIdentifier
         <$> pIdentifier
-    pHiddenSpecBlockTargetSpecBlockTargetModuleModule :: Parser (MoveTerm HiddenSpecBlockTargetL)
-    pHiddenSpecBlockTargetSpecBlockTargetModuleModule =
-      iHiddenSpecBlockTargetSpecBlockTargetModuleModule
+    pHiddenSpecBlockTargetModule :: Parser (MoveTerm HiddenSpecBlockTargetL)
+    pHiddenSpecBlockTargetModule =
+      iHiddenSpecBlockTargetModule
         <$> pModule
     pHiddenSpecBlockTargetSpecBlockTargetSchema :: Parser (MoveTerm HiddenSpecBlockTargetL)
     pHiddenSpecBlockTargetSpecBlockTargetSchema =
@@ -1329,10 +1326,10 @@ pTypeParameter = do
 pAbility :: Parser (MoveTerm AbilityL)
 pAbility = do
   _sym <- pSymbol "ability" SAbilitySymbol
-  choice [ pAbilityCopy
-         , pAbilityDrop
-         , pAbilityStore
-         , pAbilityKey
+  choice [ Megaparsec.try pAbilityCopy
+         , Megaparsec.try pAbilityDrop
+         , Megaparsec.try pAbilityStore
+         , Megaparsec.try pAbilityKey
          ]
   where
     pAbilityCopy :: Parser (MoveTerm AbilityL)
@@ -1354,9 +1351,9 @@ pAbility = do
 
 pHiddenSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
 pHiddenSpecFunction = do
-  choice [ pHiddenSpecFunctionNativeSpecFunction
-         , pHiddenSpecFunctionUsualSpecFunction
-         , pHiddenSpecFunctionUninterpretedSpecFunction
+  choice [ Megaparsec.try pHiddenSpecFunctionNativeSpecFunction
+         , Megaparsec.try pHiddenSpecFunctionUsualSpecFunction
+         , Megaparsec.try pHiddenSpecFunctionUninterpretedSpecFunction
          ]
   where
     pHiddenSpecFunctionNativeSpecFunction :: Parser (MoveTerm HiddenSpecFunctionL)
@@ -1388,8 +1385,8 @@ pFunctionParameters = do
 
 pFunctionParametersInternal0 :: Parser (MoveTerm FunctionParametersInternal0L)
 pFunctionParametersInternal0 = do
-  choice [ pFunctionParametersInternal0MutFunctionParameter
-         , pFunctionParametersInternal0FunctionParameter
+  choice [ Megaparsec.try pFunctionParametersInternal0MutFunctionParameter
+         , Megaparsec.try pFunctionParametersInternal0FunctionParameter
          ]
   where
     pFunctionParametersInternal0MutFunctionParameter :: Parser (MoveTerm FunctionParametersInternal0L)
@@ -1410,8 +1407,8 @@ pFunctionParameter = do
 
 pFunctionParameterInternal0 :: Parser (MoveTerm FunctionParameterInternal0L)
 pFunctionParameterInternal0 = do
-  choice [ pFunctionParameterInternal0Name
-         , pFunctionParameterInternal02
+  choice [ Megaparsec.try pFunctionParameterInternal0Name
+         , Megaparsec.try pFunctionParameterInternal02
          ]
   where
     pFunctionParameterInternal0Name :: Parser (MoveTerm FunctionParameterInternal0L)
@@ -1458,14 +1455,14 @@ pSpecBody = do
 
 pHiddenSpecBlockMemeber :: Parser (MoveTerm HiddenSpecBlockMemeberL)
 pHiddenSpecBlockMemeber = do
-  choice [ pHiddenSpecBlockMemeberSpecInvariant
-         , pHiddenSpecBlockMemeberSpecFunction
-         , pHiddenSpecBlockMemeberSpecCondition
-         , pHiddenSpecBlockMemeberSpecInclude
-         , pHiddenSpecBlockMemeberSpecApply
-         , pHiddenSpecBlockMemeberSpecPragma
-         , pHiddenSpecBlockMemeberSpecVariable
-         , pHiddenSpecBlockMemeberSpecLet
+  choice [ Megaparsec.try pHiddenSpecBlockMemeberSpecInvariant
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecFunction
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecCondition
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecInclude
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecApply
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecPragma
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecVariable
+         , Megaparsec.try pHiddenSpecBlockMemeberSpecLet
          ]
   where
     pHiddenSpecBlockMemeberSpecInvariant :: Parser (MoveTerm HiddenSpecBlockMemeberL)
@@ -1525,8 +1522,8 @@ pSpecApplyNamePattern = do
 
 pSpecApplyPatternInternal0 :: Parser (MoveTerm SpecApplyPatternInternal0L)
 pSpecApplyPatternInternal0 = do
-  choice [ pSpecApplyPatternInternal0Public
-         , pSpecApplyPatternInternal0Internal
+  choice [ Megaparsec.try pSpecApplyPatternInternal0Public
+         , Megaparsec.try pSpecApplyPatternInternal0Internal
          ]
   where
     pSpecApplyPatternInternal0Public :: Parser (MoveTerm SpecApplyPatternInternal0L)
@@ -1541,9 +1538,9 @@ pSpecApplyPatternInternal0 = do
 pSpecCondition :: Parser (MoveTerm SpecConditionL)
 pSpecCondition = do
   _sym <- pSymbol "spec_condition" SSpecConditionSymbol
-  choice [ pSpecConditionSpecCondition
-         , pSpecConditionSpecAbortIf
-         , pSpecConditionSpecAbortWithOrModifies
+  choice [ Megaparsec.try pSpecConditionSpecCondition
+         , Megaparsec.try pSpecConditionSpecAbortIf
+         , Megaparsec.try pSpecConditionSpecAbortWithOrModifies
          ]
   where
     pSpecConditionSpecCondition :: Parser (MoveTerm SpecConditionL)
@@ -1561,8 +1558,8 @@ pSpecCondition = do
 
 pHiddenSpecAbortWithOrModifiesInternal0 :: Parser (MoveTerm HiddenSpecAbortWithOrModifiesInternal0L)
 pHiddenSpecAbortWithOrModifiesInternal0 = do
-  choice [ pHiddenSpecAbortWithOrModifiesInternal0AbortsWith
-         , pHiddenSpecAbortWithOrModifiesInternal0Modifies
+  choice [ Megaparsec.try pHiddenSpecAbortWithOrModifiesInternal0AbortsWith
+         , Megaparsec.try pHiddenSpecAbortWithOrModifiesInternal0Modifies
          ]
   where
     pHiddenSpecAbortWithOrModifiesInternal0AbortsWith :: Parser (MoveTerm HiddenSpecAbortWithOrModifiesInternal0L)
@@ -1576,8 +1573,8 @@ pHiddenSpecAbortWithOrModifiesInternal0 = do
 
 pHiddenSpecConditionInternal0 :: Parser (MoveTerm HiddenSpecConditionInternal0L)
 pHiddenSpecConditionInternal0 = do
-  choice [ pHiddenSpecConditionInternal0Kind
-         , pHiddenSpecConditionInternal02
+  choice [ Megaparsec.try pHiddenSpecConditionInternal0Kind
+         , Megaparsec.try pHiddenSpecConditionInternal02
          ]
   where
     pHiddenSpecConditionInternal0Kind :: Parser (MoveTerm HiddenSpecConditionInternal0L)
@@ -1592,11 +1589,11 @@ pHiddenSpecConditionInternal0 = do
 
 pHiddenSpecConditionKind :: Parser (MoveTerm HiddenSpecConditionKindL)
 pHiddenSpecConditionKind = do
-  choice [ pHiddenSpecConditionKindAssert
-         , pHiddenSpecConditionKindAssume
-         , pHiddenSpecConditionKindDecreases
-         , pHiddenSpecConditionKindEnsures
-         , pHiddenSpecConditionKindSucceedsIf
+  choice [ Megaparsec.try pHiddenSpecConditionKindAssert
+         , Megaparsec.try pHiddenSpecConditionKindAssume
+         , Megaparsec.try pHiddenSpecConditionKindDecreases
+         , Megaparsec.try pHiddenSpecConditionKindEnsures
+         , Megaparsec.try pHiddenSpecConditionKindSucceedsIf
          ]
   where
     pHiddenSpecConditionKindAssert :: Parser (MoveTerm HiddenSpecConditionKindL)
@@ -1651,10 +1648,10 @@ pSpecInvariant = do
 
 pSpecInvariantInternal0 :: Parser (MoveTerm SpecInvariantInternal0L)
 pSpecInvariantInternal0 = do
-  choice [ pSpecInvariantInternal0Update
-         , pSpecInvariantInternal0Pack
-         , pSpecInvariantInternal0Unpack
-         , pSpecInvariantInternal0Module
+  choice [ Megaparsec.try pSpecInvariantInternal0Update
+         , Megaparsec.try pSpecInvariantInternal0Pack
+         , Megaparsec.try pSpecInvariantInternal0Unpack
+         , Megaparsec.try pSpecInvariantInternal0Module
          ]
   where
     pSpecInvariantInternal0Update :: Parser (MoveTerm SpecInvariantInternal0L)
@@ -1701,8 +1698,8 @@ pSpecVariable = do
 
 pSpecVariableInternal0 :: Parser (MoveTerm SpecVariableInternal0L)
 pSpecVariableInternal0 = do
-  choice [ pSpecVariableInternal0Global
-         , pSpecVariableInternal0Local
+  choice [ Megaparsec.try pSpecVariableInternal0Global
+         , Megaparsec.try pSpecVariableInternal0Local
          ]
   where
     pSpecVariableInternal0Global :: Parser (MoveTerm SpecVariableInternal0L)
@@ -1723,10 +1720,10 @@ pUseDeclaration = do
 
 pUseDeclarationInternal0 :: Parser (MoveTerm UseDeclarationInternal0L)
 pUseDeclarationInternal0 = do
-  choice [ pUseDeclarationInternal0UseFun
-         , pUseDeclarationInternal0UseModule
-         , pUseDeclarationInternal0UseModuleMember
-         , pUseDeclarationInternal0UseModuleMembers
+  choice [ Megaparsec.try pUseDeclarationInternal0UseFun
+         , Megaparsec.try pUseDeclarationInternal0UseModule
+         , Megaparsec.try pUseDeclarationInternal0UseModuleMember
+         , Megaparsec.try pUseDeclarationInternal0UseModuleMembers
          ]
   where
     pUseDeclarationInternal0UseFun :: Parser (MoveTerm UseDeclarationInternal0L)
@@ -1770,9 +1767,9 @@ pUseModuleMember = do
 pUseMember :: Parser (MoveTerm UseMemberL)
 pUseMember = do
   _sym <- pSymbol "use_member" SUseMemberSymbol
-  choice [ pUseMember1
-         , pUseMember2
-         , pUseMember3
+  choice [ Megaparsec.try pUseMember1
+         , Megaparsec.try pUseMember2
+         , Megaparsec.try pUseMember3
          ]
   where
     pUseMember1 :: Parser (MoveTerm UseMemberL)
@@ -1795,8 +1792,8 @@ pUseMember = do
 pUseModuleMembers :: Parser (MoveTerm UseModuleMembersL)
 pUseModuleMembers = do
   _sym <- pSymbol "use_module_members" SUseModuleMembersSymbol
-  choice [ pUseModuleMembers1
-         , pUseModuleMembers2
+  choice [ Megaparsec.try pUseModuleMembers1
+         , Megaparsec.try pUseModuleMembers2
          ]
   where
     pUseModuleMembers1 :: Parser (MoveTerm UseModuleMembersL)
@@ -1843,8 +1840,8 @@ pMoveOrCopyExpression = do
 
 pMoveOrCopyExpressionInternal0 :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
 pMoveOrCopyExpressionInternal0 = do
-  choice [ pMoveOrCopyExpressionInternal0Move
-         , pMoveOrCopyExpressionInternal0Copy
+  choice [ Megaparsec.try pMoveOrCopyExpressionInternal0Move
+         , Megaparsec.try pMoveOrCopyExpressionInternal0Copy
          ]
   where
     pMoveOrCopyExpressionInternal0Move :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
@@ -1884,26 +1881,26 @@ pAssignExpression = do
 pBinaryExpression :: Parser (MoveTerm BinaryExpressionL)
 pBinaryExpression = do
   _sym <- pSymbol "binary_expression" SBinaryExpressionSymbol
-  choice [ pBinaryExpression1
-         , pBinaryExpression2
-         , pBinaryExpression3
-         , pBinaryExpression4
-         , pBinaryExpression5
-         , pBinaryExpression6
-         , pBinaryExpression7
-         , pBinaryExpression8
-         , pBinaryExpression9
-         , pBinaryExpression10
-         , pBinaryExpression11
-         , pBinaryExpression12
-         , pBinaryExpression13
-         , pBinaryExpression14
-         , pBinaryExpression15
-         , pBinaryExpression16
-         , pBinaryExpression17
-         , pBinaryExpression18
-         , pBinaryExpression19
-         , pBinaryExpression20
+  choice [ Megaparsec.try pBinaryExpression1
+         , Megaparsec.try pBinaryExpression2
+         , Megaparsec.try pBinaryExpression3
+         , Megaparsec.try pBinaryExpression4
+         , Megaparsec.try pBinaryExpression5
+         , Megaparsec.try pBinaryExpression6
+         , Megaparsec.try pBinaryExpression7
+         , Megaparsec.try pBinaryExpression8
+         , Megaparsec.try pBinaryExpression9
+         , Megaparsec.try pBinaryExpression10
+         , Megaparsec.try pBinaryExpression11
+         , Megaparsec.try pBinaryExpression12
+         , Megaparsec.try pBinaryExpression13
+         , Megaparsec.try pBinaryExpression14
+         , Megaparsec.try pBinaryExpression15
+         , Megaparsec.try pBinaryExpression16
+         , Megaparsec.try pBinaryExpression17
+         , Megaparsec.try pBinaryExpression18
+         , Megaparsec.try pBinaryExpression19
+         , Megaparsec.try pBinaryExpression20
          ]
   where
     pBinaryExpression1 :: Parser (MoveTerm BinaryExpressionL)
@@ -2065,9 +2062,9 @@ pLambdaBindings = do
 pLambdaBinding :: Parser (MoveTerm LambdaBindingL)
 pLambdaBinding = do
   _sym <- pSymbol "lambda_binding" SLambdaBindingSymbol
-  choice [ pLambdaBindingCommaBindList
-         , pLambdaBindingBind
-         , pLambdaBinding3
+  choice [ Megaparsec.try pLambdaBindingCommaBindList
+         , Megaparsec.try pLambdaBindingBind
+         , Megaparsec.try pLambdaBinding3
          ]
   where
     pLambdaBindingCommaBindList :: Parser (MoveTerm LambdaBindingL)
@@ -2105,8 +2102,8 @@ pQuantifierBindings = do
 pQuantifierBinding :: Parser (MoveTerm QuantifierBindingL)
 pQuantifierBinding = do
   _sym <- pSymbol "quantifier_binding" SQuantifierBindingSymbol
-  choice [ pQuantifierBinding1
-         , pQuantifierBinding2
+  choice [ Megaparsec.try pQuantifierBinding1
+         , Megaparsec.try pQuantifierBinding2
          ]
   where
     pQuantifierBinding1 :: Parser (MoveTerm QuantifierBindingL)
@@ -2123,8 +2120,8 @@ pQuantifierBinding = do
 pReturnExpression :: Parser (MoveTerm ReturnExpressionL)
 pReturnExpression = do
   _sym <- pSymbol "return_expression" SReturnExpressionSymbol
-  choice [ pReturnExpression1
-         , pReturnExpressionLabel
+  choice [ Megaparsec.try pReturnExpression1
+         , Megaparsec.try pReturnExpressionLabel
          ]
   where
     pReturnExpression1 :: Parser (MoveTerm ReturnExpressionL)
@@ -2147,8 +2144,8 @@ pWhileExpression = do
 pBlockItem :: Parser (MoveTerm BlockItemL)
 pBlockItem = do
   _sym <- pSymbol "block_item" SBlockItemSymbol
-  choice [ pBlockItemExpression
-         , pBlockItemLetStatement
+  choice [ Megaparsec.try pBlockItemExpression
+         , Megaparsec.try pBlockItemLetStatement
          ]
   where
     pBlockItemExpression :: Parser (MoveTerm BlockItemL)
@@ -2171,9 +2168,9 @@ pLetStatement = do
 pModifier :: Parser (MoveTerm ModifierL)
 pModifier = do
   _sym <- pSymbol "modifier" SModifierSymbol
-  choice [ pModifier1
-         , pModifierEntry
-         , pModifierNative
+  choice [ Megaparsec.try pModifier1
+         , Megaparsec.try pModifierEntry
+         , Megaparsec.try pModifierNative
          ]
   where
     pModifier1 :: Parser (MoveTerm ModifierL)
@@ -2192,8 +2189,8 @@ pModifier = do
 
 pModifierInternal0 :: Parser (MoveTerm ModifierInternal0L)
 pModifierInternal0 = do
-  choice [ pModifierInternal0Package
-         , pModifierInternal0Friend
+  choice [ Megaparsec.try pModifierInternal0Package
+         , Megaparsec.try pModifierInternal0Friend
          ]
   where
     pModifierInternal0Package :: Parser (MoveTerm ModifierInternal0L)
@@ -2221,8 +2218,8 @@ pNativeFunctionDefinition = do
 
 pHiddenStructItem :: Parser (MoveTerm HiddenStructItemL)
 pHiddenStructItem = do
-  choice [ pHiddenStructItemNativeStructDefinition
-         , pHiddenStructItemStructDefinition
+  choice [ Megaparsec.try pHiddenStructItemNativeStructDefinition
+         , Megaparsec.try pHiddenStructItemStructDefinition
          ]
   where
     pHiddenStructItemNativeStructDefinition :: Parser (MoveTerm HiddenStructItemL)
@@ -2261,8 +2258,8 @@ pStructDefinition = do
 pDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
 pDatatypeFields = do
   _sym <- pSymbol "datatype_fields" SDatatypeFieldsSymbol
-  choice [ pDatatypeFieldsPositionalFields
-         , pDatatypeFieldsNamedFields
+  choice [ Megaparsec.try pDatatypeFieldsPositionalFields
+         , Megaparsec.try pDatatypeFieldsNamedFields
          ]
   where
     pDatatypeFieldsPositionalFields :: Parser (MoveTerm DatatypeFieldsL)
@@ -2344,8 +2341,8 @@ pFriendDeclaration = do
 pFriendAccess :: Parser (MoveTerm FriendAccessL)
 pFriendAccess = do
   _sym <- pSymbol "friend_access" SFriendAccessSymbol
-  choice [ pFriendAccessLocalModule
-         , pFriendAccessFullyQualifiedModule
+  choice [ Megaparsec.try pFriendAccessLocalModule
+         , Megaparsec.try pFriendAccessFullyQualifiedModule
          ]
   where
     pFriendAccessLocalModule :: Parser (MoveTerm FriendAccessL)

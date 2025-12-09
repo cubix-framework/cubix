@@ -106,8 +106,8 @@ ${if(it.hasSymbol)}
   _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol
 ${endif}
 ${if(it.sum)}
-  choice [ ${for(it.constructors)}p${it.name.camelCase}${sep}
-         , ${endfor}
+  choice [ Megaparsec.try ${for(it.constructors)}p${it.name.camelCase}${sep}
+         , Megaparsec.try ${endfor}
          ]
 ${else}
 ${for(it.constructors)}
