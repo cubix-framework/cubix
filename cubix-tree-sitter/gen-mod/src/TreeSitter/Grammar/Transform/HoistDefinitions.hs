@@ -1,7 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module TreeSitter.GenerateAst.Internal.Transform.HoistDefinitions (
+module TreeSitter.Grammar.Transform.HoistDefinitions (
   hoistDefinitions
 ) where
 
@@ -17,8 +17,8 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Vector qualified as Vector
-import TreeSitter.GenerateAst.Internal.Grammar
-import TreeSitter.GenerateAst.Internal.Data (TokenMap)
+import TreeSitter.Generate.Data (TokenMap)
+import TreeSitter.Grammar
 
 newtype HoistError
   = HoistErrorUnusedString Text

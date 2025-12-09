@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module TreeSitter.GenerateAst.Internal.Transform.NonEmpty (
+module TreeSitter.Grammar.Transform.NonEmpty (
   nonEmpty
 ) where
 
@@ -8,8 +8,8 @@ import Data.Functor.Foldable
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Vector qualified as Vector
-import TreeSitter.GenerateAst.Internal.Data (TokenMap)
-import TreeSitter.GenerateAst.Internal.Grammar
+import TreeSitter.Generate.Data (TokenMap)
+import TreeSitter.Grammar
 
 nonEmpty :: Grammar -> Grammar
 nonEmpty g@(Grammar {..}) = g { rules = nonEmptyRules rules }

@@ -20,7 +20,7 @@ import Data.Text qualified as Text
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
-import TreeSitter.GenerateAst.Internal.Grammar
+import TreeSitter.Grammar
 
 import Debug.Trace
 

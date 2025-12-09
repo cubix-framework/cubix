@@ -1,14 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module TreeSitter.GenerateAst.Internal.Transform.RemoveUnusedStrings (
+module TreeSitter.Grammar.Transform.RemoveUnusedStrings (
   removeUnusedStrings
 ) where
 
 import Data.Functor.Foldable
 import Data.Map (Map)
 import Data.Map qualified as Map
-import TreeSitter.GenerateAst.Internal.Data (TokenMap)
-import TreeSitter.GenerateAst.Internal.Grammar
+import TreeSitter.Generate.Data (TokenMap)
+import TreeSitter.Grammar
 
 removeUnusedStrings :: TokenMap -> Grammar -> Grammar
 removeUnusedStrings preserved g@(Grammar {..}) = g { rules = removeUnusedStringsRules preserved rules }

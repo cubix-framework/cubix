@@ -9,7 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
-module TreeSitter.GenerateAst.Internal.Grammar where
+module TreeSitter.Grammar where
 
 import Control.Applicative (Alternative (..))
 import Data.Aeson.Types (FromJSON (..), Parser, Value (..), defaultOptions, genericParseJSON, typeMismatch, withObject, (.:), (.:?))

@@ -111,15 +111,12 @@ library gen-internal
     TreeSitter.Generate.Data
     TreeSitter.Generate.Parser
     TreeSitter.Generate.Render
-    TreeSitter.GenerateAst.Internal.CodeGen
-    TreeSitter.GenerateAst.Internal.Data
-    TreeSitter.GenerateAst.Internal.Grammar
-    TreeSitter.GenerateAst.Internal.Parser
-    TreeSitter.GenerateAst.Internal.Transform
-    TreeSitter.GenerateAst.Internal.Transform.HoistDefinitions
-    TreeSitter.GenerateAst.Internal.Transform.NonEmpty
-    TreeSitter.GenerateAst.Internal.Transform.RemoveUnusedStrings
-    TreeSitter.GenerateAst.Internal.Transform.StripBlanks
+    TreeSitter.Grammar
+    TreeSitter.Grammar.Transform
+    TreeSitter.Grammar.Transform.HoistDefinitions
+    TreeSitter.Grammar.Transform.NonEmpty
+    TreeSitter.Grammar.Transform.RemoveUnusedStrings
+    TreeSitter.Grammar.Transform.StripBlanks
 
 executable gen-mod
   import: language

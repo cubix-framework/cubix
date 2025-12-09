@@ -27,13 +27,12 @@ import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
 
-import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..), RuleName)
-import TreeSitter.GenerateAst.Internal.Transform (transform)
 import TreeSitter.Generate.Data
 import TreeSitter.Generate.Parser (Parser (..), mkParser)
+import TreeSitter.Grammar (Grammar (..), RuleName)
 
-import Text.Pretty.Simple
-import System.IO.Unsafe (unsafePerformIO)
+-- import Text.Pretty.Simple
+-- import System.IO.Unsafe (unsafePerformIO)
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -45,7 +44,7 @@ data RenderState = InText | InTemplate [Text]
 
 renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
 renderSyntax Metadata{..} grammar templateFile template tokenMap =
-  unsafePerformIO (pPrintLightBg (rules grammar)) `seq` errorOrModule
+  {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
@@ -63,7 +62,7 @@ renderSyntax Metadata{..} grammar templateFile template tokenMap =
   tokensCtx = Context . Map.singleton "tokens" . toVal
     $ Map.elems tokens
   nodes = Map.elems $ Map.mapWithKey (topRuleToNode tokenMap grammar.rules) grammar.rules
-  nodes' = (unsafePerformIO (pPrintLightBg nodes) `seq` nodes) `reachableFrom` Name startRuleName
+  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachableFrom` Name startRuleName
 
   nodesCtx = Context . Map.fromList $
     [ ("data", toVal nodes')

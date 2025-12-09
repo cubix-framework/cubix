@@ -1,13 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module TreeSitter.GenerateAst.Internal.Transform.StripBlanks (
+module TreeSitter.Grammar.Transform.StripBlanks (
   stripBlanks
 ) where
 
 import Data.Functor.Foldable
 import Data.Map (Map)
 import Data.Vector qualified as Vector
-import TreeSitter.GenerateAst.Internal.Grammar
+import TreeSitter.Grammar
 
 stripBlanks :: Grammar -> Grammar
 stripBlanks g@(Grammar {..}) = g { rules = stripBlanksRules rules }

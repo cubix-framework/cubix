@@ -14,9 +14,8 @@ import Options.Applicative (Parser, ParserInfo, execParser, flag', fullDesc, hel
 import TreeSitter.Generate.Data
 import TreeSitter.Generate.Render
 
-import Text.Pretty.Simple
-import TreeSitter.GenerateAst.Internal.Grammar (Grammar (..))
-import TreeSitter.GenerateAst.Internal.Transform (transform)
+import TreeSitter.Grammar (Grammar (..))
+import TreeSitter.Grammar.Transform (transform)
 
 template :: Text
 template = T.decodeUtf8 $(embedFileRelative "gen-mod/data/ParsePretty.hs.template")
