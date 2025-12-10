@@ -15,6 +15,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import Language.Haskell.TH qualified as TH
 import TreeSitter qualified as TS
 
 import Cubix.Language.Info (TermLab)
@@ -251,3 +252,25 @@ mkSymbolTable lang = do
     )
     (IM.empty :: IntMap SomeSymbolSing)
     [0..count-1]
+
+--------------------------------------------------------------------------------
+-- Signature TH Names
+--------------------------------------------------------------------------------
+
+{-+}
+${grammarName/lowercase}SigNames :: [TH.Name]
+${grammarName/lowercase}SigNames =
+${for(data/first)}
+   [ ''${it.name.camelCase}
+${endfor}
+${for(data/rest)}
+   , ''${it.name.camelCase}
+${endfor}
+   , ''Token
+   , ''Syntax.PairF
+   , ''Syntax.MaybeF
+   , ''Syntax.ListF
+   , ''Syntax.EitherF
+   , ''Syntax.UnitF
+   ]
+{+-}
