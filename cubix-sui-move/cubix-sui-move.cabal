@@ -84,13 +84,8 @@ library
   exposed-modules:
     Cubix.Language.SuiMove.ParsePretty
     Cubix.Language.SuiMove.IPS
+    Cubix.Language.SuiMove.IPS.Trans
+    Cubix.Language.SuiMove.IPS.Types
     Cubix.Language.SuiMove.Modularized
-    -- Language.SuiMove.Syntax
-  -- other-modules:
-  --   Cubix.Language.Move.IPS.Trans
-  --   Cubix.Language.Move.IPS.Types
-  --   Cubix.Language.Move.Modularized.Names
-  --   Cubix.Language.Move.Modularized.Trans
-  --   Cubix.Language.Move.Modularized.Types
 
 
