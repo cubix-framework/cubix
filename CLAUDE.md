@@ -1,100 +1,69 @@
-# CLAUDE.md
+# The Cubix framework
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+The Cubix framework for multi-language transformation.
 
-## Project Overview
+## Build commands with [devenv](https://devenv.sh/) (recommended)
+
+```bash
+devenv                                 # Enter dev shell with GHC, cabal, HLS
+cabal build                            # Build main cubix library and executables
+cabal build cubix-sui-move             # Build associated Sui Move language support library and executables
+cabal build cubix-examples             # Build programs that demonstrate cubix capabilities
+cabal build cubix-benchmarks:mainbench # Build benchmarks
+```
 
 Cubix is a framework for language-parametric program transformation - defining single source-to-source transformations that work across multiple programming languages. It currently supports C, Java, JavaScript, Lua, and Python. The core innovation is "incremental parametric syntax" which allows language definitions to share common components while enabling transformations to be written generically.
 
-## Build System and Development Commands
+## Architecture Overview
 
-### Development Environment Setup
+### Project Structure
 
-**Initialize submodules:**
-```bash
-git submodule update --init
+```
+├── src/Cubix/
+│   ├── Language/
+│   │   ├── Parametric/     # Core parametric syntax framework
+│   │   ├── C/              # C language support (deprecated, language support should be it separate package)
+│   │   ├── Java/           # Java language support (deprecated, language support should be it separate package)
+│   │   ├── JavaScript/     # JavaScript language support (deprecated, language support should be it separate package)
+│   │   ├── Lua/            # Lua language support (deprecated, language support should be it separate package)
+│   │   └── Python/         # Python language support (deprecated, language support should be it separate package)
+│   ├── Transformations/    # Program transformations
+│   ├── Analysis/           # Program analyses
+│   ├── Sin/                # Compatibility layer
+│   ├── Essentials.hs       # Beginner-friendly exports
+│   └── ParsePretty.hs      # Parsing and pretty-printing
+├── compdata/               # Compositional data types library
+├── compstrat/              # Strategy combinators library
+├── comptrans/              # Transformation utilities library
+├── cubix-solidity/         # Solidity language support
+├── cubix-tree-sitter/      # Generating cubix language support based on tree-sitter grammar definitions
+├── cubix-examples          # Demos of cubix capabilities
+├── cubix-benchmarks/       # Cubix framework benchmarks
+├── cubix-sui-move/         # Generated (from tree-sitter grammar) language support for Sui Move
+└── tree-sitter-sui-move/   # Contains tree-sitter grammar for sui-move
 ```
 
-**Enter development environment:**
-```bash
-devenv shell
+### Language support package structure
+
+Supporting new language should be realised by adding new package: `cubix-{language_name}`. Within that package there should be module hierarchy like:
+
+```
+Cubix.Language.{LanguageName}
+├── Modularized # Modularized AST, generated automatically by `gen-mod` executable of `cubix-tree-sitter`
+├── ParsePretty # Parser for language, generated from `gen-parser` executable of `cubix-tree-sitter`
+└── IPS         # Incremental Parametric Syntax, where some of the modularized nodes have been replaced by the generic ones, from the Cubix framework
 ```
 
-### Build Commands
+Note that the support modules for C, Java, JavaScript, Lua and Python are bundled within the main Cubix library. We want to move away from that by splitting them out to their own separate packages. This already happened for Solidity support modules.
 
-**Primary build command (within devenv shell):**
-```bash
-cabal build
-```
+Also note that legacy support modules have different names. `Cubix.Language.{LanguageName}.Full` for Modularized syntax module and `Cubix.Language.{LanguageName}.Common` for Incremental Parametric Syntax module.
 
-**Build specific target:**
-```bash
-cabal build cubix
-```
-
-**Build examples:**
-```bash
-cabal build cubix-examples
-```
-
-**Build benchmarks:**
-```bash
-cabal build cubix-benchmarks:mainbench
-```
-
-### Running Transformations
-
-**Main transformation driver:**
-```bash
-cabal exec examples-multi <language> <transform> <file>*
-```
-
-**Available languages:** `c`, `java`, `javascript`, `lua`, `python`
-
-**Available transformations:** `debug`, `id`, `cfg`, `elementary-hoist`, `hoist`, `tac`, `testcov`, `ipt`
-
-**Available analyses:** `anal-triv-call`
-
-**Example:**
-```bash
-cabal exec examples-multi javascript tac Foo.js
-```
-
-### Test Commands
-
-**Run CFG tests:**
-```bash
-cabal test cfg-test
-```
-
-**Run benchmarks:**
-```bash
-cabal bench cubix-benchmarks:mainbench
-```
-
-**Run language test suites:**
-```bash
-./scripts/test_<lang>.rb <transformation>
-```
-
-### Alternative Commands (Legacy)
-
-The repository also supports Stack for legacy compatibility, but **cabal within devenv is the recommended approach**.
-
-## Code Architecture
-
-### Core Components
+### Core Components of Cubix framework
 
 **Language Fragments (`src/Cubix/Language/Parametric/Syntax/`):**
 - Base syntax definitions shared across languages
 - Expression, Function, VarDecl, and Functor fragments
 - Built using higher-kinded data types with kind `(* -> *) -> * -> *`
-
-**Language-Specific Implementations (`src/Cubix/Language/*/`):**
-- Each language has `Parametric/Common/` and `Parametric/Full/` modules
-- `Common/` contains shared parametric syntax definitions
-- `Full/` contains complete language-specific implementations
-- `Parse.hs` handles parsing for each language
 
 **Transformation Framework (`src/Cubix/Transformations/`):**
 - `Hoist/` - Code hoisting transformations
@@ -105,16 +74,6 @@ The repository also supports Stack for legacy compatibility, but **cabal within 
 
 **Analysis Framework (`src/Cubix/Analysis/`):**
 - `Call/Trivial.hs` - Basic call analysis
-
-**Supporting Libraries:**
-- `compdata/` - Compositional data types library
-- `compstrat/` - Strategy combinators library
-- `comptrans/` - Transformation utilities library
-
-**Separate Packages:**
-- `cubix-examples/` - Example usage of the Cubix framework
-- `cubix-benchmarks/` - Performance benchmarks for the Cubix framework
-- `cubix-solidity/` - Solidity language support
 
 ### Key Types and Concepts
 
@@ -135,72 +94,51 @@ The codebase extensively uses Template Haskell for deriving instances:
 - `createSortInclusionType` creates sort conversion types
 - Smart constructors and pattern synonyms are auto-generated
 
-## Project Structure
+### Adding new language support (based on tree-sitter)
 
-```
-src/Cubix/
-├── Language/
-│   ├── Parametric/           # Core parametric syntax framework
-│   ├── C/                    # C language support
-│   ├── Java/                 # Java language support  
-│   ├── JavaScript/           # JavaScript language support
-│   ├── Lua/                  # Lua language support
-│   └── Python/               # Python language support
-├── Transformations/          # Program transformations
-├── Analysis/                 # Program analyses
-├── Sin/                      # Compatibility layer
-├── Essentials.hs            # Beginner-friendly exports
-└── ParsePretty.hs           # Parsing and pretty-printing
+1. Tree-sitter syntax generation cannot handle tree-sitter alias rule properly, therefore one needs to preprecess language `grammar.json` file with this jq filter, in the tree-sitter grammar definition project root directory:
+```bash
+cat <<< $(jq 'walk(if type != "object" then . else if .type == "ALIAS" then .content else . end end)' src/grammar.json) > src/grammar.json
 ```
 
-## Important Development Notes
+2. Once processed you need to regenerate tree-sitter artefacts from processed grammar file:
+```bash
+tree-sitter generate --abi 14 src/grammar.json
+```
 
-### Compilation Performance
+3. Make a new cubix package that adds language support.
 
-- **Never use `-O1` or `-O2`** - causes GHC to run out of memory
-- Use `-O0` with increased heap sizes (configured in cabal.project)
-- Performance issues are due to extensive Template Haskell and type-level programming
-- The cabal.project file includes optimized GHC options for compilation
+4. Investigate and make a `preserved_tokens.json` file, for tokens that tree-sitter would normally omit, but you want to preserve in the syntax tree.
 
-### Language Support
+5. Run `gen-mod` from `cubix-tree-sitter` to generate Modularized syntax tree
+```bash
+cabal run gen-mod -- \
+    {path to grammar.json} \
+    --start-rule-name {top level tree-sitter rule: usually source_file} \
+    --module-name Cubix.Language.{LanguageName}.Modularized \
+    --token-map {path to preserved_tokens.json} \
+    -o {output file}
+```
 
-- Each language has extensive test suites in `integration-test-input-files/`
-- Third-party parsers are used (forks of `language-c`, `language-java`, etc.)
-- Parser dependencies are managed through git submodules
+6. Run `gen-parser` from `cubix-tree-sitter` to generate Modularized syntax tree
+```bash
+cabal run gen-parser -- \
+    {path to grammar.json} \
+    --start-rule-name {top level tree-sitter rule: usually source_file} \
+    --module-name Cubix.Language.{LanguageName}.ParsePretty \
+    --token-map {path to preserved_tokens.json} \
+    -o {output file}
+```
 
-### Testing
+7. Define `IPS.Types` submodule with appropriate nodes replacet by it's generic counterparts
 
-- CFG tests verify control flow graph construction
-- Language test suites run transformations on real codebases
-- Use `count_loc` parameter to count lines of code in test suites
+8. Add `IPS.Trans` submodule with instances of the Trans typeclass for translation from modularized to parametric syntax
 
-## Common Development Patterns
+9. Add Untrans instance for translating back from parametric to modularized syntax
 
-### Adding New Language Fragments
+## Advanced References
 
-1. Define GADT in `src/Cubix/Language/Parametric/Syntax/`
-2. Use `deriveAll [''YourFragment]` to generate instances
-3. Add to appropriate language signature
-4. Create sort inclusion types if needed
-
-### Writing Transformations
-
-1. Use strategy combinators from `compstrat` library
-2. Build on `RewriteM` monad for stateful transformations
-3. Use `alltdR` for top-down rewrites, `prunetdR` for pruning
-4. Leverage `DynCase` for pattern matching on terms
-
-### Working with Terms
-
-- Use smart constructors (prefixed with `i`) for term construction
-- Use `project` to extract specific node types from terms
-- Use `inject` to embed terms into larger signatures
-- Use `stripA` to remove annotations from terms
-
-## External Dependencies
-
-- Custom forks of language parsers (see `cabal.project` for git dependencies)
-- JAR files for Java parsing: `javaparser-1.0.8.jar`, `javaparser-to-hs.jar`
-- Various Haskell libraries for parsing and pretty-printing
-
-This framework requires deep understanding of advanced Haskell concepts including higher-kinded types, GADTs, type families, and extensive Template Haskell usage.
+### Papers
+- **One Tool, Many Languages: Language-Parametric Transformation with Incremental Parametric Syntax** - Describes Cubix framework
+- **One CFG-Generator to Rule Them All** - Original _compositional data types_ as in the `compdata` package. Note that this project uses it's own fork
+- **Typed Multi-Language Strategy Combinators** - Describes `compstrat` package
