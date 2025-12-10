@@ -36,7 +36,9 @@ common language
 
 common ghc-options
   ghc-options:
-    -W -fno-warn-unused-foralls
+    -W
+    -fno-warn-unused-foralls
+    -freduction-depth=400
 
 common dependencies
   build-depends:
