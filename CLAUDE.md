@@ -120,7 +120,7 @@ cabal run gen-mod -- \
     -o {output file}
 ```
 
-6. Run `gen-parser` from `cubix-tree-sitter` to generate Modularized syntax tree
+6. Run `gen-parser` from `cubix-tree-sitter` to generate parser for tree-sitter lexed tokens
 ```bash
 cabal run gen-parser -- \
     {path to grammar.json} \
