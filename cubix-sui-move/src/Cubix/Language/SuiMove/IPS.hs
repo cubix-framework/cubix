@@ -17,28 +17,26 @@ module Cubix.Language.SuiMove.IPS (
     module Types
   , module Trans
   , module M
-
   , module Para
   ) where
 
 import Cubix.Language.SuiMove.IPS.Types as Types
 import Cubix.Language.SuiMove.IPS.Trans as Trans
-import Cubix.Language.SuiMove.Modularized as M hiding
-  ( Identifier, iIdentifier, jIdentifier, pattern Identifier'
-  , IdentifierL
-  -- Hide types and operators that conflict with Para exports
-  , UnaryOpL, BlockL, BlockItemL, FunctionParameterL
+import Cubix.Language.SuiMove.Modularized as M
+import Cubix.Language.Parametric.Syntax as Para hiding
+  ( UnaryOpL
+  , FunctionParameterL
+  , BlockL, BlockItemL
   , Block, iBlock, jBlock, pattern Block'
-  , Assign, iAssign, jAssign, pattern Assign'
   , Add, iAdd, jAdd, pattern Add'
-  , Sub, iSub, jSub, pattern Sub'
-  , Mul, iMul, jMul, pattern Mul'
+  , Assign, iAssign, jAssign, pattern Assign'
   , Div, iDiv, jDiv, pattern Div'
-  , Mod, iMod, jMod, pattern Mod'
-  , Shl, iShl, jShl, pattern Shl'
-  , Lt, iLt, jLt, pattern Lt'
-  , Gt, iGt, jGt, pattern Gt'
   , Eq, iEq, jEq, pattern Eq'
+  , Gt, iGt, jGt, pattern Gt'
+  , Lt, iLt, jLt, pattern Lt'
+  , Mod, iMod, jMod, pattern Mod'
+  , Mul, iMul, jMul, pattern Mul'
   , Neq, iNeq, jNeq, pattern Neq'
+  , Shl, iShl, jShl, pattern Shl'
+  , Sub, iSub, jSub, pattern Sub'
   )
-import Cubix.Language.Parametric.Syntax as Para
