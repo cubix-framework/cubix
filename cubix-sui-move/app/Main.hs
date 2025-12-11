@@ -6,6 +6,7 @@ import Text.Pretty.Simple
 -- import GHC.Debug.Stub (withGhcDebug)
 
 import Cubix.Language.SuiMove.ParsePretty qualified as SuiMove
+import Cubix.Language.SuiMove.IPS (translate)
 
 data Options = Options
   { inputFile :: FilePath }
@@ -32,7 +33,9 @@ main = -- withGhcDebug $
     mast <-
       SuiMove.parse inputFile
     case mast of
-      Just ast -> pPrintLightBg ast
+      Just ast -> do
+        pPrintLightBg ast
+        pPrintLightBg (translate ast)
       Nothing -> putStrLn "something went wrong"
 
     pure ()
