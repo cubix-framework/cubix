@@ -24,7 +24,9 @@ import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
-parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
+{-+}
+parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
+{+-}
 parse' = do
   filepath <- getFilePath
   rootNode <- liftIO . TS.treeRootNode =<< getTree
@@ -42,7 +44,9 @@ parse' = do
       liftIO . putStrLn $ Megaparsec.errorBundlePretty err
       pure Nothing
 
-parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
+{-+}
+parse :: FilePath -> IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
+{+-}
 parse path =
   runReaderT parse' =<<
     newTreeSitterEnv path tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
@@ -70,29 +74,39 @@ pText :: Parser Text
 pText = pure mempty
 
 -- reify the types to aid inference, that might get broken
-pMaybe :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm (Maybe a))
+{-+}
+pMaybe :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term (Maybe a))
+{+-}
 pMaybe = Megaparsec.Cubix.pMaybe
 
-pPair :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (a , b))
+{-+}
+pPair :: (Typeable a, Typeable b) => Parser (${grammarName}Term a) -> Parser (${grammarName}Term b) -> Parser (${grammarName}Term (a , b))
+{+-}
 pPair = Megaparsec.Cubix.pPair
 
-pEither :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (Either a b))
+{-+}
+pEither :: (Typeable a, Typeable b) => Parser (${grammarName}Term a) -> Parser (${grammarName}Term b) -> Parser (${grammarName}Term (Either a b))
+{+-}
 pEither = Megaparsec.Cubix.pEither
 
-pSome :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
+{-+}
+pSome :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term [a])
+{+-}
 pSome = Megaparsec.Cubix.pSome
 
-pMany :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
+{-+}
+pMany :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term [a])
+{+-}
 pMany = Megaparsec.Cubix.pMany
 
 {-+}
-pRoot :: Parser (MoveTerm (RootSort MoveSig))
+pRoot :: Parser (${grammarName}Term (RootSort ${grammarName}Sig))
 pRoot = p${startSort.camelCase}
 {+-}
 
 {-+}
 ${for(tokens)}
-p${it.name.camelCase} :: Parser (MoveTerm ${it.name.camelCase}TokL)
+p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.camelCase}TokL)
 p${it.name.camelCase} = pSymbol "${it.name.text}" S${it.name.camelCase}TokSymbol $$> i${it.name.camelCase}
 
 ${endfor}
@@ -100,7 +114,7 @@ ${endfor}
 
 {-+}
 ${for(data)}
-p${it.name.camelCase} :: Parser (MoveTerm ${it.name.sort})
+p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.sort})
 p${it.name.camelCase} = do
 ${if(it.hasSymbol)}
   _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol
@@ -123,7 +137,7 @@ ${endif}
 ${if(it.sum)}
   where
 ${for(it.constructors)}
-    p${it.name.camelCase} :: Parser (MoveTerm ${it.type.sort})
+    p${it.name.camelCase} :: Parser (${grammarName}Term ${it.type.sort})
     p${it.name.camelCase} =
       ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
 ${for(it.fields/first)}
