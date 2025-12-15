@@ -8,4 +8,4 @@ import TreeSitter.Grammar.Transform.RemoveUnusedStrings (removeUnusedStrings)
 import TreeSitter.Grammar.Transform.StripBlanks (stripBlanks)
 
 transform :: TokenMap -> Grammar -> Grammar
-transform preserved = hoistDefinitions preserved . nonEmpty . stripBlanks . removeUnusedStrings preserved
+transform preserved = hoistDefinitions preserved . nonEmpty . stripBlanks

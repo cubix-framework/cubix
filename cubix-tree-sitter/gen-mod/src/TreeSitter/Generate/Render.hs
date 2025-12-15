@@ -23,6 +23,7 @@ import Data.Text qualified as Text
 import Data.Text.Lazy qualified as Text.Lazy
 import Data.Text.Lazy.Builder (Builder)
 import Data.Text.Lazy.Builder qualified as Builder
+import Unicode.Char.General.Names qualified as Unicode
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
@@ -31,8 +32,8 @@ import TreeSitter.Generate.Data
 import TreeSitter.Generate.Parser (Parser (..), mkParser)
 import TreeSitter.Grammar (Grammar (..), RuleName)
 
--- import Text.Pretty.Simple
--- import System.IO.Unsafe (unsafePerformIO)
+import Text.Pretty.Simple
+import System.IO.Unsafe (unsafePerformIO)
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -44,7 +45,7 @@ data RenderState = InText | InTemplate [Text]
 
 renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
 renderSyntax Metadata{..} grammar templateFile template tokenMap =
-  {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
+  unsafePerformIO (pPrintLightBg (rules grammar)) `seq` errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
@@ -221,10 +222,14 @@ data Case = Upper | Lower | Keep
 
 -- | @`snakeToCase` c txt@ converts a string from snake or kebab case to camel case.
 snakeToCase :: Case -> Text -> Text
-snakeToCase = \b -> Text.pack . go b . Text.unpack
+snakeToCase b = Text.pack . go b . Text.unpack
  where
   go _ [] = []
-  go b (c : cs) = if isAlphaNum c then c `to` b : go Keep cs else go Upper cs
+  go a (c : cs) =
+    if | c == '_' -> go Upper cs
+       | isAlphaNum c -> c `to` a : go Keep cs
+       | Just n <- Unicode.name c -> go a (toLower <$> n ++ cs)
+       | otherwise -> go Upper cs
 
   to c Upper = toUpper c
   to c Lower = toLower c

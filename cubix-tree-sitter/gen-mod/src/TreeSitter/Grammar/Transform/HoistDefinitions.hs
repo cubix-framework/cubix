@@ -111,17 +111,17 @@ extractDefs preserved rules rulename =
 extractDefsAlgM :: TokenMap -> RuleF Rule -> HoistM Rule
 extractDefsAlgM preserved = \case
   ChoiceRuleF {..} -> hoistDedup $ ChoiceRule membersF
-  rule@(AliasRuleF {..}) -> do
-    let name = case contentF of
-          SymbolRule sym -> valueF <> "_" <> sym
-          -- Unused strings should be removed by now
-          StringRule string ->
-            valueF <> "_" <> fromMaybe string
-              (fromMaybe (throw $ HoistErrorUnusedString string)
-               $ Map.lookup string preserved)
-          _ -> valueF
-    -- make new rule hidden so there is a chance it won't show up in the final AST
-    hoist (Text.cons '_' name) $ embed rule
+  -- rule@(AliasRuleF {..}) -> do
+  --   let name = case contentF of
+  --         SymbolRule sym -> valueF <> "_" <> sym
+  --         -- Unused strings should be removed by now
+  --         StringRule string ->
+  --           valueF <> "_" <> fromMaybe string
+  --             (fromMaybe (throw $ HoistErrorUnusedString string)
+  --              $ Map.lookup string preserved)
+  --         _ -> valueF
+  --   -- make new rule hidden so there is a chance it won't show up in the final AST
+  --   hoist (Text.cons '_' name) $ embed rule
   r -> pure $ embed r
 
 hoistChoiceRules :: TokenMap -> Map RuleName Rule -> Map RuleName Rule

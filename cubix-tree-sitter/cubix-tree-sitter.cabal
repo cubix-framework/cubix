@@ -80,6 +80,7 @@ common dependencies
     , template-haskell >= 2.21.0.0
     , text >= 2.1.2
     , transformers ^>= 0.6
+    , unicode-data-names
     , unordered-containers ^>= 0.2
     , vector >= 0.13.2.0
     , tree-sitter-sui-move

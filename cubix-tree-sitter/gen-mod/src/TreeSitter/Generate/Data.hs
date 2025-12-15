@@ -39,11 +39,11 @@ isInternal n = let segments = Text.split (== '_') n
 
 shouldInline :: Map RuleName Rule -> RuleName -> Maybe Rule
 shouldInline rules name
-  | isHidden name =
-      case getRule rules name of
-        ChoiceRule {} -> Nothing
-        AliasRule {..} -> Just content
-        r -> Just r
+  | isHidden name = Nothing
+      -- case getRule rules name of
+      --   ChoiceRule {} -> Nothing
+      --   AliasRule {..} -> Just content
+      --   r -> Just r
   | otherwise = Nothing
   
 data Type
@@ -126,12 +126,15 @@ ruleToConstructor tokenMap rules parent = go
       AliasRule {} -> error $ "Alias is not a valid constructor: " <> show parent
       RepeatRule {} -> error $ "Repeat is not a valid constructor: " <> show parent
       Repeat1Rule {} -> error $ "Repeat1 is not a valid constructor: " <> show parent
+      SepByRule {} ->  error $ "SepBy is not a valid constructor: " <> show parent
+      SepBy1Rule {} ->  error $ "SepBy1 is not a valid constructor: " <> show parent
+      BetweenRule {..} -> Constructor parent [toField content]
       r@(StringRule s) -> Constructor (suffix s) [toField r]
       TokenRule r -> go r
       ImmediateTokenRule r -> go r
       FieldRule {..} -> Constructor (suffix name) [toField content] 
       PrecRule {..} -> go content
-      Optional {..} -> go content
+      OptionalRule {..} -> go content
       SeqRule {..} -> Constructor parent $ Vector.toList $ toField <$> members
       r@(PatternRule {}) -> Constructor parent [toField r]
       r@(SymbolRule sym) -> Constructor (suffix sym) [toField r]
@@ -183,17 +186,25 @@ ruleToType tokenMap rules = go
         Nothing -> Ref n
     alg (SeqRuleF (Vector.uncons -> Nothing)) = error "Empty sequence rule"
     alg (SeqRuleF (Vector.uncons -> Just (h, t))) =
-      Vector.foldl Tuple h t
+      Vector.foldl mkTuple h t
     alg (SeqRuleF _) = error "Impossible happened"
     alg (RepeatRuleF {..}) = List contentF
     alg (Repeat1RuleF {..}) = NonEmpty contentF
-    alg (OptionalF {..}) = Maybe contentF
+    alg (SepByRuleF {..}) = List contentF
+    alg (SepBy1RuleF {..}) = NonEmpty contentF
+    alg (OptionalRuleF {..}) = Maybe contentF
 
     -- The following constructors are transparent:
+    alg (BetweenRuleF {..}) = contentF
     alg (TokenRuleF {..}) = contentF
     alg (ImmediateTokenRuleF {..}) = contentF
     alg (FieldRuleF {..}) = contentF
     alg (PrecRuleF {..}) = contentF
+
+    mkTuple :: Type -> Type -> Type
+    mkTuple Unit r = r
+    mkTuple l Unit = l
+    mkTuple l r = Tuple l r
 
 depsOfNode :: Node -> [Name]
 depsOfNode (Node _ _ cs) = concatMap depsOfConstructor cs

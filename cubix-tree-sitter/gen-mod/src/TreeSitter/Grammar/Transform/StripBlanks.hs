@@ -30,7 +30,7 @@ stripBlanksAlg (ChoiceRuleF members)
       let members' = Vector.filter (/= BlankRule) members
       in if Vector.null members'
          then BlankRule
-         else Optional (ChoiceRule members')
+         else OptionalRule (ChoiceRule members')
   | otherwise =
       ChoiceRule members
 

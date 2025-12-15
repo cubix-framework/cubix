@@ -101,8 +101,22 @@ data Rule
   | RefRule
       { name :: !RuleName
       }
-  | Optional
+  -- | In order to retain pretty printing capability we need to recreate much of the available grammar.js combinators:
+  | OptionalRule
       { content :: !Rule
+      }
+  | SepByRule
+      { separator :: Rule
+      , content :: Rule
+      }
+  | SepBy1Rule
+      { separator :: Rule
+      , content :: Rule
+      }
+  | BetweenRule
+      { open :: Text
+      , content :: Rule
+      , close :: Text
       }
   deriving (Eq, Show, Generic)
 
