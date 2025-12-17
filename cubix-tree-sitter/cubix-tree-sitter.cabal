@@ -109,13 +109,15 @@ library gen-internal
     , fgl ^>= 5.8
   exposed-modules:
     Data.Functor.Base.Extra
+    Data.Vector.Extra
     TreeSitter.Generate.Data
     TreeSitter.Generate.Parser
     TreeSitter.Generate.Render
     TreeSitter.Grammar
     TreeSitter.Grammar.Transform
+    TreeSitter.Grammar.Transform.Between
     TreeSitter.Grammar.Transform.HoistDefinitions
-    TreeSitter.Grammar.Transform.NonEmpty
+    TreeSitter.Grammar.Transform.SepBy
     TreeSitter.Grammar.Transform.RemoveUnusedStrings
     TreeSitter.Grammar.Transform.StripBlanks
 
