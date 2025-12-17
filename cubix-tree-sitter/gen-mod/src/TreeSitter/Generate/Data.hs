@@ -169,8 +169,9 @@ ruleToType tokenMap rules = go
     alg (AliasRuleF n True _) = Ref (Name n)
     alg (AliasRuleF _ False r) = r
 
-    -- Not used string should have been eliminated
-    alg (StringRuleF {..}) = maybe Unit (Token . fromMaybe valueF) (Map.lookup valueF tokenMap)
+    -- Some strings are captured in between, sepBy rules. Otherwise
+    -- they'll be in our syntax
+    alg (StringRuleF {..}) = Token valueF
     alg (PatternRuleF {}) = Content
     alg (SymbolRuleF n@(Name -> s)) =
       case shouldInline rules n of
