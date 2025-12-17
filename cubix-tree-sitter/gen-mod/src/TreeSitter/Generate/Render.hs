@@ -23,6 +23,7 @@ import Data.Text qualified as Text
 import Data.Text.Lazy qualified as Text.Lazy
 import Data.Text.Lazy.Builder (Builder)
 import Data.Text.Lazy.Builder qualified as Builder
+import Unicode.Char.General qualified as Unicode
 import Unicode.Char.General.Names qualified as Unicode
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
@@ -32,8 +33,8 @@ import TreeSitter.Generate.Data
 import TreeSitter.Generate.Parser (Parser (..), mkParser)
 import TreeSitter.Grammar (Grammar (..), RuleName)
 
-import Text.Pretty.Simple
-import System.IO.Unsafe (unsafePerformIO)
+-- import Text.Pretty.Simple
+-- import System.IO.Unsafe (unsafePerformIO)
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -45,7 +46,7 @@ data RenderState = InText | InTemplate [Text]
 
 renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
 renderSyntax Metadata{..} grammar templateFile template tokenMap =
-  unsafePerformIO (pPrintLightBg (rules grammar)) `seq` errorOrModule
+  {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
   metadataContext =
@@ -63,7 +64,8 @@ renderSyntax Metadata{..} grammar templateFile template tokenMap =
   tokensCtx = Context . Map.singleton "tokens" . toVal
     $ Map.elems tokens
   nodes = Map.elems $ Map.mapWithKey (topRuleToNode tokenMap grammar.rules) grammar.rules
-  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachableFrom` Name startRuleName
+  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachable` Name startRuleName
+  reachable = reachableFrom tokenMap
 
   nodesCtx = Context . Map.fromList $
     [ ("data", toVal nodes')
@@ -227,8 +229,10 @@ snakeToCase b = Text.pack . go b . Text.unpack
   go _ [] = []
   go a (c : cs) =
     if | c == '_' -> go Upper cs
+       | c == '-' -> go Upper cs
+       | Unicode.isWhiteSpace c -> go Upper cs
        | isAlphaNum c -> c `to` a : go Keep cs
-       | Just n <- Unicode.name c -> go a (toLower <$> n ++ cs)
+       | Just n <- Unicode.name c -> go a ((toLower <$> n) ++ cs)
        | otherwise -> go Upper cs
 
   to c Upper = toUpper c
