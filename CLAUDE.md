@@ -130,11 +130,32 @@ cabal run gen-parser -- \
     -o {output file}
 ```
 
-7. Define `IPS.Types` submodule with appropriate nodes replacet by it's generic counterparts
+7. Define `IPS.Types` submodule with appropriate nodes replaced by it's generic counterparts
 
 8. Add `IPS.Trans` submodule with instances of the Trans typeclass for translation from modularized to parametric syntax
 
-9. Add Untrans instance for translating back from parametric to modularized syntax
+9. Add `Untrans` instance for translating back from parametric to modularized syntax
+
+### Parametrizing Modular syntax
+
+In `Types` module:
+1. Identify node from modularized syntax that can be replaced by parameterized one
+
+2. Define sort inclusion types by utilizing `TemplateHaskell` functions: `createSortInclusionTypes`, `deriveAllButSortInjection` and `createSortInclusionInfers`.
+
+3. Update the `Declaring the IPS` section with appropriate nodes:
+  - add defined sort injection to `${lang}SortInjections` array
+  - add parametric node to list of additional nodes
+  - potentially remove old node from list of names
+
+4. Define additional sort injections if necessary
+
+In `Trans` module:
+1. Add sort injection to exemption list for generating default instance
+
+2. Define `Trans` instance for node being replaced. Additionally define helper function that also changes the sort type. Be sure to utilize automatically derived Cubix smart constructors.
+
+3. Define `Untrans` instance for getting back the Modularized syntax from parametric one. Similarly it might be easier to define helper function first, that also changes the sort type.
 
 ## Advanced References
 
@@ -142,3 +163,39 @@ cabal run gen-parser -- \
 - **One Tool, Many Languages: Language-Parametric Transformation with Incremental Parametric Syntax** - Describes Cubix framework
 - **One CFG-Generator to Rule Them All** - Original _compositional data types_ as in the `compdata` package. Note that this project uses it's own fork
 - **Typed Multi-Language Strategy Combinators** - Describes `compstrat` package
+
+## Code Guards: Protected Code Sections
+
+**Code Guards mark critical code that has broken before and should rarely be changed.**
+
+### 🚨 CRITICAL RULES for AI Agents
+
+1. **Code within Code Guards should RARELY be changed**
+2. **IF you want to change guarded code**:
+   - You MUST ask the user for explicit permission first
+   - Explain why the change is necessary
+   - Describe what could break if done incorrectly
+3. **AFTER changing guarded code**:
+   - You MUST inform the user what was changed
+   - Explain how you preserved the critical functionality
+   - Recommend testing steps to verify nothing broke
+
+### Identifying Code Guards
+
+Code Guards are marked with special comments:
+
+```haskell
+-- CODE_GUARD_START
+-- Name: top level translate interface
+-- Description: Entry point for translation
+translate :: F.MoveTerm l -> MSuiMoveTerm l
+translate = trans . unTerm @(Sum F.MoveSig)
+-- CODE_GUARD_END
+```
+
+**Key markers**:
+
+- `CODE_GUARD_START` - Start of protected region
+- `Name: [Guard Name]` - Human-readable name for this guard
+- `Description: [Feature description]` - (Optional) Describe the feature it protects
+- `CODE_GUARD_END` - End of protected region
