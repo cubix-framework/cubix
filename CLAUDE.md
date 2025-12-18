@@ -157,6 +157,9 @@ In `Trans` module:
 
 3. Define `Untrans` instance for getting back the Modularized syntax from parametric one. Similarly it might be easier to define helper function first, that also changes the sort type.
 
+## Dealing with type errors
+While compiling Cubix one can encounter scary looking, huge compilation errors. While intimidating at first are actually pretty easy once you learn how to read them. Whenever you gat a huge type error about missing instance for `KnownNat` with a lot of `1 +...` it means that some node that you are trying to access isn't in your signature. Look at the end of the message to learn which node is missing.
+
 ## Advanced References
 
 ### Papers
