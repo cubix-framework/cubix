@@ -185,8 +185,12 @@ sumToNames nm = do
     extract :: Type -> [Name]
     extract (SigT t _) = extract t
     extract (AppT (AppT PromotedConsT (ConT n)) res) = n : extract res
+    extract (AppT (AppT PromotedConsT (SigT (ConT n) _)) res) = n : extract res
     extract PromotedNilT = []
-    extract _ = error "sumToNames found invalid summand; only recognizes Sum and names"
+    extract t = error $
+      "sumToNames found invalid summand: " <>
+      show t <>
+      "; only recognizes Sum and names"
 
 -- | Used for creating default cases for Untrans instances.
 --   There are two default untranslate cases (identity for shared functors, error for unshared),
