@@ -96,6 +96,7 @@ test-suite unit-tests
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    BannedConstructorTH
     BannedConstructorsSpec
     TransRoundtripSpec
   build-depends:

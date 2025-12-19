@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module BannedConstructorsSpec (spec) where
 
 import Control.Monad (filterM, forM_, when )
@@ -13,16 +15,10 @@ import Data.Comp.Multi.Strategic
 import TreeSitter.SuiMove (getTestDir)
 import Cubix.Language.SuiMove.ParsePretty (parse)
 import Cubix.Language.SuiMove.IPS (translate, MSuiMoveTerm)
-import Cubix.Language.SuiMove.Modularized qualified as M
 
------------------------------------------------------------------------
--- Banned constructor detection
------------------------------------------------------------------------
+import BannedConstructorTH (mkHasBanned, bannedCons)
 
-hasBanned' :: Translate MSuiMoveTerm l Any
-hasBanned' (project -> Just (M.Identifier {})) = pure $ Any True
-hasBanned' (project -> Just (M.BinaryExpression4 {})) = pure $ Any True
-hasBanned' _ = pure $ Any False
+$(mkHasBanned bannedCons)
 
 hasBanned :: MSuiMoveTerm :=> Bool
 hasBanned = getAny . runIdentity . foldtdT hasBanned'
