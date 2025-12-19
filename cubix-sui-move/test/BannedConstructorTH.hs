@@ -14,7 +14,28 @@ import Cubix.Language.SuiMove.Modularized qualified as M
 -- Add or remove constructor names here to modify the set of banned constructors
 bannedCons :: [Name]
 bannedCons =
-  [ 'M.Identifier ]
+  [ 'M.Identifier
+  , 'M.BinaryExpression1
+  , 'M.BinaryExpression2
+  , 'M.BinaryExpression3
+  , 'M.BinaryExpression4
+  , 'M.BinaryExpression5
+  , 'M.BinaryExpression6
+  , 'M.BinaryExpression7
+  , 'M.BinaryExpression8
+  , 'M.BinaryExpression9
+  -- , 'M.BinaryExpression10  -- Range operator - kept as-is
+  , 'M.BinaryExpression11
+  , 'M.BinaryExpression12
+  , 'M.BinaryExpression13
+  , 'M.BinaryExpression14
+  , 'M.BinaryExpression15
+  , 'M.BinaryExpression16
+  , 'M.BinaryExpression17
+  , 'M.BinaryExpression18
+  , 'M.BinaryExpression19
+  , 'M.BinaryExpression20
+  ]
 
 -- | Generate a function that checks if a term contains any banned constructors.
 -- Takes a list of constructor Names and generates pattern matches using empty record patterns.

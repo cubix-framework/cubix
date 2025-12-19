@@ -14,7 +14,7 @@ import Data.Text qualified as Text
 import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
+import Data.Comp.Multi ( project, project', inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 
 import Cubix.Language.SuiMove.IPS.Types
 import Cubix.Language.SuiMove.Modularized qualified as F
@@ -66,7 +66,6 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MSuiMoveSig, f :-<: F.MoveSig)
 ---------------------------------
 
 -------- Identifiers
-
 transIdent :: F.MoveTerm F.IdentifierL -> MSuiMoveTerm IdentL
 transIdent (project -> Just (F.Identifier t)) = Ident' (Text.unpack t)
 
@@ -76,49 +75,55 @@ instance Trans F.Identifier where
 
 -------- Binary Expressions
 
--- Translate binary operators to parametric BinaryOpL when possible
-transBinOp :: F.BinaryExpression F.MoveTerm l -> Maybe (MSuiMoveTerm BinaryOpL, F.MoveTerm F.HiddenExpressionL, F.MoveTerm F.HiddenExpressionL)
-transBinOp (F.BinaryExpression2 a _ b) = Just (LogicOr', a, b)   -- ||
-transBinOp (F.BinaryExpression3 a _ b) = Just (LogicAnd', a, b)  -- &&
-transBinOp (F.BinaryExpression4 a _ b) = Just (Eq', a, b)        -- ==
-transBinOp (F.BinaryExpression5 a _ b) = Just (Neq', a, b)       -- !=
-transBinOp (F.BinaryExpression6 a _ b) = Just (Lt', a, b)        -- <
-transBinOp (F.BinaryExpression7 a _ b) = Just (Gt', a, b)        -- >
-transBinOp (F.BinaryExpression8 a _ b) = Just (Lte', a, b)       -- <=
-transBinOp (F.BinaryExpression9 a _ b) = Just (Gte', a, b)       -- >=
-transBinOp (F.BinaryExpression11 a _ b) = Just (BitOr', a, b)    -- |
-transBinOp (F.BinaryExpression12 a _ b) = Just (BitXor', a, b)   -- ^
-transBinOp (F.BinaryExpression13 a _ b) = Just (BitAnd', a, b)   -- &
-transBinOp (F.BinaryExpression14 a _ b) = Just (Shl', a, b)      -- <<
-transBinOp (F.BinaryExpression15 a _ b) = Just (LogicShr', a, b) -- >>
-transBinOp (F.BinaryExpression16 a _ b) = Just (Add', a, b)      -- +
-transBinOp (F.BinaryExpression17 a _ b) = Just (Sub', a, b)      -- -
-transBinOp (F.BinaryExpression18 a _ b) = Just (Mul', a, b)      -- *
-transBinOp (F.BinaryExpression19 a _ b) = Just (Div', a, b)      -- /
-transBinOp (F.BinaryExpression20 a _ b) = Just (Mod', a, b)      -- %
-transBinOp _ = Nothing
-
--- Translate HiddenExpression nodes, converting BinaryExpressions to parametric Binary
--- We use a helper function to safely extract ExpressionL from translated HiddenExpression
-safeFromProjF :: MSuiMoveTerm F.HiddenExpressionL -> Maybe (MSuiMoveTerm ExpressionL)
-safeFromProjF term = case project term of
-  Just (ExpressionIsHiddenExpression expr) -> Just expr
-  _ -> Nothing
+transBinaryExpr :: F.MoveTerm F.BinaryExpressionL -> Maybe (MSuiMoveTerm F.HiddenExpressionL)
+transBinaryExpr (F.BinaryExpression1' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' LogicOr' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression2' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' LogicOr' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression3' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' LogicAnd' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression4' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Eq' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression5' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Neq' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression6' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Lt' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression7' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Gt' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression8' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Lte' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression9' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Gte' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression10' lhs _ rhs) =
+  -- Range operator (..) - no direct equivalent in parametric syntax, keep as-is
+  Just $ F.iHiddenExpressionBinaryExpression $ F.iBinaryExpression10 (translate lhs) (inject F.Range) (translate rhs)
+transBinaryExpr (F.BinaryExpression11' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' BitOr' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression12' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' BitXor' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression13' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' BitAnd' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression14' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Shl' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression15' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' ArithShr' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression16' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Add' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression17' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Sub' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression18' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Mul' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression19' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Div' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr (F.BinaryExpression20' lhs _ rhs) =
+  Just $ iExpressionIsHiddenExpression $ Binary' Mod' (injF $ translate lhs) (injF $ translate rhs)
+transBinaryExpr _ = Nothing
 
 instance Trans F.HiddenExpression where
-  trans (F.HiddenExpressionBinaryExpression binExpr) = 
-    case project binExpr of
-      Just binExpr' -> case transBinOp binExpr' of
-        Just (op, a, b) -> 
-          let a' = translate a
-              b' = translate b
-          in case (safeFromProjF a', safeFromProjF b') of
-            (Just aExpr, Just bExpr) ->
-              let binary = iBinary op aExpr bExpr
-              in inject $ ExpressionIsHiddenExpression binary
-            _ -> transDefault (F.HiddenExpressionBinaryExpression binExpr)
-        Nothing -> transDefault (F.HiddenExpressionBinaryExpression binExpr)
-      Nothing -> transDefault (F.HiddenExpressionBinaryExpression binExpr)
+  trans he@(F.HiddenExpressionBinaryExpression be) =
+    case transBinaryExpr be of
+      Just result -> result
+      Nothing -> transDefault he
   trans x = transDefault x
 
 ------------------------------------------------------------------------------------
@@ -188,48 +193,31 @@ untransIdent (Ident' s) = F.iIdentifier (Text.pack s)
 instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
   untrans (IdentIsIdentifier n) = untransIdent n
 
--------- Expressions
-
--- Untrans instance for ExpressionIsHiddenExpression sort injection
-instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
-  untrans (ExpressionIsHiddenExpression e) = untransExpression e
-
 -------- Binary Expressions
 
--- Helper to untranslate expressions
-untransExpression :: MSuiMoveTerm ExpressionL -> F.MoveTerm F.HiddenExpressionL
-untransExpression (Binary' op a b) = untransBinary op a b
-untransExpression e = 
-  let hiddenExpr :: MSuiMoveTerm F.HiddenExpressionL
-      hiddenExpr = injF e
-  in untranslate hiddenExpr
+instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
+  untrans (ExpressionIsHiddenExpression (Binary' op lhs rhs)) =
+    F.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
+  untrans (ExpressionIsHiddenExpression e) = 
+    error $ "Cannot untranslate ExpressionIsHiddenExpression for non-Binary expression: " ++ show e
 
-untransBinary
-  :: MSuiMoveTerm BinaryOpL
-  -> MSuiMoveTerm ExpressionL
-  -> MSuiMoveTerm ExpressionL
-  -> F.MoveTerm F.HiddenExpressionL
-untransBinary op a b =
-  let a' = untransExpression a
-      b' = untransExpression b
-      -- Create the binary expression based on the operator
-      binExpr = case op of
-        LogicOr'   -> F.iBinaryExpression2 a' F.Or' b'
-        LogicAnd'  -> F.iBinaryExpression3 a' F.And' b'
-        Eq'        -> F.iBinaryExpression4 a' F.Eq' b'
-        Neq'       -> F.iBinaryExpression5 a' F.Neq' b'
-        Lt'        -> F.iBinaryExpression6 a' F.Lt' b'
-        Gt'        -> F.iBinaryExpression7 a' F.Gt' b'
-        Lte'       -> F.iBinaryExpression8 a' F.Le' b'
-        Gte'       -> F.iBinaryExpression9 a' F.Ge' b'
-        BitOr'     -> F.iBinaryExpression11 a' F.Bitor' b'
-        BitXor'    -> F.iBinaryExpression12 a' F.Xor' b'
-        BitAnd'    -> F.iBinaryExpression13 a' F.Bitand' b'
-        Shl'       -> F.iBinaryExpression14 a' F.Shl' b'
-        LogicShr'  -> F.iBinaryExpression15 a' F.Shr' b'
-        Add'       -> F.iBinaryExpression16 a' F.Add' b'
-        Sub'       -> F.iBinaryExpression17 a' F.Sub' b'
-        Mul'       -> F.iBinaryExpression18 a' F.Mul' b'
-        Div'       -> F.iBinaryExpression19 a' F.Div' b'
-        Mod'       -> F.iBinaryExpression20 a' F.Mod' b'
-  in F.iHiddenExpressionBinaryExpression binExpr
+untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm F.HiddenExpressionL -> MSuiMoveTerm F.HiddenExpressionL -> F.MoveTerm F.BinaryExpressionL
+untransBinaryOp LogicOr' lhs rhs  = F.iBinaryExpression2 (untranslate lhs) (inject F.Or) (untranslate rhs)
+untransBinaryOp LogicAnd' lhs rhs = F.iBinaryExpression3 (untranslate lhs) (inject F.And) (untranslate rhs)
+untransBinaryOp Eq' lhs rhs       = F.iBinaryExpression4 (untranslate lhs) (inject F.Eq) (untranslate rhs)
+untransBinaryOp Neq' lhs rhs      = F.iBinaryExpression5 (untranslate lhs) (inject F.Neq) (untranslate rhs)
+untransBinaryOp Lt' lhs rhs       = F.iBinaryExpression6 (untranslate lhs) (inject F.Lt) (untranslate rhs)
+untransBinaryOp Gt' lhs rhs       = F.iBinaryExpression7 (untranslate lhs) (inject F.Gt) (untranslate rhs)
+untransBinaryOp Lte' lhs rhs      = F.iBinaryExpression8 (untranslate lhs) (inject F.Le) (untranslate rhs)
+untransBinaryOp Gte' lhs rhs      = F.iBinaryExpression9 (untranslate lhs) (inject F.Ge) (untranslate rhs)
+untransBinaryOp BitOr' lhs rhs    = F.iBinaryExpression11 (untranslate lhs) (inject F.Bitor) (untranslate rhs)
+untransBinaryOp BitXor' lhs rhs   = F.iBinaryExpression12 (untranslate lhs) (inject F.Xor) (untranslate rhs)
+untransBinaryOp BitAnd' lhs rhs   = F.iBinaryExpression13 (untranslate lhs) (inject F.Bitand) (untranslate rhs)
+untransBinaryOp Shl' lhs rhs      = F.iBinaryExpression14 (untranslate lhs) (inject F.Shl) (untranslate rhs)
+untransBinaryOp ArithShr' lhs rhs = F.iBinaryExpression15 (untranslate lhs) (inject F.Shr) (untranslate rhs)
+untransBinaryOp Add' lhs rhs      = F.iBinaryExpression16 (untranslate lhs) (inject F.Add) (untranslate rhs)
+untransBinaryOp Sub' lhs rhs      = F.iBinaryExpression17 (untranslate lhs) (inject F.Sub) (untranslate rhs)
+untransBinaryOp Mul' lhs rhs      = F.iBinaryExpression18 (untranslate lhs) (inject F.Mul) (untranslate rhs)
+untransBinaryOp Div' lhs rhs      = F.iBinaryExpression19 (untranslate lhs) (inject F.Div) (untranslate rhs)
+untransBinaryOp Mod' lhs rhs      = F.iBinaryExpression20 (untranslate lhs) (inject F.Mod) (untranslate rhs)
+untransBinaryOp _ _ _             = error "untransBinaryOp: unsupported operator"

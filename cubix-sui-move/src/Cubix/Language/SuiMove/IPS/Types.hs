@@ -34,7 +34,7 @@ createSortInclusionInfers
   [''IdentifierL]
 
 -----------------------------------------------------------------------------------
----------------------     Expressions                      ------------------------
+----------------------         Binary Operations           ------------------------
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
@@ -46,28 +46,38 @@ createSortInclusionInfers
   [''P.ExpressionL]
   [''HiddenExpressionL]
 
-
+createSortInclusionTypes
+  [''HiddenExpressionL]
+  [''P.ExpressionL]
+deriveAllButSortInjection
+  [ ''HiddenExpressionIsExpression ]
+createSortInclusionInfers
+  [''HiddenExpressionL]
+  [''P.ExpressionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
-do let moveSortInjections =
+do let suiSortInjections =
          [ ''IdentIsIdentifier
          , ''ExpressionIsHiddenExpression
+         , ''HiddenExpressionIsExpression
          ]
-       moveNewNodes = []
+       suiNewNodes = []
        names =
-         (moveSigNames \\ [mkName "Identifier"]) ++
-         moveSortInjections ++
-         moveNewNodes ++
+         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression"]) ++
+         suiSortInjections ++
+         suiNewNodes ++
          [ ''P.Ident
-         -- Operators (includes Binary, Unary, Ternary)
          , ''P.Operator
-         -- Binary operators
-         , ''P.ArithBinOp, ''P.DivOp, ''P.ModOp
-         , ''P.BitwiseBinOp, ''P.LogicalBinOp
-         , ''P.ShlOp, ''P.LogicalShrOp
+         , ''P.ArithBinOp
+         , ''P.DivOp
+         , ''P.ModOp
+         , ''P.BitwiseBinOp
+         , ''P.LogicalBinOp
+         , ''P.ShlOp
+         , ''P.ArithShrOp
          , ''P.RelationalBinOp
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
@@ -77,7 +87,6 @@ type MSuiMoveTermLab = TermLab MSuiMoveSig
 
 type MSuiMoveCxt h a = CxtS h MSuiMoveSig a
 type MSuiMoveCxtA h a p = AnnCxtS p h MSuiMoveSig a
-
 
 -----------------------------------------------------------------------------------
 ----------------------         Sort injections             ------------------------
