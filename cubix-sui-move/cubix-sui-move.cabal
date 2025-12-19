@@ -96,8 +96,10 @@ test-suite unit-tests
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    BannedConstructorsSpec
     TransRoundtripSpec
   build-depends:
+    , compstrat
     , cubix-sui-move
     , hspec >= 2.11
     , hspec-discover >= 2.11
