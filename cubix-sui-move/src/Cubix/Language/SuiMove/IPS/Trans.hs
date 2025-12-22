@@ -9,6 +9,7 @@ module Cubix.Language.SuiMove.IPS.Trans (
   , untranslate
   ) where
 
+import Data.Either ( partitionEithers )
 import Data.List( (\\) )
 import Data.Text qualified as Text
 import Language.Haskell.TH qualified as TH
@@ -126,6 +127,23 @@ instance Trans F.HiddenExpression where
       Nothing -> transDefault he
   trans x = transDefault x
 
+-------- Block
+
+transBlock :: F.MoveTerm F.BlockL -> MSuiMoveTerm BlockL
+transBlock (F.Block' useDecls blockItems maybeExpr) =
+  let -- Extract, translate, and inject use declarations as BlockItems
+      translatedUseDecls = map (\ud -> injF $ UseDeclarationIsBlockItem' (injF $ translate ud)) (extractF useDecls)
+      -- Extract, translate, and inject block items as BlockItems
+      translatedBlockItems = map (\bi -> injF $ BlockItemIsBlockItem' (injF $ translate bi)) (extractF blockItems)
+      -- Combine all items
+      allItems = insertF $ translatedUseDecls ++ translatedBlockItems
+      -- Translate the optional final expression into BlockEnd
+      blockEnd = injF $ SuiMoveBlockEnd' (mapF (injF . translate) maybeExpr)
+  in Block' allItems blockEnd
+
+instance Trans F.Block where
+  trans b@(F.Block _ _ _) = injF $ BlockIsBlock' (transBlock $ inject b)
+
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
 ------------------------------------------------------------------------------------
@@ -158,7 +176,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 -- CODE_GUARD_END
 
 do ipsNames <- sumToNames ''MSuiMoveSig
-   let targTs = map ConT $ (ipsNames \\ F.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression]
+   let targTs = map ConT $ (ipsNames \\ F.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 -- CODE_GUARD_START
@@ -221,3 +239,23 @@ untransBinaryOp Mul' lhs rhs      = F.iBinaryExpression18 (untranslate lhs) (inj
 untransBinaryOp Div' lhs rhs      = F.iBinaryExpression19 (untranslate lhs) (inject F.Div) (untranslate rhs)
 untransBinaryOp Mod' lhs rhs      = F.iBinaryExpression20 (untranslate lhs) (inject F.Mod) (untranslate rhs)
 untransBinaryOp _ _ _             = error "untransBinaryOp: unsupported operator"
+
+-------- Block
+
+untransBlock :: MSuiMoveTerm BlockL -> F.MoveTerm F.BlockL
+untransBlock (Block' items (projF -> Just (SuiMoveBlockEnd' maybeExpr))) =
+  let -- Extract all items and separate UseDeclarations from BlockItems
+      allItems = extractF items
+      (useDecls, blockItems) = partitionEithers $ map separateItem allItems
+  in F.iBlock 
+      (insertF useDecls)
+      (insertF blockItems)
+      (mapF untranslate maybeExpr)
+  where
+    separateItem :: MSuiMoveTerm BlockItemL -> Either (F.MoveTerm F.UseDeclarationL) (F.MoveTerm F.BlockItemL)
+    separateItem (projF -> Just (UseDeclarationIsBlockItem' ud)) = Left (untranslate $ fromProjF ud)
+    separateItem (projF -> Just (BlockItemIsBlockItem' bi)) = Right (untranslate $ fromProjF bi)
+    separateItem item = error $ "untransBlock: unexpected BlockItem type: " ++ show item
+
+instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
+  untrans (BlockIsBlock b) = untransBlock b

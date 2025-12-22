@@ -35,6 +35,7 @@ bannedCons =
   , 'M.BinaryExpression18
   , 'M.BinaryExpression19
   , 'M.BinaryExpression20
+  , 'M.Block
   ]
 
 -- | Generate a function that checks if a term contains any banned constructors.

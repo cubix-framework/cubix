@@ -56,6 +56,46 @@ createSortInclusionInfers
   [''P.ExpressionL]
 
 -----------------------------------------------------------------------------------
+----------------------         Block                       ------------------------
+-----------------------------------------------------------------------------------
+
+-- SuiMoveBlockEnd wraps the optional final expression in blocks
+data SuiMoveBlockEnd e l where
+  SuiMoveBlockEnd :: e (Maybe HiddenExpressionL) -> SuiMoveBlockEnd e P.BlockEndL
+
+deriveAll [''SuiMoveBlockEnd]
+
+-- Sort injection: UseDeclaration can appear as BlockItem
+createSortInclusionTypes
+  [''UseDeclarationL]
+  [''P.BlockItemL]
+deriveAllButSortInjection
+  [ ''UseDeclarationIsBlockItem ]
+createSortInclusionInfers
+  [''UseDeclarationL]
+  [''P.BlockItemL]
+
+-- Sort injection: BlockItem to parametric BlockItem
+createSortInclusionTypes
+  [''BlockItemL]
+  [''P.BlockItemL]
+deriveAllButSortInjection
+  [ ''BlockItemIsBlockItem ]
+createSortInclusionInfers
+  [''BlockItemL]
+  [''P.BlockItemL]
+
+-- Sort injection: Block to parametric Block
+createSortInclusionTypes
+  [''P.BlockL]
+  [''BlockL]
+deriveAllButSortInjection
+  [ ''BlockIsBlock ]
+createSortInclusionInfers
+  [''P.BlockL]
+  [''BlockL]
+
+-----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
@@ -63,10 +103,15 @@ do let suiSortInjections =
          [ ''IdentIsIdentifier
          , ''ExpressionIsHiddenExpression
          , ''HiddenExpressionIsExpression
+         , ''UseDeclarationIsBlockItem
+         , ''BlockItemIsBlockItem
+         , ''BlockIsBlock
          ]
-       suiNewNodes = []
+       suiNewNodes =
+         [ ''SuiMoveBlockEnd
+         ]
        names =
-         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression"]) ++
+         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "Block"]) ++
          suiSortInjections ++
          suiNewNodes ++
          [ ''P.Ident
@@ -79,6 +124,8 @@ do let suiSortInjections =
          , ''P.ShlOp
          , ''P.ArithShrOp
          , ''P.RelationalBinOp
+         , ''P.Block
+         , ''P.EmptyBlockEnd
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 
