@@ -3,16 +3,16 @@
 let
   unstable = import inputs.unstable {
     config.allowUnfree = true;
-    system = pkgs.stdenv.system;
+    localSystem = pkgs.stdenv.system;
   };
 
 in {
   packages = with pkgs; [
     fourmolu
+    jq
     gdb
     ghcid
     tree-sitter
-    unstable.claude-code
     valgrind
   ];
 
