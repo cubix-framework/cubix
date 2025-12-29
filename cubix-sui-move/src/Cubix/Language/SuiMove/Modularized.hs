@@ -20,7 +20,7 @@ import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Sort, Term)
+import Data.Comp.Multi (Term)
 
 --------------------------------------------------------------------------------
 -- Labels
@@ -2352,8 +2352,6 @@ type MoveSig =
    , Syntax.PairF
    , Syntax.MaybeF
    , Syntax.ListF
-   , Syntax.EitherF
-   , Syntax.UnitF
    ]
 
 type MoveTerm      = Term MoveSig
@@ -3605,6 +3603,4 @@ moveSigNames =
    , ''Syntax.PairF
    , ''Syntax.MaybeF
    , ''Syntax.ListF
-   , ''Syntax.EitherF
-   , ''Syntax.UnitF
    ]

@@ -85,11 +85,6 @@ pPair :: (Typeable a, Typeable b) => Parser (${grammarName}Term a) -> Parser (${
 pPair = Megaparsec.Cubix.pPair
 
 {-+}
-pEither :: (Typeable a, Typeable b) => Parser (${grammarName}Term a) -> Parser (${grammarName}Term b) -> Parser (${grammarName}Term (Either a b))
-{+-}
-pEither = Megaparsec.Cubix.pEither
-
-{-+}
 pSome :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term [a])
 {+-}
 pSome = Megaparsec.Cubix.pSome

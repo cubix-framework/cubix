@@ -11,10 +11,8 @@ import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Data.Text.IO qualified as T
 import Options.Applicative (Parser, ParserInfo, execParser, flag', fullDesc, help, helper, info, long, metavar, optional, progDesc, short, strArgument, strOption, (<**>))
-import TreeSitter.Generate.Data
 import TreeSitter.Generate.Render
 
-import TreeSitter.Grammar (Grammar (..))
 import TreeSitter.Grammar.Transform (transform)
 
 template :: Text

@@ -74,9 +74,6 @@ pMaybe = Megaparsec.Cubix.pMaybe
 pPair :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (a , b))
 pPair = Megaparsec.Cubix.pPair
 
-pEither :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (Either a b))
-pEither = Megaparsec.Cubix.pEither
-
 pSome :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
 pSome = Megaparsec.Cubix.pSome
 
