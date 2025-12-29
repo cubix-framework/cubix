@@ -70,8 +70,8 @@ pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
     Just (Refl, HRefl) -> Just symSing
     Nothing -> Nothing
 
-pText :: Parser Text
-pText = pure mempty
+pContent :: Cubix.TreeSitter.Token a -> Parser Text
+pContent = Megaparsec.TreeSitter.pContent
 
 -- reify the types to aid inference, that might get broken
 {-+}
@@ -114,14 +114,17 @@ ${endfor}
 
 {-+}
 ${for(data)}
+${if(it.hasSymbol)}
 p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.sort})
 p${it.name.camelCase} = do
-${if(it.hasSymbol)}
   _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol
+${else}
+p${it.name.camelCase} :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ${it.name.sort})
+p${it.name.camelCase} _sym = do
 ${endif}
 ${if(it.sum)}
-  choice [ Megaparsec.try ${for(it.constructors)}p${it.name.camelCase}${sep}
-         , Megaparsec.try ${endfor}
+  choice [ Megaparsec.try (${for(it.constructors)}p${it.name.camelCase}${sep} _sym)
+         , Megaparsec.try (${endfor} _sym)
          ]
 ${else}
 ${for(it.constructors)}
@@ -137,8 +140,8 @@ ${endif}
 ${if(it.sum)}
   where
 ${for(it.constructors)}
-    p${it.name.camelCase} :: Parser (${grammarName}Term ${it.type.sort})
-    p${it.name.camelCase} =
+    p${it.name.camelCase} :: Cubix.TreeSitter.Token a -> Parser (${grammarName}Term ${it.type.sort})
+    p${it.name.camelCase} _sym =
       ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
 ${for(it.fields/first)}
         <$$> ${it.parser}

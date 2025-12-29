@@ -2,6 +2,7 @@
 module Text.Megaparsec.TreeSitter
   ( Lexed (..)
   , Parser
+  , pContent
   , pToken
   ) where
 
@@ -13,12 +14,16 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Proxy (Proxy (Proxy))
 import Data.Set qualified as Set
+import Data.Text (Text)
+import Data.Text.Encoding qualified as Text.Encoding
+import Data.Text.Encoding.Error qualified as Text.Encoding
 import Data.Void (Void)
 import Text.Megaparsec qualified
 
 import Cubix.Language.Info
   ( SourcePos (..)
   , SourceSpan (..)
+  , SourceRange (..)
   , rangeLength
   )
 import Cubix.TreeSitter (Token (..))
@@ -115,3 +120,13 @@ pToken expected f = do
     (Set.singleton (Text.Megaparsec.Label expected))
   where
     test tok = fmap (\a -> tok {tokenValue = a}) (f (tokenValue tok))
+
+pContent :: Eq symbol => Token a -> Parser symbol Text
+pContent MkToken {..} =
+  let len = rangeLength tokenRange
+      start = _rangeStart tokenRange
+      chunk = ByteString.take len . ByteString.drop start
+   in do
+    src <- source . Text.Megaparsec.stateInput <$>
+      Text.Megaparsec.getParserState
+    pure $ Text.Encoding.decodeUtf8With Text.Encoding.lenientDecode (chunk src)

@@ -64,8 +64,7 @@ renderSyntax Metadata{..} grammar templateFile template tokenMap =
   tokensCtx = Context . Map.singleton "tokens" . toVal
     $ Map.elems tokens
   nodes = Map.elems $ Map.mapWithKey (topRuleToNode tokenMap grammar.rules) grammar.rules
-  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachable` Name startRuleName
-  reachable = reachableFrom tokenMap
+  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachableFrom` Name startRuleName
 
   nodesCtx = Context . Map.fromList $
     [ ("data", toVal nodes')
@@ -196,9 +195,12 @@ instance ToContext Text Parser where
   toVal = textToVal . Text.Lazy.toStrict . Builder.toLazyText . p2t False
    where
     par b t = if b then "(" <> t <> ")" else t
+    hasSymbol :: Name -> Bool
+    hasSymbol (getName -> n) = not $ isHidden n || isInternal n
     p2t p = \case
       Symbol name -> Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
-      Inline name -> Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
+      Inline name -> par (not $ hasSymbol name) $
+        Builder.fromText ("p" <> snakeToCase Upper (hiddenName name) <> if hasSymbol name then "" else " _sym")
       Alt a b -> par p ("pEither " <> p2t True a <> " " <> p2t True b)
       -- Choice ps -> "
       Optional a -> par p ("pMaybe " <> p2t True a)
@@ -206,7 +208,9 @@ instance ToContext Text Parser where
       Some ps -> par p ("pSome " <> p2t True ps)
       Pair a b -> par p ("pPair " <> p2t True a <> " " <> p2t True b)
       Skip -> Builder.fromText "pure ()"
-      Extract -> "pText"
+      Extract -> "pContent _sym"
+
+      -- if the node exists in ts token stream
 
 hiddenName :: Name -> Text
 hiddenName (getName -> n)
