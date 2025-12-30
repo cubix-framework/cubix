@@ -12,6 +12,7 @@ devenv.local.nix
 # direnv
 .direnv
 .envrc-local
+.env.secrets
 
 # pre-commit
 .pre-commit-config.yaml
