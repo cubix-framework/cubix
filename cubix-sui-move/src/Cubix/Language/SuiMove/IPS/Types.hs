@@ -96,6 +96,19 @@ createSortInclusionInfers
   [''BlockL]
 
 -----------------------------------------------------------------------------------
+----------------------         Unit Expression             ------------------------
+-----------------------------------------------------------------------------------
+
+createSortInclusionTypes
+  [ ''() ]
+  [''UnitExpressionL]
+deriveAllButSortInjection
+  [ ''UnitIsUnitExpression ]
+createSortInclusionInfers
+  [ ''() ]
+  [''UnitExpressionL]
+
+-----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
@@ -106,12 +119,13 @@ do let suiSortInjections =
          , ''UseDeclarationIsBlockItem
          , ''BlockItemIsBlockItem
          , ''BlockIsBlock
+         , ''UnitIsUnitExpression
          ]
        suiNewNodes =
          [ ''SuiMoveBlockEnd
          ]
        names =
-         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "Block"]) ++
+         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "Block", mkName "UnitExpression"]) ++
          suiSortInjections ++
          suiNewNodes ++
          [ ''P.Ident
@@ -126,6 +140,7 @@ do let suiSortInjections =
          , ''P.RelationalBinOp
          , ''P.Block
          , ''P.EmptyBlockEnd
+         , ''P.UnitF
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 

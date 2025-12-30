@@ -144,6 +144,12 @@ transBlock (F.Block' useDecls blockItems maybeExpr) =
 instance Trans F.Block where
   trans b@(F.Block _ _ _) = injF $ BlockIsBlock' (transBlock $ inject b)
 
+transUnitExpression :: F.MoveTerm F.UnitExpressionL -> MSuiMoveTerm ()
+transUnitExpression F.UnitExpression' = UnitF'
+
+instance Trans F.UnitExpression where
+  trans F.UnitExpression = injF $ UnitIsUnitExpression' (transUnitExpression $ inject F.UnitExpression)
+
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
 ------------------------------------------------------------------------------------
@@ -176,7 +182,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 -- CODE_GUARD_END
 
 do ipsNames <- sumToNames ''MSuiMoveSig
-   let targTs = map ConT $ (ipsNames \\ F.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock]
+   let targTs = map ConT $ (ipsNames \\ F.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock, ''UnitIsUnitExpression]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 -- CODE_GUARD_START
@@ -259,3 +265,9 @@ untransBlock (Block' items (projF -> Just (SuiMoveBlockEnd' maybeExpr))) =
 
 instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
   untrans (BlockIsBlock b) = untransBlock b
+
+untransUnitExpression :: MSuiMoveTerm () -> F.MoveTerm F.UnitExpressionL
+untransUnitExpression UnitF' = F.UnitExpression'
+
+instance {-# OVERLAPPING #-} Untrans UnitIsUnitExpression where
+  untrans (UnitIsUnitExpression u) = untransUnitExpression u
