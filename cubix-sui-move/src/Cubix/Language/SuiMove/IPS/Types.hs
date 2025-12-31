@@ -14,23 +14,23 @@ import Language.Haskell.TH qualified as TH
 import Data.Comp.Multi ( Term, project', CxtS, AnnCxtS, inject, project )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
-import Cubix.Language.SuiMove.Modularized as SuiMove
+import Cubix.Language.SuiMove.Modularized as Modularized
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax qualified as P
+import Cubix.Language.Parametric.Syntax qualified as Parametric
 
 -----------------------------------------------------------------------------------
 ---------------------     Identifiers                      ------------------------
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
-  [''P.IdentL]
+  [''Parametric.IdentL]
   [''IdentifierL]
 deriveAllButSortInjection
   [ ''IdentIsIdentifier ]
 createSortInclusionInfers
-  [''P.IdentL]
+  [''Parametric.IdentL]
   [''IdentifierL]
 
 -----------------------------------------------------------------------------------
@@ -38,22 +38,22 @@ createSortInclusionInfers
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
-  [''P.ExpressionL]
+  [''Parametric.ExpressionL]
   [''HiddenExpressionL]
 deriveAllButSortInjection
   [ ''ExpressionIsHiddenExpression ]
 createSortInclusionInfers
-  [''P.ExpressionL]
+  [''Parametric.ExpressionL]
   [''HiddenExpressionL]
 
 createSortInclusionTypes
   [''HiddenExpressionL]
-  [''P.ExpressionL]
+  [''Parametric.ExpressionL]
 deriveAllButSortInjection
   [ ''HiddenExpressionIsExpression ]
 createSortInclusionInfers
   [''HiddenExpressionL]
-  [''P.ExpressionL]
+  [''Parametric.ExpressionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Block                       ------------------------
@@ -61,38 +61,38 @@ createSortInclusionInfers
 
 -- SuiMoveBlockEnd wraps the optional final expression in blocks
 data SuiMoveBlockEnd e l where
-  SuiMoveBlockEnd :: e (Maybe HiddenExpressionL) -> SuiMoveBlockEnd e P.BlockEndL
+  SuiMoveBlockEnd :: e (Maybe HiddenExpressionL) -> SuiMoveBlockEnd e Parametric.BlockEndL
 
 deriveAll [''SuiMoveBlockEnd]
 
 -- Sort injection: UseDeclaration can appear as BlockItem
 createSortInclusionTypes
   [''UseDeclarationL]
-  [''P.BlockItemL]
+  [''Parametric.BlockItemL]
 deriveAllButSortInjection
   [ ''UseDeclarationIsBlockItem ]
 createSortInclusionInfers
   [''UseDeclarationL]
-  [''P.BlockItemL]
+  [''Parametric.BlockItemL]
 
 -- Sort injection: BlockItem to parametric BlockItem
 createSortInclusionTypes
   [''BlockItemL]
-  [''P.BlockItemL]
+  [''Parametric.BlockItemL]
 deriveAllButSortInjection
   [ ''BlockItemIsBlockItem ]
 createSortInclusionInfers
   [''BlockItemL]
-  [''P.BlockItemL]
+  [''Parametric.BlockItemL]
 
 -- Sort injection: Block to parametric Block
 createSortInclusionTypes
-  [''P.BlockL]
+  [''Parametric.BlockL]
   [''BlockL]
 deriveAllButSortInjection
   [ ''BlockIsBlock ]
 createSortInclusionInfers
-  [''P.BlockL]
+  [''Parametric.BlockL]
   [''BlockL]
 
 -----------------------------------------------------------------------------------
@@ -128,19 +128,19 @@ do let suiSortInjections =
          (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "Block", mkName "UnitExpression"]) ++
          suiSortInjections ++
          suiNewNodes ++
-         [ ''P.Ident
-         , ''P.Operator
-         , ''P.ArithBinOp
-         , ''P.DivOp
-         , ''P.ModOp
-         , ''P.BitwiseBinOp
-         , ''P.LogicalBinOp
-         , ''P.ShlOp
-         , ''P.ArithShrOp
-         , ''P.RelationalBinOp
-         , ''P.Block
-         , ''P.EmptyBlockEnd
-         , ''P.UnitF
+         [ ''Parametric.Ident
+         , ''Parametric.Operator
+         , ''Parametric.ArithBinOp
+         , ''Parametric.DivOp
+         , ''Parametric.ModOp
+         , ''Parametric.BitwiseBinOp
+         , ''Parametric.LogicalBinOp
+         , ''Parametric.ShlOp
+         , ''Parametric.ArithShrOp
+         , ''Parametric.RelationalBinOp
+         , ''Parametric.Block
+         , ''Parametric.EmptyBlockEnd
+         , ''Parametric.UnitF
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 
