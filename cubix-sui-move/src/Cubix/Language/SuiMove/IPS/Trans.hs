@@ -132,23 +132,23 @@ instance Trans F.HiddenExpression where
 transBlock :: F.MoveTerm F.BlockL -> MSuiMoveTerm BlockL
 transBlock (F.Block' useDecls blockItems maybeExpr) =
   let -- Extract, translate, and inject use declarations as BlockItems
-      translatedUseDecls = map (\ud -> injF $ UseDeclarationIsBlockItem' (injF $ translate ud)) (extractF useDecls)
+      translatedUseDecls = map (\ud -> iUseDeclarationIsBlockItem (injF $ translate ud)) (extractF useDecls)
       -- Extract, translate, and inject block items as BlockItems
-      translatedBlockItems = map (\bi -> injF $ BlockItemIsBlockItem' (injF $ translate bi)) (extractF blockItems)
+      translatedBlockItems = map (\bi -> iBlockItemIsBlockItem (injF $ translate bi)) (extractF blockItems)
       -- Combine all items
       allItems = insertF $ translatedUseDecls ++ translatedBlockItems
       -- Translate the optional final expression into BlockEnd
-      blockEnd = injF $ SuiMoveBlockEnd' (mapF (injF . translate) maybeExpr)
+      blockEnd = iSuiMoveBlockEnd (mapF (injF . translate) maybeExpr)
   in Block' allItems blockEnd
 
 instance Trans F.Block where
-  trans b@(F.Block _ _ _) = injF $ BlockIsBlock' (transBlock $ inject b)
+  trans b@(F.Block _ _ _) = iBlockIsBlock (transBlock $ inject b)
 
 transUnitExpression :: F.MoveTerm F.UnitExpressionL -> MSuiMoveTerm ()
 transUnitExpression F.UnitExpression' = UnitF'
 
 instance Trans F.UnitExpression where
-  trans F.UnitExpression = injF $ UnitIsUnitExpression' (transUnitExpression $ inject F.UnitExpression)
+  trans F.UnitExpression = iUnitIsUnitExpression (transUnitExpression $ inject F.UnitExpression)
 
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
@@ -222,7 +222,7 @@ instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
 instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
   untrans (ExpressionIsHiddenExpression (Binary' op lhs rhs)) =
     F.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
-  untrans (ExpressionIsHiddenExpression e) = 
+  untrans (ExpressionIsHiddenExpression e) =
     error $ "Cannot untranslate ExpressionIsHiddenExpression for non-Binary expression: " ++ show e
 
 untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm F.HiddenExpressionL -> MSuiMoveTerm F.HiddenExpressionL -> F.MoveTerm F.BinaryExpressionL
@@ -253,7 +253,7 @@ untransBlock (Block' items (projF -> Just (SuiMoveBlockEnd' maybeExpr))) =
   let -- Extract all items and separate UseDeclarations from BlockItems
       allItems = extractF items
       (useDecls, blockItems) = partitionEithers $ map separateItem allItems
-  in F.iBlock 
+  in F.iBlock
       (insertF useDecls)
       (insertF blockItems)
       (mapF untranslate maybeExpr)
