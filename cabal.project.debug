@@ -1,8 +1,8 @@
 import: cabal.project.release
 debug-info: 3
-profiling: True
-executable-profiling: True
-library-profiling: True
+profiling: False
+executable-profiling: False
+library-profiling: False
 
 optimization: False
 
