@@ -68,7 +68,7 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MSuiMoveSig, f :-<: Modularize
 
 -------- Identifiers
 transIdent :: Modularized.MoveTerm Modularized.IdentifierL -> MSuiMoveTerm IdentL
-transIdent (project -> Just (Modularized.Identifier t)) = Ident' (Text.unpack t)
+transIdent (Modularized.Identifier' t) = Ident' (Text.unpack t)
 
 -- Clone of transIdent because type-safe pattern match
 instance Trans Modularized.Identifier where
@@ -76,55 +76,51 @@ instance Trans Modularized.Identifier where
 
 -------- Binary Expressions
 
-transBinaryExpr :: Modularized.MoveTerm Modularized.BinaryExpressionL -> Maybe (MSuiMoveTerm Modularized.HiddenExpressionL)
+transBinaryExpr :: Modularized.MoveTerm Modularized.BinaryExpressionL -> MSuiMoveTerm ExpressionL
 transBinaryExpr (Modularized.BinaryExpression1' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' LogicOr' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' LogicOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression2' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' LogicOr' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' LogicOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression3' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' LogicAnd' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' LogicAnd' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression4' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Eq' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Eq' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression5' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Neq' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Neq' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression6' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Lt' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Lt' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression7' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Gt' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Gt' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression8' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Lte' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Lte' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression9' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Gte' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Gte' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression10' lhs _ rhs) =
   -- Range operator (..) - no direct equivalent in parametric syntax, keep as-is
-  Just $ Modularized.iHiddenExpressionBinaryExpression $ Modularized.iBinaryExpression10 (translate lhs) (inject Modularized.Range) (translate rhs)
+  Modularized.iBinaryExpression10 (translate lhs) Modularized.iRange (translate rhs)
 transBinaryExpr (Modularized.BinaryExpression11' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' BitOr' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' BitOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression12' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' BitXor' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' BitXor' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression13' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' BitAnd' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' BitAnd' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression14' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Shl' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Shl' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression15' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' ArithShr' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' ArithShr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression16' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Add' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Add' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression17' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Sub' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Sub' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression18' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Mul' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Mul' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression19' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Div' (injF $ translate lhs) (injF $ translate rhs)
+  Binary' Div' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression20' lhs _ rhs) =
-  Just $ iExpressionIsHiddenExpression $ Binary' Mod' (injF $ translate lhs) (injF $ translate rhs)
-transBinaryExpr _ = Nothing
+  Binary' Mod' (translate' lhs) (translate' rhs)
 
 instance Trans Modularized.HiddenExpression where
-  trans he@(Modularized.HiddenExpressionBinaryExpression be) =
-    case transBinaryExpr be of
-      Just result -> result
-      Nothing -> transDefault he
+  trans (Modularized.HiddenExpressionBinaryExpression be) = injF $ transBinaryExpr be
   trans x = transDefault x
 
 -------- Block
@@ -132,9 +128,9 @@ instance Trans Modularized.HiddenExpression where
 transBlock :: Modularized.MoveTerm Modularized.BlockL -> MSuiMoveTerm BlockL
 transBlock (Modularized.Block' useDecls blockItems maybeExpr) =
   let -- Extract, translate, and inject use declarations as BlockItems
-      translatedUseDecls = map (\ud -> iUseDeclarationIsBlockItem (injF $ translate ud)) (extractF useDecls)
+      translatedUseDecls = map (iUseDeclarationIsBlockItem . translate') (extractF useDecls)
       -- Extract, translate, and inject block items as BlockItems
-      translatedBlockItems = map (\bi -> iBlockItemIsBlockItem (injF $ translate bi)) (extractF blockItems)
+      translatedBlockItems = map (iBlockItemIsBlockItem . translate') (extractF blockItems)
       -- Combine all items
       allItems = insertF $ translatedUseDecls ++ translatedBlockItems
       -- Translate the optional final expression into BlockEnd
@@ -142,7 +138,7 @@ transBlock (Modularized.Block' useDecls blockItems maybeExpr) =
   in Block' allItems blockEnd
 
 instance Trans Modularized.Block where
-  trans b@(Modularized.Block _ _ _) = iBlockIsBlock (transBlock $ inject b)
+  trans b@(Modularized.Block {}) = iBlockIsBlock (transBlock $ inject b)
 
 transUnitExpression :: Modularized.MoveTerm Modularized.UnitExpressionL -> MSuiMoveTerm ()
 transUnitExpression Modularized.UnitExpression' = UnitF'

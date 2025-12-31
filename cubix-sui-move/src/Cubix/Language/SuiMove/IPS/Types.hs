@@ -153,3 +153,12 @@ type MSuiMoveCxtA h a p = AnnCxtS p h MSuiMoveSig a
 -----------------------------------------------------------------------------------
 ----------------------         Sort injections             ------------------------
 -----------------------------------------------------------------------------------
+
+instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.BinaryExpressionL Parametric.ExpressionL where
+  injF = iHiddenExpressionBinaryExpression
+
+  projF' e
+    | Just (HiddenExpressionIsExpression e') <- project' e
+    , Just (HiddenExpressionBinaryExpression exp) <- project' e'
+    = projF' exp
+  projF' _ = Nothing
