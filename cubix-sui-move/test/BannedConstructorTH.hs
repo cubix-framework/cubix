@@ -35,6 +35,7 @@ bannedCons =
   , 'M.BinaryExpression18
   , 'M.BinaryExpression19
   , 'M.BinaryExpression20
+  , 'M.UnaryExpression
   , 'M.Block
   , 'M.UnitExpression
   ]

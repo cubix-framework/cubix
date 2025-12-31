@@ -119,8 +119,20 @@ transBinaryExpr (Modularized.BinaryExpression19' lhs _ rhs) =
 transBinaryExpr (Modularized.BinaryExpression20' lhs _ rhs) =
   Binary' Mod' (translate' lhs) (translate' rhs)
 
+-------- Unary Expressions
+
+transUnop :: Modularized.MoveTerm Modularized.UnaryOpL -> MSuiMoveTerm UnaryOpL
+transUnop (Modularized.UnaryOp' Modularized.Bang') = Not'
+
+transUnaryExpr :: Modularized.MoveTerm Modularized.UnaryExpressionL -> MSuiMoveTerm ExpressionL
+transUnaryExpr (Modularized.UnaryExpression' op expr) =
+  Unary' (transUnop op) (translate' expr)
+
 instance Trans Modularized.HiddenExpression where
   trans (Modularized.HiddenExpressionBinaryExpression be) = injF $ transBinaryExpr be
+  trans (Modularized.HiddenExpressionUnaryExpression
+         (Modularized.HiddenUnaryExpressionInternal0UnaryExpression' uexp))
+    = injF $ transUnaryExpr uexp
   trans x = transDefault x
 
 -------- Block
@@ -218,8 +230,10 @@ instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
 instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
   untrans (ExpressionIsHiddenExpression (Binary' op lhs rhs)) =
     Modularized.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
+  untrans (ExpressionIsHiddenExpression (Unary' op expr)) =
+    Modularized.iHiddenExpressionUnaryExpression $ untransUnaryOp op (fromProjF expr)
   untrans (ExpressionIsHiddenExpression e) =
-    error $ "Cannot untranslate ExpressionIsHiddenExpression for non-Binary expression: " ++ show e
+    error $ "Cannot untranslate ExpressionIsHiddenExpression for non-Binary/Unary expression: " ++ show e
 
 untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.BinaryExpressionL
 untransBinaryOp LogicOr' lhs rhs  = Modularized.iBinaryExpression2 (untranslate lhs) (inject Modularized.Or) (untranslate rhs)
@@ -241,6 +255,17 @@ untransBinaryOp Mul' lhs rhs      = Modularized.iBinaryExpression18 (untranslate
 untransBinaryOp Div' lhs rhs      = Modularized.iBinaryExpression19 (untranslate lhs) (inject Modularized.Div) (untranslate rhs)
 untransBinaryOp Mod' lhs rhs      = Modularized.iBinaryExpression20 (untranslate lhs) (inject Modularized.Mod) (untranslate rhs)
 untransBinaryOp _ _ _             = error "untransBinaryOp: unsupported operator"
+
+-------- Unary Expressions
+
+untransUnaryOp :: MSuiMoveTerm UnaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.HiddenUnaryExpressionInternal0L
+untransUnaryOp Not' expr =
+  -- Map LogicalNegationOp (Not) back to UnaryExpression with UnaryOp (BangTok)
+  Modularized.iHiddenUnaryExpressionInternal0UnaryExpression $
+    Modularized.iUnaryExpression
+      (Modularized.iUnaryOp (inject Modularized.Bang))
+      (untranslate expr)
+untransUnaryOp _ _ = error "untransUnaryOp: unsupported operator"
 
 -------- Block
 

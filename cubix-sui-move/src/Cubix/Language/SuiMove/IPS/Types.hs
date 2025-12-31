@@ -125,7 +125,7 @@ do let suiSortInjections =
          [ ''SuiMoveBlockEnd
          ]
        names =
-         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "Block", mkName "UnitExpression"]) ++
+         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "UnaryExpression", mkName "Block", mkName "UnitExpression"]) ++
          suiSortInjections ++
          suiNewNodes ++
          [ ''Parametric.Ident
@@ -138,6 +138,7 @@ do let suiSortInjections =
          , ''Parametric.ShlOp
          , ''Parametric.ArithShrOp
          , ''Parametric.RelationalBinOp
+         , ''Parametric.LogicalNegationOp
          , ''Parametric.Block
          , ''Parametric.EmptyBlockEnd
          , ''Parametric.UnitF
@@ -161,4 +162,14 @@ instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.BinaryExpressionL Para
     | Just (HiddenExpressionIsExpression e') <- project' e
     , Just (HiddenExpressionBinaryExpression exp) <- project' e'
     = projF' exp
+  projF' _ = Nothing
+
+instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.UnaryExpressionL Parametric.ExpressionL where
+  injF = iHiddenExpressionUnaryExpression . iHiddenUnaryExpressionInternal0UnaryExpression
+
+  projF' e
+    | Just (HiddenExpressionIsExpression e') <- project' e
+    , Just (HiddenExpressionUnaryExpression ue) <- project' e'
+    , Just (HiddenUnaryExpressionInternal0UnaryExpression uexp) <- project' ue
+    = projF' uexp
   projF' _ = Nothing
