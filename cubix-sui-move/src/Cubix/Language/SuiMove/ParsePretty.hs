@@ -662,57 +662,42 @@ pNumLiteral :: Parser (MoveTerm NumLiteralL)
 pNumLiteral = do
   _sym <- pSymbol "num_literal" SNumLiteralSymbol
   iNumLiteral
-    <$> (pNumLiteralInternal0 _sym)
-    <*> pMaybe (pNumLiteralInternal1 _sym)
+    <$> pContent _sym
+    <*> pMaybe (pNumLiteralInternal0 _sym)
 
 pNumLiteralInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
 pNumLiteralInternal0 _sym = do
-  choice [ Megaparsec.try (pNumLiteralInternal01 _sym)
-         , Megaparsec.try (pNumLiteralInternal02 _sym)
+  choice [ Megaparsec.try (pNumLiteralInternal0U8 _sym)
+         , Megaparsec.try (pNumLiteralInternal0U16 _sym)
+         , Megaparsec.try (pNumLiteralInternal0U32 _sym)
+         , Megaparsec.try (pNumLiteralInternal0U64 _sym)
+         , Megaparsec.try (pNumLiteralInternal0U128 _sym)
+         , Megaparsec.try (pNumLiteralInternal0U256 _sym)
          ]
   where
-    pNumLiteralInternal01 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal01 _sym =
-      iNumLiteralInternal01
-        <$> pContent _sym
-    pNumLiteralInternal02 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal02 _sym =
-      iNumLiteralInternal02
-        <$> pContent _sym
-
-pNumLiteralInternal1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-pNumLiteralInternal1 _sym = do
-  choice [ Megaparsec.try (pNumLiteralInternal1U8 _sym)
-         , Megaparsec.try (pNumLiteralInternal1U16 _sym)
-         , Megaparsec.try (pNumLiteralInternal1U32 _sym)
-         , Megaparsec.try (pNumLiteralInternal1U64 _sym)
-         , Megaparsec.try (pNumLiteralInternal1U128 _sym)
-         , Megaparsec.try (pNumLiteralInternal1U256 _sym)
-         ]
-  where
-    pNumLiteralInternal1U8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U8 _sym =
-      iNumLiteralInternal1U8
+    pNumLiteralInternal0U8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U8 _sym =
+      iNumLiteralInternal0U8
         <$> pU8
-    pNumLiteralInternal1U16 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U16 _sym =
-      iNumLiteralInternal1U16
+    pNumLiteralInternal0U16 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U16 _sym =
+      iNumLiteralInternal0U16
         <$> pU16
-    pNumLiteralInternal1U32 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U32 _sym =
-      iNumLiteralInternal1U32
+    pNumLiteralInternal0U32 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U32 _sym =
+      iNumLiteralInternal0U32
         <$> pU32
-    pNumLiteralInternal1U64 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U64 _sym =
-      iNumLiteralInternal1U64
+    pNumLiteralInternal0U64 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U64 _sym =
+      iNumLiteralInternal0U64
         <$> pU64
-    pNumLiteralInternal1U128 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U128 _sym =
-      iNumLiteralInternal1U128
+    pNumLiteralInternal0U128 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U128 _sym =
+      iNumLiteralInternal0U128
         <$> pU128
-    pNumLiteralInternal1U256 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal1L)
-    pNumLiteralInternal1U256 _sym =
-      iNumLiteralInternal1U256
+    pNumLiteralInternal0U256 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U256 _sym =
+      iNumLiteralInternal0U256
         <$> pU256
 
 pTypeArguments :: Parser (MoveTerm TypeArgumentsL)

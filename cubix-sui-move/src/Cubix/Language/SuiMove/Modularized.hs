@@ -166,7 +166,6 @@ data NativeStructDefinitionL
 data NewlineL
 data NumLiteralL
 data NumLiteralInternal0L
-data NumLiteralInternal1L
 data OrBindListL
 data PackExpressionL
 data PositionalFieldsL
@@ -422,14 +421,16 @@ data ModuleBody e l where
   ModuleBody
     :: e ModuleBodyInternal0L
     -> e [ModuleBodyInternal1L]
-    -> e (Maybe )
+    -> e (Maybe RightCurlyBracketTokL)
     -> ModuleBody e ModuleBodyL
 
 data ModuleBodyInternal0 e l where
   ModuleBodyInternal0Semicolon
-    :: ModuleBodyInternal0 e ModuleBodyInternal0L
-  ModuleBodyInternal0Leftspacecurlyspacebracket
-    :: ModuleBodyInternal0 e ModuleBodyInternal0L
+    :: e SemicolonTokL
+    -> ModuleBodyInternal0 e ModuleBodyInternal0L
+  ModuleBodyInternal0LeftCurlyBracket
+    :: e LeftCurlyBracketTokL
+    -> ModuleBodyInternal0 e ModuleBodyInternal0L
 
 data ModuleBodyInternal1 e l where
   ModuleBodyInternal1UseDeclaration
@@ -469,7 +470,7 @@ data EnumDefinition e l where
 
 data HiddenEnumSignature e l where
   HiddenEnumSignature
-    :: e 
+    :: e EnumTokL
     -> e HiddenEnumIdentifierL
     -> e (Maybe TypeParametersL)
     -> e (Maybe AbilityDeclsL)
@@ -487,7 +488,7 @@ data Identifier e l where
 
 data AbilityDecls e l where
   AbilityDecls
-    :: e 
+    :: e HasTokL
     -> e [AbilityL]
     -> AbilityDecls e AbilityDeclsL
 
@@ -512,10 +513,10 @@ data TypeParameters e l where
 
 data TypeParameter e l where
   TypeParameter
-    :: e (Maybe DollarTokL)
+    :: e (Maybe DollarSignTokL)
     -> e (Maybe PhantomTokL)
     -> e HiddenTypeParameterIdentifierL
-    -> e (Maybe [AbilityL])
+    -> e (Maybe (ColonTokL, [AbilityL]))
     -> TypeParameter e TypeParameterL
 
 data HiddenTypeParameterIdentifier e l where
@@ -555,7 +556,7 @@ data NamedFields e l where
 data FieldAnnotation e l where
   FieldAnnotation
     :: e HiddenFieldIdentifierL
-    -> e 
+    -> e ColonTokL
     -> e HiddenTypeL
     -> FieldAnnotation e FieldAnnotationL
 
@@ -588,49 +589,49 @@ data ApplyType e l where
 
 data ModuleAccess e l where
   ModuleAccess1
-    :: e DollarTokL
+    :: e DollarSignTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess2
-    :: e AtTokL
+    :: e CommercialAtTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
-  ModuleAccessMember
-    :: e HiddenReservedIdentifierL
+  ModuleAccess3
+    :: e ModuleIdentityL
+    -> e ColoncolonTokL
+    -> e IdentifierL
+    -> e (Maybe TypeArgumentsL)
+    -> e ColoncolonTokL
+    -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess4
-    :: e IdentifierL
-    -> e (Maybe TypeArgumentsL)
+    :: e ModuleIdentityL
+    -> e ColoncolonTokL
+    -> e IdentifierL
+    -> e TypeArgumentsL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess5
-    :: e HiddenModuleIdentifierL
+    :: e ModuleIdentityL
     -> e (Maybe TypeArgumentsL)
-    -> e 
+    -> e ColoncolonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess6
-    :: e ModuleIdentityL
-    -> e 
+    :: e HiddenModuleIdentifierL
+    -> e (Maybe TypeArgumentsL)
+    -> e ColoncolonTokL
     -> e IdentifierL
-    -> e TypeArgumentsL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess7
     :: e ModuleIdentityL
     -> e (Maybe TypeArgumentsL)
     -> ModuleAccess e ModuleAccessL
   ModuleAccess8
-    :: e ModuleIdentityL
+    :: e IdentifierL
     -> e (Maybe TypeArgumentsL)
-    -> e 
-    -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
-  ModuleAccess9
-    :: e ModuleIdentityL
-    -> e 
-    -> e IdentifierL
-    -> e (Maybe TypeArgumentsL)
-    -> e 
-    -> e IdentifierL
+  ModuleAccessMember
+    :: e HiddenReservedIdentifierL
     -> ModuleAccess e ModuleAccessL
 
 data HiddenModuleIdentifier e l where
@@ -659,7 +660,7 @@ data HiddenForall e l where
 data ModuleIdentity e l where
   ModuleIdentity
     :: e ModuleIdentityInternal0L
-    -> e 
+    -> e ColoncolonTokL
     -> e HiddenModuleIdentifierL
     -> ModuleIdentity e ModuleIdentityL
 
@@ -673,37 +674,29 @@ data ModuleIdentityInternal0 e l where
 
 data NumLiteral e l where
   NumLiteral
-    :: e NumLiteralInternal0L
-    -> e (Maybe NumLiteralInternal1L)
+    :: Text
+    -> e (Maybe NumLiteralInternal0L)
     -> NumLiteral e NumLiteralL
 
 data NumLiteralInternal0 e l where
-  NumLiteralInternal01
-    :: Text
-    -> NumLiteralInternal0 e NumLiteralInternal0L
-  NumLiteralInternal02
-    :: Text
-    -> NumLiteralInternal0 e NumLiteralInternal0L
-
-data NumLiteralInternal1 e l where
-  NumLiteralInternal1U8
+  NumLiteralInternal0U8
     :: e U8TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
-  NumLiteralInternal1U16
+    -> NumLiteralInternal0 e NumLiteralInternal0L
+  NumLiteralInternal0U16
     :: e U16TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
-  NumLiteralInternal1U32
+    -> NumLiteralInternal0 e NumLiteralInternal0L
+  NumLiteralInternal0U32
     :: e U32TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
-  NumLiteralInternal1U64
+    -> NumLiteralInternal0 e NumLiteralInternal0L
+  NumLiteralInternal0U64
     :: e U64TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
-  NumLiteralInternal1U128
+    -> NumLiteralInternal0 e NumLiteralInternal0L
+  NumLiteralInternal0U128
     :: e U128TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
-  NumLiteralInternal1U256
+    -> NumLiteralInternal0 e NumLiteralInternal0L
+  NumLiteralInternal0U256
     :: e U256TokL
-    -> NumLiteralInternal1 e NumLiteralInternal1L
+    -> NumLiteralInternal0 e NumLiteralInternal0L
 
 data TypeArguments e l where
   TypeArguments
@@ -713,7 +706,7 @@ data TypeArguments e l where
 data FunctionType e l where
   FunctionType
     :: e FunctionTypeParametersL
-    -> e (Maybe HiddenTypeL)
+    -> e (Maybe (GreaterThanSignTokL, HiddenTypeL))
     -> FunctionType e FunctionTypeL
 
 data FunctionTypeParameters e l where
@@ -769,13 +762,13 @@ data HiddenReference e l where
 
 data ImmRef e l where
   ImmRef
-    :: e BitandTokL
+    :: e AmpersandTokL
     -> ImmRef e ImmRefL
 
 data MutRef e l where
   MutRef
-    :: e BitandTokL
-    -> e 
+    :: e AmpersandTokL
+    -> e MutTokL
     -> MutRef e MutRefL
 
 data TupleType e l where
@@ -815,7 +808,7 @@ data HiddenFunctionSignature e l where
     :: e (Maybe ModifierL)
     -> e (Maybe ModifierL)
     -> e (Maybe ModifierL)
-    -> e 
+    -> e FunTokL
     -> e HiddenFunctionIdentifierL
     -> e (Maybe TypeParametersL)
     -> e FunctionParametersL
@@ -843,7 +836,7 @@ data FunctionParametersInternal0 e l where
 data FunctionParameter e l where
   FunctionParameter
     :: e FunctionParameterInternal0L
-    -> e 
+    -> e ColonTokL
     -> e HiddenTypeL
     -> FunctionParameter e FunctionParameterL
 
@@ -852,7 +845,7 @@ data FunctionParameterInternal0 e l where
     :: e HiddenVariableIdentifierL
     -> FunctionParameterInternal0 e FunctionParameterInternal0L
   FunctionParameterInternal02
-    :: e DollarTokL
+    :: e DollarSignTokL
     -> e HiddenVariableIdentifierL
     -> FunctionParameterInternal0 e FunctionParameterInternal0L
 
@@ -863,7 +856,7 @@ data HiddenVariableIdentifier e l where
 
 data MutFunctionParameter e l where
   MutFunctionParameter
-    :: e 
+    :: e MutTokL
     -> e FunctionParameterL
     -> MutFunctionParameter e MutFunctionParameterL
 
@@ -889,13 +882,17 @@ data ModifierInternal0 e l where
 
 data RetType e l where
   RetType
-    :: e 
+    :: e ColonTokL
     -> e HiddenTypeL
     -> RetType e RetTypeL
 
 data Block e l where
   Block
-    :: e (([UseDeclarationL], [BlockItemL]), Maybe HiddenExpressionL)
+    :: e LeftCurlyBracketTokL
+    -> e [UseDeclarationL]
+    -> e [BlockItemL]
+    -> e (Maybe HiddenExpressionL)
+    -> e RightCurlyBracketTokL
     -> Block e BlockL
 
 data HiddenExpression e l where
@@ -1065,19 +1062,21 @@ data HexStringLiteral e l where
 
 data AnnotationExpression e l where
   AnnotationExpression
-    :: e (HiddenExpressionL, HiddenTypeL)
+    :: e HiddenExpressionL
+    -> e HiddenTypeL
+    -> e RightParenthesisTokL
     -> AnnotationExpression e AnnotationExpressionL
 
 data BreakExpression e l where
   BreakExpression
-    :: e 
+    :: e BreakTokL
     -> e (Maybe LabelL)
     -> e (Maybe HiddenExpressionL)
     -> BreakExpression e BreakExpressionL
 
 data Label e l where
   Label
-    :: e 
+    :: e ApostropheTokL
     -> e IdentifierL
     -> Label e LabelL
 
@@ -1093,19 +1092,19 @@ data ArgList e l where
 
 data NameExpression e l where
   NameExpression
-    :: e (Maybe )
+    :: e (Maybe ColoncolonTokL)
     -> e ModuleAccessL
     -> NameExpression e NameExpressionL
 
 data ContinueExpression e l where
   ContinueExpression
-    :: e 
+    :: e ContinueTokL
     -> e (Maybe LabelL)
     -> ContinueExpression e ContinueExpressionL
 
 data DotExpression e l where
   DotExpression
-    :: e (HiddenExpressionTermL, HiddenExpressionTermL)
+    :: e ((HiddenExpressionTermL, FullStopTokL), HiddenExpressionTermL)
     -> DotExpression e DotExpressionL
 
 data ExpressionList e l where
@@ -1115,7 +1114,7 @@ data ExpressionList e l where
 
 data IfExpression e l where
   IfExpression
-    :: e ((HiddenExpressionL, HiddenExpressionL), Maybe HiddenExpressionL)
+    :: e (((IfTokL, HiddenExpressionL), HiddenExpressionL), Maybe (ElseTokL, HiddenExpressionL))
     -> IfExpression e IfExpressionL
 
 data IndexExpression e l where
@@ -1133,15 +1132,13 @@ data MacroCallExpression e l where
 data MacroModuleAccess e l where
   MacroModuleAccess
     :: e ModuleAccessL
-    -> e BangTokL
+    -> e ExclamationMarkTokL
     -> MacroModuleAccess e MacroModuleAccessL
 
 data MatchExpression e l where
   MatchExpression
-    :: e 
-    -> e 
+    :: e MatchTokL
     -> e HiddenExpressionL
-    -> e 
     -> e HiddenMatchBodyL
     -> MatchExpression e MatchExpressionL
 
@@ -1154,7 +1151,7 @@ data MatchArm e l where
   MatchArm
     :: e BindListL
     -> e (Maybe MatchConditionL)
-    -> e 
+    -> e EqualsSigngreaterThanSignTokL
     -> e HiddenExpressionL
     -> MatchArm e MatchArmL
 
@@ -1193,14 +1190,14 @@ data HiddenBindInternal0 e l where
 
 data MutBindVar e l where
   MutBindVar
-    :: e 
+    :: e MutTokL
     -> e HiddenVariableIdentifierL
     -> MutBindVar e MutBindVarL
 
 data AtBind e l where
   AtBind
     :: e HiddenVariableIdentifierL
-    -> e AtTokL
+    -> e CommercialAtTokL
     -> e BindListL
     -> AtBind e AtBindL
 
@@ -1234,7 +1231,7 @@ data BindNamedFieldsInternal0 e l where
 data BindField e l where
   BindField1
     :: e BindListL
-    -> e (Maybe BindListL)
+    -> e (Maybe (ColonTokL, BindListL))
     -> BindField e BindFieldL
   BindFieldSpreadOperator
     :: e HiddenSpreadOperatorL
@@ -1242,12 +1239,12 @@ data BindField e l where
 
 data HiddenSpreadOperator e l where
   HiddenSpreadOperator
-    :: e RangeTokL
+    :: e FullStopfullStopTokL
     -> HiddenSpreadOperator e HiddenSpreadOperatorL
 
 data MutBindField e l where
   MutBindField
-    :: e 
+    :: e MutTokL
     -> e BindFieldL
     -> MutBindField e MutBindFieldL
 
@@ -1263,11 +1260,15 @@ data CommaBindList e l where
 
 data OrBindList e l where
   OrBindList
-    :: OrBindList e OrBindListL
+    :: e (Maybe LeftParenthesisTokL)
+    -> e [((Maybe LeftParenthesisTokL, HiddenBindL), Maybe RightParenthesisTokL)]
+    -> e (Maybe RightParenthesisTokL)
+    -> OrBindList e OrBindListL
 
 data MatchCondition e l where
   MatchCondition
-    :: e HiddenExpressionL
+    :: e IfTokL
+    -> e HiddenExpressionL
     -> MatchCondition e MatchConditionL
 
 data PackExpression e l where
@@ -1284,12 +1285,12 @@ data FieldInitializeList e l where
 data ExpField e l where
   ExpField
     :: e HiddenFieldIdentifierL
-    -> e (Maybe HiddenExpressionL)
+    -> e (Maybe (ColonTokL, HiddenExpressionL))
     -> ExpField e ExpFieldL
 
 data SpecBlock e l where
   SpecBlock
-    :: e 
+    :: e SpecTokL
     -> e SpecBlockInternal0L
     -> SpecBlock e SpecBlockL
 
@@ -1315,7 +1316,7 @@ data HiddenSpecBlockTarget e l where
 
 data SpecBlockTargetSchema e l where
   SpecBlockTargetSchema
-    :: e 
+    :: e SchemaTokL
     -> e HiddenStructIdentifierL
     -> e (Maybe TypeParametersL)
     -> SpecBlockTargetSchema e SpecBlockTargetSchemaL
@@ -1338,7 +1339,8 @@ data HiddenSpecFunction e l where
 
 data NativeSpecFunction e l where
   NativeSpecFunction
-    :: e HiddenSpecFunctionSignatureL
+    :: e NativeTokL
+    -> e HiddenSpecFunctionSignatureL
     -> NativeSpecFunction e NativeSpecFunctionL
 
 data HiddenSpecFunctionSignature e l where
@@ -1356,14 +1358,17 @@ data UninterpretedSpecFunction e l where
 
 data UsualSpecFunction e l where
   UsualSpecFunction
-    :: e 
+    :: e FunTokL
     -> e HiddenSpecFunctionSignatureL
     -> e BlockL
     -> UsualSpecFunction e UsualSpecFunctionL
 
 data SpecBody e l where
   SpecBody
-    :: e ([UseDeclarationL], [HiddenSpecBlockMemeberL])
+    :: e LeftCurlyBracketTokL
+    -> e [UseDeclarationL]
+    -> e [HiddenSpecBlockMemeberL]
+    -> e RightCurlyBracketTokL
     -> SpecBody e SpecBodyL
 
 data HiddenSpecBlockMemeber e l where
@@ -1394,7 +1399,10 @@ data HiddenSpecBlockMemeber e l where
 
 data SpecApply e l where
   SpecApply
-    :: e ((HiddenExpressionL, [SpecApplyPatternL]), Maybe [SpecApplyPatternL])
+    :: e HiddenExpressionL
+    -> e [SpecApplyPatternL]
+    -> e (Maybe (ExceptTokL, [SpecApplyPatternL]))
+    -> e SemicolonTokL
     -> SpecApply e SpecApplyL
 
 data SpecApplyPattern e l where
@@ -1433,8 +1441,8 @@ data HiddenSpecAbortIf e l where
     :: e AbortsIfTokL
     -> e (Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
-    -> e (Maybe HiddenExpressionL)
-    -> e 
+    -> e (Maybe (WithTokL, HiddenExpressionL))
+    -> e SemicolonTokL
     -> HiddenSpecAbortIf e HiddenSpecAbortIfL
 
 data ConditionProperties e l where
@@ -1445,7 +1453,7 @@ data ConditionProperties e l where
 data SpecProperty e l where
   SpecProperty
     :: e IdentifierL
-    -> e (Maybe (AssignTokL, HiddenLiteralValueL))
+    -> e (Maybe (EqualsSignTokL, HiddenLiteralValueL))
     -> SpecProperty e SpecPropertyL
 
 data HiddenSpecAbortWithOrModifies e l where
@@ -1453,7 +1461,7 @@ data HiddenSpecAbortWithOrModifies e l where
     :: e HiddenSpecAbortWithOrModifiesInternal0L
     -> e (Maybe ConditionPropertiesL)
     -> e [HiddenExpressionL]
-    -> e 
+    -> e SemicolonTokL
     -> HiddenSpecAbortWithOrModifies e HiddenSpecAbortWithOrModifiesL
 
 data HiddenSpecAbortWithOrModifiesInternal0 e l where
@@ -1469,7 +1477,7 @@ data HiddenSpecCondition e l where
     :: e HiddenSpecConditionInternal0L
     -> e (Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
-    -> e 
+    -> e SemicolonTokL
     -> HiddenSpecCondition e HiddenSpecConditionL
 
 data HiddenSpecConditionInternal0 e l where
@@ -1509,7 +1517,7 @@ data SpecInvariant e l where
     -> e (Maybe SpecInvariantInternal0L)
     -> e (Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
-    -> e 
+    -> e SemicolonTokL
     -> SpecInvariant e SpecInvariantL
 
 data SpecInvariantInternal0 e l where
@@ -1528,7 +1536,10 @@ data SpecInvariantInternal0 e l where
 
 data SpecLet e l where
   SpecLet
-    :: e (((Maybe PostTokL, IdentifierL), AssignTokL), HiddenExpressionL)
+    :: e LetTokL
+    -> e (Maybe PostTokL)
+    -> e IdentifierL
+    -> e HiddenExpressionL
     -> SpecLet e SpecLetL
 
 data SpecPragma e l where
@@ -1541,9 +1552,7 @@ data SpecVariable e l where
     :: e (Maybe SpecVariableInternal0L)
     -> e IdentifierL
     -> e (Maybe TypeParametersL)
-    -> e 
     -> e HiddenTypeL
-    -> e 
     -> SpecVariable e SpecVariableL
 
 data SpecVariableInternal0 e l where
@@ -1557,9 +1566,7 @@ data SpecVariableInternal0 e l where
 data UseDeclaration e l where
   UseDeclaration
     :: e (Maybe PublicTokL)
-    -> e 
     -> e UseDeclarationInternal0L
-    -> e 
     -> UseDeclaration e UseDeclarationL
 
 data UseDeclarationInternal0 e l where
@@ -1578,76 +1585,72 @@ data UseDeclarationInternal0 e l where
 
 data UseFun e l where
   UseFun
-    :: e 
-    -> e ModuleAccessL
-    -> e 
-    -> e (ModuleAccessL, HiddenFunctionIdentifierL)
+    :: e ModuleAccessL
+    -> e ((ModuleAccessL, FullStopTokL), HiddenFunctionIdentifierL)
     -> UseFun e UseFunL
 
 data UseModule e l where
   UseModule
     :: e ModuleIdentityL
-    -> e (Maybe HiddenModuleIdentifierL)
+    -> e (Maybe (AsTokL, HiddenModuleIdentifierL))
     -> UseModule e UseModuleL
 
 data UseModuleMember e l where
   UseModuleMember
     :: e ModuleIdentityL
-    -> e 
+    -> e ColoncolonTokL
     -> e UseMemberL
     -> UseModuleMember e UseModuleMemberL
 
 data UseMember e l where
   UseMember1
     :: e IdentifierL
-    -> e 
-    -> e 
+    -> e ColoncolonTokL
     -> e [UseMemberL]
-    -> e 
     -> UseMember e UseMemberL
   UseMember2
     :: e IdentifierL
-    -> e 
+    -> e ColoncolonTokL
     -> e IdentifierL
-    -> e (Maybe IdentifierL)
+    -> e (Maybe (AsTokL, IdentifierL))
     -> UseMember e UseMemberL
   UseMember3
     :: e IdentifierL
-    -> e (Maybe IdentifierL)
+    -> e (Maybe (AsTokL, IdentifierL))
     -> UseMember e UseMemberL
 
 data UseModuleMembers e l where
   UseModuleMembers1
     :: e ModuleIdentityInternal0L
-    -> e 
-    -> e 
+    -> e ColoncolonTokL
     -> e [UseMemberL]
-    -> e 
     -> UseModuleMembers e UseModuleMembersL
   UseModuleMembers2
     :: e ModuleIdentityL
-    -> e 
-    -> e 
+    -> e ColoncolonTokL
     -> e [UseMemberL]
-    -> e 
     -> UseModuleMembers e UseModuleMembersL
 
 data UnitExpression e l where
   UnitExpression
-    :: UnitExpression e UnitExpressionL
+    :: e LeftParenthesisTokL
+    -> e RightParenthesisTokL
+    -> UnitExpression e UnitExpressionL
 
 data VectorExpression e l where
   VectorExpression
     :: e VectorExpressionInternal0L
     -> e [HiddenExpressionL]
-    -> e 
+    -> e RightSquareBracketTokL
     -> VectorExpression e VectorExpressionL
 
 data VectorExpressionInternal0 e l where
-  VectorExpressionInternal0Vectorleftspacesquarespacebracket
-    :: VectorExpressionInternal0 e VectorExpressionInternal0L
+  VectorExpressionInternal0VectorleftSquareBracket
+    :: e VectorleftSquareBracketTokL
+    -> VectorExpressionInternal0 e VectorExpressionInternal0L
   VectorExpressionInternal02
-    :: e ([HiddenTypeL], GtTokL)
+    :: e [HiddenTypeL]
+    -> e LeftSquareBracketTokL
     -> VectorExpressionInternal0 e VectorExpressionInternal0L
 
 data BorrowExpression e l where
@@ -1657,7 +1660,7 @@ data BorrowExpression e l where
 
 data DereferenceExpression e l where
   DereferenceExpression
-    :: e (MulTokL, HiddenExpressionL)
+    :: e (AsteriskTokL, HiddenExpressionL)
     -> DereferenceExpression e DereferenceExpressionL
 
 data MoveOrCopyExpression e l where
@@ -1681,125 +1684,125 @@ data UnaryExpression e l where
 
 data UnaryOp e l where
   UnaryOp
-    :: e BangTokL
+    :: e ExclamationMarkTokL
     -> UnaryOp e UnaryOpL
 
 data AbortExpression e l where
   AbortExpression
-    :: e 
+    :: e AbortTokL
     -> e (Maybe HiddenExpressionL)
     -> AbortExpression e AbortExpressionL
 
 data AssignExpression e l where
   AssignExpression
-    :: e ((HiddenUnaryExpressionL, AssignTokL), HiddenExpressionL)
+    :: e ((HiddenUnaryExpressionL, EqualsSignTokL), HiddenExpressionL)
     -> AssignExpression e AssignExpressionL
 
 data BinaryExpression e l where
   BinaryExpression1
     :: e HiddenExpressionL
-    -> e ImpliesTokL
+    -> e EqualsSignequalsSigngreaterThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression2
     :: e HiddenExpressionL
-    -> e OrTokL
+    -> e VerticalLineverticalLineTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression3
     :: e HiddenExpressionL
-    -> e AndTokL
+    -> e AmpersandampersandTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression4
     :: e HiddenExpressionL
-    -> e EqTokL
+    -> e EqualsSignequalsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression5
     :: e HiddenExpressionL
-    -> e NeqTokL
+    -> e ExclamationMarkequalsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression6
     :: e HiddenExpressionL
-    -> e LtTokL
+    -> e LessThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression7
     :: e HiddenExpressionL
-    -> e GtTokL
+    -> e GreaterThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression8
     :: e HiddenExpressionL
-    -> e LeTokL
+    -> e LessThanSignequalsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression9
     :: e HiddenExpressionL
-    -> e GeTokL
+    -> e GreaterThanSignequalsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression10
     :: e HiddenExpressionL
-    -> e RangeTokL
+    -> e FullStopfullStopTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression11
     :: e HiddenExpressionL
-    -> e BitorTokL
+    -> e VerticalLineTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression12
     :: e HiddenExpressionL
-    -> e XorTokL
+    -> e CircumflexAccentTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression13
     :: e HiddenExpressionL
-    -> e BitandTokL
+    -> e AmpersandTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression14
     :: e HiddenExpressionL
-    -> e ShlTokL
+    -> e LessThanSignlessThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression15
     :: e HiddenExpressionL
-    -> e ShrTokL
+    -> e GreaterThanSigngreaterThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression16
     :: e HiddenExpressionL
-    -> e AddTokL
+    -> e PlusSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression17
     :: e HiddenExpressionL
-    -> e SubTokL
+    -> e TokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression18
     :: e HiddenExpressionL
-    -> e MulTokL
+    -> e AsteriskTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression19
     :: e HiddenExpressionL
-    -> e DivTokL
+    -> e SolidusTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression20
     :: e HiddenExpressionL
-    -> e ModTokL
+    -> e PercentSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
 
 data CastExpression e l where
   CastExpression
-    :: e (HiddenExpressionL, HiddenTypeL)
+    :: e ((HiddenExpressionL, AsTokL), HiddenTypeL)
     -> CastExpression e CastExpressionL
 
 data IdentifiedExpression e l where
@@ -1811,13 +1814,13 @@ data IdentifiedExpression e l where
 data BlockIdentifier e l where
   BlockIdentifier
     :: e LabelL
-    -> e 
+    -> e ColonTokL
     -> BlockIdentifier e BlockIdentifierL
 
 data LambdaExpression e l where
   LambdaExpression
     :: e LambdaBindingsL
-    -> e (Maybe HiddenTypeL)
+    -> e (Maybe (GreaterThanSignTokL, HiddenTypeL))
     -> e HiddenExpressionL
     -> LambdaExpression e LambdaExpressionL
 
@@ -1835,18 +1838,18 @@ data LambdaBinding e l where
     -> LambdaBinding e LambdaBindingL
   LambdaBinding3
     :: e HiddenBindL
-    -> e (Maybe HiddenTypeL)
+    -> e (Maybe (ColonTokL, HiddenTypeL))
     -> LambdaBinding e LambdaBindingL
 
 data LoopExpression e l where
   LoopExpression
-    :: e 
+    :: e LoopTokL
     -> e HiddenExpressionL
     -> LoopExpression e LoopExpressionL
 
 data QuantifierExpression e l where
   QuantifierExpression
-    :: e (((HiddenReservedIdentifierL, QuantifierBindingsL), Maybe HiddenExpressionL), HiddenExpressionL)
+    :: e ((((HiddenReservedIdentifierL, QuantifierBindingsL), Maybe (WhereTokL, HiddenExpressionL)), ColonTokL), HiddenExpressionL)
     -> QuantifierExpression e QuantifierExpressionL
 
 data QuantifierBindings e l where
@@ -1857,39 +1860,37 @@ data QuantifierBindings e l where
 data QuantifierBinding e l where
   QuantifierBinding1
     :: e IdentifierL
-    -> e 
+    -> e ColonTokL
     -> e HiddenTypeL
     -> QuantifierBinding e QuantifierBindingL
   QuantifierBinding2
     :: e IdentifierL
-    -> e 
+    -> e InTokL
     -> e HiddenExpressionL
     -> QuantifierBinding e QuantifierBindingL
 
 data ReturnExpression e l where
   ReturnExpression1
-    :: e 
+    :: e ReturnTokL
     -> e (Maybe LabelL)
     -> e HiddenExpressionL
     -> ReturnExpression e ReturnExpressionL
   ReturnExpression2
-    :: e 
+    :: e ReturnTokL
     -> e (Maybe LabelL)
     -> ReturnExpression e ReturnExpressionL
 
 data WhileExpression e l where
   WhileExpression
-    :: e 
-    -> e 
+    :: e WhileTokL
     -> e HiddenExpressionL
-    -> e 
     -> e HiddenExpressionL
     -> WhileExpression e WhileExpressionL
 
 data BlockItem e l where
   BlockItem
     :: e BlockItemInternal0L
-    -> e 
+    -> e SemicolonTokL
     -> BlockItem e BlockItemL
 
 data BlockItemInternal0 e l where
@@ -1902,16 +1903,16 @@ data BlockItemInternal0 e l where
 
 data LetStatement e l where
   LetStatement
-    :: e 
+    :: e LetTokL
     -> e BindListL
-    -> e (Maybe HiddenTypeL)
-    -> e (Maybe (AssignTokL, HiddenExpressionL))
+    -> e (Maybe (ColonTokL, HiddenTypeL))
+    -> e (Maybe (EqualsSignTokL, HiddenExpressionL))
     -> LetStatement e LetStatementL
 
 data MacroFunctionDefinition e l where
   MacroFunctionDefinition
     :: e (Maybe ModifierL)
-    -> e 
+    -> e MacroTokL
     -> e HiddenMacroSignatureL
     -> e BlockL
     -> MacroFunctionDefinition e MacroFunctionDefinitionL
@@ -1919,7 +1920,7 @@ data MacroFunctionDefinition e l where
 data HiddenMacroSignature e l where
   HiddenMacroSignature
     :: e (Maybe ModifierL)
-    -> e 
+    -> e FunTokL
     -> e HiddenFunctionIdentifierL
     -> e (Maybe TypeParametersL)
     -> e FunctionParametersL
@@ -1929,7 +1930,7 @@ data HiddenMacroSignature e l where
 data NativeFunctionDefinition e l where
   NativeFunctionDefinition
     :: e HiddenFunctionSignatureL
-    -> e 
+    -> e SemicolonTokL
     -> NativeFunctionDefinition e NativeFunctionDefinitionL
 
 data HiddenStructItem e l where
@@ -1943,14 +1944,12 @@ data HiddenStructItem e l where
 data NativeStructDefinition e l where
   NativeStructDefinition
     :: e (Maybe PublicTokL)
-    -> e NativeTokL
     -> e HiddenStructSignatureL
-    -> e 
     -> NativeStructDefinition e NativeStructDefinitionL
 
 data HiddenStructSignature e l where
   HiddenStructSignature
-    :: e 
+    :: e StructTokL
     -> e HiddenStructIdentifierL
     -> e (Maybe TypeParametersL)
     -> e (Maybe AbilityDeclsL)
@@ -1966,7 +1965,9 @@ data StructDefinition e l where
 
 data Constant e l where
   Constant
-    :: e (((IdentifierL, HiddenTypeL), AssignTokL), HiddenExpressionL)
+    :: e IdentifierL
+    -> e HiddenTypeL
+    -> e HiddenExpressionL
     -> Constant e ConstantL
 
 data FriendDeclaration e l where
@@ -2016,7 +2017,6 @@ deriveAll
   , ''ModuleIdentityInternal0
   , ''NumLiteral
   , ''NumLiteralInternal0
-  , ''NumLiteralInternal1
   , ''TypeArguments
   , ''FunctionType
   , ''FunctionTypeParameters
@@ -2202,7 +2202,6 @@ type MoveSig =
    , ModuleIdentityInternal0
    , NumLiteral
    , NumLiteralInternal0
-   , NumLiteralInternal1
    , TypeArguments
    , FunctionType
    , FunctionTypeParameters
@@ -2401,7 +2400,6 @@ type data Symbol (symbolType :: SymbolType) where
   ModuleIdentityInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
   NumLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
   NumLiteralInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  NumLiteralInternal1Symbol :: (symbolType ~ Regular) => Symbol symbolType
   TypeArgumentsSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FunctionTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FunctionTypeParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2652,7 +2650,6 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SModuleIdentityInternal0Symbol :: SymbolSing Regular ModuleIdentityInternal0Symbol
   SNumLiteralSymbol :: SymbolSing Regular NumLiteralSymbol
   SNumLiteralInternal0Symbol :: SymbolSing Regular NumLiteralInternal0Symbol
-  SNumLiteralInternal1Symbol :: SymbolSing Regular NumLiteralInternal1Symbol
   STypeArgumentsSymbol :: SymbolSing Regular TypeArgumentsSymbol
   SFunctionTypeSymbol :: SymbolSing Regular FunctionTypeSymbol
   SFunctionTypeParametersSymbol :: SymbolSing Regular FunctionTypeParametersSymbol
@@ -2907,7 +2904,6 @@ decSymbolSing SModuleIdentitySymbol SModuleIdentitySymbol = Just (Refl, HRefl)
 decSymbolSing SModuleIdentityInternal0Symbol SModuleIdentityInternal0Symbol = Just (Refl, HRefl)
 decSymbolSing SNumLiteralSymbol SNumLiteralSymbol = Just (Refl, HRefl)
 decSymbolSing SNumLiteralInternal0Symbol SNumLiteralInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SNumLiteralInternal1Symbol SNumLiteralInternal1Symbol = Just (Refl, HRefl)
 decSymbolSing STypeArgumentsSymbol STypeArgumentsSymbol = Just (Refl, HRefl)
 decSymbolSing SFunctionTypeSymbol SFunctionTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SFunctionTypeParametersSymbol SFunctionTypeParametersSymbol = Just (Refl, HRefl)
@@ -3187,7 +3183,6 @@ symbolMap = Map.fromList
     , ("module_identity_internal0", SomeRegularSymbolSing SModuleIdentityInternal0Symbol)
     , ("num_literal", SomeRegularSymbolSing SNumLiteralSymbol)
     , ("num_literal_internal0", SomeRegularSymbolSing SNumLiteralInternal0Symbol)
-    , ("num_literal_internal1", SomeRegularSymbolSing SNumLiteralInternal1Symbol)
     , ("type_arguments", SomeRegularSymbolSing STypeArgumentsSymbol)
     , ("function_type", SomeRegularSymbolSing SFunctionTypeSymbol)
     , ("function_type_parameters", SomeRegularSymbolSing SFunctionTypeParametersSymbol)
@@ -3453,7 +3448,6 @@ moveSigNames =
    , ''ModuleIdentityInternal0
    , ''NumLiteral
    , ''NumLiteralInternal0
-   , ''NumLiteralInternal1
    , ''TypeArguments
    , ''FunctionType
    , ''FunctionTypeParameters

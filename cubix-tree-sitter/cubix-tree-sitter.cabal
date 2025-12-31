@@ -118,8 +118,9 @@ library gen-internal
     TreeSitter.Grammar.Transform
     TreeSitter.Grammar.Transform.Between
     TreeSitter.Grammar.Transform.HoistDefinitions
-    TreeSitter.Grammar.Transform.SepBy
+    TreeSitter.Grammar.Transform.MergePatterns
     TreeSitter.Grammar.Transform.RemoveUnusedStrings
+    TreeSitter.Grammar.Transform.SepBy
     TreeSitter.Grammar.Transform.StripBlanks
 
 executable gen-mod
