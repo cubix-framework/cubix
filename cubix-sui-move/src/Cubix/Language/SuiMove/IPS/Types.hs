@@ -11,7 +11,7 @@ import Data.List ( (\\) )
 import Language.Haskell.TH ( Name, mkName, runQ )
 import Language.Haskell.TH qualified as TH
 
-import Data.Comp.Multi ( Term, project', CxtS, AnnCxtS, inject, project )
+import Data.Comp.Multi ( All, HFunctor, Term, project', CxtS, AnnCxtS, inject, project, (:-<:) )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.SuiMove.Modularized as Modularized
@@ -34,8 +34,38 @@ createSortInclusionInfers
   [''IdentifierL]
 
 -----------------------------------------------------------------------------------
-----------------------         Block                       ------------------------
+---------------       Variable declarations and blocks     ------------------------
 -----------------------------------------------------------------------------------
+
+data HiddenTypeIsLocalVarDeclAttrs e l where
+   HiddenTypeIsLocalVarDeclAttrs
+     :: e HiddenTypeL
+     -> HiddenTypeIsLocalVarDeclAttrs e Parametric.LocalVarDeclAttrsL
+
+deriveAllButSortInjection [''HiddenTypeIsLocalVarDeclAttrs]
+
+instance
+  ( All HFunctor fs
+  , HiddenTypeIsLocalVarDeclAttrs :-<: fs
+  ) => InjF fs HiddenTypeL Parametric.LocalVarDeclAttrsL where
+  injF = iHiddenTypeIsLocalVarDeclAttrs
+
+  projF' (project' -> Just (HiddenTypeIsLocalVarDeclAttrs ty)) = Just ty
+  projF' _ = Nothing
+
+createSortInclusionTypes
+  [''Parametric.SingleLocalVarDeclL, ''HiddenExpressionL]
+  [''LetStatementL, ''Parametric.LocalVarInitL]
+deriveAllButSortInjection
+  [''SingleLocalVarDeclIsLetStatement, ''HiddenExpressionIsLocalVarInit]
+createSortInclusionInfers
+  [''Parametric.SingleLocalVarDeclL, ''HiddenExpressionL]
+  [''LetStatementL, ''Parametric.LocalVarInitL]
+
+data BinderIsVarDeclBinder e l where
+  BinderIsVarDeclBinder :: e BindListL -> BinderIsVarDeclBinder e Parametric.VarDeclBinderL
+
+deriveAllButSortInjection [''BinderIsVarDeclBinder]
 
 data SuiMoveBlockEnd e l where
   SuiMoveBlockEnd :: e (Maybe HiddenExpressionL) -> SuiMoveBlockEnd e Parametric.BlockEndL
@@ -43,13 +73,13 @@ data SuiMoveBlockEnd e l where
 deriveAll [''SuiMoveBlockEnd]
 
 createSortInclusionTypes
-  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL]
-  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL]
+  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL, ''Parametric.SingleLocalVarDeclL]
+  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL, ''Parametric.BlockItemL]
 deriveAllButSortInjection
-  [ ''UseDeclarationIsBlockItem, ''BlockItemIsBlockItem, ''BlockIsBlock ]
+  [ ''UseDeclarationIsBlockItem, ''BlockItemIsBlockItem, ''BlockIsBlock, ''SingleLocalVarDeclIsBlockItem ]
 createSortInclusionInfers
-  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL]
-  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL]
+  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL, ''Parametric.SingleLocalVarDeclL]
+  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL, ''Parametric.BlockItemL]
 
 -----------------------------------------------------------------------------------
 ----------------------           Expressions               ------------------------
@@ -69,11 +99,16 @@ createSortInclusionInfers
 -----------------------------------------------------------------------------------
 
 do let suiSortInjections =
-         [ ''IdentIsIdentifier
+         [ ''HiddenTypeIsLocalVarDeclAttrs
+         , ''BinderIsVarDeclBinder
+         , ''SingleLocalVarDeclIsLetStatement
+         , ''HiddenExpressionIsLocalVarInit
+         , ''IdentIsIdentifier
          , ''ExpressionIsHiddenExpression
          , ''HiddenExpressionIsExpression
          , ''UseDeclarationIsBlockItem
          , ''BlockItemIsBlockItem
+         , ''SingleLocalVarDeclIsBlockItem
          , ''BlockIsBlock
          , ''UnitIsUnitExpression
          , ''HiddenUnaryExpressionInternal0IsLhs
@@ -86,7 +121,7 @@ do let suiSortInjections =
        names =
          (moveSigNames \\
           [ mkName "BinaryExpression", mkName "UnaryExpression", mkName "UnitExpression", mkName "AssignExpression"
-          , mkName "Identifier", mkName "Block"
+          , mkName "Identifier", mkName "Block", mkName "LetStatement"
           ]) ++
          suiSortInjections ++
          suiNewNodes ++
@@ -106,6 +141,11 @@ do let suiSortInjections =
          , ''Parametric.UnitF
          , ''Parametric.AssignOpEquals
          , ''Parametric.Assign
+         , ''Parametric.OptLocalVarInit
+         , ''Parametric.TupleBinder
+         , ''Parametric.IdentIsVarDeclBinder
+         , ''Parametric.EmptyLocalVarDeclAttrs
+         , ''Parametric.SingleLocalVarDecl
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 

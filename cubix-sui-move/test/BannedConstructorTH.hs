@@ -39,6 +39,7 @@ bannedCons =
   , 'M.Block
   , 'M.UnitExpression
   , 'M.AssignExpression
+  , 'M.LetStatement
   ]
 
 -- | Generate a function that checks if a term contains any banned constructors.
