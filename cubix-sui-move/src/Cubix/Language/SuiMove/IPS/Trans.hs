@@ -129,6 +129,7 @@ transUnaryExpr (Modularized.UnaryExpression' op expr) =
   Unary' (transUnop op) (translate' expr)
 
 instance Trans Modularized.HiddenExpression where
+  trans (Modularized.HiddenExpressionAssignExpression ae) = injF $ transAssignExpr ae
   trans (Modularized.HiddenExpressionBinaryExpression be) = injF $ transBinaryExpr be
   trans (Modularized.HiddenExpressionUnaryExpression
          (Modularized.HiddenUnaryExpressionInternal0UnaryExpression' uexp))
@@ -157,6 +158,14 @@ transUnitExpression Modularized.UnitExpression' = UnitF'
 
 instance Trans Modularized.UnitExpression where
   trans Modularized.UnitExpression = iUnitIsUnitExpression (transUnitExpression $ inject Modularized.UnitExpression)
+
+-------- Assign Expression
+
+transAssignExpr :: Modularized.MoveTerm Modularized.AssignExpressionL -> MSuiMoveTerm AssignL
+transAssignExpr (Modularized.AssignExpression' tuple) =
+  let (lhsTok, rhs) = extractF2 tuple
+      (lhs, _assignTok) = extractF2 lhsTok
+  in Assign' (translate' lhs) AssignOpEquals' (translate' rhs)
 
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
@@ -190,7 +199,7 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 -- CODE_GUARD_END
 
 do ipsNames <- sumToNames ''MSuiMoveSig
-   let targTs = map ConT $ (ipsNames \\ Modularized.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock, ''UnitIsUnitExpression]
+   let targTs = map ConT $ (ipsNames \\ Modularized.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock, ''UnitIsUnitExpression, ''AssignIsHiddenExpression]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 -- CODE_GUARD_START
@@ -292,3 +301,16 @@ untransUnitExpression UnitF' = Modularized.UnitExpression'
 
 instance {-# OVERLAPPING #-} Untrans UnitIsUnitExpression where
   untrans (UnitIsUnitExpression u) = untransUnitExpression u
+
+-------- Assign Expression
+
+untransAssignExpr :: MSuiMoveTerm AssignL -> Modularized.MoveTerm Modularized.AssignExpressionL
+untransAssignExpr (Assign' lhs _op rhs) =
+  let lhsTerm = untranslate $ fromProjF lhs
+      rhsTerm = untranslate $ fromProjF rhs
+      lhsTokPair = riPairF lhsTerm (inject Modularized.Assign)
+      fullTuple = riPairF lhsTokPair rhsTerm
+  in Modularized.iAssignExpression fullTuple
+
+instance {-# OVERLAPPING #-} Untrans AssignIsHiddenExpression where
+  untrans (AssignIsHiddenExpression a) = Modularized.iHiddenExpressionAssignExpression $ untransAssignExpr a

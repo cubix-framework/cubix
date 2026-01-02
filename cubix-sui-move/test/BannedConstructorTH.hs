@@ -38,6 +38,7 @@ bannedCons =
   , 'M.UnaryExpression
   , 'M.Block
   , 'M.UnitExpression
+  , 'M.AssignExpression
   ]
 
 -- | Generate a function that checks if a term contains any banned constructors.

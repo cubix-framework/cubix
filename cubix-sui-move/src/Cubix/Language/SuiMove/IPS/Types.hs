@@ -34,79 +34,35 @@ createSortInclusionInfers
   [''IdentifierL]
 
 -----------------------------------------------------------------------------------
-----------------------         Binary Operations           ------------------------
------------------------------------------------------------------------------------
-
-createSortInclusionTypes
-  [''Parametric.ExpressionL]
-  [''HiddenExpressionL]
-deriveAllButSortInjection
-  [ ''ExpressionIsHiddenExpression ]
-createSortInclusionInfers
-  [''Parametric.ExpressionL]
-  [''HiddenExpressionL]
-
-createSortInclusionTypes
-  [''HiddenExpressionL]
-  [''Parametric.ExpressionL]
-deriveAllButSortInjection
-  [ ''HiddenExpressionIsExpression ]
-createSortInclusionInfers
-  [''HiddenExpressionL]
-  [''Parametric.ExpressionL]
-
------------------------------------------------------------------------------------
 ----------------------         Block                       ------------------------
 -----------------------------------------------------------------------------------
 
--- SuiMoveBlockEnd wraps the optional final expression in blocks
 data SuiMoveBlockEnd e l where
   SuiMoveBlockEnd :: e (Maybe HiddenExpressionL) -> SuiMoveBlockEnd e Parametric.BlockEndL
 
 deriveAll [''SuiMoveBlockEnd]
 
--- Sort injection: UseDeclaration can appear as BlockItem
 createSortInclusionTypes
-  [''UseDeclarationL]
-  [''Parametric.BlockItemL]
+  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL]
+  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL]
 deriveAllButSortInjection
-  [ ''UseDeclarationIsBlockItem ]
+  [ ''UseDeclarationIsBlockItem, ''BlockItemIsBlockItem, ''BlockIsBlock ]
 createSortInclusionInfers
-  [''UseDeclarationL]
-  [''Parametric.BlockItemL]
-
--- Sort injection: BlockItem to parametric BlockItem
-createSortInclusionTypes
-  [''BlockItemL]
-  [''Parametric.BlockItemL]
-deriveAllButSortInjection
-  [ ''BlockItemIsBlockItem ]
-createSortInclusionInfers
-  [''BlockItemL]
-  [''Parametric.BlockItemL]
-
--- Sort injection: Block to parametric Block
-createSortInclusionTypes
-  [''Parametric.BlockL]
-  [''BlockL]
-deriveAllButSortInjection
-  [ ''BlockIsBlock ]
-createSortInclusionInfers
-  [''Parametric.BlockL]
-  [''BlockL]
+  [''UseDeclarationL, ''BlockItemL, ''Parametric.BlockL]
+  [''Parametric.BlockItemL, ''Parametric.BlockItemL, ''BlockL]
 
 -----------------------------------------------------------------------------------
-----------------------         Unit Expression             ------------------------
+----------------------           Expressions               ------------------------
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
-  [ ''() ]
-  [''UnitExpressionL]
+  [''(), ''HiddenUnaryExpressionInternal0L, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
+  [''UnitExpressionL, ''Parametric.LhsL, ''Parametric.RhsL, ''HiddenExpressionL, ''HiddenExpressionL, ''Parametric.ExpressionL]
 deriveAllButSortInjection
-  [ ''UnitIsUnitExpression ]
+  [''UnitIsUnitExpression, ''HiddenUnaryExpressionInternal0IsLhs, ''HiddenExpressionIsRhs, ''AssignIsHiddenExpression, ''ExpressionIsHiddenExpression, ''HiddenExpressionIsExpression]
 createSortInclusionInfers
-  [ ''() ]
-  [''UnitExpressionL]
+  [''(), ''HiddenUnaryExpressionInternal0L, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
+  [''UnitExpressionL, ''Parametric.LhsL, ''Parametric.RhsL, ''HiddenExpressionL, ''HiddenExpressionL, ''Parametric.ExpressionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
@@ -120,12 +76,18 @@ do let suiSortInjections =
          , ''BlockItemIsBlockItem
          , ''BlockIsBlock
          , ''UnitIsUnitExpression
+         , ''HiddenUnaryExpressionInternal0IsLhs
+         , ''HiddenExpressionIsRhs
+         , ''AssignIsHiddenExpression
          ]
        suiNewNodes =
          [ ''SuiMoveBlockEnd
          ]
        names =
-         (moveSigNames \\ [mkName "Identifier", mkName "BinaryExpression", mkName "UnaryExpression", mkName "Block", mkName "UnitExpression"]) ++
+         (moveSigNames \\
+          [ mkName "BinaryExpression", mkName "UnaryExpression", mkName "UnitExpression", mkName "AssignExpression"
+          , mkName "Identifier", mkName "Block"
+          ]) ++
          suiSortInjections ++
          suiNewNodes ++
          [ ''Parametric.Ident
@@ -142,6 +104,8 @@ do let suiSortInjections =
          , ''Parametric.Block
          , ''Parametric.EmptyBlockEnd
          , ''Parametric.UnitF
+         , ''Parametric.AssignOpEquals
+         , ''Parametric.Assign
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 
