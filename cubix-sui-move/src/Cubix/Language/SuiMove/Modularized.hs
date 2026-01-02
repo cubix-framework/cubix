@@ -230,6 +230,7 @@ data AddTokL
 data SubTokL
 data RangeTokL
 data DivTokL
+data AccessTokL
 data LtTokL
 data ShlTokL
 data LeTokL
@@ -346,6 +347,7 @@ data Token e l where
   Sub :: Token e SubTokL
   Range :: Token e RangeTokL
   Div :: Token e DivTokL
+  Access :: Token e AccessTokL
   Lt :: Token e LtTokL
   Shl :: Token e ShlTokL
   Le :: Token e LeTokL
@@ -2556,6 +2558,7 @@ type data Symbol (symbolType :: SymbolType) where
   SubTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   RangeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DivTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AccessTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   LtTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ShlTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   LeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2806,6 +2809,7 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SSubTokSymbol :: SymbolSing Anonymous SubTokSymbol
   SRangeTokSymbol :: SymbolSing Anonymous RangeTokSymbol
   SDivTokSymbol :: SymbolSing Anonymous DivTokSymbol
+  SAccessTokSymbol :: SymbolSing Anonymous AccessTokSymbol
   SLtTokSymbol :: SymbolSing Anonymous LtTokSymbol
   SShlTokSymbol :: SymbolSing Anonymous ShlTokSymbol
   SLeTokSymbol :: SymbolSing Anonymous LeTokSymbol
@@ -3060,6 +3064,7 @@ decSymbolSing SAddTokSymbol SAddTokSymbol = Just (Refl, HRefl)
 decSymbolSing SSubTokSymbol SSubTokSymbol = Just (Refl, HRefl)
 decSymbolSing SRangeTokSymbol SRangeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDivTokSymbol SDivTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAccessTokSymbol SAccessTokSymbol = Just (Refl, HRefl)
 decSymbolSing SLtTokSymbol SLtTokSymbol = Just (Refl, HRefl)
 decSymbolSing SShlTokSymbol SShlTokSymbol = Just (Refl, HRefl)
 decSymbolSing SLeTokSymbol SLeTokSymbol = Just (Refl, HRefl)
@@ -3339,6 +3344,7 @@ symbolMap = Map.fromList
     , ("-", SomeAnonymousSymbolSing SSubTokSymbol)
     , ("..", SomeAnonymousSymbolSing SRangeTokSymbol)
     , ("/", SomeAnonymousSymbolSing SDivTokSymbol)
+    , ("::", SomeAnonymousSymbolSing SAccessTokSymbol)
     , ("<", SomeAnonymousSymbolSing SLtTokSymbol)
     , ("<<", SomeAnonymousSymbolSing SShlTokSymbol)
     , ("<=", SomeAnonymousSymbolSing SLeTokSymbol)

@@ -116,6 +116,9 @@ pRange = pSymbol "range" SRangeTokSymbol $> iRange
 pDiv :: Parser (MoveTerm DivTokL)
 pDiv = pSymbol "div" SDivTokSymbol $> iDiv
 
+pAccess :: Parser (MoveTerm AccessTokL)
+pAccess = pSymbol "access" SAccessTokSymbol $> iAccess
+
 pLt :: Parser (MoveTerm LtTokL)
 pLt = pSymbol "lt" SLtTokSymbol $> iLt
 
