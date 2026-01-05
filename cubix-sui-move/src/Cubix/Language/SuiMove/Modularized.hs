@@ -227,6 +227,7 @@ data BitandTokL
 data AndTokL
 data MulTokL
 data AddTokL
+data CommaTokL
 data SubTokL
 data RangeTokL
 data DivTokL
@@ -344,6 +345,7 @@ data Token e l where
   And :: Token e AndTokL
   Mul :: Token e MulTokL
   Add :: Token e AddTokL
+  Comma :: Token e CommaTokL
   Sub :: Token e SubTokL
   Range :: Token e RangeTokL
   Div :: Token e DivTokL
@@ -2555,6 +2557,7 @@ type data Symbol (symbolType :: SymbolType) where
   AndTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MulTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AddTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  CommaTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SubTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   RangeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DivTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2806,6 +2809,7 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SAndTokSymbol :: SymbolSing Anonymous AndTokSymbol
   SMulTokSymbol :: SymbolSing Anonymous MulTokSymbol
   SAddTokSymbol :: SymbolSing Anonymous AddTokSymbol
+  SCommaTokSymbol :: SymbolSing Anonymous CommaTokSymbol
   SSubTokSymbol :: SymbolSing Anonymous SubTokSymbol
   SRangeTokSymbol :: SymbolSing Anonymous RangeTokSymbol
   SDivTokSymbol :: SymbolSing Anonymous DivTokSymbol
@@ -3061,6 +3065,7 @@ decSymbolSing SBitandTokSymbol SBitandTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAndTokSymbol SAndTokSymbol = Just (Refl, HRefl)
 decSymbolSing SMulTokSymbol SMulTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAddTokSymbol SAddTokSymbol = Just (Refl, HRefl)
+decSymbolSing SCommaTokSymbol SCommaTokSymbol = Just (Refl, HRefl)
 decSymbolSing SSubTokSymbol SSubTokSymbol = Just (Refl, HRefl)
 decSymbolSing SRangeTokSymbol SRangeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDivTokSymbol SDivTokSymbol = Just (Refl, HRefl)
@@ -3341,6 +3346,7 @@ symbolMap = Map.fromList
     , ("&&", SomeAnonymousSymbolSing SAndTokSymbol)
     , ("*", SomeAnonymousSymbolSing SMulTokSymbol)
     , ("+", SomeAnonymousSymbolSing SAddTokSymbol)
+    , (",", SomeAnonymousSymbolSing SCommaTokSymbol)
     , ("-", SomeAnonymousSymbolSing SSubTokSymbol)
     , ("..", SomeAnonymousSymbolSing SRangeTokSymbol)
     , ("/", SomeAnonymousSymbolSing SDivTokSymbol)

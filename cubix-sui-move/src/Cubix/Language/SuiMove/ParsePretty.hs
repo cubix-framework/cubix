@@ -107,6 +107,9 @@ pMul = pSymbol "mul" SMulTokSymbol $> iMul
 pAdd :: Parser (MoveTerm AddTokL)
 pAdd = pSymbol "add" SAddTokSymbol $> iAdd
 
+pComma :: Parser (MoveTerm CommaTokL)
+pComma = pSymbol "comma" SCommaTokSymbol $> iComma
+
 pSub :: Parser (MoveTerm SubTokL)
 pSub = pSymbol "sub" SSubTokSymbol $> iSub
 

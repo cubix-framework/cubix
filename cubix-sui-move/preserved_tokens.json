@@ -1,4 +1,5 @@
 {
+  ",": "comma",
   "=": "assign",
   "==>": "implies",
   "||": "or",
