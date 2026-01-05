@@ -11,9 +11,8 @@ module Cubix.Language.SuiMove.IPS.Trans (
   ) where
 
 import Data.Either ( partitionEithers )
-import Data.List( (\\) )
+import Data.List( (\\), unsnoc )
 import Data.Text qualified as Text
-import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Data.Comp.Multi ( project, project', inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
@@ -23,7 +22,6 @@ import Cubix.Language.SuiMove.Modularized qualified as Modularized
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
-import Data.Typeable (Typeable)
 
 ------------------------------------------------------------------------------------
 ---------------- Forward translation: Modularized syntax to IPS  -------------------
@@ -184,7 +182,12 @@ transBindList bindList =
 
 -- Extract identifiers from CommaBindList for tuple destructuring
 extractBindListIdents :: Modularized.MoveTerm Modularized.CommaBindListL -> [MSuiMoveTerm IdentL]
-extractBindListIdents (Modularized.CommaBindList' binds) = map extractIdentFromBind (extractF binds)
+extractBindListIdents (Modularized.CommaBindList' binds mlast) =
+  let binds' = mapF (\(PairF' bind _) -> bind) binds
+      binds'' = extractF binds' ++ case mlast of
+        Nothing' -> []
+        Just' last -> [last]
+  in map extractIdentFromBind binds''
 
 -- Extract single identifier from a bind
 extractIdentFromBind :: Modularized.MoveTerm Modularized.HiddenBindL -> MSuiMoveTerm IdentL
@@ -241,7 +244,17 @@ untransError t = error $ "Cannot untranslate root node: " ++ show (inject t)
 -- CODE_GUARD_END
 
 do ipsNames <- sumToNames ''MSuiMoveSig
-   let targTs = map ConT $ (ipsNames \\ Modularized.moveSigNames) \\ [''IdentIsIdentifier, ''ExpressionIsHiddenExpression, ''BlockIsBlock, ''UnitIsUnitExpression, ''AssignIsHiddenExpression, ''SingleLocalVarDeclIsLetStatement, ''HiddenExpressionIsLocalVarInit, ''BinderIsVarDeclBinder, ''HiddenTypeIsLocalVarDeclAttrs]
+   let targTs = map ConT $ (ipsNames \\ Modularized.moveSigNames) \\
+         [ ''IdentIsIdentifier
+         , ''ExpressionIsHiddenExpression
+         , ''AssignIsHiddenExpression
+         , ''UnitIsUnitExpression
+         , ''BlockIsBlock
+         , ''SingleLocalVarDeclIsLetStatement
+         , ''HiddenExpressionIsLocalVarInit
+         , ''BinderIsVarDeclBinder
+         , ''HiddenTypeIsLocalVarDeclAttrs
+         ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
 -- CODE_GUARD_START
@@ -321,7 +334,7 @@ untransUnaryOp _ _ = error "untransUnaryOp: unsupported operator"
 -------- Block
 
 untransBlock :: MSuiMoveTerm BlockL -> Modularized.MoveTerm Modularized.BlockL
-untransBlock (Block' items (projF -> Just (SuiMoveBlockEnd' maybeExpr))) =
+untransBlock (Block' items (SuiMoveBlockEnd' maybeExpr)) =
   let -- Extract all items and separate UseDeclarations from BlockItems
       allItems = extractF items
       (useDecls, blockItems) = partitionEithers $ map separateItem allItems
@@ -331,9 +344,9 @@ untransBlock (Block' items (projF -> Just (SuiMoveBlockEnd' maybeExpr))) =
       (mapF untranslate maybeExpr)
   where
     separateItem :: MSuiMoveTerm BlockItemL -> Either (Modularized.MoveTerm Modularized.UseDeclarationL) (Modularized.MoveTerm Modularized.BlockItemL)
-    separateItem (projF -> Just (UseDeclarationIsBlockItem' ud)) = Left (untranslate $ fromProjF ud)
-    separateItem (projF -> Just (BlockItemIsBlockItem' bi)) = Right (untranslate $ fromProjF bi)
-    separateItem (projF -> Just (SingleLocalVarDeclIsBlockItem' svd)) = Right (inject $ Modularized.BlockItemLetStatement $ untransLetStatement svd)
+    separateItem (UseDeclarationIsBlockItem' ud) = Left (untranslate' ud)
+    separateItem (BlockItemIsBlockItem' bi) = Right (untranslate' bi)
+    separateItem (SingleLocalVarDeclIsBlockItem' svd) = Right (inject $ Modularized.BlockItemLetStatement $ untransLetStatement svd)
     separateItem item = error $ "untransBlock: unexpected BlockItem type: " ++ show item
 
 instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
@@ -349,8 +362,8 @@ instance {-# OVERLAPPING #-} Untrans UnitIsUnitExpression where
 
 untransAssignExpr :: MSuiMoveTerm AssignL -> Modularized.MoveTerm Modularized.AssignExpressionL
 untransAssignExpr (Assign' lhs _op rhs) =
-  let lhsTerm = untranslate $ fromProjF lhs
-      rhsTerm = untranslate $ fromProjF rhs
+  let lhsTerm = untranslate' lhs
+      rhsTerm = untranslate' rhs
       lhsTokPair = riPairF lhsTerm (inject Modularized.Assign)
       fullTuple = riPairF lhsTokPair rhsTerm
   in Modularized.iAssignExpression fullTuple
@@ -361,42 +374,47 @@ instance {-# OVERLAPPING #-} Untrans AssignIsHiddenExpression where
 -------- Variable Declarations (LetStatement)
 
 untransBindList :: MSuiMoveTerm VarDeclBinderL -> Modularized.MoveTerm Modularized.BindListL
-untransBindList (projF -> Just (IdentIsVarDeclBinder' ident)) =
+untransBindList (IdentIsVarDeclBinder' ident) =
   Modularized.iBindListBind $
     Modularized.iHiddenBindBindInternal0 $
       Modularized.iHiddenBindInternal0VariableIdentifier $
         untransIdent ident
-untransBindList (projF -> Just (TupleBinder' idents)) =
-  let identTerms = extractF idents
+untransBindList (TupleBinder' idents) =
+  let binds = map ((`riPairF` Modularized.Comma') . wrapIdentToBind . untransIdent)
+        $ extractF idents
+      (init, last) = case unsnoc binds of
+        Just (a, b) -> (a, case b of (PairF' bind _) -> iJustF bind)
+        Nothing -> ([], riNothingF)
   in Modularized.iBindListCommaBindList $
-       Modularized.iCommaBindList $ mapF (wrapIdentToBind . untransIdent) idents
+    Modularized.iCommaBindList (insertF init) last
+    -- mapF (wrapIdentToBind . untransIdent) idents
   where
     wrapIdentToBind :: Modularized.MoveTerm Modularized.IdentifierL -> Modularized.MoveTerm Modularized.HiddenBindL
     wrapIdentToBind ident =
       Modularized.iHiddenBindBindInternal0 $
         Modularized.iHiddenBindInternal0VariableIdentifier ident
-untransBindList (projF -> Just (BinderIsVarDeclBinder' bindList)) =
+untransBindList (BinderIsVarDeclBinder' bindList) =
   untranslate bindList
 untransBindList binder =
   error $ "untransBindList: unexpected binder type: " ++ show binder
 
 -- Main untranslation for SingleLocalVarDecl to LetStatement
 untransLetStatement :: MSuiMoveTerm SingleLocalVarDeclL -> Modularized.MoveTerm Modularized.LetStatementL
-untransLetStatement (projF -> Just (SingleLocalVarDecl' attrs binder varInit)) =
+untransLetStatement (SingleLocalVarDecl' attrs binder varInit) =
   let -- Untranslate attributes (type annotation)
-      maybeType = case projF attrs of
-                    Just (HiddenTypeIsLocalVarDeclAttrs' hiddenType) ->
+      maybeType = case attrs of
+                    (HiddenTypeIsLocalVarDeclAttrs' hiddenType) ->
                       insertF $ Just $ untranslate hiddenType
-                    Just EmptyLocalVarDeclAttrs' ->
+                    EmptyLocalVarDeclAttrs' ->
                       insertF Nothing
                     _ -> error "untransLetStatement: unexpected LocalVarDeclAttrs"
       -- Untranslate the binder
       bindList = untransBindList binder
       -- Untranslate the initializer
-      maybeInit = case projF varInit of
-                    Just NoLocalVarInit' ->
+      maybeInit = case varInit of
+                    NoLocalVarInit' ->
                       insertF Nothing
-                    Just (JustLocalVarInit' expr) ->
+                    (JustLocalVarInit' expr) ->
                       let assignTok = inject Modularized.Assign
                           exprTerm = untranslate' expr
                           pair = riPairF assignTok exprTerm
