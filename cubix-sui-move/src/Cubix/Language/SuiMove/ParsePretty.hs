@@ -81,7 +81,7 @@ pMany :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
 pMany = Megaparsec.Cubix.pMany
 
 pRoot :: Parser (MoveTerm (RootSort MoveSig))
-pRoot = pSourceFile
+pRoot = pSourceFile <* Megaparsec.eof
 
 pBang :: Parser (MoveTerm BangTokL)
 pBang = pSymbol "bang" SBangTokSymbol $> iBang

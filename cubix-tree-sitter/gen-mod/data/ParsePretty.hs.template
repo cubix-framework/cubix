@@ -96,7 +96,7 @@ pMany = Megaparsec.Cubix.pMany
 
 {-+}
 pRoot :: Parser (${grammarName}Term (RootSort ${grammarName}Sig))
-pRoot = p${startSort.camelCase}
+pRoot = p${startSort.camelCase} <* Megaparsec.eof
 {+-}
 
 {-+}
