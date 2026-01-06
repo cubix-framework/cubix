@@ -114,6 +114,7 @@ library gen-internal
     TreeSitter.Generate.Data
     TreeSitter.Generate.Parser
     TreeSitter.Generate.Render
+    TreeSitter.Generate.Types
     TreeSitter.Grammar
     TreeSitter.Grammar.Transform
     TreeSitter.Grammar.Transform.Between

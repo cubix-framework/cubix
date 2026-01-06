@@ -7,7 +7,7 @@ module TreeSitter.Grammar.Transform.RemoveUnusedStrings (
 import Data.Functor.Foldable
 import Data.Map (Map)
 import Data.Map qualified as Map
-import TreeSitter.Generate.Data (TokenMap)
+import TreeSitter.Generate.Types (TokenMap)
 import TreeSitter.Grammar
 
 removeUnusedStrings :: TokenMap -> Grammar -> Grammar

@@ -12,8 +12,10 @@
 module TreeSitter.Generate.Render where
 
 import Data.Char (isAlphaNum, toLower, toUpper)
+import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (..))
 import Data.List (uncons)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Set qualified as Set
@@ -29,12 +31,10 @@ import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
 
+import TreeSitter.Generate.Types
 import TreeSitter.Generate.Data
-import TreeSitter.Generate.Parser (Parser (..), mkParser)
+import TreeSitter.Generate.Parser (Parser (..))
 import TreeSitter.Grammar (Grammar (..), RuleName)
-
--- import Text.Pretty.Simple
--- import System.IO.Unsafe (unsafePerformIO)
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -44,8 +44,8 @@ data Metadata = Metadata
 
 data RenderState = InText | InTemplate [Text]
 
-renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
-renderSyntax Metadata{..} grammar templateFile template tokenMap =
+renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> Either String Text
+renderSyntax Metadata{..} grammar templateFile template =
   {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
@@ -56,15 +56,16 @@ renderSyntax Metadata{..} grammar templateFile template tokenMap =
       , ("moduleName", textToVal $ fromMaybe defaultModuleName moduleName)
       , ("pretty", BoolVal pretty)
       ]
-  tokens = Map.mapWithKey
-    (\k v -> MapVal . Context . Map.fromList $
-      [ ("name", toVal . Name $ fromMaybe k v)
-      , ("symbol", textToVal k)])
-    tokenMap
-  tokensCtx = Context . Map.singleton "tokens" . toVal
-    $ Map.elems tokens
-  nodes = Map.elems $ Map.mapWithKey (topRuleToNode tokenMap grammar.rules) grammar.rules
-  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachableFrom` Name startRuleName
+  nodes  = Map.elems $ Map.mapWithKey (topRuleToNode grammar.rules) grammar.rules
+  nodes' = nodes `reachableFrom` Name startRuleName
+
+  -- Collect all tokens from grammar rules by traversing them with catamorphism
+  tokens = mconcat $ tokensOfRule <$> Map.elems grammar.rules
+  tokensCtx = Context . Map.singleton "tokens" . toVal $ Set.toList tokens <&> (\k ->
+    MapVal . Context . Map.fromList $
+      [ ("name", toVal (Name (k <> "_tok")))
+      , ("symbol", textToVal k)
+      ])
 
   nodesCtx = Context . Map.fromList $
     [ ("data", toVal nodes')
@@ -134,13 +135,14 @@ instance ToContext Text (Name, Constructor) where
   toVal :: (Name, Constructor) -> Val Text
   toVal = MapVal . toContext
   toContext :: (Name, Constructor) -> Context Text
-  toContext (sort, Constructor name fields) =
+  toContext (sort, Constructor name fields cParser) =
     Context . Map.fromList $
       [ ("name", toVal $ Name name)
       , ("type", toVal sort)
       , ("fields", ListVal (toVal <$> zip [(0 :: Int) ..] fields))
       , ("hasChildren", toVal hasChildren)
-      ] 
+      , ("parser", toVal cParser)
+      ]
    where
     hasChildren :: Bool
     hasChildren = any (isNodeLike . fType) fields
@@ -153,7 +155,6 @@ instance ToContext Text (Int, Field) where
     Context . Map.fromList $
       [ ("name", maybe NullVal toVal (fieldName field))
       , ("type", toVal (fType field))
-      , ("parser", toVal (mkParser (fType field)))
       , ("index", SimpleVal . fromString . show $ index)
       ]
 
@@ -198,19 +199,38 @@ instance ToContext Text Parser where
     hasSymbol :: Name -> Bool
     hasSymbol (getName -> n) = not $ isHidden n || isInternal n
     p2t p = \case
-      Symbol name -> Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
+      Symbol name ->
+        let nosym = not $ hasSymbol name
+        in par nosym $
+            "p" <>
+            Builder.fromText (snakeToCase Upper (hiddenName name)) <>
+            if nosym
+               then " _sym"
+               else mempty
       Inline name -> par (not $ hasSymbol name) $
         Builder.fromText ("p" <> snakeToCase Upper (hiddenName name) <> if hasSymbol name then "" else " _sym")
-      Alt a b -> par p ("pEither " <> p2t True a <> " " <> p2t True b)
-      -- Choice ps -> "
+      Tok t -> Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
+      Seq ps -> mconcat $ intersperseBy (p2t False) inspect (NonEmpty.toList ps)
+        -- mconcat (p2t False <$> NonEmpty.toList ps)
+      Pair a b -> par p ("pPair "<> p2t True a <> " " <> p2t True b)
       Optional a -> par p ("pMaybe " <> p2t True a)
       Many ps -> par p ("pMany " <> p2t True ps)
       Some ps -> par p ("pSome " <> p2t True ps)
-      Pair a b -> par p ("pPair " <> p2t True a <> " " <> p2t True b)
       Skip -> Builder.fromText "pure ()"
       Extract -> "pContent _sym"
-
-      -- if the node exists in ts token stream
+      SepBy sep content -> par p ("pSepBy " <> p2t True content <> " " <> p2t True sep)
+      SepBy1 sep content -> par p ("pSepBy1 " <> p2t True content <> " " <> p2t True sep)
+      Between open close content -> par p ("pBetween " <> p2t True open <> " " <> p2t True close <> " " <> p2t True content)
+    inspect :: Parser -> Parser -> Builder
+    -- future
+    -- inspect (Tok _) _ = Builder.fromText " *> "
+    -- inspect _ (Tok _) = Builder.fromText " <* "
+    inspect _ _ = Builder.fromText " <*> "
+    
+    intersperseBy :: Monoid b => (a -> b) -> (a -> a -> b) -> [a] -> [b]
+    intersperseBy _ _ []     = mempty
+    intersperseBy g _ [x]    = [g x]
+    intersperseBy g f (x:y:xs) = g x : f x y : intersperseBy g f (y:xs)
 
 hiddenName :: Name -> Text
 hiddenName (getName -> n)
@@ -233,12 +253,17 @@ snakeToCase b = Text.pack . go b . Text.unpack
   go _ [] = []
   go a (c : cs) =
     if | c == '_' -> go Upper cs
-       | c == '-' -> go Upper cs
        | Unicode.isWhiteSpace c -> go Upper cs
        | isAlphaNum c -> c `to` a : go Keep cs
-       | Just n <- Unicode.name c -> go a ((toLower <$> n) ++ cs)
+       | Just n <- Unicode.name c -> go Upper $
+           -- Some unicode names use '-' as separator
+           (toLower <$> replaceChar '-' '_' n) ++ cs
        | otherwise -> go Upper cs
 
   to c Upper = toUpper c
   to c Lower = toLower c
   to c Keep = c
+
+replaceChar :: Char -> Char -> String -> String
+replaceChar needle new haystack = haystack <&> \c ->
+  if c == needle then new else c

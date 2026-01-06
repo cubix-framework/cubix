@@ -22,13 +22,11 @@ import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
 import TreeSitter.Grammar
 
+import TreeSitter.Generate.Types
+import TreeSitter.Generate.Parser
+
 import Debug.Trace
-
-newtype Name = Name { getName :: Text }
-  deriving newtype (Eq, Ord, Show, IsString)
-
--- | Preserves tokens used as keys, and renames them to value
-type TokenMap = Map Text (Maybe Text)
+import Data.Set qualified as Set
 
 isHidden :: RuleName -> Bool
 isHidden n = Text.head n == '_'
@@ -71,6 +69,7 @@ fieldName (Unnamed _) = Nothing
 data Constructor = Constructor
   { cName :: Text
   , cFields :: [Field]
+  , cParser :: Parser
   } deriving (Show, Generic)
 
 data Node = Node
@@ -96,29 +95,28 @@ getRule rules name = fromMaybe failUnknownRule tryRules
     tryRules = Map.lookup name rules
     failUnknownRule = throw $ GrammarErrorUnknownRule name
 
-topRuleToNode :: TokenMap -> Map RuleName Rule -> RuleName -> Rule -> Node
-topRuleToNode tokenMap gr name = \case
+topRuleToNode :: Map RuleName Rule -> RuleName -> Rule -> Node
+topRuleToNode gr name = \case
   ChoiceRule rules ->
     Node name name
     $ renameConstructors name
-    $ Vector.foldr (\rule -> (ruleToConstructor tokenMap gr name rule :)) [] rules
-  r@(SeqRule _) -> Node name name [ruleToConstructor tokenMap gr name r]
-  AliasRule value _ content ->
-    Node name value [Constructor name [ruleToField tokenMap gr content]]
-  (ruleToField tokenMap gr -> f) ->
-    Node name name [Constructor name [f]]
+    $ Vector.foldr (\rule -> (ruleToConstructor gr name rule :)) [] rules
+  r@(SeqRule _) -> Node name name [ruleToConstructor gr name r]
+  r@(AliasRule value _ content) ->
+    Node name value [Constructor name [ruleToField gr content] (mkParser r)]
+  r -> Node name name [Constructor name [ruleToField gr r] (mkParser r)]
 
 renameConstructors :: Text -> [Constructor] -> [Constructor]
 renameConstructors typeName ctors = go <$> zip ctors [1..]
   where
     go :: (Constructor, Int) -> Constructor
-    go (ctor@(Constructor name fields), ord) =
+    go (ctor@(Constructor name fields parser), ord) =
       if name == typeName
-         then Constructor (name <> Text.show ord) fields
+         then Constructor (name <> Text.show ord) fields parser
          else ctor
 
-ruleToConstructor :: TokenMap -> Map RuleName Rule -> RuleName -> Rule -> Constructor
-ruleToConstructor tokenMap rules parent = go
+ruleToConstructor :: Map RuleName Rule -> RuleName -> Rule -> Constructor
+ruleToConstructor rules parent = go
   where
     go = \case
       ChoiceRule _ -> error $ "Choice is not a valid constructor: " <> show parent
@@ -128,24 +126,24 @@ ruleToConstructor tokenMap rules parent = go
       Repeat1Rule {} -> error $ "Repeat1 is not a valid constructor: " <> show parent
       SepByRule {} ->  error $ "SepBy is not a valid constructor: " <> show parent
       SepBy1Rule {} ->  error $ "SepBy1 is not a valid constructor: " <> show parent
-      BetweenRule {..} -> Constructor parent [toField content]
-      r@(StringRule s) -> Constructor (suffix s) [toField r]
+      r@(BetweenRule {..}) -> Constructor parent [toField content] (mkParser r)
+      r@(StringRule s) -> Constructor (suffix s) [toField r] (mkParser r)
       TokenRule r -> go r
       ImmediateTokenRule r -> go r
-      FieldRule {..} -> Constructor (suffix name) [toField content] 
+      r@(FieldRule {..}) -> Constructor (suffix name) [toField content] (mkParser r)
       PrecRule {..} -> go content
       OptionalRule {..} -> go content
-      SeqRule {..} -> Constructor parent $ Vector.toList $ toField <$> members
-      r@(PatternRule {}) -> Constructor parent [toField r]
-      r@(SymbolRule sym) -> Constructor (suffix sym) [toField r]
-      r@(RefRule ref) -> Constructor (suffix ref) [toField r]
-    toField = ruleToField tokenMap rules
+      r@(SeqRule {..}) -> Constructor parent (Vector.toList $ toField <$> members) (mkParser r)
+      r@(PatternRule {}) -> Constructor parent [toField r] (mkParser r)
+      r@(SymbolRule sym) -> Constructor (suffix sym) [toField r] (mkParser r)
+      r@(RefRule ref) -> Constructor (suffix ref) [toField r] (mkParser r)
+    toField = ruleToField rules
     suffix s = parent <> "_" <> s
   
-ruleToField :: TokenMap -> Map RuleName Rule -> Rule -> Field
-ruleToField tokenMap rules = para alg
+ruleToField :: Map RuleName Rule -> Rule -> Field
+ruleToField rules = para alg
   where
-    toType = ruleToType tokenMap rules
+    toType = ruleToType rules
     alg :: RuleF (Rule, Field) -> Field
     -- those should be processed upfront
     alg (ChoiceRuleF _) = error "Not hoisted choice rule"
@@ -158,8 +156,8 @@ ruleToField tokenMap rules = para alg
     -- anonymous
     alg r = Unnamed (toType . embed $ fst <$> r)
 
-ruleToType :: TokenMap -> Map RuleName Rule -> Rule -> Type
-ruleToType tokenMap rules = go
+ruleToType :: Map RuleName Rule -> Rule -> Type
+ruleToType rules = go
   where
     go = cata alg
     alg :: RuleF Type -> Type
@@ -174,17 +172,19 @@ ruleToType tokenMap rules = go
     alg (StringRuleF {..}) = Token valueF
     alg (PatternRuleF {}) = Content
     alg (SymbolRuleF n@(Name -> s)) =
-      case shouldInline rules n of
-        Just r -> go r
-        Nothing -> Ref s
+      -- case shouldInline rules n of
+      --   Just r -> go r
+      --   Nothing ->
+      Ref s
       -- if isHidden (getName s)
       --    then ruleToType rules (getRule rules n)
       -- -- $ ruleToType (rule $ unName s) -- Node (Name s)
       --    else Ref s
     alg (RefRuleF s@(Name -> n)) =
-      case shouldInline rules s of
-        Just r -> go r
-        Nothing -> Ref n
+      -- case shouldInline rules s of
+      --   Just r -> go r
+      --   Nothing ->
+      Ref n
     alg (SeqRuleF (Vector.uncons -> Nothing)) = error "Empty sequence rule"
     alg (SeqRuleF (Vector.uncons -> Just (h, t))) =
       Vector.foldl mkTuple h t
@@ -211,7 +211,7 @@ depsOfNode :: Node -> [Name]
 depsOfNode (Node _ _ cs) = concatMap depsOfConstructor cs
 
 depsOfConstructor :: Constructor -> [Name]
-depsOfConstructor (Constructor _ fs) = concatMap (depsOfType . (.fType)) fs
+depsOfConstructor (Constructor _ fs _) = concatMap (depsOfType . (.fType)) fs
 
 depsOfType :: Type -> [Name]
 depsOfType = go
@@ -224,6 +224,31 @@ depsOfType = go
           Tuple a b -> go a <> go b
           Maybe t -> go t
           Content -> []
+
+-- | Collect all tokens (StringRule values) from a grammar rule using catamorphism
+tokensOfRule :: Rule -> Set Text
+tokensOfRule = cata alg
+  where
+    alg :: RuleF (Set Text) -> Set Text
+    alg = \case
+      BlankRuleF -> Set.empty
+      StringRuleF {..} -> Set.singleton valueF
+      PatternRuleF {} -> Set.empty
+      SymbolRuleF {} -> Set.empty
+      SeqRuleF {..} -> mconcat (Vector.toList membersF)
+      ChoiceRuleF {..} -> mconcat (Vector.toList membersF)
+      AliasRuleF {..} -> contentF
+      RepeatRuleF {..} -> contentF
+      Repeat1RuleF {..} -> contentF
+      TokenRuleF {..} -> contentF
+      ImmediateTokenRuleF {..} -> contentF
+      FieldRuleF {..} -> contentF
+      PrecRuleF {..} -> contentF
+      RefRuleF {} -> Set.empty
+      OptionalRuleF {..} -> contentF
+      SepByRuleF {..} -> separatorF <> contentF
+      SepBy1RuleF {..} -> separatorF <> contentF
+      BetweenRuleF {..} -> Set.fromList [openF, closeF] <> contentF
 
 reachableFrom :: [Node] -> Name -> [Node]
 reachableFrom dataTypes start = usedData

@@ -6,7 +6,6 @@ module Main (main) where
 import Control.Applicative (Alternative (..))
 import Data.Aeson (eitherDecodeFileStrict)
 import Data.FileEmbed (embedFileRelative)
-import Data.Map qualified as Map
 import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Data.Text.IO qualified as T
@@ -93,8 +92,7 @@ main :: IO ()
 main = do
   Options{..} <- execParser optionsInfo
   grammar <- either fail pure =<< eitherDecodeFileStrict inputFile
-  tokenMap <- either fail pure =<< maybe (pure $ Right Map.empty) eitherDecodeFileStrict tokenMapFile
-  let grammar' = transform tokenMap grammar
+  let grammar' = transform grammar
 
-  result <- either fail pure (renderSyntax metadata grammar' "ParsePretty.hs.template" template tokenMap)
+  result <- either fail pure (renderSyntax metadata grammar' "ParsePretty.hs.template" template)
   maybe T.putStrLn T.writeFile outputFile result

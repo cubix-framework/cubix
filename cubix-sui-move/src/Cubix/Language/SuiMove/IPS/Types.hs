@@ -86,12 +86,12 @@ createSortInclusionInfers
 -----------------------------------------------------------------------------------
 
 createSortInclusionTypes
-  [''(), ''HiddenUnaryExpressionInternal0L, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
+  [''(), ''HiddenUnaryExpressionL, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
   [''UnitExpressionL, ''Parametric.LhsL, ''Parametric.RhsL, ''HiddenExpressionL, ''HiddenExpressionL, ''Parametric.ExpressionL]
 deriveAllButSortInjection
-  [''UnitIsUnitExpression, ''HiddenUnaryExpressionInternal0IsLhs, ''HiddenExpressionIsRhs, ''AssignIsHiddenExpression, ''ExpressionIsHiddenExpression, ''HiddenExpressionIsExpression]
+  [''UnitIsUnitExpression, ''HiddenUnaryExpressionIsLhs, ''HiddenExpressionIsRhs, ''AssignIsHiddenExpression, ''ExpressionIsHiddenExpression, ''HiddenExpressionIsExpression]
 createSortInclusionInfers
-  [''(), ''HiddenUnaryExpressionInternal0L, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
+  [''(), ''HiddenUnaryExpressionL, ''HiddenExpressionL, ''Parametric.AssignL, ''Parametric.ExpressionL, ''HiddenExpressionL]
   [''UnitExpressionL, ''Parametric.LhsL, ''Parametric.RhsL, ''HiddenExpressionL, ''HiddenExpressionL, ''Parametric.ExpressionL]
 
 -----------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ do let suiSortInjections =
          , ''SingleLocalVarDeclIsBlockItem
          , ''BlockIsBlock
          , ''UnitIsUnitExpression
-         , ''HiddenUnaryExpressionInternal0IsLhs
+         , ''HiddenUnaryExpressionIsLhs
          , ''HiddenExpressionIsRhs
          , ''AssignIsHiddenExpression
          ]
@@ -169,11 +169,15 @@ instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.BinaryExpressionL Para
   projF' _ = Nothing
 
 instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.UnaryExpressionL Parametric.ExpressionL where
-  injF = iHiddenExpressionUnaryExpression . iHiddenUnaryExpressionInternal0UnaryExpression
-
+  injF = iHiddenExpressionIsExpression
+       . iHiddenExpressionUnaryExpression
+       . iHiddenUnaryExpression
+       . iHiddenUnaryExpressionInternal0UnaryExpression
+  
   projF' e
     | Just (HiddenExpressionIsExpression e') <- project' e
     , Just (HiddenExpressionUnaryExpression ue) <- project' e'
-    , Just (HiddenUnaryExpressionInternal0UnaryExpression uexp) <- project' ue
+    , Just (HiddenUnaryExpression ue') <- project' ue
+    , Just (HiddenUnaryExpressionInternal0UnaryExpression uexp) <- project' ue'
     = projF' uexp
   projF' _ = Nothing

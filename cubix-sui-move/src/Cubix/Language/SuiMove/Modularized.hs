@@ -219,64 +219,102 @@ data VectorExpressionL
 data VectorExpressionInternal0L
 data WhileExpressionL
 
-data BangTokL
-data NeqTokL
-data DollarTokL
-data ModTokL
-data BitandTokL
-data AndTokL
-data MulTokL
-data AddTokL
+data ExclamationMarkTokL
+data ExclamationMarkEqualsSignTokL
+data NumberSignLeftSquareBracketTokL
+data DollarSignTokL
+data PercentSignTokL
+data AmpersandTokL
+data AmpersandAmpersandTokL
+data ApostropheTokL
+data LeftParenthesisTokL
+data RightParenthesisTokL
+data AsteriskTokL
+data PlusSignTokL
 data CommaTokL
-data SubTokL
-data RangeTokL
-data DivTokL
-data AccessTokL
-data LtTokL
-data ShlTokL
-data LeTokL
-data AssignTokL
-data EqTokL
-data ImpliesTokL
-data GtTokL
-data GeTokL
-data ShrTokL
-data AtTokL
-data XorTokL
+data HyphenMinusTokL
+data HyphenMinusGreaterThanSignTokL
+data FullStopTokL
+data FullStopFullStopTokL
+data SolidusTokL
+data SolidusAsteriskTokL
+data SolidusSolidusTokL
+data ColonTokL
+data ColonColonTokL
+data SemicolonTokL
+data LessThanSignTokL
+data LessThanSignLessThanSignTokL
+data LessThanSignEqualsSignTokL
+data EqualsSignTokL
+data EqualsSignEqualsSignTokL
+data EqualsSignEqualsSignGreaterThanSignTokL
+data EqualsSignGreaterThanSignTokL
+data GreaterThanSignTokL
+data GreaterThanSignEqualsSignTokL
+data GreaterThanSignGreaterThanSignTokL
+data CommercialAtTokL
+data LeftSquareBracketTokL
+data RightSquareBracketTokL
+data CircumflexAccentTokL
+data AbortTokL
 data AbortsIfTokL
 data AbortsWithTokL
 data AddressTokL
+data ApplyTokL
+data AsTokL
 data AssertTokL
 data AssumeTokL
 data BoolTokL
+data BreakTokL
 data BytearrayTokL
+data ConstTokL
+data ContinueTokL
 data CopyTokL
 data DecreasesTokL
 data DropTokL
+data ElseTokL
 data EnsuresTokL
 data EntryTokL
+data EnumTokL
+data ExceptTokL
 data ExistsTokL
 data FalseTokL
 data ForallTokL
 data FriendTokL
+data FunTokL
 data GlobalTokL
+data HasTokL
+data IfTokL
+data InTokL
+data IncludeTokL
 data InternalTokL
 data InvariantTokL
 data KeyTokL
+data LetTokL
 data LocalTokL
+data LoopTokL
+data MacroTokL
+data MatchTokL
 data ModifiesTokL
 data ModuleTokL
 data MoveTokL
+data MutTokL
 data NativeTokL
 data PackTokL
 data PackageTokL
 data PhantomTokL
 data PostTokL
+data PragmaTokL
 data PublicTokL
 data RequiresTokL
+data ReturnTokL
+data SchemaTokL
 data SignerTokL
+data SpecTokL
 data StoreTokL
+data StructTokL
 data SucceedsIfTokL
+data ToTokL
 data TrueTokL
 data U128TokL
 data U16TokL
@@ -286,8 +324,16 @@ data U64TokL
 data U8TokL
 data UnpackTokL
 data UpdateTokL
-data BitorTokL
-data OrTokL
+data UseTokL
+data VectorLessThanSignTokL
+data VectorLeftSquareBracketTokL
+data WhereTokL
+data WhileTokL
+data WithTokL
+data LeftCurlyBracketTokL
+data VerticalLineTokL
+data VerticalLineVerticalLineTokL
+data RightCurlyBracketTokL
 
 --------------------------------------------------------------------------------
 -- SymbolType
@@ -337,75 +383,121 @@ symbolTypeIsReal = \case
 --------------------------------------------------------------------------------
 
 data Token e l where
-  Bang :: Token e BangTokL
-  Neq :: Token e NeqTokL
-  Dollar :: Token e DollarTokL
-  Mod :: Token e ModTokL
-  Bitand :: Token e BitandTokL
-  And :: Token e AndTokL
-  Mul :: Token e MulTokL
-  Add :: Token e AddTokL
-  Comma :: Token e CommaTokL
-  Sub :: Token e SubTokL
-  Range :: Token e RangeTokL
-  Div :: Token e DivTokL
-  Access :: Token e AccessTokL
-  Lt :: Token e LtTokL
-  Shl :: Token e ShlTokL
-  Le :: Token e LeTokL
-  Assign :: Token e AssignTokL
-  Eq :: Token e EqTokL
-  Implies :: Token e ImpliesTokL
-  Gt :: Token e GtTokL
-  Ge :: Token e GeTokL
-  Shr :: Token e ShrTokL
-  At :: Token e AtTokL
-  Xor :: Token e XorTokL
-  AbortsIf :: Token e AbortsIfTokL
-  AbortsWith :: Token e AbortsWithTokL
-  Address :: Token e AddressTokL
-  Assert :: Token e AssertTokL
-  Assume :: Token e AssumeTokL
-  Bool :: Token e BoolTokL
-  Bytearray :: Token e BytearrayTokL
-  Copy :: Token e CopyTokL
-  Decreases :: Token e DecreasesTokL
-  Drop :: Token e DropTokL
-  Ensures :: Token e EnsuresTokL
-  Entry :: Token e EntryTokL
-  Exists :: Token e ExistsTokL
-  False :: Token e FalseTokL
-  Forall :: Token e ForallTokL
-  Friend :: Token e FriendTokL
-  Global :: Token e GlobalTokL
-  Internal :: Token e InternalTokL
-  Invariant :: Token e InvariantTokL
-  Key :: Token e KeyTokL
-  Local :: Token e LocalTokL
-  Modifies :: Token e ModifiesTokL
-  Module :: Token e ModuleTokL
-  Move :: Token e MoveTokL
-  Native :: Token e NativeTokL
-  Pack :: Token e PackTokL
-  Package :: Token e PackageTokL
-  Phantom :: Token e PhantomTokL
-  Post :: Token e PostTokL
-  Public :: Token e PublicTokL
-  Requires :: Token e RequiresTokL
-  Signer :: Token e SignerTokL
-  Store :: Token e StoreTokL
-  SucceedsIf :: Token e SucceedsIfTokL
-  True :: Token e TrueTokL
-  U128 :: Token e U128TokL
-  U16 :: Token e U16TokL
-  U256 :: Token e U256TokL
-  U32 :: Token e U32TokL
-  U64 :: Token e U64TokL
-  U8 :: Token e U8TokL
-  Unpack :: Token e UnpackTokL
-  Update :: Token e UpdateTokL
-  Bitor :: Token e BitorTokL
-  Or :: Token e OrTokL
+  ExclamationMarkTok :: Token e ExclamationMarkTokL
+  ExclamationMarkEqualsSignTok :: Token e ExclamationMarkEqualsSignTokL
+  NumberSignLeftSquareBracketTok :: Token e NumberSignLeftSquareBracketTokL
+  DollarSignTok :: Token e DollarSignTokL
+  PercentSignTok :: Token e PercentSignTokL
+  AmpersandTok :: Token e AmpersandTokL
+  AmpersandAmpersandTok :: Token e AmpersandAmpersandTokL
+  ApostropheTok :: Token e ApostropheTokL
+  LeftParenthesisTok :: Token e LeftParenthesisTokL
+  RightParenthesisTok :: Token e RightParenthesisTokL
+  AsteriskTok :: Token e AsteriskTokL
+  PlusSignTok :: Token e PlusSignTokL
+  CommaTok :: Token e CommaTokL
+  HyphenMinusTok :: Token e HyphenMinusTokL
+  HyphenMinusGreaterThanSignTok :: Token e HyphenMinusGreaterThanSignTokL
+  FullStopTok :: Token e FullStopTokL
+  FullStopFullStopTok :: Token e FullStopFullStopTokL
+  SolidusTok :: Token e SolidusTokL
+  SolidusAsteriskTok :: Token e SolidusAsteriskTokL
+  SolidusSolidusTok :: Token e SolidusSolidusTokL
+  ColonTok :: Token e ColonTokL
+  ColonColonTok :: Token e ColonColonTokL
+  SemicolonTok :: Token e SemicolonTokL
+  LessThanSignTok :: Token e LessThanSignTokL
+  LessThanSignLessThanSignTok :: Token e LessThanSignLessThanSignTokL
+  LessThanSignEqualsSignTok :: Token e LessThanSignEqualsSignTokL
+  EqualsSignTok :: Token e EqualsSignTokL
+  EqualsSignEqualsSignTok :: Token e EqualsSignEqualsSignTokL
+  EqualsSignEqualsSignGreaterThanSignTok :: Token e EqualsSignEqualsSignGreaterThanSignTokL
+  EqualsSignGreaterThanSignTok :: Token e EqualsSignGreaterThanSignTokL
+  GreaterThanSignTok :: Token e GreaterThanSignTokL
+  GreaterThanSignEqualsSignTok :: Token e GreaterThanSignEqualsSignTokL
+  GreaterThanSignGreaterThanSignTok :: Token e GreaterThanSignGreaterThanSignTokL
+  CommercialAtTok :: Token e CommercialAtTokL
+  LeftSquareBracketTok :: Token e LeftSquareBracketTokL
+  RightSquareBracketTok :: Token e RightSquareBracketTokL
+  CircumflexAccentTok :: Token e CircumflexAccentTokL
+  AbortTok :: Token e AbortTokL
+  AbortsIfTok :: Token e AbortsIfTokL
+  AbortsWithTok :: Token e AbortsWithTokL
+  AddressTok :: Token e AddressTokL
+  ApplyTok :: Token e ApplyTokL
+  AsTok :: Token e AsTokL
+  AssertTok :: Token e AssertTokL
+  AssumeTok :: Token e AssumeTokL
+  BoolTok :: Token e BoolTokL
+  BreakTok :: Token e BreakTokL
+  BytearrayTok :: Token e BytearrayTokL
+  ConstTok :: Token e ConstTokL
+  ContinueTok :: Token e ContinueTokL
+  CopyTok :: Token e CopyTokL
+  DecreasesTok :: Token e DecreasesTokL
+  DropTok :: Token e DropTokL
+  ElseTok :: Token e ElseTokL
+  EnsuresTok :: Token e EnsuresTokL
+  EntryTok :: Token e EntryTokL
+  EnumTok :: Token e EnumTokL
+  ExceptTok :: Token e ExceptTokL
+  ExistsTok :: Token e ExistsTokL
+  FalseTok :: Token e FalseTokL
+  ForallTok :: Token e ForallTokL
+  FriendTok :: Token e FriendTokL
+  FunTok :: Token e FunTokL
+  GlobalTok :: Token e GlobalTokL
+  HasTok :: Token e HasTokL
+  IfTok :: Token e IfTokL
+  InTok :: Token e InTokL
+  IncludeTok :: Token e IncludeTokL
+  InternalTok :: Token e InternalTokL
+  InvariantTok :: Token e InvariantTokL
+  KeyTok :: Token e KeyTokL
+  LetTok :: Token e LetTokL
+  LocalTok :: Token e LocalTokL
+  LoopTok :: Token e LoopTokL
+  MacroTok :: Token e MacroTokL
+  MatchTok :: Token e MatchTokL
+  ModifiesTok :: Token e ModifiesTokL
+  ModuleTok :: Token e ModuleTokL
+  MoveTok :: Token e MoveTokL
+  MutTok :: Token e MutTokL
+  NativeTok :: Token e NativeTokL
+  PackTok :: Token e PackTokL
+  PackageTok :: Token e PackageTokL
+  PhantomTok :: Token e PhantomTokL
+  PostTok :: Token e PostTokL
+  PragmaTok :: Token e PragmaTokL
+  PublicTok :: Token e PublicTokL
+  RequiresTok :: Token e RequiresTokL
+  ReturnTok :: Token e ReturnTokL
+  SchemaTok :: Token e SchemaTokL
+  SignerTok :: Token e SignerTokL
+  SpecTok :: Token e SpecTokL
+  StoreTok :: Token e StoreTokL
+  StructTok :: Token e StructTokL
+  SucceedsIfTok :: Token e SucceedsIfTokL
+  ToTok :: Token e ToTokL
+  TrueTok :: Token e TrueTokL
+  U128Tok :: Token e U128TokL
+  U16Tok :: Token e U16TokL
+  U256Tok :: Token e U256TokL
+  U32Tok :: Token e U32TokL
+  U64Tok :: Token e U64TokL
+  U8Tok :: Token e U8TokL
+  UnpackTok :: Token e UnpackTokL
+  UpdateTok :: Token e UpdateTokL
+  UseTok :: Token e UseTokL
+  VectorLessThanSignTok :: Token e VectorLessThanSignTokL
+  VectorLeftSquareBracketTok :: Token e VectorLeftSquareBracketTokL
+  WhereTok :: Token e WhereTokL
+  WhileTok :: Token e WhileTokL
+  WithTok :: Token e WithTokL
+  LeftCurlyBracketTok :: Token e LeftCurlyBracketTokL
+  VerticalLineTok :: Token e VerticalLineTokL
+  VerticalLineVerticalLineTok :: Token e VerticalLineVerticalLineTokL
+  RightCurlyBracketTok :: Token e RightCurlyBracketTokL
 
 deriveAll [''Token]
 
@@ -602,28 +694,28 @@ data ModuleAccess e l where
     -> ModuleAccess e ModuleAccessL
   ModuleAccess3
     :: e ModuleIdentityL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> e (Maybe TypeArgumentsL)
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess4
     :: e ModuleIdentityL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> e TypeArgumentsL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess5
     :: e ModuleIdentityL
     -> e (Maybe TypeArgumentsL)
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess6
     :: e HiddenModuleIdentifierL
     -> e (Maybe TypeArgumentsL)
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess7
@@ -664,7 +756,7 @@ data HiddenForall e l where
 data ModuleIdentity e l where
   ModuleIdentity
     :: e ModuleIdentityInternal0L
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e HiddenModuleIdentifierL
     -> ModuleIdentity e ModuleIdentityL
 
@@ -710,7 +802,7 @@ data TypeArguments e l where
 data FunctionType e l where
   FunctionType
     :: e FunctionTypeParametersL
-    -> e (Maybe (GreaterThanSignTokL, HiddenTypeL))
+    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
     -> FunctionType e FunctionTypeL
 
 data FunctionTypeParameters e l where
@@ -1096,7 +1188,7 @@ data ArgList e l where
 
 data NameExpression e l where
   NameExpression
-    :: e (Maybe ColoncolonTokL)
+    :: e (Maybe ColonColonTokL)
     -> e ModuleAccessL
     -> NameExpression e NameExpressionL
 
@@ -1155,7 +1247,7 @@ data MatchArm e l where
   MatchArm
     :: e BindListL
     -> e (Maybe MatchConditionL)
-    -> e EqualsSigngreaterThanSignTokL
+    -> e EqualsSignGreaterThanSignTokL
     -> e HiddenExpressionL
     -> MatchArm e MatchArmL
 
@@ -1243,7 +1335,7 @@ data BindField e l where
 
 data HiddenSpreadOperator e l where
   HiddenSpreadOperator
-    :: e FullStopfullStopTokL
+    :: e FullStopFullStopTokL
     -> HiddenSpreadOperator e HiddenSpreadOperatorL
 
 data MutBindField e l where
@@ -1602,19 +1694,19 @@ data UseModule e l where
 data UseModuleMember e l where
   UseModuleMember
     :: e ModuleIdentityL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e UseMemberL
     -> UseModuleMember e UseModuleMemberL
 
 data UseMember e l where
   UseMember1
     :: e IdentifierL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e [UseMemberL]
     -> UseMember e UseMemberL
   UseMember2
     :: e IdentifierL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e IdentifierL
     -> e (Maybe (AsTokL, IdentifierL))
     -> UseMember e UseMemberL
@@ -1626,12 +1718,12 @@ data UseMember e l where
 data UseModuleMembers e l where
   UseModuleMembers1
     :: e ModuleIdentityInternal0L
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e [UseMemberL]
     -> UseModuleMembers e UseModuleMembersL
   UseModuleMembers2
     :: e ModuleIdentityL
-    -> e ColoncolonTokL
+    -> e ColonColonTokL
     -> e [UseMemberL]
     -> UseModuleMembers e UseModuleMembersL
 
@@ -1649,8 +1741,8 @@ data VectorExpression e l where
     -> VectorExpression e VectorExpressionL
 
 data VectorExpressionInternal0 e l where
-  VectorExpressionInternal0VectorleftSquareBracket
-    :: e VectorleftSquareBracketTokL
+  VectorExpressionInternal0VectorLeftSquareBracket
+    :: e VectorLeftSquareBracketTokL
     -> VectorExpressionInternal0 e VectorExpressionInternal0L
   VectorExpressionInternal02
     :: e [HiddenTypeL]
@@ -1705,27 +1797,27 @@ data AssignExpression e l where
 data BinaryExpression e l where
   BinaryExpression1
     :: e HiddenExpressionL
-    -> e EqualsSignequalsSigngreaterThanSignTokL
+    -> e EqualsSignEqualsSignGreaterThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression2
     :: e HiddenExpressionL
-    -> e VerticalLineverticalLineTokL
+    -> e VerticalLineVerticalLineTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression3
     :: e HiddenExpressionL
-    -> e AmpersandampersandTokL
+    -> e AmpersandAmpersandTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression4
     :: e HiddenExpressionL
-    -> e EqualsSignequalsSignTokL
+    -> e EqualsSignEqualsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression5
     :: e HiddenExpressionL
-    -> e ExclamationMarkequalsSignTokL
+    -> e ExclamationMarkEqualsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression6
@@ -1740,17 +1832,17 @@ data BinaryExpression e l where
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression8
     :: e HiddenExpressionL
-    -> e LessThanSignequalsSignTokL
+    -> e LessThanSignEqualsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression9
     :: e HiddenExpressionL
-    -> e GreaterThanSignequalsSignTokL
+    -> e GreaterThanSignEqualsSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression10
     :: e HiddenExpressionL
-    -> e FullStopfullStopTokL
+    -> e FullStopFullStopTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression11
@@ -1770,12 +1862,12 @@ data BinaryExpression e l where
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression14
     :: e HiddenExpressionL
-    -> e LessThanSignlessThanSignTokL
+    -> e LessThanSignLessThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression15
     :: e HiddenExpressionL
-    -> e GreaterThanSigngreaterThanSignTokL
+    -> e GreaterThanSignGreaterThanSignTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression16
@@ -1785,7 +1877,7 @@ data BinaryExpression e l where
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression17
     :: e HiddenExpressionL
-    -> e TokL
+    -> e HyphenMinusTokL
     -> e HiddenExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression18
@@ -1824,7 +1916,7 @@ data BlockIdentifier e l where
 data LambdaExpression e l where
   LambdaExpression
     :: e LambdaBindingsL
-    -> e (Maybe (GreaterThanSignTokL, HiddenTypeL))
+    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
     -> e HiddenExpressionL
     -> LambdaExpression e LambdaExpressionL
 
@@ -2549,64 +2641,102 @@ type data Symbol (symbolType :: SymbolType) where
   ConstantSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendDeclarationSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendAccessSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BangTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  NeqTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  DollarTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ModTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BitandTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AndTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  MulTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AddTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ExclamationMarkTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ExclamationMarkEqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NumberSignLeftSquareBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  DollarSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  PercentSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AmpersandTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AmpersandAmpersandTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ApostropheTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LeftParenthesisTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  RightParenthesisTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AsteriskTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  PlusSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   CommaTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  SubTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  RangeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  DivTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AccessTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  LtTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ShlTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  LeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AssignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  EqTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ImpliesTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  GtTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  GeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ShrTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AtTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  XorTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HyphenMinusTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HyphenMinusGreaterThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FullStopTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FullStopFullStopTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SolidusTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SolidusAsteriskTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SolidusSolidusTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ColonTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ColonColonTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SemicolonTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LessThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LessThanSignLessThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LessThanSignEqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EqualsSignEqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EqualsSignEqualsSignGreaterThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EqualsSignGreaterThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  GreaterThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  GreaterThanSignEqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  GreaterThanSignGreaterThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  CommercialAtTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LeftSquareBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  RightSquareBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  CircumflexAccentTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AbortTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AbortsIfTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AbortsWithTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AddressTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ApplyTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AsTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AssertTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AssumeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BoolTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BreakTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BytearrayTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ConstTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ContinueTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   CopyTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DecreasesTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DropTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ElseTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   EnsuresTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   EntryTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EnumTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ExceptTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExistsTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FalseTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ForallTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   GlobalTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HasTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  IfTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  InTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  IncludeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   InternalTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   InvariantTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   KeyTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LetTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   LocalTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LoopTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  MacroTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  MatchTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModifiesTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MoveTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  MutTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   NativeTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PackTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PackageTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PhantomTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PostTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  PragmaTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PublicTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   RequiresTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ReturnTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SchemaTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SignerTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  SpecTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   StoreTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  StructTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SucceedsIfTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ToTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   TrueTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   U128TokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   U16TokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2616,8 +2746,16 @@ type data Symbol (symbolType :: SymbolType) where
   U8TokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UnpackTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UpdateTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BitorTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  OrTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  VectorLessThanSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  VectorLeftSquareBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  WhereTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  WhileTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  WithTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  LeftCurlyBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  VerticalLineTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  VerticalLineVerticalLineTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  RightCurlyBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ErrorSymbol :: (symbolType ~ Auxiliary) => Symbol symbolType
   MissingSymbol :: (symbolType ~ Auxiliary) => Symbol symbolType
   SortMismatchSymbol :: (symbolType ~ Virtual) => Symbol symbolType
@@ -2801,64 +2939,102 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SConstantSymbol :: SymbolSing Regular ConstantSymbol
   SFriendDeclarationSymbol :: SymbolSing Regular FriendDeclarationSymbol
   SFriendAccessSymbol :: SymbolSing Regular FriendAccessSymbol
-  SBangTokSymbol :: SymbolSing Anonymous BangTokSymbol
-  SNeqTokSymbol :: SymbolSing Anonymous NeqTokSymbol
-  SDollarTokSymbol :: SymbolSing Anonymous DollarTokSymbol
-  SModTokSymbol :: SymbolSing Anonymous ModTokSymbol
-  SBitandTokSymbol :: SymbolSing Anonymous BitandTokSymbol
-  SAndTokSymbol :: SymbolSing Anonymous AndTokSymbol
-  SMulTokSymbol :: SymbolSing Anonymous MulTokSymbol
-  SAddTokSymbol :: SymbolSing Anonymous AddTokSymbol
+  SExclamationMarkTokSymbol :: SymbolSing Anonymous ExclamationMarkTokSymbol
+  SExclamationMarkEqualsSignTokSymbol :: SymbolSing Anonymous ExclamationMarkEqualsSignTokSymbol
+  SNumberSignLeftSquareBracketTokSymbol :: SymbolSing Anonymous NumberSignLeftSquareBracketTokSymbol
+  SDollarSignTokSymbol :: SymbolSing Anonymous DollarSignTokSymbol
+  SPercentSignTokSymbol :: SymbolSing Anonymous PercentSignTokSymbol
+  SAmpersandTokSymbol :: SymbolSing Anonymous AmpersandTokSymbol
+  SAmpersandAmpersandTokSymbol :: SymbolSing Anonymous AmpersandAmpersandTokSymbol
+  SApostropheTokSymbol :: SymbolSing Anonymous ApostropheTokSymbol
+  SLeftParenthesisTokSymbol :: SymbolSing Anonymous LeftParenthesisTokSymbol
+  SRightParenthesisTokSymbol :: SymbolSing Anonymous RightParenthesisTokSymbol
+  SAsteriskTokSymbol :: SymbolSing Anonymous AsteriskTokSymbol
+  SPlusSignTokSymbol :: SymbolSing Anonymous PlusSignTokSymbol
   SCommaTokSymbol :: SymbolSing Anonymous CommaTokSymbol
-  SSubTokSymbol :: SymbolSing Anonymous SubTokSymbol
-  SRangeTokSymbol :: SymbolSing Anonymous RangeTokSymbol
-  SDivTokSymbol :: SymbolSing Anonymous DivTokSymbol
-  SAccessTokSymbol :: SymbolSing Anonymous AccessTokSymbol
-  SLtTokSymbol :: SymbolSing Anonymous LtTokSymbol
-  SShlTokSymbol :: SymbolSing Anonymous ShlTokSymbol
-  SLeTokSymbol :: SymbolSing Anonymous LeTokSymbol
-  SAssignTokSymbol :: SymbolSing Anonymous AssignTokSymbol
-  SEqTokSymbol :: SymbolSing Anonymous EqTokSymbol
-  SImpliesTokSymbol :: SymbolSing Anonymous ImpliesTokSymbol
-  SGtTokSymbol :: SymbolSing Anonymous GtTokSymbol
-  SGeTokSymbol :: SymbolSing Anonymous GeTokSymbol
-  SShrTokSymbol :: SymbolSing Anonymous ShrTokSymbol
-  SAtTokSymbol :: SymbolSing Anonymous AtTokSymbol
-  SXorTokSymbol :: SymbolSing Anonymous XorTokSymbol
+  SHyphenMinusTokSymbol :: SymbolSing Anonymous HyphenMinusTokSymbol
+  SHyphenMinusGreaterThanSignTokSymbol :: SymbolSing Anonymous HyphenMinusGreaterThanSignTokSymbol
+  SFullStopTokSymbol :: SymbolSing Anonymous FullStopTokSymbol
+  SFullStopFullStopTokSymbol :: SymbolSing Anonymous FullStopFullStopTokSymbol
+  SSolidusTokSymbol :: SymbolSing Anonymous SolidusTokSymbol
+  SSolidusAsteriskTokSymbol :: SymbolSing Anonymous SolidusAsteriskTokSymbol
+  SSolidusSolidusTokSymbol :: SymbolSing Anonymous SolidusSolidusTokSymbol
+  SColonTokSymbol :: SymbolSing Anonymous ColonTokSymbol
+  SColonColonTokSymbol :: SymbolSing Anonymous ColonColonTokSymbol
+  SSemicolonTokSymbol :: SymbolSing Anonymous SemicolonTokSymbol
+  SLessThanSignTokSymbol :: SymbolSing Anonymous LessThanSignTokSymbol
+  SLessThanSignLessThanSignTokSymbol :: SymbolSing Anonymous LessThanSignLessThanSignTokSymbol
+  SLessThanSignEqualsSignTokSymbol :: SymbolSing Anonymous LessThanSignEqualsSignTokSymbol
+  SEqualsSignTokSymbol :: SymbolSing Anonymous EqualsSignTokSymbol
+  SEqualsSignEqualsSignTokSymbol :: SymbolSing Anonymous EqualsSignEqualsSignTokSymbol
+  SEqualsSignEqualsSignGreaterThanSignTokSymbol :: SymbolSing Anonymous EqualsSignEqualsSignGreaterThanSignTokSymbol
+  SEqualsSignGreaterThanSignTokSymbol :: SymbolSing Anonymous EqualsSignGreaterThanSignTokSymbol
+  SGreaterThanSignTokSymbol :: SymbolSing Anonymous GreaterThanSignTokSymbol
+  SGreaterThanSignEqualsSignTokSymbol :: SymbolSing Anonymous GreaterThanSignEqualsSignTokSymbol
+  SGreaterThanSignGreaterThanSignTokSymbol :: SymbolSing Anonymous GreaterThanSignGreaterThanSignTokSymbol
+  SCommercialAtTokSymbol :: SymbolSing Anonymous CommercialAtTokSymbol
+  SLeftSquareBracketTokSymbol :: SymbolSing Anonymous LeftSquareBracketTokSymbol
+  SRightSquareBracketTokSymbol :: SymbolSing Anonymous RightSquareBracketTokSymbol
+  SCircumflexAccentTokSymbol :: SymbolSing Anonymous CircumflexAccentTokSymbol
+  SAbortTokSymbol :: SymbolSing Anonymous AbortTokSymbol
   SAbortsIfTokSymbol :: SymbolSing Anonymous AbortsIfTokSymbol
   SAbortsWithTokSymbol :: SymbolSing Anonymous AbortsWithTokSymbol
   SAddressTokSymbol :: SymbolSing Anonymous AddressTokSymbol
+  SApplyTokSymbol :: SymbolSing Anonymous ApplyTokSymbol
+  SAsTokSymbol :: SymbolSing Anonymous AsTokSymbol
   SAssertTokSymbol :: SymbolSing Anonymous AssertTokSymbol
   SAssumeTokSymbol :: SymbolSing Anonymous AssumeTokSymbol
   SBoolTokSymbol :: SymbolSing Anonymous BoolTokSymbol
+  SBreakTokSymbol :: SymbolSing Anonymous BreakTokSymbol
   SBytearrayTokSymbol :: SymbolSing Anonymous BytearrayTokSymbol
+  SConstTokSymbol :: SymbolSing Anonymous ConstTokSymbol
+  SContinueTokSymbol :: SymbolSing Anonymous ContinueTokSymbol
   SCopyTokSymbol :: SymbolSing Anonymous CopyTokSymbol
   SDecreasesTokSymbol :: SymbolSing Anonymous DecreasesTokSymbol
   SDropTokSymbol :: SymbolSing Anonymous DropTokSymbol
+  SElseTokSymbol :: SymbolSing Anonymous ElseTokSymbol
   SEnsuresTokSymbol :: SymbolSing Anonymous EnsuresTokSymbol
   SEntryTokSymbol :: SymbolSing Anonymous EntryTokSymbol
+  SEnumTokSymbol :: SymbolSing Anonymous EnumTokSymbol
+  SExceptTokSymbol :: SymbolSing Anonymous ExceptTokSymbol
   SExistsTokSymbol :: SymbolSing Anonymous ExistsTokSymbol
   SFalseTokSymbol :: SymbolSing Anonymous FalseTokSymbol
   SForallTokSymbol :: SymbolSing Anonymous ForallTokSymbol
   SFriendTokSymbol :: SymbolSing Anonymous FriendTokSymbol
+  SFunTokSymbol :: SymbolSing Anonymous FunTokSymbol
   SGlobalTokSymbol :: SymbolSing Anonymous GlobalTokSymbol
+  SHasTokSymbol :: SymbolSing Anonymous HasTokSymbol
+  SIfTokSymbol :: SymbolSing Anonymous IfTokSymbol
+  SInTokSymbol :: SymbolSing Anonymous InTokSymbol
+  SIncludeTokSymbol :: SymbolSing Anonymous IncludeTokSymbol
   SInternalTokSymbol :: SymbolSing Anonymous InternalTokSymbol
   SInvariantTokSymbol :: SymbolSing Anonymous InvariantTokSymbol
   SKeyTokSymbol :: SymbolSing Anonymous KeyTokSymbol
+  SLetTokSymbol :: SymbolSing Anonymous LetTokSymbol
   SLocalTokSymbol :: SymbolSing Anonymous LocalTokSymbol
+  SLoopTokSymbol :: SymbolSing Anonymous LoopTokSymbol
+  SMacroTokSymbol :: SymbolSing Anonymous MacroTokSymbol
+  SMatchTokSymbol :: SymbolSing Anonymous MatchTokSymbol
   SModifiesTokSymbol :: SymbolSing Anonymous ModifiesTokSymbol
   SModuleTokSymbol :: SymbolSing Anonymous ModuleTokSymbol
   SMoveTokSymbol :: SymbolSing Anonymous MoveTokSymbol
+  SMutTokSymbol :: SymbolSing Anonymous MutTokSymbol
   SNativeTokSymbol :: SymbolSing Anonymous NativeTokSymbol
   SPackTokSymbol :: SymbolSing Anonymous PackTokSymbol
   SPackageTokSymbol :: SymbolSing Anonymous PackageTokSymbol
   SPhantomTokSymbol :: SymbolSing Anonymous PhantomTokSymbol
   SPostTokSymbol :: SymbolSing Anonymous PostTokSymbol
+  SPragmaTokSymbol :: SymbolSing Anonymous PragmaTokSymbol
   SPublicTokSymbol :: SymbolSing Anonymous PublicTokSymbol
   SRequiresTokSymbol :: SymbolSing Anonymous RequiresTokSymbol
+  SReturnTokSymbol :: SymbolSing Anonymous ReturnTokSymbol
+  SSchemaTokSymbol :: SymbolSing Anonymous SchemaTokSymbol
   SSignerTokSymbol :: SymbolSing Anonymous SignerTokSymbol
+  SSpecTokSymbol :: SymbolSing Anonymous SpecTokSymbol
   SStoreTokSymbol :: SymbolSing Anonymous StoreTokSymbol
+  SStructTokSymbol :: SymbolSing Anonymous StructTokSymbol
   SSucceedsIfTokSymbol :: SymbolSing Anonymous SucceedsIfTokSymbol
+  SToTokSymbol :: SymbolSing Anonymous ToTokSymbol
   STrueTokSymbol :: SymbolSing Anonymous TrueTokSymbol
   SU128TokSymbol :: SymbolSing Anonymous U128TokSymbol
   SU16TokSymbol :: SymbolSing Anonymous U16TokSymbol
@@ -2868,8 +3044,16 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SU8TokSymbol :: SymbolSing Anonymous U8TokSymbol
   SUnpackTokSymbol :: SymbolSing Anonymous UnpackTokSymbol
   SUpdateTokSymbol :: SymbolSing Anonymous UpdateTokSymbol
-  SBitorTokSymbol :: SymbolSing Anonymous BitorTokSymbol
-  SOrTokSymbol :: SymbolSing Anonymous OrTokSymbol
+  SUseTokSymbol :: SymbolSing Anonymous UseTokSymbol
+  SVectorLessThanSignTokSymbol :: SymbolSing Anonymous VectorLessThanSignTokSymbol
+  SVectorLeftSquareBracketTokSymbol :: SymbolSing Anonymous VectorLeftSquareBracketTokSymbol
+  SWhereTokSymbol :: SymbolSing Anonymous WhereTokSymbol
+  SWhileTokSymbol :: SymbolSing Anonymous WhileTokSymbol
+  SWithTokSymbol :: SymbolSing Anonymous WithTokSymbol
+  SLeftCurlyBracketTokSymbol :: SymbolSing Anonymous LeftCurlyBracketTokSymbol
+  SVerticalLineTokSymbol :: SymbolSing Anonymous VerticalLineTokSymbol
+  SVerticalLineVerticalLineTokSymbol :: SymbolSing Anonymous VerticalLineVerticalLineTokSymbol
+  SRightCurlyBracketTokSymbol :: SymbolSing Anonymous RightCurlyBracketTokSymbol
   SErrorSymbol :: SymbolSing Auxiliary ErrorSymbol
   SMissingSymbol :: SymbolSing Auxiliary MissingSymbol
   SSortMismatchSymbol :: SymbolSing Virtual SortMismatchSymbol
@@ -3057,64 +3241,102 @@ decSymbolSing SStructDefinitionSymbol SStructDefinitionSymbol = Just (Refl, HRef
 decSymbolSing SConstantSymbol SConstantSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendDeclarationSymbol SFriendDeclarationSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendAccessSymbol SFriendAccessSymbol = Just (Refl, HRefl)
-decSymbolSing SBangTokSymbol SBangTokSymbol = Just (Refl, HRefl)
-decSymbolSing SNeqTokSymbol SNeqTokSymbol = Just (Refl, HRefl)
-decSymbolSing SDollarTokSymbol SDollarTokSymbol = Just (Refl, HRefl)
-decSymbolSing SModTokSymbol SModTokSymbol = Just (Refl, HRefl)
-decSymbolSing SBitandTokSymbol SBitandTokSymbol = Just (Refl, HRefl)
-decSymbolSing SAndTokSymbol SAndTokSymbol = Just (Refl, HRefl)
-decSymbolSing SMulTokSymbol SMulTokSymbol = Just (Refl, HRefl)
-decSymbolSing SAddTokSymbol SAddTokSymbol = Just (Refl, HRefl)
+decSymbolSing SExclamationMarkTokSymbol SExclamationMarkTokSymbol = Just (Refl, HRefl)
+decSymbolSing SExclamationMarkEqualsSignTokSymbol SExclamationMarkEqualsSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SNumberSignLeftSquareBracketTokSymbol SNumberSignLeftSquareBracketTokSymbol = Just (Refl, HRefl)
+decSymbolSing SDollarSignTokSymbol SDollarSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SPercentSignTokSymbol SPercentSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAmpersandTokSymbol SAmpersandTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAmpersandAmpersandTokSymbol SAmpersandAmpersandTokSymbol = Just (Refl, HRefl)
+decSymbolSing SApostropheTokSymbol SApostropheTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLeftParenthesisTokSymbol SLeftParenthesisTokSymbol = Just (Refl, HRefl)
+decSymbolSing SRightParenthesisTokSymbol SRightParenthesisTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAsteriskTokSymbol SAsteriskTokSymbol = Just (Refl, HRefl)
+decSymbolSing SPlusSignTokSymbol SPlusSignTokSymbol = Just (Refl, HRefl)
 decSymbolSing SCommaTokSymbol SCommaTokSymbol = Just (Refl, HRefl)
-decSymbolSing SSubTokSymbol SSubTokSymbol = Just (Refl, HRefl)
-decSymbolSing SRangeTokSymbol SRangeTokSymbol = Just (Refl, HRefl)
-decSymbolSing SDivTokSymbol SDivTokSymbol = Just (Refl, HRefl)
-decSymbolSing SAccessTokSymbol SAccessTokSymbol = Just (Refl, HRefl)
-decSymbolSing SLtTokSymbol SLtTokSymbol = Just (Refl, HRefl)
-decSymbolSing SShlTokSymbol SShlTokSymbol = Just (Refl, HRefl)
-decSymbolSing SLeTokSymbol SLeTokSymbol = Just (Refl, HRefl)
-decSymbolSing SAssignTokSymbol SAssignTokSymbol = Just (Refl, HRefl)
-decSymbolSing SEqTokSymbol SEqTokSymbol = Just (Refl, HRefl)
-decSymbolSing SImpliesTokSymbol SImpliesTokSymbol = Just (Refl, HRefl)
-decSymbolSing SGtTokSymbol SGtTokSymbol = Just (Refl, HRefl)
-decSymbolSing SGeTokSymbol SGeTokSymbol = Just (Refl, HRefl)
-decSymbolSing SShrTokSymbol SShrTokSymbol = Just (Refl, HRefl)
-decSymbolSing SAtTokSymbol SAtTokSymbol = Just (Refl, HRefl)
-decSymbolSing SXorTokSymbol SXorTokSymbol = Just (Refl, HRefl)
+decSymbolSing SHyphenMinusTokSymbol SHyphenMinusTokSymbol = Just (Refl, HRefl)
+decSymbolSing SHyphenMinusGreaterThanSignTokSymbol SHyphenMinusGreaterThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SFullStopTokSymbol SFullStopTokSymbol = Just (Refl, HRefl)
+decSymbolSing SFullStopFullStopTokSymbol SFullStopFullStopTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSolidusTokSymbol SSolidusTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSolidusAsteriskTokSymbol SSolidusAsteriskTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSolidusSolidusTokSymbol SSolidusSolidusTokSymbol = Just (Refl, HRefl)
+decSymbolSing SColonTokSymbol SColonTokSymbol = Just (Refl, HRefl)
+decSymbolSing SColonColonTokSymbol SColonColonTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSemicolonTokSymbol SSemicolonTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLessThanSignTokSymbol SLessThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLessThanSignLessThanSignTokSymbol SLessThanSignLessThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLessThanSignEqualsSignTokSymbol SLessThanSignEqualsSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEqualsSignTokSymbol SEqualsSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEqualsSignEqualsSignTokSymbol SEqualsSignEqualsSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEqualsSignEqualsSignGreaterThanSignTokSymbol SEqualsSignEqualsSignGreaterThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEqualsSignGreaterThanSignTokSymbol SEqualsSignGreaterThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SGreaterThanSignTokSymbol SGreaterThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SGreaterThanSignEqualsSignTokSymbol SGreaterThanSignEqualsSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SGreaterThanSignGreaterThanSignTokSymbol SGreaterThanSignGreaterThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SCommercialAtTokSymbol SCommercialAtTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLeftSquareBracketTokSymbol SLeftSquareBracketTokSymbol = Just (Refl, HRefl)
+decSymbolSing SRightSquareBracketTokSymbol SRightSquareBracketTokSymbol = Just (Refl, HRefl)
+decSymbolSing SCircumflexAccentTokSymbol SCircumflexAccentTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAbortTokSymbol SAbortTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAbortsIfTokSymbol SAbortsIfTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAbortsWithTokSymbol SAbortsWithTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAddressTokSymbol SAddressTokSymbol = Just (Refl, HRefl)
+decSymbolSing SApplyTokSymbol SApplyTokSymbol = Just (Refl, HRefl)
+decSymbolSing SAsTokSymbol SAsTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAssertTokSymbol SAssertTokSymbol = Just (Refl, HRefl)
 decSymbolSing SAssumeTokSymbol SAssumeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SBoolTokSymbol SBoolTokSymbol = Just (Refl, HRefl)
+decSymbolSing SBreakTokSymbol SBreakTokSymbol = Just (Refl, HRefl)
 decSymbolSing SBytearrayTokSymbol SBytearrayTokSymbol = Just (Refl, HRefl)
+decSymbolSing SConstTokSymbol SConstTokSymbol = Just (Refl, HRefl)
+decSymbolSing SContinueTokSymbol SContinueTokSymbol = Just (Refl, HRefl)
 decSymbolSing SCopyTokSymbol SCopyTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDecreasesTokSymbol SDecreasesTokSymbol = Just (Refl, HRefl)
 decSymbolSing SDropTokSymbol SDropTokSymbol = Just (Refl, HRefl)
+decSymbolSing SElseTokSymbol SElseTokSymbol = Just (Refl, HRefl)
 decSymbolSing SEnsuresTokSymbol SEnsuresTokSymbol = Just (Refl, HRefl)
 decSymbolSing SEntryTokSymbol SEntryTokSymbol = Just (Refl, HRefl)
+decSymbolSing SEnumTokSymbol SEnumTokSymbol = Just (Refl, HRefl)
+decSymbolSing SExceptTokSymbol SExceptTokSymbol = Just (Refl, HRefl)
 decSymbolSing SExistsTokSymbol SExistsTokSymbol = Just (Refl, HRefl)
 decSymbolSing SFalseTokSymbol SFalseTokSymbol = Just (Refl, HRefl)
 decSymbolSing SForallTokSymbol SForallTokSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendTokSymbol SFriendTokSymbol = Just (Refl, HRefl)
+decSymbolSing SFunTokSymbol SFunTokSymbol = Just (Refl, HRefl)
 decSymbolSing SGlobalTokSymbol SGlobalTokSymbol = Just (Refl, HRefl)
+decSymbolSing SHasTokSymbol SHasTokSymbol = Just (Refl, HRefl)
+decSymbolSing SIfTokSymbol SIfTokSymbol = Just (Refl, HRefl)
+decSymbolSing SInTokSymbol SInTokSymbol = Just (Refl, HRefl)
+decSymbolSing SIncludeTokSymbol SIncludeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SInternalTokSymbol SInternalTokSymbol = Just (Refl, HRefl)
 decSymbolSing SInvariantTokSymbol SInvariantTokSymbol = Just (Refl, HRefl)
 decSymbolSing SKeyTokSymbol SKeyTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLetTokSymbol SLetTokSymbol = Just (Refl, HRefl)
 decSymbolSing SLocalTokSymbol SLocalTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLoopTokSymbol SLoopTokSymbol = Just (Refl, HRefl)
+decSymbolSing SMacroTokSymbol SMacroTokSymbol = Just (Refl, HRefl)
+decSymbolSing SMatchTokSymbol SMatchTokSymbol = Just (Refl, HRefl)
 decSymbolSing SModifiesTokSymbol SModifiesTokSymbol = Just (Refl, HRefl)
 decSymbolSing SModuleTokSymbol SModuleTokSymbol = Just (Refl, HRefl)
 decSymbolSing SMoveTokSymbol SMoveTokSymbol = Just (Refl, HRefl)
+decSymbolSing SMutTokSymbol SMutTokSymbol = Just (Refl, HRefl)
 decSymbolSing SNativeTokSymbol SNativeTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPackTokSymbol SPackTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPackageTokSymbol SPackageTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPhantomTokSymbol SPhantomTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPostTokSymbol SPostTokSymbol = Just (Refl, HRefl)
+decSymbolSing SPragmaTokSymbol SPragmaTokSymbol = Just (Refl, HRefl)
 decSymbolSing SPublicTokSymbol SPublicTokSymbol = Just (Refl, HRefl)
 decSymbolSing SRequiresTokSymbol SRequiresTokSymbol = Just (Refl, HRefl)
+decSymbolSing SReturnTokSymbol SReturnTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSchemaTokSymbol SSchemaTokSymbol = Just (Refl, HRefl)
 decSymbolSing SSignerTokSymbol SSignerTokSymbol = Just (Refl, HRefl)
+decSymbolSing SSpecTokSymbol SSpecTokSymbol = Just (Refl, HRefl)
 decSymbolSing SStoreTokSymbol SStoreTokSymbol = Just (Refl, HRefl)
+decSymbolSing SStructTokSymbol SStructTokSymbol = Just (Refl, HRefl)
 decSymbolSing SSucceedsIfTokSymbol SSucceedsIfTokSymbol = Just (Refl, HRefl)
+decSymbolSing SToTokSymbol SToTokSymbol = Just (Refl, HRefl)
 decSymbolSing STrueTokSymbol STrueTokSymbol = Just (Refl, HRefl)
 decSymbolSing SU128TokSymbol SU128TokSymbol = Just (Refl, HRefl)
 decSymbolSing SU16TokSymbol SU16TokSymbol = Just (Refl, HRefl)
@@ -3124,8 +3346,16 @@ decSymbolSing SU64TokSymbol SU64TokSymbol = Just (Refl, HRefl)
 decSymbolSing SU8TokSymbol SU8TokSymbol = Just (Refl, HRefl)
 decSymbolSing SUnpackTokSymbol SUnpackTokSymbol = Just (Refl, HRefl)
 decSymbolSing SUpdateTokSymbol SUpdateTokSymbol = Just (Refl, HRefl)
-decSymbolSing SBitorTokSymbol SBitorTokSymbol = Just (Refl, HRefl)
-decSymbolSing SOrTokSymbol SOrTokSymbol = Just (Refl, HRefl)
+decSymbolSing SUseTokSymbol SUseTokSymbol = Just (Refl, HRefl)
+decSymbolSing SVectorLessThanSignTokSymbol SVectorLessThanSignTokSymbol = Just (Refl, HRefl)
+decSymbolSing SVectorLeftSquareBracketTokSymbol SVectorLeftSquareBracketTokSymbol = Just (Refl, HRefl)
+decSymbolSing SWhereTokSymbol SWhereTokSymbol = Just (Refl, HRefl)
+decSymbolSing SWhileTokSymbol SWhileTokSymbol = Just (Refl, HRefl)
+decSymbolSing SWithTokSymbol SWithTokSymbol = Just (Refl, HRefl)
+decSymbolSing SLeftCurlyBracketTokSymbol SLeftCurlyBracketTokSymbol = Just (Refl, HRefl)
+decSymbolSing SVerticalLineTokSymbol SVerticalLineTokSymbol = Just (Refl, HRefl)
+decSymbolSing SVerticalLineVerticalLineTokSymbol SVerticalLineVerticalLineTokSymbol = Just (Refl, HRefl)
+decSymbolSing SRightCurlyBracketTokSymbol SRightCurlyBracketTokSymbol = Just (Refl, HRefl)
 decSymbolSing SErrorSymbol SErrorSymbol = Just (Refl, HRefl)
 decSymbolSing SMissingSymbol SMissingSymbol = Just (Refl, HRefl)
 decSymbolSing SSortMismatchSymbol SSortMismatchSymbol = Just (Refl, HRefl)
@@ -3338,64 +3568,102 @@ symbolMap = Map.fromList
     , ("constant", SomeRegularSymbolSing SConstantSymbol)
     , ("friend_declaration", SomeRegularSymbolSing SFriendDeclarationSymbol)
     , ("friend_access", SomeRegularSymbolSing SFriendAccessSymbol)
-    , ("!", SomeAnonymousSymbolSing SBangTokSymbol)
-    , ("!=", SomeAnonymousSymbolSing SNeqTokSymbol)
-    , ("$", SomeAnonymousSymbolSing SDollarTokSymbol)
-    , ("%", SomeAnonymousSymbolSing SModTokSymbol)
-    , ("&", SomeAnonymousSymbolSing SBitandTokSymbol)
-    , ("&&", SomeAnonymousSymbolSing SAndTokSymbol)
-    , ("*", SomeAnonymousSymbolSing SMulTokSymbol)
-    , ("+", SomeAnonymousSymbolSing SAddTokSymbol)
+    , ("!", SomeAnonymousSymbolSing SExclamationMarkTokSymbol)
+    , ("!=", SomeAnonymousSymbolSing SExclamationMarkEqualsSignTokSymbol)
+    , ("#[", SomeAnonymousSymbolSing SNumberSignLeftSquareBracketTokSymbol)
+    , ("$", SomeAnonymousSymbolSing SDollarSignTokSymbol)
+    , ("%", SomeAnonymousSymbolSing SPercentSignTokSymbol)
+    , ("&", SomeAnonymousSymbolSing SAmpersandTokSymbol)
+    , ("&&", SomeAnonymousSymbolSing SAmpersandAmpersandTokSymbol)
+    , ("'", SomeAnonymousSymbolSing SApostropheTokSymbol)
+    , ("(", SomeAnonymousSymbolSing SLeftParenthesisTokSymbol)
+    , (")", SomeAnonymousSymbolSing SRightParenthesisTokSymbol)
+    , ("*", SomeAnonymousSymbolSing SAsteriskTokSymbol)
+    , ("+", SomeAnonymousSymbolSing SPlusSignTokSymbol)
     , (",", SomeAnonymousSymbolSing SCommaTokSymbol)
-    , ("-", SomeAnonymousSymbolSing SSubTokSymbol)
-    , ("..", SomeAnonymousSymbolSing SRangeTokSymbol)
-    , ("/", SomeAnonymousSymbolSing SDivTokSymbol)
-    , ("::", SomeAnonymousSymbolSing SAccessTokSymbol)
-    , ("<", SomeAnonymousSymbolSing SLtTokSymbol)
-    , ("<<", SomeAnonymousSymbolSing SShlTokSymbol)
-    , ("<=", SomeAnonymousSymbolSing SLeTokSymbol)
-    , ("=", SomeAnonymousSymbolSing SAssignTokSymbol)
-    , ("==", SomeAnonymousSymbolSing SEqTokSymbol)
-    , ("==>", SomeAnonymousSymbolSing SImpliesTokSymbol)
-    , (">", SomeAnonymousSymbolSing SGtTokSymbol)
-    , (">=", SomeAnonymousSymbolSing SGeTokSymbol)
-    , (">>", SomeAnonymousSymbolSing SShrTokSymbol)
-    , ("@", SomeAnonymousSymbolSing SAtTokSymbol)
-    , ("^", SomeAnonymousSymbolSing SXorTokSymbol)
+    , ("-", SomeAnonymousSymbolSing SHyphenMinusTokSymbol)
+    , ("->", SomeAnonymousSymbolSing SHyphenMinusGreaterThanSignTokSymbol)
+    , (".", SomeAnonymousSymbolSing SFullStopTokSymbol)
+    , ("..", SomeAnonymousSymbolSing SFullStopFullStopTokSymbol)
+    , ("/", SomeAnonymousSymbolSing SSolidusTokSymbol)
+    , ("/*", SomeAnonymousSymbolSing SSolidusAsteriskTokSymbol)
+    , ("//", SomeAnonymousSymbolSing SSolidusSolidusTokSymbol)
+    , (":", SomeAnonymousSymbolSing SColonTokSymbol)
+    , ("::", SomeAnonymousSymbolSing SColonColonTokSymbol)
+    , (";", SomeAnonymousSymbolSing SSemicolonTokSymbol)
+    , ("<", SomeAnonymousSymbolSing SLessThanSignTokSymbol)
+    , ("<<", SomeAnonymousSymbolSing SLessThanSignLessThanSignTokSymbol)
+    , ("<=", SomeAnonymousSymbolSing SLessThanSignEqualsSignTokSymbol)
+    , ("=", SomeAnonymousSymbolSing SEqualsSignTokSymbol)
+    , ("==", SomeAnonymousSymbolSing SEqualsSignEqualsSignTokSymbol)
+    , ("==>", SomeAnonymousSymbolSing SEqualsSignEqualsSignGreaterThanSignTokSymbol)
+    , ("=>", SomeAnonymousSymbolSing SEqualsSignGreaterThanSignTokSymbol)
+    , (">", SomeAnonymousSymbolSing SGreaterThanSignTokSymbol)
+    , (">=", SomeAnonymousSymbolSing SGreaterThanSignEqualsSignTokSymbol)
+    , (">>", SomeAnonymousSymbolSing SGreaterThanSignGreaterThanSignTokSymbol)
+    , ("@", SomeAnonymousSymbolSing SCommercialAtTokSymbol)
+    , ("[", SomeAnonymousSymbolSing SLeftSquareBracketTokSymbol)
+    , ("]", SomeAnonymousSymbolSing SRightSquareBracketTokSymbol)
+    , ("^", SomeAnonymousSymbolSing SCircumflexAccentTokSymbol)
+    , ("abort", SomeAnonymousSymbolSing SAbortTokSymbol)
     , ("aborts_if", SomeAnonymousSymbolSing SAbortsIfTokSymbol)
     , ("aborts_with", SomeAnonymousSymbolSing SAbortsWithTokSymbol)
     , ("address", SomeAnonymousSymbolSing SAddressTokSymbol)
+    , ("apply", SomeAnonymousSymbolSing SApplyTokSymbol)
+    , ("as", SomeAnonymousSymbolSing SAsTokSymbol)
     , ("assert", SomeAnonymousSymbolSing SAssertTokSymbol)
     , ("assume", SomeAnonymousSymbolSing SAssumeTokSymbol)
     , ("bool", SomeAnonymousSymbolSing SBoolTokSymbol)
+    , ("break", SomeAnonymousSymbolSing SBreakTokSymbol)
     , ("bytearray", SomeAnonymousSymbolSing SBytearrayTokSymbol)
+    , ("const", SomeAnonymousSymbolSing SConstTokSymbol)
+    , ("continue", SomeAnonymousSymbolSing SContinueTokSymbol)
     , ("copy", SomeAnonymousSymbolSing SCopyTokSymbol)
     , ("decreases", SomeAnonymousSymbolSing SDecreasesTokSymbol)
     , ("drop", SomeAnonymousSymbolSing SDropTokSymbol)
+    , ("else", SomeAnonymousSymbolSing SElseTokSymbol)
     , ("ensures", SomeAnonymousSymbolSing SEnsuresTokSymbol)
     , ("entry", SomeAnonymousSymbolSing SEntryTokSymbol)
+    , ("enum", SomeAnonymousSymbolSing SEnumTokSymbol)
+    , ("except", SomeAnonymousSymbolSing SExceptTokSymbol)
     , ("exists", SomeAnonymousSymbolSing SExistsTokSymbol)
     , ("false", SomeAnonymousSymbolSing SFalseTokSymbol)
     , ("forall", SomeAnonymousSymbolSing SForallTokSymbol)
     , ("friend", SomeAnonymousSymbolSing SFriendTokSymbol)
+    , ("fun", SomeAnonymousSymbolSing SFunTokSymbol)
     , ("global", SomeAnonymousSymbolSing SGlobalTokSymbol)
+    , ("has", SomeAnonymousSymbolSing SHasTokSymbol)
+    , ("if", SomeAnonymousSymbolSing SIfTokSymbol)
+    , ("in", SomeAnonymousSymbolSing SInTokSymbol)
+    , ("include", SomeAnonymousSymbolSing SIncludeTokSymbol)
     , ("internal", SomeAnonymousSymbolSing SInternalTokSymbol)
     , ("invariant", SomeAnonymousSymbolSing SInvariantTokSymbol)
     , ("key", SomeAnonymousSymbolSing SKeyTokSymbol)
+    , ("let", SomeAnonymousSymbolSing SLetTokSymbol)
     , ("local", SomeAnonymousSymbolSing SLocalTokSymbol)
+    , ("loop", SomeAnonymousSymbolSing SLoopTokSymbol)
+    , ("macro", SomeAnonymousSymbolSing SMacroTokSymbol)
+    , ("match", SomeAnonymousSymbolSing SMatchTokSymbol)
     , ("modifies", SomeAnonymousSymbolSing SModifiesTokSymbol)
     , ("module", SomeAnonymousSymbolSing SModuleTokSymbol)
     , ("move", SomeAnonymousSymbolSing SMoveTokSymbol)
+    , ("mut", SomeAnonymousSymbolSing SMutTokSymbol)
     , ("native", SomeAnonymousSymbolSing SNativeTokSymbol)
     , ("pack", SomeAnonymousSymbolSing SPackTokSymbol)
     , ("package", SomeAnonymousSymbolSing SPackageTokSymbol)
     , ("phantom", SomeAnonymousSymbolSing SPhantomTokSymbol)
     , ("post", SomeAnonymousSymbolSing SPostTokSymbol)
+    , ("pragma", SomeAnonymousSymbolSing SPragmaTokSymbol)
     , ("public", SomeAnonymousSymbolSing SPublicTokSymbol)
     , ("requires", SomeAnonymousSymbolSing SRequiresTokSymbol)
+    , ("return", SomeAnonymousSymbolSing SReturnTokSymbol)
+    , ("schema", SomeAnonymousSymbolSing SSchemaTokSymbol)
     , ("signer", SomeAnonymousSymbolSing SSignerTokSymbol)
+    , ("spec", SomeAnonymousSymbolSing SSpecTokSymbol)
     , ("store", SomeAnonymousSymbolSing SStoreTokSymbol)
+    , ("struct", SomeAnonymousSymbolSing SStructTokSymbol)
     , ("succeeds_if", SomeAnonymousSymbolSing SSucceedsIfTokSymbol)
+    , ("to", SomeAnonymousSymbolSing SToTokSymbol)
     , ("true", SomeAnonymousSymbolSing STrueTokSymbol)
     , ("u128", SomeAnonymousSymbolSing SU128TokSymbol)
     , ("u16", SomeAnonymousSymbolSing SU16TokSymbol)
@@ -3405,8 +3673,16 @@ symbolMap = Map.fromList
     , ("u8", SomeAnonymousSymbolSing SU8TokSymbol)
     , ("unpack", SomeAnonymousSymbolSing SUnpackTokSymbol)
     , ("update", SomeAnonymousSymbolSing SUpdateTokSymbol)
-    , ("|", SomeAnonymousSymbolSing SBitorTokSymbol)
-    , ("||", SomeAnonymousSymbolSing SOrTokSymbol)
+    , ("use", SomeAnonymousSymbolSing SUseTokSymbol)
+    , ("vector<", SomeAnonymousSymbolSing SVectorLessThanSignTokSymbol)
+    , ("vector[", SomeAnonymousSymbolSing SVectorLeftSquareBracketTokSymbol)
+    , ("where", SomeAnonymousSymbolSing SWhereTokSymbol)
+    , ("while", SomeAnonymousSymbolSing SWhileTokSymbol)
+    , ("with", SomeAnonymousSymbolSing SWithTokSymbol)
+    , ("{", SomeAnonymousSymbolSing SLeftCurlyBracketTokSymbol)
+    , ("|", SomeAnonymousSymbolSing SVerticalLineTokSymbol)
+    , ("||", SomeAnonymousSymbolSing SVerticalLineVerticalLineTokSymbol)
+    , ("}", SomeAnonymousSymbolSing SRightCurlyBracketTokSymbol)
     ]
 
 mkSymbolTable :: TS.Language -> IO SymbolTable

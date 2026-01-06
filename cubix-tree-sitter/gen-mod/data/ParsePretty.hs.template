@@ -95,14 +95,39 @@ pMany :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Te
 pMany = Megaparsec.Cubix.pMany
 
 {-+}
+pSepBy :: Typeable a
+       => Parser (${grammarName}Term a)
+       -> Parser (${grammarName}Term sep)
+       -> Parser (${grammarName}Term [a])
+{+-}
+pSepBy = Megaparsec.Cubix.pSepBy
+
+{-+}
+pSepBy1 :: Typeable a
+       => Parser (${grammarName}Term a)
+       -> Parser (${grammarName}Term sep)
+       -> Parser (${grammarName}Term [a])
+{+-}
+pSepBy1 = Megaparsec.Cubix.pSepBy1
+
+{-+}
+pBetween :: Typeable a
+       => Parser (${grammarName}Term open)
+       -> Parser (${grammarName}Term close)
+       -> Parser (${grammarName}Term a)
+       -> Parser (${grammarName}Term a)
+{+-}
+pBetween = Megaparsec.Cubix.pBetween
+
+{-+}
 pRoot :: Parser (${grammarName}Term (RootSort ${grammarName}Sig))
 pRoot = p${startSort.camelCase} <* Megaparsec.eof
 {+-}
 
 {-+}
 ${for(tokens)}
-p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.camelCase}TokL)
-p${it.name.camelCase} = pSymbol "${it.name.text}" S${it.name.camelCase}TokSymbol $$> i${it.name.camelCase}
+p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.sort})
+p${it.name.camelCase} = pSymbol "${it.symbol}" S${it.name.camelCase}Symbol $$> i${it.name.camelCase}
 
 ${endfor}
 {+-}
@@ -123,13 +148,7 @@ ${if(it.sum)}
          ]
 ${else}
 ${for(it.constructors)}
-  ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
-${for(it.fields/first)}
-    <$$> ${it.parser}
-${endfor}
-${for(it.fields/rest)}
-    <*> ${it.parser}
-${endfor}
+  ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase} <$$> ${it.parser}
 ${endfor}
 ${endif}
 ${if(it.sum)}
@@ -137,13 +156,7 @@ ${if(it.sum)}
 ${for(it.constructors)}
     p${it.name.camelCase} :: Cubix.TreeSitter.Token a -> Parser (${grammarName}Term ${it.type.sort})
     p${it.name.camelCase} _sym =
-      ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase}
-${for(it.fields/first)}
-        <$$> ${it.parser}
-${endfor}
-${for(it.fields/rest)}
-        <*> ${it.parser}
-${endfor}
+      ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase} <$$> ${it.parser}
 ${endfor}
 ${endif}
 
