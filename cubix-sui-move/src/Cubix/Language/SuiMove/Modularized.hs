@@ -1356,9 +1356,7 @@ data CommaBindList e l where
 
 data OrBindList e l where
   OrBindList
-    :: e (Maybe LeftParenthesisTokL)
-    -> e [((Maybe LeftParenthesisTokL, HiddenBindL), Maybe RightParenthesisTokL)]
-    -> e (Maybe RightParenthesisTokL)
+    :: e [HiddenBindL]
     -> OrBindList e OrBindListL
 
 data MatchCondition e l where
@@ -1929,10 +1927,7 @@ data LambdaBinding e l where
   LambdaBindingCommaBindList
     :: e CommaBindListL
     -> LambdaBinding e LambdaBindingL
-  LambdaBindingBind
-    :: e HiddenBindL
-    -> LambdaBinding e LambdaBindingL
-  LambdaBinding3
+  LambdaBinding2
     :: e HiddenBindL
     -> e (Maybe (ColonTokL, HiddenTypeL))
     -> LambdaBinding e LambdaBindingL

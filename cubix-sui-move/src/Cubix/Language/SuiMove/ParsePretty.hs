@@ -1421,7 +1421,14 @@ pCommaBindList = do
 pOrBindList :: Parser (MoveTerm OrBindListL)
 pOrBindList = do
   _sym <- pSymbol "or_bind_list" SOrBindListSymbol
-  iOrBindList <$> pMaybe pLeftParenthesisTok <*> pSepBy1 (pPair (pPair (pMaybe pLeftParenthesisTok) (pHiddenBind _sym)) (pMaybe pRightParenthesisTok)) pVerticalLineTok <*> pMaybe pRightParenthesisTok
+  let pBind = choice [ pHiddenBind _sym
+                     , between pLeftParenthesisTok pRightParenthesisTok (pHiddenBind _sym)
+                     ]
+      pInternal = pSepBy1 pBind pVerticalLineTok
+  iOrBindList
+    <$> choice [ Megaparsec.try pInternal
+               , between pLeftParenthesisTok pRightParenthesisTok pInternal
+               ]
 
 pMatchCondition :: Parser (MoveTerm MatchConditionL)
 pMatchCondition = do
@@ -2002,19 +2009,15 @@ pLambdaBinding :: Parser (MoveTerm LambdaBindingL)
 pLambdaBinding = do
   _sym <- pSymbol "lambda_binding" SLambdaBindingSymbol
   choice [ Megaparsec.try (pLambdaBindingCommaBindList _sym)
-         , Megaparsec.try (pLambdaBindingBind _sym)
-         , Megaparsec.try (pLambdaBinding3 _sym)
+         , Megaparsec.try (pLambdaBinding2 _sym)
          ]
   where
     pLambdaBindingCommaBindList :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
     pLambdaBindingCommaBindList _sym =
       iLambdaBindingCommaBindList <$> pCommaBindList
-    pLambdaBindingBind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
-    pLambdaBindingBind _sym =
-      iLambdaBindingBind <$> (pHiddenBind _sym)
-    pLambdaBinding3 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
-    pLambdaBinding3 _sym =
-      iLambdaBinding3 <$> (pHiddenBind _sym) <*> pMaybe (pPair pColonTok (pHiddenType _sym))
+    pLambdaBinding2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
+    pLambdaBinding2 _sym =
+      iLambdaBinding2 <$> (pHiddenBind _sym) <*> pMaybe (pPair pColonTok (pHiddenType _sym))
 
 pLoopExpression :: Parser (MoveTerm LoopExpressionL)
 pLoopExpression = do
