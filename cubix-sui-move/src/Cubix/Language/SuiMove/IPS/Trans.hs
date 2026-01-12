@@ -77,7 +77,8 @@ instance Trans Modularized.Identifier where
 
 transBinaryExpr :: Modularized.MoveTerm Modularized.BinaryExpressionL -> MSuiMoveTerm ExpressionL
 transBinaryExpr (Modularized.BinaryExpression1' lhs _ rhs) =
-  Binary' LogicOr' (translate' lhs) (translate' rhs)
+  -- Implies operator (..) - no direct equivalent in parametric syntax, keep as-is
+  Modularized.iBinaryExpression1 (translate lhs) Modularized.iEqualsSignEqualsSignGreaterThanSignTok (translate rhs)
 transBinaryExpr (Modularized.BinaryExpression2' lhs _ rhs) =
   Binary' LogicOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression3' lhs _ rhs) =
@@ -288,8 +289,7 @@ instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
     Modularized.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
   untrans (ExpressionIsHiddenExpression (Unary' op expr)) =
     Modularized.iHiddenExpressionUnaryExpression $ untransUnaryOp op (fromProjF expr)
-  untrans (ExpressionIsHiddenExpression e) =
-    error $ "Cannot untranslate ExpressionIsHiddenExpression for non-Binary/Unary expression: " ++ show e
+  untrans (ExpressionIsHiddenExpression e) = untranslate' e
 
 untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.BinaryExpressionL
 untransBinaryOp LogicOr' lhs rhs  = Modularized.iBinaryExpression2 (untranslate lhs) (inject Modularized.VerticalLineVerticalLineTok) (untranslate rhs)

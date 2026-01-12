@@ -15,7 +15,7 @@ import Cubix.Language.SuiMove.Modularized qualified as M
 bannedCons :: [Name]
 bannedCons =
   [ 'M.Identifier
-  , 'M.BinaryExpression1
+  -- , 'M.BinaryExpression1  -- Implies operator - kept as-is
   , 'M.BinaryExpression2
   , 'M.BinaryExpression3
   , 'M.BinaryExpression4
