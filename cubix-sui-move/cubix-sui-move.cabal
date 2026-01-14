@@ -45,6 +45,7 @@ common dependencies
     , base >= 4.19.2.0
     , bytestring ^>= 0.12
     , containers >= 0.6.8
+    , compstrat ^>= 0.1.0.3
     , comptrans >= 0.1.0.7
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2
@@ -82,6 +83,7 @@ library
   import: dependencies
   hs-source-dirs: src
   exposed-modules:
+    Cubix.Language.SuiMove.Parse
     Cubix.Language.SuiMove.ParsePretty
     Cubix.Language.SuiMove.IPS
     Cubix.Language.SuiMove.IPS.Trans

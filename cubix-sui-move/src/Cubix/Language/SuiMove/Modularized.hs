@@ -26,47 +26,6 @@ import Data.Comp.Multi (Term)
 -- Labels
 --------------------------------------------------------------------------------
 
-data HiddenBindL
-data HiddenBindInternal0L
-data HiddenEnumIdentifierL
-data HiddenEnumItemL
-data HiddenEnumSignatureL
-data HiddenExistsL
-data HiddenExpressionL
-data HiddenExpressionTermL
-data HiddenFieldIdentifierL
-data HiddenForallL
-data HiddenFunctionIdentifierL
-data HiddenFunctionItemL
-data HiddenFunctionSignatureL
-data HiddenLiteralValueL
-data HiddenMacroSignatureL
-data HiddenMatchBodyL
-data HiddenModuleIdentifierL
-data HiddenReferenceL
-data HiddenReservedIdentifierL
-data HiddenSpecAbortIfL
-data HiddenSpecAbortWithOrModifiesL
-data HiddenSpecAbortWithOrModifiesInternal0L
-data HiddenSpecBlockMemeberL
-data HiddenSpecBlockTargetL
-data HiddenSpecConditionL
-data HiddenSpecConditionInternal0L
-data HiddenSpecConditionKindL
-data HiddenSpecFunctionL
-data HiddenSpecFunctionSignatureL
-data HiddenSpreadOperatorL
-data HiddenStructIdentifierL
-data HiddenStructItemL
-data HiddenStructSignatureL
-data HiddenTypeL
-data HiddenTypeIdentifierL
-data HiddenTypeParameterIdentifierL
-data HiddenUnaryExpressionL
-data HiddenUnaryExpressionInternal0L
-data HiddenVariableIdentifierL
-data HiddenVariantIdentifierL
-data HiddenWhitespaceL
 data AbilityL
 data AbilityDeclsL
 data AbortExpressionL
@@ -124,6 +83,47 @@ data FunctionParametersInternal0L
 data FunctionTypeL
 data FunctionTypeParametersL
 data HexStringLiteralL
+data HidBindL
+data HidBindInternal0L
+data HidEnumIdentifierL
+data HidEnumItemL
+data HidEnumSignatureL
+data HidExistsL
+data HidExpressionL
+data HidExpressionTermL
+data HidFieldIdentifierL
+data HidForallL
+data HidFunctionIdentifierL
+data HidFunctionItemL
+data HidFunctionSignatureL
+data HidLiteralValueL
+data HidMacroSignatureL
+data HidMatchBodyL
+data HidModuleIdentifierL
+data HidReferenceL
+data HidReservedIdentifierL
+data HidSpecAbortIfL
+data HidSpecAbortWithOrModifiesL
+data HidSpecAbortWithOrModifiesInternal0L
+data HidSpecBlockMemeberL
+data HidSpecBlockTargetL
+data HidSpecConditionL
+data HidSpecConditionInternal0L
+data HidSpecConditionKindL
+data HidSpecFunctionL
+data HidSpecFunctionSignatureL
+data HidSpreadOperatorL
+data HidStructIdentifierL
+data HidStructItemL
+data HidStructSignatureL
+data HidTypeL
+data HidTypeIdentifierL
+data HidTypeParameterIdentifierL
+data HidUnaryExpressionL
+data HidUnaryExpressionInternal0L
+data HidVariableIdentifierL
+data HidVariantIdentifierL
+data HidWhitespaceL
 data IdentifiedExpressionL
 data IdentifierL
 data IfExpressionL
@@ -538,145 +538,214 @@ data ModuleBodyInternal1 e l where
   ModuleBodyInternal1Constant
     :: e ConstantL
     -> ModuleBodyInternal1 e ModuleBodyInternal1L
-  ModuleBodyInternal1FunctionItem
-    :: e HiddenFunctionItemL
+  ModuleBodyInternal1HidFunctionItem
+    :: e HidFunctionItemL
     -> ModuleBodyInternal1 e ModuleBodyInternal1L
-  ModuleBodyInternal1StructItem
-    :: e HiddenStructItemL
+  ModuleBodyInternal1HidStructItem
+    :: e HidStructItemL
     -> ModuleBodyInternal1 e ModuleBodyInternal1L
-  ModuleBodyInternal1EnumItem
-    :: e HiddenEnumItemL
+  ModuleBodyInternal1HidEnumItem
+    :: e HidEnumItemL
     -> ModuleBodyInternal1 e ModuleBodyInternal1L
   ModuleBodyInternal1SpecBlock
     :: e SpecBlockL
     -> ModuleBodyInternal1 e ModuleBodyInternal1L
 
-data HiddenEnumItem e l where
-  HiddenEnumItem
-    :: e EnumDefinitionL
-    -> HiddenEnumItem e HiddenEnumItemL
-
-data EnumDefinition e l where
-  EnumDefinition
-    :: e (Maybe PublicTokL)
-    -> e HiddenEnumSignatureL
-    -> e EnumVariantsL
-    -> e (Maybe PostfixAbilityDeclsL)
-    -> EnumDefinition e EnumDefinitionL
-
-data HiddenEnumSignature e l where
-  HiddenEnumSignature
-    :: e EnumTokL
-    -> e HiddenEnumIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e (Maybe AbilityDeclsL)
-    -> HiddenEnumSignature e HiddenEnumSignatureL
-
-data HiddenEnumIdentifier e l where
-  HiddenEnumIdentifier
+data Constant e l where
+  Constant
     :: e IdentifierL
-    -> HiddenEnumIdentifier e HiddenEnumIdentifierL
+    -> e HidTypeL
+    -> e HidExpressionL
+    -> Constant e ConstantL
 
-data Identifier e l where
-  Identifier
-    :: Text
-    -> Identifier e IdentifierL
+data HidExpression e l where
+  HidExpressionCallExpression
+    :: e CallExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionMacroCallExpression
+    :: e MacroCallExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionLambdaExpression
+    :: e LambdaExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionIfExpression
+    :: e IfExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionWhileExpression
+    :: e WhileExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionReturnExpression
+    :: e ReturnExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionAbortExpression
+    :: e AbortExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionAssignExpression
+    :: e AssignExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionHidUnaryExpression
+    :: e HidUnaryExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionBinaryExpression
+    :: e BinaryExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionCastExpression
+    :: e CastExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionQuantifierExpression
+    :: e QuantifierExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionMatchExpression
+    :: e MatchExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionVectorExpression
+    :: e VectorExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionLoopExpression
+    :: e LoopExpressionL
+    -> HidExpression e HidExpressionL
+  HidExpressionIdentifiedExpression
+    :: e IdentifiedExpressionL
+    -> HidExpression e HidExpressionL
 
-data AbilityDecls e l where
-  AbilityDecls
-    :: e HasTokL
-    -> e [AbilityL]
-    -> AbilityDecls e AbilityDeclsL
+data AbortExpression e l where
+  AbortExpression
+    :: e AbortTokL
+    -> e (Maybe HidExpressionL)
+    -> AbortExpression e AbortExpressionL
 
-data Ability e l where
-  AbilityCopy
-    :: e CopyTokL
-    -> Ability e AbilityL
-  AbilityDrop
-    :: e DropTokL
-    -> Ability e AbilityL
-  AbilityStore
-    :: e StoreTokL
-    -> Ability e AbilityL
-  AbilityKey
-    :: e KeyTokL
-    -> Ability e AbilityL
+data AssignExpression e l where
+  AssignExpression
+    :: e ((HidUnaryExpressionL, EqualsSignTokL), HidExpressionL)
+    -> AssignExpression e AssignExpressionL
 
-data TypeParameters e l where
-  TypeParameters
-    :: e [TypeParameterL]
-    -> TypeParameters e TypeParametersL
+data HidUnaryExpression e l where
+  HidUnaryExpression
+    :: e HidUnaryExpressionInternal0L
+    -> HidUnaryExpression e HidUnaryExpressionL
 
-data TypeParameter e l where
-  TypeParameter
-    :: e (Maybe DollarSignTokL)
-    -> e (Maybe PhantomTokL)
-    -> e HiddenTypeParameterIdentifierL
-    -> e (Maybe (ColonTokL, [AbilityL]))
-    -> TypeParameter e TypeParameterL
+data HidUnaryExpressionInternal0 e l where
+  HidUnaryExpressionInternal0UnaryExpression
+    :: e UnaryExpressionL
+    -> HidUnaryExpressionInternal0 e HidUnaryExpressionInternal0L
+  HidUnaryExpressionInternal0BorrowExpression
+    :: e BorrowExpressionL
+    -> HidUnaryExpressionInternal0 e HidUnaryExpressionInternal0L
+  HidUnaryExpressionInternal0DereferenceExpression
+    :: e DereferenceExpressionL
+    -> HidUnaryExpressionInternal0 e HidUnaryExpressionInternal0L
+  HidUnaryExpressionInternal0MoveOrCopyExpression
+    :: e MoveOrCopyExpressionL
+    -> HidUnaryExpressionInternal0 e HidUnaryExpressionInternal0L
+  HidUnaryExpressionInternal0HidExpressionTerm
+    :: e HidExpressionTermL
+    -> HidUnaryExpressionInternal0 e HidUnaryExpressionInternal0L
 
-data HiddenTypeParameterIdentifier e l where
-  HiddenTypeParameterIdentifier
-    :: e IdentifierL
-    -> HiddenTypeParameterIdentifier e HiddenTypeParameterIdentifierL
+data BorrowExpression e l where
+  BorrowExpression
+    :: e (HidReferenceL, HidExpressionL)
+    -> BorrowExpression e BorrowExpressionL
 
-data EnumVariants e l where
-  EnumVariants
-    :: e [VariantL]
-    -> EnumVariants e EnumVariantsL
+data HidReference e l where
+  HidReferenceImmRef
+    :: e ImmRefL
+    -> HidReference e HidReferenceL
+  HidReferenceMutRef
+    :: e MutRefL
+    -> HidReference e HidReferenceL
 
-data Variant e l where
-  Variant
-    :: e HiddenVariantIdentifierL
-    -> e (Maybe DatatypeFieldsL)
-    -> Variant e VariantL
+data ImmRef e l where
+  ImmRef
+    :: e AmpersandTokL
+    -> ImmRef e ImmRefL
 
-data HiddenVariantIdentifier e l where
-  HiddenVariantIdentifier
-    :: e IdentifierL
-    -> HiddenVariantIdentifier e HiddenVariantIdentifierL
+data MutRef e l where
+  MutRef
+    :: e AmpersandTokL
+    -> e MutTokL
+    -> MutRef e MutRefL
 
-data DatatypeFields e l where
-  DatatypeFieldsPositionalFields
-    :: e PositionalFieldsL
-    -> DatatypeFields e DatatypeFieldsL
-  DatatypeFieldsNamedFields
-    :: e NamedFieldsL
-    -> DatatypeFields e DatatypeFieldsL
+data DereferenceExpression e l where
+  DereferenceExpression
+    :: e (AsteriskTokL, HidExpressionL)
+    -> DereferenceExpression e DereferenceExpressionL
 
-data NamedFields e l where
-  NamedFields
-    :: e [FieldAnnotationL]
-    -> NamedFields e NamedFieldsL
+data HidExpressionTerm e l where
+  HidExpressionTermCallExpression
+    :: e CallExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermBreakExpression
+    :: e BreakExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermContinueExpression
+    :: e ContinueExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermNameExpression
+    :: e NameExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermMacroCallExpression
+    :: e MacroCallExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermPackExpression
+    :: e PackExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermHidLiteralValue
+    :: e HidLiteralValueL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermUnitExpression
+    :: e UnitExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermExpressionList
+    :: e ExpressionListL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermAnnotationExpression
+    :: e AnnotationExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermBlock
+    :: e BlockL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermSpecBlock
+    :: e SpecBlockL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermIfExpression
+    :: e IfExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermDotExpression
+    :: e DotExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermIndexExpression
+    :: e IndexExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermVectorExpression
+    :: e VectorExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
+  HidExpressionTermMatchExpression
+    :: e MatchExpressionL
+    -> HidExpressionTerm e HidExpressionTermL
 
-data FieldAnnotation e l where
-  FieldAnnotation
-    :: e HiddenFieldIdentifierL
-    -> e ColonTokL
-    -> e HiddenTypeL
-    -> FieldAnnotation e FieldAnnotationL
+data AnnotationExpression e l where
+  AnnotationExpression
+    :: e HidExpressionL
+    -> e HidTypeL
+    -> e RightParenthesisTokL
+    -> AnnotationExpression e AnnotationExpressionL
 
-data HiddenFieldIdentifier e l where
-  HiddenFieldIdentifier
-    :: e IdentifierL
-    -> HiddenFieldIdentifier e HiddenFieldIdentifierL
-
-data HiddenType e l where
-  HiddenTypeApplyType
+data HidType e l where
+  HidTypeApplyType
     :: e ApplyTypeL
-    -> HiddenType e HiddenTypeL
-  HiddenTypeRefType
+    -> HidType e HidTypeL
+  HidTypeRefType
     :: e RefTypeL
-    -> HiddenType e HiddenTypeL
-  HiddenTypeTupleType
+    -> HidType e HidTypeL
+  HidTypeTupleType
     :: e TupleTypeL
-    -> HiddenType e HiddenTypeL
-  HiddenTypeFunctionType
+    -> HidType e HidTypeL
+  HidTypeFunctionType
     :: e FunctionTypeL
-    -> HiddenType e HiddenTypeL
-  HiddenTypePrimitiveType
+    -> HidType e HidTypeL
+  HidTypePrimitiveType
     :: e PrimitiveTypeL
-    -> HiddenType e HiddenTypeL
+    -> HidType e HidTypeL
 
 data ApplyType e l where
   ApplyType
@@ -713,7 +782,7 @@ data ModuleAccess e l where
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess6
-    :: e HiddenModuleIdentifierL
+    :: e HidModuleIdentifierL
     -> e (Maybe TypeArgumentsL)
     -> e ColonColonTokL
     -> e IdentifierL
@@ -727,45 +796,50 @@ data ModuleAccess e l where
     -> e (Maybe TypeArgumentsL)
     -> ModuleAccess e ModuleAccessL
   ModuleAccessMember
-    :: e HiddenReservedIdentifierL
+    :: e HidReservedIdentifierL
     -> ModuleAccess e ModuleAccessL
 
-data HiddenModuleIdentifier e l where
-  HiddenModuleIdentifier
+data HidModuleIdentifier e l where
+  HidModuleIdentifier
     :: e IdentifierL
-    -> HiddenModuleIdentifier e HiddenModuleIdentifierL
+    -> HidModuleIdentifier e HidModuleIdentifierL
 
-data HiddenReservedIdentifier e l where
-  HiddenReservedIdentifierForall
-    :: e HiddenForallL
-    -> HiddenReservedIdentifier e HiddenReservedIdentifierL
-  HiddenReservedIdentifierExists
-    :: e HiddenExistsL
-    -> HiddenReservedIdentifier e HiddenReservedIdentifierL
+data Identifier e l where
+  Identifier
+    :: Text
+    -> Identifier e IdentifierL
 
-data HiddenExists e l where
-  HiddenExists
+data HidReservedIdentifier e l where
+  HidReservedIdentifierHidForall
+    :: e HidForallL
+    -> HidReservedIdentifier e HidReservedIdentifierL
+  HidReservedIdentifierHidExists
+    :: e HidExistsL
+    -> HidReservedIdentifier e HidReservedIdentifierL
+
+data HidExists e l where
+  HidExists
     :: e ExistsTokL
-    -> HiddenExists e HiddenExistsL
+    -> HidExists e HidExistsL
 
-data HiddenForall e l where
-  HiddenForall
+data HidForall e l where
+  HidForall
     :: e ForallTokL
-    -> HiddenForall e HiddenForallL
+    -> HidForall e HidForallL
 
 data ModuleIdentity e l where
   ModuleIdentity
     :: e ModuleIdentityInternal0L
     -> e ColonColonTokL
-    -> e HiddenModuleIdentifierL
+    -> e HidModuleIdentifierL
     -> ModuleIdentity e ModuleIdentityL
 
 data ModuleIdentityInternal0 e l where
   ModuleIdentityInternal0NumLiteral
     :: e NumLiteralL
     -> ModuleIdentityInternal0 e ModuleIdentityInternal0L
-  ModuleIdentityInternal0ModuleIdentifier
-    :: e HiddenModuleIdentifierL
+  ModuleIdentityInternal0HidModuleIdentifier
+    :: e HidModuleIdentifierL
     -> ModuleIdentityInternal0 e ModuleIdentityInternal0L
 
 data NumLiteral e l where
@@ -796,18 +870,18 @@ data NumLiteralInternal0 e l where
 
 data TypeArguments e l where
   TypeArguments
-    :: e [HiddenTypeL]
+    :: e [HidTypeL]
     -> TypeArguments e TypeArgumentsL
 
 data FunctionType e l where
   FunctionType
     :: e FunctionTypeParametersL
-    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
+    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HidTypeL))
     -> FunctionType e FunctionTypeL
 
 data FunctionTypeParameters e l where
   FunctionTypeParameters
-    :: e [HiddenTypeL]
+    :: e [HidTypeL]
     -> FunctionTypeParameters e FunctionTypeParametersL
 
 data PrimitiveType e l where
@@ -844,416 +918,49 @@ data PrimitiveType e l where
 
 data RefType e l where
   RefType
-    :: e HiddenReferenceL
-    -> e HiddenTypeL
+    :: e HidReferenceL
+    -> e HidTypeL
     -> RefType e RefTypeL
-
-data HiddenReference e l where
-  HiddenReferenceImmRef
-    :: e ImmRefL
-    -> HiddenReference e HiddenReferenceL
-  HiddenReferenceMutRef
-    :: e MutRefL
-    -> HiddenReference e HiddenReferenceL
-
-data ImmRef e l where
-  ImmRef
-    :: e AmpersandTokL
-    -> ImmRef e ImmRefL
-
-data MutRef e l where
-  MutRef
-    :: e AmpersandTokL
-    -> e MutTokL
-    -> MutRef e MutRefL
 
 data TupleType e l where
   TupleType
-    :: e [HiddenTypeL]
+    :: e [HidTypeL]
     -> TupleType e TupleTypeL
-
-data PositionalFields e l where
-  PositionalFields
-    :: e [HiddenTypeL]
-    -> PositionalFields e PositionalFieldsL
-
-data PostfixAbilityDecls e l where
-  PostfixAbilityDecls
-    :: e [AbilityL]
-    -> PostfixAbilityDecls e PostfixAbilityDeclsL
-
-data HiddenFunctionItem e l where
-  HiddenFunctionItemNativeFunctionDefinition
-    :: e NativeFunctionDefinitionL
-    -> HiddenFunctionItem e HiddenFunctionItemL
-  HiddenFunctionItemMacroFunctionDefinition
-    :: e MacroFunctionDefinitionL
-    -> HiddenFunctionItem e HiddenFunctionItemL
-  HiddenFunctionItemFunctionDefinition
-    :: e FunctionDefinitionL
-    -> HiddenFunctionItem e HiddenFunctionItemL
-
-data FunctionDefinition e l where
-  FunctionDefinition
-    :: e HiddenFunctionSignatureL
-    -> e BlockL
-    -> FunctionDefinition e FunctionDefinitionL
-
-data HiddenFunctionSignature e l where
-  HiddenFunctionSignature
-    :: e (Maybe ModifierL)
-    -> e (Maybe ModifierL)
-    -> e (Maybe ModifierL)
-    -> e FunTokL
-    -> e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e FunctionParametersL
-    -> e (Maybe RetTypeL)
-    -> HiddenFunctionSignature e HiddenFunctionSignatureL
-
-data HiddenFunctionIdentifier e l where
-  HiddenFunctionIdentifier
-    :: e IdentifierL
-    -> HiddenFunctionIdentifier e HiddenFunctionIdentifierL
-
-data FunctionParameters e l where
-  FunctionParameters
-    :: e [FunctionParametersInternal0L]
-    -> FunctionParameters e FunctionParametersL
-
-data FunctionParametersInternal0 e l where
-  FunctionParametersInternal0MutFunctionParameter
-    :: e MutFunctionParameterL
-    -> FunctionParametersInternal0 e FunctionParametersInternal0L
-  FunctionParametersInternal0FunctionParameter
-    :: e FunctionParameterL
-    -> FunctionParametersInternal0 e FunctionParametersInternal0L
-
-data FunctionParameter e l where
-  FunctionParameter
-    :: e FunctionParameterInternal0L
-    -> e ColonTokL
-    -> e HiddenTypeL
-    -> FunctionParameter e FunctionParameterL
-
-data FunctionParameterInternal0 e l where
-  FunctionParameterInternal0Name
-    :: e HiddenVariableIdentifierL
-    -> FunctionParameterInternal0 e FunctionParameterInternal0L
-  FunctionParameterInternal02
-    :: e DollarSignTokL
-    -> e HiddenVariableIdentifierL
-    -> FunctionParameterInternal0 e FunctionParameterInternal0L
-
-data HiddenVariableIdentifier e l where
-  HiddenVariableIdentifier
-    :: e IdentifierL
-    -> HiddenVariableIdentifier e HiddenVariableIdentifierL
-
-data MutFunctionParameter e l where
-  MutFunctionParameter
-    :: e MutTokL
-    -> e FunctionParameterL
-    -> MutFunctionParameter e MutFunctionParameterL
-
-data Modifier e l where
-  Modifier1
-    :: e PublicTokL
-    -> e (Maybe ModifierInternal0L)
-    -> Modifier e ModifierL
-  ModifierEntry
-    :: e EntryTokL
-    -> Modifier e ModifierL
-  ModifierNative
-    :: e NativeTokL
-    -> Modifier e ModifierL
-
-data ModifierInternal0 e l where
-  ModifierInternal0Package
-    :: e PackageTokL
-    -> ModifierInternal0 e ModifierInternal0L
-  ModifierInternal0Friend
-    :: e FriendTokL
-    -> ModifierInternal0 e ModifierInternal0L
-
-data RetType e l where
-  RetType
-    :: e ColonTokL
-    -> e HiddenTypeL
-    -> RetType e RetTypeL
 
 data Block e l where
   Block
     :: e LeftCurlyBracketTokL
     -> e [UseDeclarationL]
     -> e [BlockItemL]
-    -> e (Maybe HiddenExpressionL)
+    -> e (Maybe HidExpressionL)
     -> e RightCurlyBracketTokL
     -> Block e BlockL
 
-data HiddenExpression e l where
-  HiddenExpressionCallExpression
-    :: e CallExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionMacroCallExpression
-    :: e MacroCallExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionLambdaExpression
-    :: e LambdaExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionIfExpression
-    :: e IfExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionWhileExpression
-    :: e WhileExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionReturnExpression
-    :: e ReturnExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionAbortExpression
-    :: e AbortExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionAssignExpression
-    :: e AssignExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionUnaryExpression
-    :: e HiddenUnaryExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionBinaryExpression
-    :: e BinaryExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionCastExpression
-    :: e CastExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionQuantifierExpression
-    :: e QuantifierExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionMatchExpression
-    :: e MatchExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionVectorExpression
-    :: e VectorExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionLoopExpression
-    :: e LoopExpressionL
-    -> HiddenExpression e HiddenExpressionL
-  HiddenExpressionIdentifiedExpression
-    :: e IdentifiedExpressionL
-    -> HiddenExpression e HiddenExpressionL
+data BlockItem e l where
+  BlockItem
+    :: e BlockItemInternal0L
+    -> e SemicolonTokL
+    -> BlockItem e BlockItemL
 
-data HiddenUnaryExpression e l where
-  HiddenUnaryExpression
-    :: e HiddenUnaryExpressionInternal0L
-    -> HiddenUnaryExpression e HiddenUnaryExpressionL
+data BlockItemInternal0 e l where
+  BlockItemInternal0HidExpression
+    :: e HidExpressionL
+    -> BlockItemInternal0 e BlockItemInternal0L
+  BlockItemInternal0LetStatement
+    :: e LetStatementL
+    -> BlockItemInternal0 e BlockItemInternal0L
 
-data HiddenUnaryExpressionInternal0 e l where
-  HiddenUnaryExpressionInternal0UnaryExpression
-    :: e UnaryExpressionL
-    -> HiddenUnaryExpressionInternal0 e HiddenUnaryExpressionInternal0L
-  HiddenUnaryExpressionInternal0BorrowExpression
-    :: e BorrowExpressionL
-    -> HiddenUnaryExpressionInternal0 e HiddenUnaryExpressionInternal0L
-  HiddenUnaryExpressionInternal0DereferenceExpression
-    :: e DereferenceExpressionL
-    -> HiddenUnaryExpressionInternal0 e HiddenUnaryExpressionInternal0L
-  HiddenUnaryExpressionInternal0MoveOrCopyExpression
-    :: e MoveOrCopyExpressionL
-    -> HiddenUnaryExpressionInternal0 e HiddenUnaryExpressionInternal0L
-  HiddenUnaryExpressionInternal0ExpressionTerm
-    :: e HiddenExpressionTermL
-    -> HiddenUnaryExpressionInternal0 e HiddenUnaryExpressionInternal0L
-
-data HiddenExpressionTerm e l where
-  HiddenExpressionTermCallExpression
-    :: e CallExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermBreakExpression
-    :: e BreakExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermContinueExpression
-    :: e ContinueExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermNameExpression
-    :: e NameExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermMacroCallExpression
-    :: e MacroCallExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermPackExpression
-    :: e PackExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermLiteralValue
-    :: e HiddenLiteralValueL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermUnitExpression
-    :: e UnitExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermExpressionList
-    :: e ExpressionListL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermAnnotationExpression
-    :: e AnnotationExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermBlock
-    :: e BlockL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermSpecBlock
-    :: e SpecBlockL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermIfExpression
-    :: e IfExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermDotExpression
-    :: e DotExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermIndexExpression
-    :: e IndexExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermVectorExpression
-    :: e VectorExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-  HiddenExpressionTermMatchExpression
-    :: e MatchExpressionL
-    -> HiddenExpressionTerm e HiddenExpressionTermL
-
-data HiddenLiteralValue e l where
-  HiddenLiteralValueAddressLiteral
-    :: e AddressLiteralL
-    -> HiddenLiteralValue e HiddenLiteralValueL
-  HiddenLiteralValueBoolLiteral
-    :: e BoolLiteralL
-    -> HiddenLiteralValue e HiddenLiteralValueL
-  HiddenLiteralValueNumLiteral
-    :: e NumLiteralL
-    -> HiddenLiteralValue e HiddenLiteralValueL
-  HiddenLiteralValueHexStringLiteral
-    :: e HexStringLiteralL
-    -> HiddenLiteralValue e HiddenLiteralValueL
-  HiddenLiteralValueByteStringLiteral
-    :: e ByteStringLiteralL
-    -> HiddenLiteralValue e HiddenLiteralValueL
-
-data AddressLiteral e l where
-  AddressLiteral
-    :: Text
-    -> AddressLiteral e AddressLiteralL
-
-data BoolLiteral e l where
-  BoolLiteralTrue
-    :: e TrueTokL
-    -> BoolLiteral e BoolLiteralL
-  BoolLiteralFalse
-    :: e FalseTokL
-    -> BoolLiteral e BoolLiteralL
-
-data ByteStringLiteral e l where
-  ByteStringLiteral
-    :: Text
-    -> ByteStringLiteral e ByteStringLiteralL
-
-data HexStringLiteral e l where
-  HexStringLiteral
-    :: Text
-    -> HexStringLiteral e HexStringLiteralL
-
-data AnnotationExpression e l where
-  AnnotationExpression
-    :: e HiddenExpressionL
-    -> e HiddenTypeL
-    -> e RightParenthesisTokL
-    -> AnnotationExpression e AnnotationExpressionL
-
-data BreakExpression e l where
-  BreakExpression
-    :: e BreakTokL
-    -> e (Maybe LabelL)
-    -> e (Maybe HiddenExpressionL)
-    -> BreakExpression e BreakExpressionL
-
-data Label e l where
-  Label
-    :: e ApostropheTokL
-    -> e IdentifierL
-    -> Label e LabelL
-
-data CallExpression e l where
-  CallExpression
-    :: e (NameExpressionL, ArgListL)
-    -> CallExpression e CallExpressionL
-
-data ArgList e l where
-  ArgList
-    :: e [HiddenExpressionL]
-    -> ArgList e ArgListL
-
-data NameExpression e l where
-  NameExpression
-    :: e (Maybe ColonColonTokL)
-    -> e ModuleAccessL
-    -> NameExpression e NameExpressionL
-
-data ContinueExpression e l where
-  ContinueExpression
-    :: e ContinueTokL
-    -> e (Maybe LabelL)
-    -> ContinueExpression e ContinueExpressionL
-
-data DotExpression e l where
-  DotExpression
-    :: e ((HiddenExpressionTermL, FullStopTokL), HiddenExpressionTermL)
-    -> DotExpression e DotExpressionL
-
-data ExpressionList e l where
-  ExpressionList
-    :: e [HiddenExpressionL]
-    -> ExpressionList e ExpressionListL
-
-data IfExpression e l where
-  IfExpression
-    :: e (((IfTokL, HiddenExpressionL), HiddenExpressionL), Maybe (ElseTokL, HiddenExpressionL))
-    -> IfExpression e IfExpressionL
-
-data IndexExpression e l where
-  IndexExpression
-    :: e (HiddenExpressionTermL, [HiddenExpressionL])
-    -> IndexExpression e IndexExpressionL
-
-data MacroCallExpression e l where
-  MacroCallExpression
-    :: e MacroModuleAccessL
-    -> e (Maybe TypeArgumentsL)
-    -> e ArgListL
-    -> MacroCallExpression e MacroCallExpressionL
-
-data MacroModuleAccess e l where
-  MacroModuleAccess
-    :: e ModuleAccessL
-    -> e ExclamationMarkTokL
-    -> MacroModuleAccess e MacroModuleAccessL
-
-data MatchExpression e l where
-  MatchExpression
-    :: e MatchTokL
-    -> e HiddenExpressionL
-    -> e HiddenMatchBodyL
-    -> MatchExpression e MatchExpressionL
-
-data HiddenMatchBody e l where
-  HiddenMatchBody
-    :: e [MatchArmL]
-    -> HiddenMatchBody e HiddenMatchBodyL
-
-data MatchArm e l where
-  MatchArm
-    :: e BindListL
-    -> e (Maybe MatchConditionL)
-    -> e EqualsSignGreaterThanSignTokL
-    -> e HiddenExpressionL
-    -> MatchArm e MatchArmL
+data LetStatement e l where
+  LetStatement
+    :: e LetTokL
+    -> e BindListL
+    -> e (Maybe (ColonTokL, HidTypeL))
+    -> e (Maybe (EqualsSignTokL, HidExpressionL))
+    -> LetStatement e LetStatementL
 
 data BindList e l where
-  BindListBind
-    :: e HiddenBindL
+  BindListHidBind
+    :: e HidBindL
     -> BindList e BindListL
   BindListCommaBindList
     :: e CommaBindListL
@@ -1262,40 +969,36 @@ data BindList e l where
     :: e OrBindListL
     -> BindList e BindListL
 
-data HiddenBind e l where
-  HiddenBindBindInternal0
-    :: e HiddenBindInternal0L
-    -> HiddenBind e HiddenBindL
-  HiddenBindBindUnpack
+data CommaBindList e l where
+  CommaBindList
+    :: e [HidBindL]
+    -> CommaBindList e CommaBindListL
+
+data HidBind e l where
+  HidBindHidBindInternal0
+    :: e HidBindInternal0L
+    -> HidBind e HidBindL
+  HidBindBindUnpack
     :: e BindUnpackL
-    -> HiddenBind e HiddenBindL
-  HiddenBindAtBind
+    -> HidBind e HidBindL
+  HidBindAtBind
     :: e AtBindL
-    -> HiddenBind e HiddenBindL
-  HiddenBindLiteralValue
-    :: e HiddenLiteralValueL
-    -> HiddenBind e HiddenBindL
-
-data HiddenBindInternal0 e l where
-  HiddenBindInternal0MutBindVar
-    :: e MutBindVarL
-    -> HiddenBindInternal0 e HiddenBindInternal0L
-  HiddenBindInternal0VariableIdentifier
-    :: e HiddenVariableIdentifierL
-    -> HiddenBindInternal0 e HiddenBindInternal0L
-
-data MutBindVar e l where
-  MutBindVar
-    :: e MutTokL
-    -> e HiddenVariableIdentifierL
-    -> MutBindVar e MutBindVarL
+    -> HidBind e HidBindL
+  HidBindHidLiteralValue
+    :: e HidLiteralValueL
+    -> HidBind e HidBindL
 
 data AtBind e l where
   AtBind
-    :: e HiddenVariableIdentifierL
+    :: e HidVariableIdentifierL
     -> e CommercialAtTokL
     -> e BindListL
     -> AtBind e AtBindL
+
+data HidVariableIdentifier e l where
+  HidVariableIdentifier
+    :: e IdentifierL
+    -> HidVariableIdentifier e HidVariableIdentifierL
 
 data BindUnpack e l where
   BindUnpack
@@ -1329,14 +1032,14 @@ data BindField e l where
     :: e BindListL
     -> e (Maybe (ColonTokL, BindListL))
     -> BindField e BindFieldL
-  BindFieldSpreadOperator
-    :: e HiddenSpreadOperatorL
+  BindFieldHidSpreadOperator
+    :: e HidSpreadOperatorL
     -> BindField e BindFieldL
 
-data HiddenSpreadOperator e l where
-  HiddenSpreadOperator
+data HidSpreadOperator e l where
+  HidSpreadOperator
     :: e FullStopFullStopTokL
-    -> HiddenSpreadOperator e HiddenSpreadOperatorL
+    -> HidSpreadOperator e HidSpreadOperatorL
 
 data MutBindField e l where
   MutBindField
@@ -1349,313 +1052,72 @@ data BindPositionalFields e l where
     :: e [BindNamedFieldsInternal0L]
     -> BindPositionalFields e BindPositionalFieldsL
 
-data CommaBindList e l where
-  CommaBindList
-    :: e [HiddenBindL]
-    -> CommaBindList e CommaBindListL
+data NameExpression e l where
+  NameExpression
+    :: e (Maybe ColonColonTokL)
+    -> e ModuleAccessL
+    -> NameExpression e NameExpressionL
+
+data HidBindInternal0 e l where
+  HidBindInternal0MutBindVar
+    :: e MutBindVarL
+    -> HidBindInternal0 e HidBindInternal0L
+  HidBindInternal0HidVariableIdentifier
+    :: e HidVariableIdentifierL
+    -> HidBindInternal0 e HidBindInternal0L
+
+data MutBindVar e l where
+  MutBindVar
+    :: e MutTokL
+    -> e HidVariableIdentifierL
+    -> MutBindVar e MutBindVarL
+
+data HidLiteralValue e l where
+  HidLiteralValueAddressLiteral
+    :: e AddressLiteralL
+    -> HidLiteralValue e HidLiteralValueL
+  HidLiteralValueBoolLiteral
+    :: e BoolLiteralL
+    -> HidLiteralValue e HidLiteralValueL
+  HidLiteralValueNumLiteral
+    :: e NumLiteralL
+    -> HidLiteralValue e HidLiteralValueL
+  HidLiteralValueHexStringLiteral
+    :: e HexStringLiteralL
+    -> HidLiteralValue e HidLiteralValueL
+  HidLiteralValueByteStringLiteral
+    :: e ByteStringLiteralL
+    -> HidLiteralValue e HidLiteralValueL
+
+data AddressLiteral e l where
+  AddressLiteral
+    :: Text
+    -> AddressLiteral e AddressLiteralL
+
+data BoolLiteral e l where
+  BoolLiteralTrue
+    :: e TrueTokL
+    -> BoolLiteral e BoolLiteralL
+  BoolLiteralFalse
+    :: e FalseTokL
+    -> BoolLiteral e BoolLiteralL
+
+data ByteStringLiteral e l where
+  ByteStringLiteral
+    :: Text
+    -> ByteStringLiteral e ByteStringLiteralL
+
+data HexStringLiteral e l where
+  HexStringLiteral
+    :: Text
+    -> HexStringLiteral e HexStringLiteralL
 
 data OrBindList e l where
   OrBindList
-    :: e [HiddenBindL]
+    :: e (Maybe LeftParenthesisTokL)
+    -> e [((Maybe LeftParenthesisTokL, HidBindL), Maybe RightParenthesisTokL)]
+    -> e (Maybe RightParenthesisTokL)
     -> OrBindList e OrBindListL
-
-data MatchCondition e l where
-  MatchCondition
-    :: e IfTokL
-    -> e HiddenExpressionL
-    -> MatchCondition e MatchConditionL
-
-data PackExpression e l where
-  PackExpression
-    :: e NameExpressionL
-    -> e FieldInitializeListL
-    -> PackExpression e PackExpressionL
-
-data FieldInitializeList e l where
-  FieldInitializeList
-    :: e [ExpFieldL]
-    -> FieldInitializeList e FieldInitializeListL
-
-data ExpField e l where
-  ExpField
-    :: e HiddenFieldIdentifierL
-    -> e (Maybe (ColonTokL, HiddenExpressionL))
-    -> ExpField e ExpFieldL
-
-data SpecBlock e l where
-  SpecBlock
-    :: e SpecTokL
-    -> e SpecBlockInternal0L
-    -> SpecBlock e SpecBlockL
-
-data SpecBlockInternal0 e l where
-  SpecBlockInternal01
-    :: e (Maybe HiddenSpecBlockTargetL)
-    -> e SpecBodyL
-    -> SpecBlockInternal0 e SpecBlockInternal0L
-  SpecBlockInternal0SpecFunction
-    :: e HiddenSpecFunctionL
-    -> SpecBlockInternal0 e SpecBlockInternal0L
-
-data HiddenSpecBlockTarget e l where
-  HiddenSpecBlockTargetIdentifier
-    :: e IdentifierL
-    -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
-  HiddenSpecBlockTargetModule
-    :: e ModuleTokL
-    -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
-  HiddenSpecBlockTargetSpecBlockTargetSchema
-    :: e SpecBlockTargetSchemaL
-    -> HiddenSpecBlockTarget e HiddenSpecBlockTargetL
-
-data SpecBlockTargetSchema e l where
-  SpecBlockTargetSchema
-    :: e SchemaTokL
-    -> e HiddenStructIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> SpecBlockTargetSchema e SpecBlockTargetSchemaL
-
-data HiddenStructIdentifier e l where
-  HiddenStructIdentifier
-    :: e IdentifierL
-    -> HiddenStructIdentifier e HiddenStructIdentifierL
-
-data HiddenSpecFunction e l where
-  HiddenSpecFunctionNativeSpecFunction
-    :: e NativeSpecFunctionL
-    -> HiddenSpecFunction e HiddenSpecFunctionL
-  HiddenSpecFunctionUsualSpecFunction
-    :: e UsualSpecFunctionL
-    -> HiddenSpecFunction e HiddenSpecFunctionL
-  HiddenSpecFunctionUninterpretedSpecFunction
-    :: e UninterpretedSpecFunctionL
-    -> HiddenSpecFunction e HiddenSpecFunctionL
-
-data NativeSpecFunction e l where
-  NativeSpecFunction
-    :: e NativeTokL
-    -> e HiddenSpecFunctionSignatureL
-    -> NativeSpecFunction e NativeSpecFunctionL
-
-data HiddenSpecFunctionSignature e l where
-  HiddenSpecFunctionSignature
-    :: e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e FunctionParametersL
-    -> e RetTypeL
-    -> HiddenSpecFunctionSignature e HiddenSpecFunctionSignatureL
-
-data UninterpretedSpecFunction e l where
-  UninterpretedSpecFunction
-    :: e HiddenSpecFunctionSignatureL
-    -> UninterpretedSpecFunction e UninterpretedSpecFunctionL
-
-data UsualSpecFunction e l where
-  UsualSpecFunction
-    :: e FunTokL
-    -> e HiddenSpecFunctionSignatureL
-    -> e BlockL
-    -> UsualSpecFunction e UsualSpecFunctionL
-
-data SpecBody e l where
-  SpecBody
-    :: e LeftCurlyBracketTokL
-    -> e [UseDeclarationL]
-    -> e [HiddenSpecBlockMemeberL]
-    -> e RightCurlyBracketTokL
-    -> SpecBody e SpecBodyL
-
-data HiddenSpecBlockMemeber e l where
-  HiddenSpecBlockMemeberSpecInvariant
-    :: e SpecInvariantL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecFunction
-    :: e HiddenSpecFunctionL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecCondition
-    :: e SpecConditionL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecInclude
-    :: e SpecIncludeL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecApply
-    :: e SpecApplyL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecPragma
-    :: e SpecPragmaL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecVariable
-    :: e SpecVariableL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-  HiddenSpecBlockMemeberSpecLet
-    :: e SpecLetL
-    -> HiddenSpecBlockMemeber e HiddenSpecBlockMemeberL
-
-data SpecApply e l where
-  SpecApply
-    :: e HiddenExpressionL
-    -> e [SpecApplyPatternL]
-    -> e (Maybe (ExceptTokL, [SpecApplyPatternL]))
-    -> e SemicolonTokL
-    -> SpecApply e SpecApplyL
-
-data SpecApplyPattern e l where
-  SpecApplyPattern
-    :: e (Maybe SpecApplyPatternInternal0L)
-    -> e SpecApplyNamePatternL
-    -> e (Maybe TypeParametersL)
-    -> SpecApplyPattern e SpecApplyPatternL
-
-data SpecApplyNamePattern e l where
-  SpecApplyNamePattern
-    :: Text
-    -> SpecApplyNamePattern e SpecApplyNamePatternL
-
-data SpecApplyPatternInternal0 e l where
-  SpecApplyPatternInternal0Public
-    :: e PublicTokL
-    -> SpecApplyPatternInternal0 e SpecApplyPatternInternal0L
-  SpecApplyPatternInternal0Internal
-    :: e InternalTokL
-    -> SpecApplyPatternInternal0 e SpecApplyPatternInternal0L
-
-data SpecCondition e l where
-  SpecConditionSpecCondition
-    :: e HiddenSpecConditionL
-    -> SpecCondition e SpecConditionL
-  SpecConditionSpecAbortIf
-    :: e HiddenSpecAbortIfL
-    -> SpecCondition e SpecConditionL
-  SpecConditionSpecAbortWithOrModifies
-    :: e HiddenSpecAbortWithOrModifiesL
-    -> SpecCondition e SpecConditionL
-
-data HiddenSpecAbortIf e l where
-  HiddenSpecAbortIf
-    :: e AbortsIfTokL
-    -> e (Maybe ConditionPropertiesL)
-    -> e HiddenExpressionL
-    -> e (Maybe (WithTokL, HiddenExpressionL))
-    -> e SemicolonTokL
-    -> HiddenSpecAbortIf e HiddenSpecAbortIfL
-
-data ConditionProperties e l where
-  ConditionProperties
-    :: e [SpecPropertyL]
-    -> ConditionProperties e ConditionPropertiesL
-
-data SpecProperty e l where
-  SpecProperty
-    :: e IdentifierL
-    -> e (Maybe (EqualsSignTokL, HiddenLiteralValueL))
-    -> SpecProperty e SpecPropertyL
-
-data HiddenSpecAbortWithOrModifies e l where
-  HiddenSpecAbortWithOrModifies
-    :: e HiddenSpecAbortWithOrModifiesInternal0L
-    -> e (Maybe ConditionPropertiesL)
-    -> e [HiddenExpressionL]
-    -> e SemicolonTokL
-    -> HiddenSpecAbortWithOrModifies e HiddenSpecAbortWithOrModifiesL
-
-data HiddenSpecAbortWithOrModifiesInternal0 e l where
-  HiddenSpecAbortWithOrModifiesInternal0AbortsWith
-    :: e AbortsWithTokL
-    -> HiddenSpecAbortWithOrModifiesInternal0 e HiddenSpecAbortWithOrModifiesInternal0L
-  HiddenSpecAbortWithOrModifiesInternal0Modifies
-    :: e ModifiesTokL
-    -> HiddenSpecAbortWithOrModifiesInternal0 e HiddenSpecAbortWithOrModifiesInternal0L
-
-data HiddenSpecCondition e l where
-  HiddenSpecCondition
-    :: e HiddenSpecConditionInternal0L
-    -> e (Maybe ConditionPropertiesL)
-    -> e HiddenExpressionL
-    -> e SemicolonTokL
-    -> HiddenSpecCondition e HiddenSpecConditionL
-
-data HiddenSpecConditionInternal0 e l where
-  HiddenSpecConditionInternal0Kind
-    :: e HiddenSpecConditionKindL
-    -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
-  HiddenSpecConditionInternal02
-    :: e RequiresTokL
-    -> e (Maybe ModuleTokL)
-    -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
-
-data HiddenSpecConditionKind e l where
-  HiddenSpecConditionKindAssert
-    :: e AssertTokL
-    -> HiddenSpecConditionKind e HiddenSpecConditionKindL
-  HiddenSpecConditionKindAssume
-    :: e AssumeTokL
-    -> HiddenSpecConditionKind e HiddenSpecConditionKindL
-  HiddenSpecConditionKindDecreases
-    :: e DecreasesTokL
-    -> HiddenSpecConditionKind e HiddenSpecConditionKindL
-  HiddenSpecConditionKindEnsures
-    :: e EnsuresTokL
-    -> HiddenSpecConditionKind e HiddenSpecConditionKindL
-  HiddenSpecConditionKindSucceedsIf
-    :: e SucceedsIfTokL
-    -> HiddenSpecConditionKind e HiddenSpecConditionKindL
-
-data SpecInclude e l where
-  SpecInclude
-    :: e HiddenExpressionL
-    -> SpecInclude e SpecIncludeL
-
-data SpecInvariant e l where
-  SpecInvariant
-    :: e InvariantTokL
-    -> e (Maybe SpecInvariantInternal0L)
-    -> e (Maybe ConditionPropertiesL)
-    -> e HiddenExpressionL
-    -> e SemicolonTokL
-    -> SpecInvariant e SpecInvariantL
-
-data SpecInvariantInternal0 e l where
-  SpecInvariantInternal0Update
-    :: e UpdateTokL
-    -> SpecInvariantInternal0 e SpecInvariantInternal0L
-  SpecInvariantInternal0Pack
-    :: e PackTokL
-    -> SpecInvariantInternal0 e SpecInvariantInternal0L
-  SpecInvariantInternal0Unpack
-    :: e UnpackTokL
-    -> SpecInvariantInternal0 e SpecInvariantInternal0L
-  SpecInvariantInternal0Module
-    :: e ModuleTokL
-    -> SpecInvariantInternal0 e SpecInvariantInternal0L
-
-data SpecLet e l where
-  SpecLet
-    :: e LetTokL
-    -> e (Maybe PostTokL)
-    -> e IdentifierL
-    -> e HiddenExpressionL
-    -> SpecLet e SpecLetL
-
-data SpecPragma e l where
-  SpecPragma
-    :: e [SpecPropertyL]
-    -> SpecPragma e SpecPragmaL
-
-data SpecVariable e l where
-  SpecVariable
-    :: e (Maybe SpecVariableInternal0L)
-    -> e IdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e HiddenTypeL
-    -> SpecVariable e SpecVariableL
-
-data SpecVariableInternal0 e l where
-  SpecVariableInternal0Global
-    :: e GlobalTokL
-    -> SpecVariableInternal0 e SpecVariableInternal0L
-  SpecVariableInternal0Local
-    :: e LocalTokL
-    -> SpecVariableInternal0 e SpecVariableInternal0L
 
 data UseDeclaration e l where
   UseDeclaration
@@ -1680,13 +1142,18 @@ data UseDeclarationInternal0 e l where
 data UseFun e l where
   UseFun
     :: e ModuleAccessL
-    -> e ((ModuleAccessL, FullStopTokL), HiddenFunctionIdentifierL)
+    -> e ((ModuleAccessL, FullStopTokL), HidFunctionIdentifierL)
     -> UseFun e UseFunL
+
+data HidFunctionIdentifier e l where
+  HidFunctionIdentifier
+    :: e IdentifierL
+    -> HidFunctionIdentifier e HidFunctionIdentifierL
 
 data UseModule e l where
   UseModule
     :: e ModuleIdentityL
-    -> e (Maybe (AsTokL, HiddenModuleIdentifierL))
+    -> e (Maybe (AsTokL, HidModuleIdentifierL))
     -> UseModule e UseModuleL
 
 data UseModuleMember e l where
@@ -1725,6 +1192,464 @@ data UseModuleMembers e l where
     -> e [UseMemberL]
     -> UseModuleMembers e UseModuleMembersL
 
+data BreakExpression e l where
+  BreakExpression
+    :: e BreakTokL
+    -> e (Maybe LabelL)
+    -> e (Maybe HidExpressionL)
+    -> BreakExpression e BreakExpressionL
+
+data Label e l where
+  Label
+    :: e ApostropheTokL
+    -> e IdentifierL
+    -> Label e LabelL
+
+data CallExpression e l where
+  CallExpression
+    :: e (NameExpressionL, ArgListL)
+    -> CallExpression e CallExpressionL
+
+data ArgList e l where
+  ArgList
+    :: e [HidExpressionL]
+    -> ArgList e ArgListL
+
+data ContinueExpression e l where
+  ContinueExpression
+    :: e ContinueTokL
+    -> e (Maybe LabelL)
+    -> ContinueExpression e ContinueExpressionL
+
+data DotExpression e l where
+  DotExpression
+    :: e ((HidExpressionTermL, FullStopTokL), HidExpressionTermL)
+    -> DotExpression e DotExpressionL
+
+data ExpressionList e l where
+  ExpressionList
+    :: e [HidExpressionL]
+    -> ExpressionList e ExpressionListL
+
+data IfExpression e l where
+  IfExpression
+    :: e (((IfTokL, HidExpressionL), HidExpressionL), Maybe (ElseTokL, HidExpressionL))
+    -> IfExpression e IfExpressionL
+
+data IndexExpression e l where
+  IndexExpression
+    :: e (HidExpressionTermL, [HidExpressionL])
+    -> IndexExpression e IndexExpressionL
+
+data MacroCallExpression e l where
+  MacroCallExpression
+    :: e MacroModuleAccessL
+    -> e (Maybe TypeArgumentsL)
+    -> e ArgListL
+    -> MacroCallExpression e MacroCallExpressionL
+
+data MacroModuleAccess e l where
+  MacroModuleAccess
+    :: e ModuleAccessL
+    -> e ExclamationMarkTokL
+    -> MacroModuleAccess e MacroModuleAccessL
+
+data MatchExpression e l where
+  MatchExpression
+    :: e MatchTokL
+    -> e HidExpressionL
+    -> e HidMatchBodyL
+    -> MatchExpression e MatchExpressionL
+
+data HidMatchBody e l where
+  HidMatchBody
+    :: e [MatchArmL]
+    -> HidMatchBody e HidMatchBodyL
+
+data MatchArm e l where
+  MatchArm
+    :: e BindListL
+    -> e (Maybe MatchConditionL)
+    -> e EqualsSignGreaterThanSignTokL
+    -> e HidExpressionL
+    -> MatchArm e MatchArmL
+
+data MatchCondition e l where
+  MatchCondition
+    :: e IfTokL
+    -> e HidExpressionL
+    -> MatchCondition e MatchConditionL
+
+data PackExpression e l where
+  PackExpression
+    :: e NameExpressionL
+    -> e FieldInitializeListL
+    -> PackExpression e PackExpressionL
+
+data FieldInitializeList e l where
+  FieldInitializeList
+    :: e [ExpFieldL]
+    -> FieldInitializeList e FieldInitializeListL
+
+data ExpField e l where
+  ExpField
+    :: e HidFieldIdentifierL
+    -> e (Maybe (ColonTokL, HidExpressionL))
+    -> ExpField e ExpFieldL
+
+data HidFieldIdentifier e l where
+  HidFieldIdentifier
+    :: e IdentifierL
+    -> HidFieldIdentifier e HidFieldIdentifierL
+
+data SpecBlock e l where
+  SpecBlock
+    :: e SpecTokL
+    -> e SpecBlockInternal0L
+    -> SpecBlock e SpecBlockL
+
+data SpecBlockInternal0 e l where
+  SpecBlockInternal01
+    :: e (Maybe HidSpecBlockTargetL)
+    -> e SpecBodyL
+    -> SpecBlockInternal0 e SpecBlockInternal0L
+  SpecBlockInternal0HidSpecFunction
+    :: e HidSpecFunctionL
+    -> SpecBlockInternal0 e SpecBlockInternal0L
+
+data HidSpecBlockTarget e l where
+  HidSpecBlockTargetIdentifier
+    :: e IdentifierL
+    -> HidSpecBlockTarget e HidSpecBlockTargetL
+  HidSpecBlockTargetModule
+    :: e ModuleTokL
+    -> HidSpecBlockTarget e HidSpecBlockTargetL
+  HidSpecBlockTargetSpecBlockTargetSchema
+    :: e SpecBlockTargetSchemaL
+    -> HidSpecBlockTarget e HidSpecBlockTargetL
+
+data SpecBlockTargetSchema e l where
+  SpecBlockTargetSchema
+    :: e SchemaTokL
+    -> e HidStructIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> SpecBlockTargetSchema e SpecBlockTargetSchemaL
+
+data HidStructIdentifier e l where
+  HidStructIdentifier
+    :: e IdentifierL
+    -> HidStructIdentifier e HidStructIdentifierL
+
+data TypeParameters e l where
+  TypeParameters
+    :: e [TypeParameterL]
+    -> TypeParameters e TypeParametersL
+
+data TypeParameter e l where
+  TypeParameter
+    :: e (Maybe DollarSignTokL)
+    -> e (Maybe PhantomTokL)
+    -> e HidTypeParameterIdentifierL
+    -> e (Maybe (ColonTokL, [AbilityL]))
+    -> TypeParameter e TypeParameterL
+
+data Ability e l where
+  AbilityCopy
+    :: e CopyTokL
+    -> Ability e AbilityL
+  AbilityDrop
+    :: e DropTokL
+    -> Ability e AbilityL
+  AbilityStore
+    :: e StoreTokL
+    -> Ability e AbilityL
+  AbilityKey
+    :: e KeyTokL
+    -> Ability e AbilityL
+
+data HidTypeParameterIdentifier e l where
+  HidTypeParameterIdentifier
+    :: e IdentifierL
+    -> HidTypeParameterIdentifier e HidTypeParameterIdentifierL
+
+data HidSpecFunction e l where
+  HidSpecFunctionNativeSpecFunction
+    :: e NativeSpecFunctionL
+    -> HidSpecFunction e HidSpecFunctionL
+  HidSpecFunctionUsualSpecFunction
+    :: e UsualSpecFunctionL
+    -> HidSpecFunction e HidSpecFunctionL
+  HidSpecFunctionUninterpretedSpecFunction
+    :: e UninterpretedSpecFunctionL
+    -> HidSpecFunction e HidSpecFunctionL
+
+data NativeSpecFunction e l where
+  NativeSpecFunction
+    :: e NativeTokL
+    -> e HidSpecFunctionSignatureL
+    -> NativeSpecFunction e NativeSpecFunctionL
+
+data HidSpecFunctionSignature e l where
+  HidSpecFunctionSignature
+    :: e HidFunctionIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e FunctionParametersL
+    -> e RetTypeL
+    -> HidSpecFunctionSignature e HidSpecFunctionSignatureL
+
+data FunctionParameters e l where
+  FunctionParameters
+    :: e [FunctionParametersInternal0L]
+    -> FunctionParameters e FunctionParametersL
+
+data FunctionParametersInternal0 e l where
+  FunctionParametersInternal0MutFunctionParameter
+    :: e MutFunctionParameterL
+    -> FunctionParametersInternal0 e FunctionParametersInternal0L
+  FunctionParametersInternal0FunctionParameter
+    :: e FunctionParameterL
+    -> FunctionParametersInternal0 e FunctionParametersInternal0L
+
+data FunctionParameter e l where
+  FunctionParameter
+    :: e FunctionParameterInternal0L
+    -> e ColonTokL
+    -> e HidTypeL
+    -> FunctionParameter e FunctionParameterL
+
+data FunctionParameterInternal0 e l where
+  FunctionParameterInternal0Name
+    :: e HidVariableIdentifierL
+    -> FunctionParameterInternal0 e FunctionParameterInternal0L
+  FunctionParameterInternal02
+    :: e DollarSignTokL
+    -> e HidVariableIdentifierL
+    -> FunctionParameterInternal0 e FunctionParameterInternal0L
+
+data MutFunctionParameter e l where
+  MutFunctionParameter
+    :: e MutTokL
+    -> e FunctionParameterL
+    -> MutFunctionParameter e MutFunctionParameterL
+
+data RetType e l where
+  RetType
+    :: e ColonTokL
+    -> e HidTypeL
+    -> RetType e RetTypeL
+
+data UninterpretedSpecFunction e l where
+  UninterpretedSpecFunction
+    :: e HidSpecFunctionSignatureL
+    -> UninterpretedSpecFunction e UninterpretedSpecFunctionL
+
+data UsualSpecFunction e l where
+  UsualSpecFunction
+    :: e FunTokL
+    -> e HidSpecFunctionSignatureL
+    -> e BlockL
+    -> UsualSpecFunction e UsualSpecFunctionL
+
+data SpecBody e l where
+  SpecBody
+    :: e LeftCurlyBracketTokL
+    -> e [UseDeclarationL]
+    -> e [HidSpecBlockMemeberL]
+    -> e RightCurlyBracketTokL
+    -> SpecBody e SpecBodyL
+
+data HidSpecBlockMemeber e l where
+  HidSpecBlockMemeberSpecInvariant
+    :: e SpecInvariantL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberHidSpecFunction
+    :: e HidSpecFunctionL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecCondition
+    :: e SpecConditionL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecInclude
+    :: e SpecIncludeL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecApply
+    :: e SpecApplyL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecPragma
+    :: e SpecPragmaL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecVariable
+    :: e SpecVariableL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+  HidSpecBlockMemeberSpecLet
+    :: e SpecLetL
+    -> HidSpecBlockMemeber e HidSpecBlockMemeberL
+
+data SpecApply e l where
+  SpecApply
+    :: e HidExpressionL
+    -> e [SpecApplyPatternL]
+    -> e (Maybe (ExceptTokL, [SpecApplyPatternL]))
+    -> e SemicolonTokL
+    -> SpecApply e SpecApplyL
+
+data SpecApplyPattern e l where
+  SpecApplyPattern
+    :: e (Maybe SpecApplyPatternInternal0L)
+    -> e SpecApplyNamePatternL
+    -> e (Maybe TypeParametersL)
+    -> SpecApplyPattern e SpecApplyPatternL
+
+data SpecApplyNamePattern e l where
+  SpecApplyNamePattern
+    :: Text
+    -> SpecApplyNamePattern e SpecApplyNamePatternL
+
+data SpecApplyPatternInternal0 e l where
+  SpecApplyPatternInternal0Public
+    :: e PublicTokL
+    -> SpecApplyPatternInternal0 e SpecApplyPatternInternal0L
+  SpecApplyPatternInternal0Internal
+    :: e InternalTokL
+    -> SpecApplyPatternInternal0 e SpecApplyPatternInternal0L
+
+data SpecCondition e l where
+  SpecConditionHidSpecCondition
+    :: e HidSpecConditionL
+    -> SpecCondition e SpecConditionL
+  SpecConditionHidSpecAbortIf
+    :: e HidSpecAbortIfL
+    -> SpecCondition e SpecConditionL
+  SpecConditionHidSpecAbortWithOrModifies
+    :: e HidSpecAbortWithOrModifiesL
+    -> SpecCondition e SpecConditionL
+
+data HidSpecAbortIf e l where
+  HidSpecAbortIf
+    :: e AbortsIfTokL
+    -> e (Maybe ConditionPropertiesL)
+    -> e HidExpressionL
+    -> e (Maybe (WithTokL, HidExpressionL))
+    -> e SemicolonTokL
+    -> HidSpecAbortIf e HidSpecAbortIfL
+
+data ConditionProperties e l where
+  ConditionProperties
+    :: e [SpecPropertyL]
+    -> ConditionProperties e ConditionPropertiesL
+
+data SpecProperty e l where
+  SpecProperty
+    :: e IdentifierL
+    -> e (Maybe (EqualsSignTokL, HidLiteralValueL))
+    -> SpecProperty e SpecPropertyL
+
+data HidSpecAbortWithOrModifies e l where
+  HidSpecAbortWithOrModifies
+    :: e HidSpecAbortWithOrModifiesInternal0L
+    -> e (Maybe ConditionPropertiesL)
+    -> e [HidExpressionL]
+    -> e SemicolonTokL
+    -> HidSpecAbortWithOrModifies e HidSpecAbortWithOrModifiesL
+
+data HidSpecAbortWithOrModifiesInternal0 e l where
+  HidSpecAbortWithOrModifiesInternal0AbortsWith
+    :: e AbortsWithTokL
+    -> HidSpecAbortWithOrModifiesInternal0 e HidSpecAbortWithOrModifiesInternal0L
+  HidSpecAbortWithOrModifiesInternal0Modifies
+    :: e ModifiesTokL
+    -> HidSpecAbortWithOrModifiesInternal0 e HidSpecAbortWithOrModifiesInternal0L
+
+data HidSpecCondition e l where
+  HidSpecCondition
+    :: e HidSpecConditionInternal0L
+    -> e (Maybe ConditionPropertiesL)
+    -> e HidExpressionL
+    -> e SemicolonTokL
+    -> HidSpecCondition e HidSpecConditionL
+
+data HidSpecConditionInternal0 e l where
+  HidSpecConditionInternal0Kind
+    :: e HidSpecConditionKindL
+    -> HidSpecConditionInternal0 e HidSpecConditionInternal0L
+  HidSpecConditionInternal02
+    :: e RequiresTokL
+    -> e (Maybe ModuleTokL)
+    -> HidSpecConditionInternal0 e HidSpecConditionInternal0L
+
+data HidSpecConditionKind e l where
+  HidSpecConditionKindAssert
+    :: e AssertTokL
+    -> HidSpecConditionKind e HidSpecConditionKindL
+  HidSpecConditionKindAssume
+    :: e AssumeTokL
+    -> HidSpecConditionKind e HidSpecConditionKindL
+  HidSpecConditionKindDecreases
+    :: e DecreasesTokL
+    -> HidSpecConditionKind e HidSpecConditionKindL
+  HidSpecConditionKindEnsures
+    :: e EnsuresTokL
+    -> HidSpecConditionKind e HidSpecConditionKindL
+  HidSpecConditionKindSucceedsIf
+    :: e SucceedsIfTokL
+    -> HidSpecConditionKind e HidSpecConditionKindL
+
+data SpecInclude e l where
+  SpecInclude
+    :: e HidExpressionL
+    -> SpecInclude e SpecIncludeL
+
+data SpecInvariant e l where
+  SpecInvariant
+    :: e InvariantTokL
+    -> e (Maybe SpecInvariantInternal0L)
+    -> e (Maybe ConditionPropertiesL)
+    -> e HidExpressionL
+    -> e SemicolonTokL
+    -> SpecInvariant e SpecInvariantL
+
+data SpecInvariantInternal0 e l where
+  SpecInvariantInternal0Update
+    :: e UpdateTokL
+    -> SpecInvariantInternal0 e SpecInvariantInternal0L
+  SpecInvariantInternal0Pack
+    :: e PackTokL
+    -> SpecInvariantInternal0 e SpecInvariantInternal0L
+  SpecInvariantInternal0Unpack
+    :: e UnpackTokL
+    -> SpecInvariantInternal0 e SpecInvariantInternal0L
+  SpecInvariantInternal0Module
+    :: e ModuleTokL
+    -> SpecInvariantInternal0 e SpecInvariantInternal0L
+
+data SpecLet e l where
+  SpecLet
+    :: e LetTokL
+    -> e (Maybe PostTokL)
+    -> e IdentifierL
+    -> e HidExpressionL
+    -> SpecLet e SpecLetL
+
+data SpecPragma e l where
+  SpecPragma
+    :: e [SpecPropertyL]
+    -> SpecPragma e SpecPragmaL
+
+data SpecVariable e l where
+  SpecVariable
+    :: e (Maybe SpecVariableInternal0L)
+    -> e IdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e HidTypeL
+    -> SpecVariable e SpecVariableL
+
+data SpecVariableInternal0 e l where
+  SpecVariableInternal0Global
+    :: e GlobalTokL
+    -> SpecVariableInternal0 e SpecVariableInternal0L
+  SpecVariableInternal0Local
+    :: e LocalTokL
+    -> SpecVariableInternal0 e SpecVariableInternal0L
+
 data UnitExpression e l where
   UnitExpression
     :: e LeftParenthesisTokL
@@ -1734,7 +1659,7 @@ data UnitExpression e l where
 data VectorExpression e l where
   VectorExpression
     :: e VectorExpressionInternal0L
-    -> e [HiddenExpressionL]
+    -> e [HidExpressionL]
     -> e RightSquareBracketTokL
     -> VectorExpression e VectorExpressionL
 
@@ -1743,23 +1668,13 @@ data VectorExpressionInternal0 e l where
     :: e VectorLeftSquareBracketTokL
     -> VectorExpressionInternal0 e VectorExpressionInternal0L
   VectorExpressionInternal02
-    :: e [HiddenTypeL]
+    :: e [HidTypeL]
     -> e LeftSquareBracketTokL
     -> VectorExpressionInternal0 e VectorExpressionInternal0L
 
-data BorrowExpression e l where
-  BorrowExpression
-    :: e (HiddenReferenceL, HiddenExpressionL)
-    -> BorrowExpression e BorrowExpressionL
-
-data DereferenceExpression e l where
-  DereferenceExpression
-    :: e (AsteriskTokL, HiddenExpressionL)
-    -> DereferenceExpression e DereferenceExpressionL
-
 data MoveOrCopyExpression e l where
   MoveOrCopyExpression
-    :: e (MoveOrCopyExpressionInternal0L, HiddenExpressionL)
+    :: e (MoveOrCopyExpressionInternal0L, HidExpressionL)
     -> MoveOrCopyExpression e MoveOrCopyExpressionL
 
 data MoveOrCopyExpressionInternal0 e l where
@@ -1773,7 +1688,7 @@ data MoveOrCopyExpressionInternal0 e l where
 data UnaryExpression e l where
   UnaryExpression
     :: e UnaryOpL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> UnaryExpression e UnaryExpressionL
 
 data UnaryOp e l where
@@ -1781,128 +1696,117 @@ data UnaryOp e l where
     :: e ExclamationMarkTokL
     -> UnaryOp e UnaryOpL
 
-data AbortExpression e l where
-  AbortExpression
-    :: e AbortTokL
-    -> e (Maybe HiddenExpressionL)
-    -> AbortExpression e AbortExpressionL
-
-data AssignExpression e l where
-  AssignExpression
-    :: e ((HiddenUnaryExpressionL, EqualsSignTokL), HiddenExpressionL)
-    -> AssignExpression e AssignExpressionL
-
 data BinaryExpression e l where
   BinaryExpression1
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e EqualsSignEqualsSignGreaterThanSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression2
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e VerticalLineVerticalLineTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression3
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e AmpersandAmpersandTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression4
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e EqualsSignEqualsSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression5
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e ExclamationMarkEqualsSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression6
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e LessThanSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression7
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e GreaterThanSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression8
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e LessThanSignEqualsSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression9
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e GreaterThanSignEqualsSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression10
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e FullStopFullStopTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression11
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e VerticalLineTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression12
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e CircumflexAccentTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression13
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e AmpersandTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression14
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e LessThanSignLessThanSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression15
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e GreaterThanSignGreaterThanSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression16
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e PlusSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression17
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e HyphenMinusTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression18
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e AsteriskTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression19
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e SolidusTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
   BinaryExpression20
-    :: e HiddenExpressionL
+    :: e HidExpressionL
     -> e PercentSignTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> BinaryExpression e BinaryExpressionL
 
 data CastExpression e l where
   CastExpression
-    :: e ((HiddenExpressionL, AsTokL), HiddenTypeL)
+    :: e ((HidExpressionL, AsTokL), HidTypeL)
     -> CastExpression e CastExpressionL
 
 data IdentifiedExpression e l where
   IdentifiedExpression
     :: e BlockIdentifierL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> IdentifiedExpression e IdentifiedExpressionL
 
 data BlockIdentifier e l where
@@ -1914,8 +1818,8 @@ data BlockIdentifier e l where
 data LambdaExpression e l where
   LambdaExpression
     :: e LambdaBindingsL
-    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
-    -> e HiddenExpressionL
+    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HidTypeL))
+    -> e HidExpressionL
     -> LambdaExpression e LambdaExpressionL
 
 data LambdaBindings e l where
@@ -1928,19 +1832,19 @@ data LambdaBinding e l where
     :: e CommaBindListL
     -> LambdaBinding e LambdaBindingL
   LambdaBinding2
-    :: e HiddenBindL
-    -> e (Maybe (ColonTokL, HiddenTypeL))
+    :: e HidBindL
+    -> e (Maybe (ColonTokL, HidTypeL))
     -> LambdaBinding e LambdaBindingL
 
 data LoopExpression e l where
   LoopExpression
     :: e LoopTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> LoopExpression e LoopExpressionL
 
 data QuantifierExpression e l where
   QuantifierExpression
-    :: e ((((HiddenReservedIdentifierL, QuantifierBindingsL), Maybe (WhereTokL, HiddenExpressionL)), ColonTokL), HiddenExpressionL)
+    :: e ((((HidReservedIdentifierL, QuantifierBindingsL), Maybe (WhereTokL, HidExpressionL)), ColonTokL), HidExpressionL)
     -> QuantifierExpression e QuantifierExpressionL
 
 data QuantifierBindings e l where
@@ -1952,19 +1856,19 @@ data QuantifierBinding e l where
   QuantifierBinding1
     :: e IdentifierL
     -> e ColonTokL
-    -> e HiddenTypeL
+    -> e HidTypeL
     -> QuantifierBinding e QuantifierBindingL
   QuantifierBinding2
     :: e IdentifierL
     -> e InTokL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> QuantifierBinding e QuantifierBindingL
 
 data ReturnExpression e l where
   ReturnExpression1
     :: e ReturnTokL
     -> e (Maybe LabelL)
-    -> e HiddenExpressionL
+    -> e HidExpressionL
     -> ReturnExpression e ReturnExpressionL
   ReturnExpression2
     :: e ReturnTokL
@@ -1974,92 +1878,9 @@ data ReturnExpression e l where
 data WhileExpression e l where
   WhileExpression
     :: e WhileTokL
-    -> e HiddenExpressionL
-    -> e HiddenExpressionL
+    -> e HidExpressionL
+    -> e HidExpressionL
     -> WhileExpression e WhileExpressionL
-
-data BlockItem e l where
-  BlockItem
-    :: e BlockItemInternal0L
-    -> e SemicolonTokL
-    -> BlockItem e BlockItemL
-
-data BlockItemInternal0 e l where
-  BlockItemInternal0Expression
-    :: e HiddenExpressionL
-    -> BlockItemInternal0 e BlockItemInternal0L
-  BlockItemInternal0LetStatement
-    :: e LetStatementL
-    -> BlockItemInternal0 e BlockItemInternal0L
-
-data LetStatement e l where
-  LetStatement
-    :: e LetTokL
-    -> e BindListL
-    -> e (Maybe (ColonTokL, HiddenTypeL))
-    -> e (Maybe (EqualsSignTokL, HiddenExpressionL))
-    -> LetStatement e LetStatementL
-
-data MacroFunctionDefinition e l where
-  MacroFunctionDefinition
-    :: e (Maybe ModifierL)
-    -> e MacroTokL
-    -> e HiddenMacroSignatureL
-    -> e BlockL
-    -> MacroFunctionDefinition e MacroFunctionDefinitionL
-
-data HiddenMacroSignature e l where
-  HiddenMacroSignature
-    :: e (Maybe ModifierL)
-    -> e FunTokL
-    -> e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e FunctionParametersL
-    -> e (Maybe RetTypeL)
-    -> HiddenMacroSignature e HiddenMacroSignatureL
-
-data NativeFunctionDefinition e l where
-  NativeFunctionDefinition
-    :: e HiddenFunctionSignatureL
-    -> e SemicolonTokL
-    -> NativeFunctionDefinition e NativeFunctionDefinitionL
-
-data HiddenStructItem e l where
-  HiddenStructItemNativeStructDefinition
-    :: e NativeStructDefinitionL
-    -> HiddenStructItem e HiddenStructItemL
-  HiddenStructItemStructDefinition
-    :: e StructDefinitionL
-    -> HiddenStructItem e HiddenStructItemL
-
-data NativeStructDefinition e l where
-  NativeStructDefinition
-    :: e (Maybe PublicTokL)
-    -> e HiddenStructSignatureL
-    -> NativeStructDefinition e NativeStructDefinitionL
-
-data HiddenStructSignature e l where
-  HiddenStructSignature
-    :: e StructTokL
-    -> e HiddenStructIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e (Maybe AbilityDeclsL)
-    -> HiddenStructSignature e HiddenStructSignatureL
-
-data StructDefinition e l where
-  StructDefinition
-    :: e (Maybe PublicTokL)
-    -> e HiddenStructSignatureL
-    -> e DatatypeFieldsL
-    -> e (Maybe PostfixAbilityDeclsL)
-    -> StructDefinition e StructDefinitionL
-
-data Constant e l where
-  Constant
-    :: e IdentifierL
-    -> e HiddenTypeL
-    -> e HiddenExpressionL
-    -> Constant e ConstantL
 
 data FriendDeclaration e l where
   FriendDeclaration
@@ -2074,36 +1895,214 @@ data FriendAccess e l where
     :: e ModuleIdentityL
     -> FriendAccess e FriendAccessL
 
+data HidEnumItem e l where
+  HidEnumItem
+    :: e EnumDefinitionL
+    -> HidEnumItem e HidEnumItemL
+
+data EnumDefinition e l where
+  EnumDefinition
+    :: e (Maybe PublicTokL)
+    -> e HidEnumSignatureL
+    -> e EnumVariantsL
+    -> e (Maybe PostfixAbilityDeclsL)
+    -> EnumDefinition e EnumDefinitionL
+
+data EnumVariants e l where
+  EnumVariants
+    :: e [VariantL]
+    -> EnumVariants e EnumVariantsL
+
+data Variant e l where
+  Variant
+    :: e HidVariantIdentifierL
+    -> e (Maybe DatatypeFieldsL)
+    -> Variant e VariantL
+
+data DatatypeFields e l where
+  DatatypeFieldsPositionalFields
+    :: e PositionalFieldsL
+    -> DatatypeFields e DatatypeFieldsL
+  DatatypeFieldsNamedFields
+    :: e NamedFieldsL
+    -> DatatypeFields e DatatypeFieldsL
+
+data NamedFields e l where
+  NamedFields
+    :: e [FieldAnnotationL]
+    -> NamedFields e NamedFieldsL
+
+data FieldAnnotation e l where
+  FieldAnnotation
+    :: e HidFieldIdentifierL
+    -> e ColonTokL
+    -> e HidTypeL
+    -> FieldAnnotation e FieldAnnotationL
+
+data PositionalFields e l where
+  PositionalFields
+    :: e [HidTypeL]
+    -> PositionalFields e PositionalFieldsL
+
+data HidVariantIdentifier e l where
+  HidVariantIdentifier
+    :: e IdentifierL
+    -> HidVariantIdentifier e HidVariantIdentifierL
+
+data HidEnumSignature e l where
+  HidEnumSignature
+    :: e EnumTokL
+    -> e HidEnumIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e (Maybe AbilityDeclsL)
+    -> HidEnumSignature e HidEnumSignatureL
+
+data AbilityDecls e l where
+  AbilityDecls
+    :: e HasTokL
+    -> e [AbilityL]
+    -> AbilityDecls e AbilityDeclsL
+
+data HidEnumIdentifier e l where
+  HidEnumIdentifier
+    :: e IdentifierL
+    -> HidEnumIdentifier e HidEnumIdentifierL
+
+data PostfixAbilityDecls e l where
+  PostfixAbilityDecls
+    :: e [AbilityL]
+    -> PostfixAbilityDecls e PostfixAbilityDeclsL
+
+data HidFunctionItem e l where
+  HidFunctionItemNativeFunctionDefinition
+    :: e NativeFunctionDefinitionL
+    -> HidFunctionItem e HidFunctionItemL
+  HidFunctionItemMacroFunctionDefinition
+    :: e MacroFunctionDefinitionL
+    -> HidFunctionItem e HidFunctionItemL
+  HidFunctionItemFunctionDefinition
+    :: e FunctionDefinitionL
+    -> HidFunctionItem e HidFunctionItemL
+
+data FunctionDefinition e l where
+  FunctionDefinition
+    :: e HidFunctionSignatureL
+    -> e BlockL
+    -> FunctionDefinition e FunctionDefinitionL
+
+data HidFunctionSignature e l where
+  HidFunctionSignature
+    :: e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e FunTokL
+    -> e HidFunctionIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e FunctionParametersL
+    -> e (Maybe RetTypeL)
+    -> HidFunctionSignature e HidFunctionSignatureL
+
+data Modifier e l where
+  Modifier1
+    :: e PublicTokL
+    -> e (Maybe ModifierInternal0L)
+    -> Modifier e ModifierL
+  ModifierEntry
+    :: e EntryTokL
+    -> Modifier e ModifierL
+  ModifierNative
+    :: e NativeTokL
+    -> Modifier e ModifierL
+
+data ModifierInternal0 e l where
+  ModifierInternal0Package
+    :: e PackageTokL
+    -> ModifierInternal0 e ModifierInternal0L
+  ModifierInternal0Friend
+    :: e FriendTokL
+    -> ModifierInternal0 e ModifierInternal0L
+
+data MacroFunctionDefinition e l where
+  MacroFunctionDefinition
+    :: e (Maybe ModifierL)
+    -> e MacroTokL
+    -> e HidMacroSignatureL
+    -> e BlockL
+    -> MacroFunctionDefinition e MacroFunctionDefinitionL
+
+data HidMacroSignature e l where
+  HidMacroSignature
+    :: e (Maybe ModifierL)
+    -> e FunTokL
+    -> e HidFunctionIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e FunctionParametersL
+    -> e (Maybe RetTypeL)
+    -> HidMacroSignature e HidMacroSignatureL
+
+data NativeFunctionDefinition e l where
+  NativeFunctionDefinition
+    :: e HidFunctionSignatureL
+    -> e SemicolonTokL
+    -> NativeFunctionDefinition e NativeFunctionDefinitionL
+
+data HidStructItem e l where
+  HidStructItemNativeStructDefinition
+    :: e NativeStructDefinitionL
+    -> HidStructItem e HidStructItemL
+  HidStructItemStructDefinition
+    :: e StructDefinitionL
+    -> HidStructItem e HidStructItemL
+
+data NativeStructDefinition e l where
+  NativeStructDefinition
+    :: e (Maybe PublicTokL)
+    -> e HidStructSignatureL
+    -> NativeStructDefinition e NativeStructDefinitionL
+
+data HidStructSignature e l where
+  HidStructSignature
+    :: e StructTokL
+    -> e HidStructIdentifierL
+    -> e (Maybe TypeParametersL)
+    -> e (Maybe AbilityDeclsL)
+    -> HidStructSignature e HidStructSignatureL
+
+data StructDefinition e l where
+  StructDefinition
+    :: e (Maybe PublicTokL)
+    -> e HidStructSignatureL
+    -> e DatatypeFieldsL
+    -> e (Maybe PostfixAbilityDeclsL)
+    -> StructDefinition e StructDefinitionL
+
 deriveAll
   [ ''SourceFile
   , ''ModuleDefinition
   , ''ModuleBody
   , ''ModuleBodyInternal0
   , ''ModuleBodyInternal1
-  , ''HiddenEnumItem
-  , ''EnumDefinition
-  , ''HiddenEnumSignature
-  , ''HiddenEnumIdentifier
-  , ''Identifier
-  , ''AbilityDecls
-  , ''Ability
-  , ''TypeParameters
-  , ''TypeParameter
-  , ''HiddenTypeParameterIdentifier
-  , ''EnumVariants
-  , ''Variant
-  , ''HiddenVariantIdentifier
-  , ''DatatypeFields
-  , ''NamedFields
-  , ''FieldAnnotation
-  , ''HiddenFieldIdentifier
-  , ''HiddenType
+  , ''Constant
+  , ''HidExpression
+  , ''AbortExpression
+  , ''AssignExpression
+  , ''HidUnaryExpression
+  , ''HidUnaryExpressionInternal0
+  , ''BorrowExpression
+  , ''HidReference
+  , ''ImmRef
+  , ''MutRef
+  , ''DereferenceExpression
+  , ''HidExpressionTerm
+  , ''AnnotationExpression
+  , ''HidType
   , ''ApplyType
   , ''ModuleAccess
-  , ''HiddenModuleIdentifier
-  , ''HiddenReservedIdentifier
-  , ''HiddenExists
-  , ''HiddenForall
+  , ''HidModuleIdentifier
+  , ''Identifier
+  , ''HidReservedIdentifier
+  , ''HidExists
+  , ''HidForall
   , ''ModuleIdentity
   , ''ModuleIdentityInternal0
   , ''NumLiteral
@@ -2113,41 +2112,45 @@ deriveAll
   , ''FunctionTypeParameters
   , ''PrimitiveType
   , ''RefType
-  , ''HiddenReference
-  , ''ImmRef
-  , ''MutRef
   , ''TupleType
-  , ''PositionalFields
-  , ''PostfixAbilityDecls
-  , ''HiddenFunctionItem
-  , ''FunctionDefinition
-  , ''HiddenFunctionSignature
-  , ''HiddenFunctionIdentifier
-  , ''FunctionParameters
-  , ''FunctionParametersInternal0
-  , ''FunctionParameter
-  , ''FunctionParameterInternal0
-  , ''HiddenVariableIdentifier
-  , ''MutFunctionParameter
-  , ''Modifier
-  , ''ModifierInternal0
-  , ''RetType
   , ''Block
-  , ''HiddenExpression
-  , ''HiddenUnaryExpression
-  , ''HiddenUnaryExpressionInternal0
-  , ''HiddenExpressionTerm
-  , ''HiddenLiteralValue
+  , ''BlockItem
+  , ''BlockItemInternal0
+  , ''LetStatement
+  , ''BindList
+  , ''CommaBindList
+  , ''HidBind
+  , ''AtBind
+  , ''HidVariableIdentifier
+  , ''BindUnpack
+  , ''BindFields
+  , ''BindNamedFields
+  , ''BindNamedFieldsInternal0
+  , ''BindField
+  , ''HidSpreadOperator
+  , ''MutBindField
+  , ''BindPositionalFields
+  , ''NameExpression
+  , ''HidBindInternal0
+  , ''MutBindVar
+  , ''HidLiteralValue
   , ''AddressLiteral
   , ''BoolLiteral
   , ''ByteStringLiteral
   , ''HexStringLiteral
-  , ''AnnotationExpression
+  , ''OrBindList
+  , ''UseDeclaration
+  , ''UseDeclarationInternal0
+  , ''UseFun
+  , ''HidFunctionIdentifier
+  , ''UseModule
+  , ''UseModuleMember
+  , ''UseMember
+  , ''UseModuleMembers
   , ''BreakExpression
   , ''Label
   , ''CallExpression
   , ''ArgList
-  , ''NameExpression
   , ''ContinueExpression
   , ''DotExpression
   , ''ExpressionList
@@ -2156,52 +2159,48 @@ deriveAll
   , ''MacroCallExpression
   , ''MacroModuleAccess
   , ''MatchExpression
-  , ''HiddenMatchBody
+  , ''HidMatchBody
   , ''MatchArm
-  , ''BindList
-  , ''HiddenBind
-  , ''HiddenBindInternal0
-  , ''MutBindVar
-  , ''AtBind
-  , ''BindUnpack
-  , ''BindFields
-  , ''BindNamedFields
-  , ''BindNamedFieldsInternal0
-  , ''BindField
-  , ''HiddenSpreadOperator
-  , ''MutBindField
-  , ''BindPositionalFields
-  , ''CommaBindList
-  , ''OrBindList
   , ''MatchCondition
   , ''PackExpression
   , ''FieldInitializeList
   , ''ExpField
+  , ''HidFieldIdentifier
   , ''SpecBlock
   , ''SpecBlockInternal0
-  , ''HiddenSpecBlockTarget
+  , ''HidSpecBlockTarget
   , ''SpecBlockTargetSchema
-  , ''HiddenStructIdentifier
-  , ''HiddenSpecFunction
+  , ''HidStructIdentifier
+  , ''TypeParameters
+  , ''TypeParameter
+  , ''Ability
+  , ''HidTypeParameterIdentifier
+  , ''HidSpecFunction
   , ''NativeSpecFunction
-  , ''HiddenSpecFunctionSignature
+  , ''HidSpecFunctionSignature
+  , ''FunctionParameters
+  , ''FunctionParametersInternal0
+  , ''FunctionParameter
+  , ''FunctionParameterInternal0
+  , ''MutFunctionParameter
+  , ''RetType
   , ''UninterpretedSpecFunction
   , ''UsualSpecFunction
   , ''SpecBody
-  , ''HiddenSpecBlockMemeber
+  , ''HidSpecBlockMemeber
   , ''SpecApply
   , ''SpecApplyPattern
   , ''SpecApplyNamePattern
   , ''SpecApplyPatternInternal0
   , ''SpecCondition
-  , ''HiddenSpecAbortIf
+  , ''HidSpecAbortIf
   , ''ConditionProperties
   , ''SpecProperty
-  , ''HiddenSpecAbortWithOrModifies
-  , ''HiddenSpecAbortWithOrModifiesInternal0
-  , ''HiddenSpecCondition
-  , ''HiddenSpecConditionInternal0
-  , ''HiddenSpecConditionKind
+  , ''HidSpecAbortWithOrModifies
+  , ''HidSpecAbortWithOrModifiesInternal0
+  , ''HidSpecCondition
+  , ''HidSpecConditionInternal0
+  , ''HidSpecConditionKind
   , ''SpecInclude
   , ''SpecInvariant
   , ''SpecInvariantInternal0
@@ -2209,24 +2208,13 @@ deriveAll
   , ''SpecPragma
   , ''SpecVariable
   , ''SpecVariableInternal0
-  , ''UseDeclaration
-  , ''UseDeclarationInternal0
-  , ''UseFun
-  , ''UseModule
-  , ''UseModuleMember
-  , ''UseMember
-  , ''UseModuleMembers
   , ''UnitExpression
   , ''VectorExpression
   , ''VectorExpressionInternal0
-  , ''BorrowExpression
-  , ''DereferenceExpression
   , ''MoveOrCopyExpression
   , ''MoveOrCopyExpressionInternal0
   , ''UnaryExpression
   , ''UnaryOp
-  , ''AbortExpression
-  , ''AssignExpression
   , ''BinaryExpression
   , ''CastExpression
   , ''IdentifiedExpression
@@ -2240,19 +2228,33 @@ deriveAll
   , ''QuantifierBinding
   , ''ReturnExpression
   , ''WhileExpression
-  , ''BlockItem
-  , ''BlockItemInternal0
-  , ''LetStatement
-  , ''MacroFunctionDefinition
-  , ''HiddenMacroSignature
-  , ''NativeFunctionDefinition
-  , ''HiddenStructItem
-  , ''NativeStructDefinition
-  , ''HiddenStructSignature
-  , ''StructDefinition
-  , ''Constant
   , ''FriendDeclaration
   , ''FriendAccess
+  , ''HidEnumItem
+  , ''EnumDefinition
+  , ''EnumVariants
+  , ''Variant
+  , ''DatatypeFields
+  , ''NamedFields
+  , ''FieldAnnotation
+  , ''PositionalFields
+  , ''HidVariantIdentifier
+  , ''HidEnumSignature
+  , ''AbilityDecls
+  , ''HidEnumIdentifier
+  , ''PostfixAbilityDecls
+  , ''HidFunctionItem
+  , ''FunctionDefinition
+  , ''HidFunctionSignature
+  , ''Modifier
+  , ''ModifierInternal0
+  , ''MacroFunctionDefinition
+  , ''HidMacroSignature
+  , ''NativeFunctionDefinition
+  , ''HidStructItem
+  , ''NativeStructDefinition
+  , ''HidStructSignature
+  , ''StructDefinition
   ]
 
 --------------------------------------------------------------------------------
@@ -2265,30 +2267,27 @@ type MoveSig =
    , ModuleBody
    , ModuleBodyInternal0
    , ModuleBodyInternal1
-   , HiddenEnumItem
-   , EnumDefinition
-   , HiddenEnumSignature
-   , HiddenEnumIdentifier
-   , Identifier
-   , AbilityDecls
-   , Ability
-   , TypeParameters
-   , TypeParameter
-   , HiddenTypeParameterIdentifier
-   , EnumVariants
-   , Variant
-   , HiddenVariantIdentifier
-   , DatatypeFields
-   , NamedFields
-   , FieldAnnotation
-   , HiddenFieldIdentifier
-   , HiddenType
+   , Constant
+   , HidExpression
+   , AbortExpression
+   , AssignExpression
+   , HidUnaryExpression
+   , HidUnaryExpressionInternal0
+   , BorrowExpression
+   , HidReference
+   , ImmRef
+   , MutRef
+   , DereferenceExpression
+   , HidExpressionTerm
+   , AnnotationExpression
+   , HidType
    , ApplyType
    , ModuleAccess
-   , HiddenModuleIdentifier
-   , HiddenReservedIdentifier
-   , HiddenExists
-   , HiddenForall
+   , HidModuleIdentifier
+   , Identifier
+   , HidReservedIdentifier
+   , HidExists
+   , HidForall
    , ModuleIdentity
    , ModuleIdentityInternal0
    , NumLiteral
@@ -2298,41 +2297,45 @@ type MoveSig =
    , FunctionTypeParameters
    , PrimitiveType
    , RefType
-   , HiddenReference
-   , ImmRef
-   , MutRef
    , TupleType
-   , PositionalFields
-   , PostfixAbilityDecls
-   , HiddenFunctionItem
-   , FunctionDefinition
-   , HiddenFunctionSignature
-   , HiddenFunctionIdentifier
-   , FunctionParameters
-   , FunctionParametersInternal0
-   , FunctionParameter
-   , FunctionParameterInternal0
-   , HiddenVariableIdentifier
-   , MutFunctionParameter
-   , Modifier
-   , ModifierInternal0
-   , RetType
    , Block
-   , HiddenExpression
-   , HiddenUnaryExpression
-   , HiddenUnaryExpressionInternal0
-   , HiddenExpressionTerm
-   , HiddenLiteralValue
+   , BlockItem
+   , BlockItemInternal0
+   , LetStatement
+   , BindList
+   , CommaBindList
+   , HidBind
+   , AtBind
+   , HidVariableIdentifier
+   , BindUnpack
+   , BindFields
+   , BindNamedFields
+   , BindNamedFieldsInternal0
+   , BindField
+   , HidSpreadOperator
+   , MutBindField
+   , BindPositionalFields
+   , NameExpression
+   , HidBindInternal0
+   , MutBindVar
+   , HidLiteralValue
    , AddressLiteral
    , BoolLiteral
    , ByteStringLiteral
    , HexStringLiteral
-   , AnnotationExpression
+   , OrBindList
+   , UseDeclaration
+   , UseDeclarationInternal0
+   , UseFun
+   , HidFunctionIdentifier
+   , UseModule
+   , UseModuleMember
+   , UseMember
+   , UseModuleMembers
    , BreakExpression
    , Label
    , CallExpression
    , ArgList
-   , NameExpression
    , ContinueExpression
    , DotExpression
    , ExpressionList
@@ -2341,52 +2344,48 @@ type MoveSig =
    , MacroCallExpression
    , MacroModuleAccess
    , MatchExpression
-   , HiddenMatchBody
+   , HidMatchBody
    , MatchArm
-   , BindList
-   , HiddenBind
-   , HiddenBindInternal0
-   , MutBindVar
-   , AtBind
-   , BindUnpack
-   , BindFields
-   , BindNamedFields
-   , BindNamedFieldsInternal0
-   , BindField
-   , HiddenSpreadOperator
-   , MutBindField
-   , BindPositionalFields
-   , CommaBindList
-   , OrBindList
    , MatchCondition
    , PackExpression
    , FieldInitializeList
    , ExpField
+   , HidFieldIdentifier
    , SpecBlock
    , SpecBlockInternal0
-   , HiddenSpecBlockTarget
+   , HidSpecBlockTarget
    , SpecBlockTargetSchema
-   , HiddenStructIdentifier
-   , HiddenSpecFunction
+   , HidStructIdentifier
+   , TypeParameters
+   , TypeParameter
+   , Ability
+   , HidTypeParameterIdentifier
+   , HidSpecFunction
    , NativeSpecFunction
-   , HiddenSpecFunctionSignature
+   , HidSpecFunctionSignature
+   , FunctionParameters
+   , FunctionParametersInternal0
+   , FunctionParameter
+   , FunctionParameterInternal0
+   , MutFunctionParameter
+   , RetType
    , UninterpretedSpecFunction
    , UsualSpecFunction
    , SpecBody
-   , HiddenSpecBlockMemeber
+   , HidSpecBlockMemeber
    , SpecApply
    , SpecApplyPattern
    , SpecApplyNamePattern
    , SpecApplyPatternInternal0
    , SpecCondition
-   , HiddenSpecAbortIf
+   , HidSpecAbortIf
    , ConditionProperties
    , SpecProperty
-   , HiddenSpecAbortWithOrModifies
-   , HiddenSpecAbortWithOrModifiesInternal0
-   , HiddenSpecCondition
-   , HiddenSpecConditionInternal0
-   , HiddenSpecConditionKind
+   , HidSpecAbortWithOrModifies
+   , HidSpecAbortWithOrModifiesInternal0
+   , HidSpecCondition
+   , HidSpecConditionInternal0
+   , HidSpecConditionKind
    , SpecInclude
    , SpecInvariant
    , SpecInvariantInternal0
@@ -2394,24 +2393,13 @@ type MoveSig =
    , SpecPragma
    , SpecVariable
    , SpecVariableInternal0
-   , UseDeclaration
-   , UseDeclarationInternal0
-   , UseFun
-   , UseModule
-   , UseModuleMember
-   , UseMember
-   , UseModuleMembers
    , UnitExpression
    , VectorExpression
    , VectorExpressionInternal0
-   , BorrowExpression
-   , DereferenceExpression
    , MoveOrCopyExpression
    , MoveOrCopyExpressionInternal0
    , UnaryExpression
    , UnaryOp
-   , AbortExpression
-   , AssignExpression
    , BinaryExpression
    , CastExpression
    , IdentifiedExpression
@@ -2425,19 +2413,33 @@ type MoveSig =
    , QuantifierBinding
    , ReturnExpression
    , WhileExpression
-   , BlockItem
-   , BlockItemInternal0
-   , LetStatement
-   , MacroFunctionDefinition
-   , HiddenMacroSignature
-   , NativeFunctionDefinition
-   , HiddenStructItem
-   , NativeStructDefinition
-   , HiddenStructSignature
-   , StructDefinition
-   , Constant
    , FriendDeclaration
    , FriendAccess
+   , HidEnumItem
+   , EnumDefinition
+   , EnumVariants
+   , Variant
+   , DatatypeFields
+   , NamedFields
+   , FieldAnnotation
+   , PositionalFields
+   , HidVariantIdentifier
+   , HidEnumSignature
+   , AbilityDecls
+   , HidEnumIdentifier
+   , PostfixAbilityDecls
+   , HidFunctionItem
+   , FunctionDefinition
+   , HidFunctionSignature
+   , Modifier
+   , ModifierInternal0
+   , MacroFunctionDefinition
+   , HidMacroSignature
+   , NativeFunctionDefinition
+   , HidStructItem
+   , NativeStructDefinition
+   , HidStructSignature
+   , StructDefinition
    , Token
    , Syntax.PairF
    , Syntax.MaybeF
@@ -2463,30 +2465,27 @@ type data Symbol (symbolType :: SymbolType) where
   ModuleBodySymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleBodyInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleBodyInternal1Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenEnumItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  EnumDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenEnumSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenEnumIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  IdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AbilityDeclsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AbilitySymbol :: (symbolType ~ Regular) => Symbol symbolType
-  TypeParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  TypeParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenTypeParameterIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  EnumVariantsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  VariantSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenVariantIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  DatatypeFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  NamedFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  FieldAnnotationSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenFieldIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ConstantSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AbortExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AssignExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidUnaryExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidUnaryExpressionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  BorrowExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidReferenceSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ImmRefSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  MutRefSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  DereferenceExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidExpressionTermSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AnnotationExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ApplyTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleAccessSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenModuleIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenReservedIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenExistsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenForallSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidModuleIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  IdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidReservedIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidExistsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidForallSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleIdentitySymbol :: (symbolType ~ Regular) => Symbol symbolType
   ModuleIdentityInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
   NumLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2496,41 +2495,45 @@ type data Symbol (symbolType :: SymbolType) where
   FunctionTypeParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PrimitiveTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   RefTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenReferenceSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ImmRefSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  MutRefSymbol :: (symbolType ~ Regular) => Symbol symbolType
   TupleTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  PositionalFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  PostfixAbilityDeclsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenFunctionItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  FunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenFunctionSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenFunctionIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  FunctionParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  FunctionParametersInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  FunctionParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  FunctionParameterInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenVariableIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  MutFunctionParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ModifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ModifierInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  RetTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BlockSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenUnaryExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenUnaryExpressionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenExpressionTermSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenLiteralValueSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BlockItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BlockItemInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  LetStatementSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  CommaBindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidBindSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AtBindSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidVariableIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindUnpackSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindNamedFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindNamedFieldsInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpreadOperatorSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  MutBindFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  BindPositionalFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NameExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidBindInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  MutBindVarSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidLiteralValueSymbol :: (symbolType ~ Regular) => Symbol symbolType
   AddressLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BoolLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ByteStringLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
   HexStringLiteralSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AnnotationExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  OrBindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseDeclarationSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseDeclarationInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseFunSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidFunctionIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseModuleSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseModuleMemberSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseMemberSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  UseModuleMembersSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BreakExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   LabelSymbol :: (symbolType ~ Regular) => Symbol symbolType
   CallExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ArgListSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  NameExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ContinueExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   DotExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExpressionListSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2539,52 +2542,48 @@ type data Symbol (symbolType :: SymbolType) where
   MacroCallExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MacroModuleAccessSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MatchExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenMatchBodySymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidMatchBodySymbol :: (symbolType ~ Regular) => Symbol symbolType
   MatchArmSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenBindSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenBindInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  MutBindVarSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AtBindSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindUnpackSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindNamedFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindNamedFieldsInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpreadOperatorSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  MutBindFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BindPositionalFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  CommaBindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  OrBindListSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MatchConditionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   PackExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FieldInitializeListSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExpFieldSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidFieldIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecBlockTargetSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecBlockTargetSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBlockTargetSchemaSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenStructIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidStructIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  TypeParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  TypeParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AbilitySymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidTypeParameterIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   NativeSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecFunctionSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecFunctionSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunctionParametersSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunctionParametersInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunctionParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunctionParameterInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  MutFunctionParameterSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  RetTypeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UninterpretedSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UsualSpecFunctionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecBodySymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecBlockMemeberSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecBlockMemeberSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecApplySymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecApplyPatternSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecApplyNamePatternSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecApplyPatternInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecConditionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecAbortIfSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecAbortIfSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ConditionPropertiesSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecPropertySymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecAbortWithOrModifiesSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecAbortWithOrModifiesInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecConditionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecConditionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenSpecConditionKindSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecAbortWithOrModifiesSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecAbortWithOrModifiesInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecConditionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecConditionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidSpecConditionKindSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecIncludeSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecInvariantSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecInvariantInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2592,24 +2591,13 @@ type data Symbol (symbolType :: SymbolType) where
   SpecPragmaSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecVariableSymbol :: (symbolType ~ Regular) => Symbol symbolType
   SpecVariableInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseDeclarationSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseDeclarationInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseFunSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseModuleSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseModuleMemberSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseMemberSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  UseModuleMembersSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UnitExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   VectorExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   VectorExpressionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  BorrowExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  DereferenceExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MoveOrCopyExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   MoveOrCopyExpressionInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
   UnaryExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   UnaryOpSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AbortExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  AssignExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   BinaryExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   CastExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   IdentifiedExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2623,19 +2611,33 @@ type data Symbol (symbolType :: SymbolType) where
   QuantifierBindingSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ReturnExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   WhileExpressionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BlockItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  BlockItemInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
-  LetStatementSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  MacroFunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenMacroSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  NativeFunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenStructItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  NativeStructDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  HiddenStructSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  StructDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
-  ConstantSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendDeclarationSymbol :: (symbolType ~ Regular) => Symbol symbolType
   FriendAccessSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidEnumItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EnumDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  EnumVariantsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  VariantSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  DatatypeFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NamedFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FieldAnnotationSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  PositionalFieldsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidVariantIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidEnumSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  AbilityDeclsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidEnumIdentifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  PostfixAbilityDeclsSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidFunctionItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  FunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidFunctionSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ModifierSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  ModifierInternal0Symbol :: (symbolType ~ Regular) => Symbol symbolType
+  MacroFunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidMacroSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NativeFunctionDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidStructItemSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  NativeStructDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  HidStructSignatureSymbol :: (symbolType ~ Regular) => Symbol symbolType
+  StructDefinitionSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExclamationMarkTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   ExclamationMarkEqualsSignTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
   NumberSignLeftSquareBracketTokSymbol :: (symbolType ~ Regular) => Symbol symbolType
@@ -2761,30 +2763,27 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SModuleBodySymbol :: SymbolSing Regular ModuleBodySymbol
   SModuleBodyInternal0Symbol :: SymbolSing Regular ModuleBodyInternal0Symbol
   SModuleBodyInternal1Symbol :: SymbolSing Regular ModuleBodyInternal1Symbol
-  SHiddenEnumItemSymbol :: SymbolSing Regular HiddenEnumItemSymbol
-  SEnumDefinitionSymbol :: SymbolSing Regular EnumDefinitionSymbol
-  SHiddenEnumSignatureSymbol :: SymbolSing Regular HiddenEnumSignatureSymbol
-  SHiddenEnumIdentifierSymbol :: SymbolSing Regular HiddenEnumIdentifierSymbol
-  SIdentifierSymbol :: SymbolSing Regular IdentifierSymbol
-  SAbilityDeclsSymbol :: SymbolSing Regular AbilityDeclsSymbol
-  SAbilitySymbol :: SymbolSing Regular AbilitySymbol
-  STypeParametersSymbol :: SymbolSing Regular TypeParametersSymbol
-  STypeParameterSymbol :: SymbolSing Regular TypeParameterSymbol
-  SHiddenTypeParameterIdentifierSymbol :: SymbolSing Regular HiddenTypeParameterIdentifierSymbol
-  SEnumVariantsSymbol :: SymbolSing Regular EnumVariantsSymbol
-  SVariantSymbol :: SymbolSing Regular VariantSymbol
-  SHiddenVariantIdentifierSymbol :: SymbolSing Regular HiddenVariantIdentifierSymbol
-  SDatatypeFieldsSymbol :: SymbolSing Regular DatatypeFieldsSymbol
-  SNamedFieldsSymbol :: SymbolSing Regular NamedFieldsSymbol
-  SFieldAnnotationSymbol :: SymbolSing Regular FieldAnnotationSymbol
-  SHiddenFieldIdentifierSymbol :: SymbolSing Regular HiddenFieldIdentifierSymbol
-  SHiddenTypeSymbol :: SymbolSing Regular HiddenTypeSymbol
+  SConstantSymbol :: SymbolSing Regular ConstantSymbol
+  SHidExpressionSymbol :: SymbolSing Regular HidExpressionSymbol
+  SAbortExpressionSymbol :: SymbolSing Regular AbortExpressionSymbol
+  SAssignExpressionSymbol :: SymbolSing Regular AssignExpressionSymbol
+  SHidUnaryExpressionSymbol :: SymbolSing Regular HidUnaryExpressionSymbol
+  SHidUnaryExpressionInternal0Symbol :: SymbolSing Regular HidUnaryExpressionInternal0Symbol
+  SBorrowExpressionSymbol :: SymbolSing Regular BorrowExpressionSymbol
+  SHidReferenceSymbol :: SymbolSing Regular HidReferenceSymbol
+  SImmRefSymbol :: SymbolSing Regular ImmRefSymbol
+  SMutRefSymbol :: SymbolSing Regular MutRefSymbol
+  SDereferenceExpressionSymbol :: SymbolSing Regular DereferenceExpressionSymbol
+  SHidExpressionTermSymbol :: SymbolSing Regular HidExpressionTermSymbol
+  SAnnotationExpressionSymbol :: SymbolSing Regular AnnotationExpressionSymbol
+  SHidTypeSymbol :: SymbolSing Regular HidTypeSymbol
   SApplyTypeSymbol :: SymbolSing Regular ApplyTypeSymbol
   SModuleAccessSymbol :: SymbolSing Regular ModuleAccessSymbol
-  SHiddenModuleIdentifierSymbol :: SymbolSing Regular HiddenModuleIdentifierSymbol
-  SHiddenReservedIdentifierSymbol :: SymbolSing Regular HiddenReservedIdentifierSymbol
-  SHiddenExistsSymbol :: SymbolSing Regular HiddenExistsSymbol
-  SHiddenForallSymbol :: SymbolSing Regular HiddenForallSymbol
+  SHidModuleIdentifierSymbol :: SymbolSing Regular HidModuleIdentifierSymbol
+  SIdentifierSymbol :: SymbolSing Regular IdentifierSymbol
+  SHidReservedIdentifierSymbol :: SymbolSing Regular HidReservedIdentifierSymbol
+  SHidExistsSymbol :: SymbolSing Regular HidExistsSymbol
+  SHidForallSymbol :: SymbolSing Regular HidForallSymbol
   SModuleIdentitySymbol :: SymbolSing Regular ModuleIdentitySymbol
   SModuleIdentityInternal0Symbol :: SymbolSing Regular ModuleIdentityInternal0Symbol
   SNumLiteralSymbol :: SymbolSing Regular NumLiteralSymbol
@@ -2794,41 +2793,45 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SFunctionTypeParametersSymbol :: SymbolSing Regular FunctionTypeParametersSymbol
   SPrimitiveTypeSymbol :: SymbolSing Regular PrimitiveTypeSymbol
   SRefTypeSymbol :: SymbolSing Regular RefTypeSymbol
-  SHiddenReferenceSymbol :: SymbolSing Regular HiddenReferenceSymbol
-  SImmRefSymbol :: SymbolSing Regular ImmRefSymbol
-  SMutRefSymbol :: SymbolSing Regular MutRefSymbol
   STupleTypeSymbol :: SymbolSing Regular TupleTypeSymbol
-  SPositionalFieldsSymbol :: SymbolSing Regular PositionalFieldsSymbol
-  SPostfixAbilityDeclsSymbol :: SymbolSing Regular PostfixAbilityDeclsSymbol
-  SHiddenFunctionItemSymbol :: SymbolSing Regular HiddenFunctionItemSymbol
-  SFunctionDefinitionSymbol :: SymbolSing Regular FunctionDefinitionSymbol
-  SHiddenFunctionSignatureSymbol :: SymbolSing Regular HiddenFunctionSignatureSymbol
-  SHiddenFunctionIdentifierSymbol :: SymbolSing Regular HiddenFunctionIdentifierSymbol
-  SFunctionParametersSymbol :: SymbolSing Regular FunctionParametersSymbol
-  SFunctionParametersInternal0Symbol :: SymbolSing Regular FunctionParametersInternal0Symbol
-  SFunctionParameterSymbol :: SymbolSing Regular FunctionParameterSymbol
-  SFunctionParameterInternal0Symbol :: SymbolSing Regular FunctionParameterInternal0Symbol
-  SHiddenVariableIdentifierSymbol :: SymbolSing Regular HiddenVariableIdentifierSymbol
-  SMutFunctionParameterSymbol :: SymbolSing Regular MutFunctionParameterSymbol
-  SModifierSymbol :: SymbolSing Regular ModifierSymbol
-  SModifierInternal0Symbol :: SymbolSing Regular ModifierInternal0Symbol
-  SRetTypeSymbol :: SymbolSing Regular RetTypeSymbol
   SBlockSymbol :: SymbolSing Regular BlockSymbol
-  SHiddenExpressionSymbol :: SymbolSing Regular HiddenExpressionSymbol
-  SHiddenUnaryExpressionSymbol :: SymbolSing Regular HiddenUnaryExpressionSymbol
-  SHiddenUnaryExpressionInternal0Symbol :: SymbolSing Regular HiddenUnaryExpressionInternal0Symbol
-  SHiddenExpressionTermSymbol :: SymbolSing Regular HiddenExpressionTermSymbol
-  SHiddenLiteralValueSymbol :: SymbolSing Regular HiddenLiteralValueSymbol
+  SBlockItemSymbol :: SymbolSing Regular BlockItemSymbol
+  SBlockItemInternal0Symbol :: SymbolSing Regular BlockItemInternal0Symbol
+  SLetStatementSymbol :: SymbolSing Regular LetStatementSymbol
+  SBindListSymbol :: SymbolSing Regular BindListSymbol
+  SCommaBindListSymbol :: SymbolSing Regular CommaBindListSymbol
+  SHidBindSymbol :: SymbolSing Regular HidBindSymbol
+  SAtBindSymbol :: SymbolSing Regular AtBindSymbol
+  SHidVariableIdentifierSymbol :: SymbolSing Regular HidVariableIdentifierSymbol
+  SBindUnpackSymbol :: SymbolSing Regular BindUnpackSymbol
+  SBindFieldsSymbol :: SymbolSing Regular BindFieldsSymbol
+  SBindNamedFieldsSymbol :: SymbolSing Regular BindNamedFieldsSymbol
+  SBindNamedFieldsInternal0Symbol :: SymbolSing Regular BindNamedFieldsInternal0Symbol
+  SBindFieldSymbol :: SymbolSing Regular BindFieldSymbol
+  SHidSpreadOperatorSymbol :: SymbolSing Regular HidSpreadOperatorSymbol
+  SMutBindFieldSymbol :: SymbolSing Regular MutBindFieldSymbol
+  SBindPositionalFieldsSymbol :: SymbolSing Regular BindPositionalFieldsSymbol
+  SNameExpressionSymbol :: SymbolSing Regular NameExpressionSymbol
+  SHidBindInternal0Symbol :: SymbolSing Regular HidBindInternal0Symbol
+  SMutBindVarSymbol :: SymbolSing Regular MutBindVarSymbol
+  SHidLiteralValueSymbol :: SymbolSing Regular HidLiteralValueSymbol
   SAddressLiteralSymbol :: SymbolSing Regular AddressLiteralSymbol
   SBoolLiteralSymbol :: SymbolSing Regular BoolLiteralSymbol
   SByteStringLiteralSymbol :: SymbolSing Regular ByteStringLiteralSymbol
   SHexStringLiteralSymbol :: SymbolSing Regular HexStringLiteralSymbol
-  SAnnotationExpressionSymbol :: SymbolSing Regular AnnotationExpressionSymbol
+  SOrBindListSymbol :: SymbolSing Regular OrBindListSymbol
+  SUseDeclarationSymbol :: SymbolSing Regular UseDeclarationSymbol
+  SUseDeclarationInternal0Symbol :: SymbolSing Regular UseDeclarationInternal0Symbol
+  SUseFunSymbol :: SymbolSing Regular UseFunSymbol
+  SHidFunctionIdentifierSymbol :: SymbolSing Regular HidFunctionIdentifierSymbol
+  SUseModuleSymbol :: SymbolSing Regular UseModuleSymbol
+  SUseModuleMemberSymbol :: SymbolSing Regular UseModuleMemberSymbol
+  SUseMemberSymbol :: SymbolSing Regular UseMemberSymbol
+  SUseModuleMembersSymbol :: SymbolSing Regular UseModuleMembersSymbol
   SBreakExpressionSymbol :: SymbolSing Regular BreakExpressionSymbol
   SLabelSymbol :: SymbolSing Regular LabelSymbol
   SCallExpressionSymbol :: SymbolSing Regular CallExpressionSymbol
   SArgListSymbol :: SymbolSing Regular ArgListSymbol
-  SNameExpressionSymbol :: SymbolSing Regular NameExpressionSymbol
   SContinueExpressionSymbol :: SymbolSing Regular ContinueExpressionSymbol
   SDotExpressionSymbol :: SymbolSing Regular DotExpressionSymbol
   SExpressionListSymbol :: SymbolSing Regular ExpressionListSymbol
@@ -2837,52 +2840,48 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SMacroCallExpressionSymbol :: SymbolSing Regular MacroCallExpressionSymbol
   SMacroModuleAccessSymbol :: SymbolSing Regular MacroModuleAccessSymbol
   SMatchExpressionSymbol :: SymbolSing Regular MatchExpressionSymbol
-  SHiddenMatchBodySymbol :: SymbolSing Regular HiddenMatchBodySymbol
+  SHidMatchBodySymbol :: SymbolSing Regular HidMatchBodySymbol
   SMatchArmSymbol :: SymbolSing Regular MatchArmSymbol
-  SBindListSymbol :: SymbolSing Regular BindListSymbol
-  SHiddenBindSymbol :: SymbolSing Regular HiddenBindSymbol
-  SHiddenBindInternal0Symbol :: SymbolSing Regular HiddenBindInternal0Symbol
-  SMutBindVarSymbol :: SymbolSing Regular MutBindVarSymbol
-  SAtBindSymbol :: SymbolSing Regular AtBindSymbol
-  SBindUnpackSymbol :: SymbolSing Regular BindUnpackSymbol
-  SBindFieldsSymbol :: SymbolSing Regular BindFieldsSymbol
-  SBindNamedFieldsSymbol :: SymbolSing Regular BindNamedFieldsSymbol
-  SBindNamedFieldsInternal0Symbol :: SymbolSing Regular BindNamedFieldsInternal0Symbol
-  SBindFieldSymbol :: SymbolSing Regular BindFieldSymbol
-  SHiddenSpreadOperatorSymbol :: SymbolSing Regular HiddenSpreadOperatorSymbol
-  SMutBindFieldSymbol :: SymbolSing Regular MutBindFieldSymbol
-  SBindPositionalFieldsSymbol :: SymbolSing Regular BindPositionalFieldsSymbol
-  SCommaBindListSymbol :: SymbolSing Regular CommaBindListSymbol
-  SOrBindListSymbol :: SymbolSing Regular OrBindListSymbol
   SMatchConditionSymbol :: SymbolSing Regular MatchConditionSymbol
   SPackExpressionSymbol :: SymbolSing Regular PackExpressionSymbol
   SFieldInitializeListSymbol :: SymbolSing Regular FieldInitializeListSymbol
   SExpFieldSymbol :: SymbolSing Regular ExpFieldSymbol
+  SHidFieldIdentifierSymbol :: SymbolSing Regular HidFieldIdentifierSymbol
   SSpecBlockSymbol :: SymbolSing Regular SpecBlockSymbol
   SSpecBlockInternal0Symbol :: SymbolSing Regular SpecBlockInternal0Symbol
-  SHiddenSpecBlockTargetSymbol :: SymbolSing Regular HiddenSpecBlockTargetSymbol
+  SHidSpecBlockTargetSymbol :: SymbolSing Regular HidSpecBlockTargetSymbol
   SSpecBlockTargetSchemaSymbol :: SymbolSing Regular SpecBlockTargetSchemaSymbol
-  SHiddenStructIdentifierSymbol :: SymbolSing Regular HiddenStructIdentifierSymbol
-  SHiddenSpecFunctionSymbol :: SymbolSing Regular HiddenSpecFunctionSymbol
+  SHidStructIdentifierSymbol :: SymbolSing Regular HidStructIdentifierSymbol
+  STypeParametersSymbol :: SymbolSing Regular TypeParametersSymbol
+  STypeParameterSymbol :: SymbolSing Regular TypeParameterSymbol
+  SAbilitySymbol :: SymbolSing Regular AbilitySymbol
+  SHidTypeParameterIdentifierSymbol :: SymbolSing Regular HidTypeParameterIdentifierSymbol
+  SHidSpecFunctionSymbol :: SymbolSing Regular HidSpecFunctionSymbol
   SNativeSpecFunctionSymbol :: SymbolSing Regular NativeSpecFunctionSymbol
-  SHiddenSpecFunctionSignatureSymbol :: SymbolSing Regular HiddenSpecFunctionSignatureSymbol
+  SHidSpecFunctionSignatureSymbol :: SymbolSing Regular HidSpecFunctionSignatureSymbol
+  SFunctionParametersSymbol :: SymbolSing Regular FunctionParametersSymbol
+  SFunctionParametersInternal0Symbol :: SymbolSing Regular FunctionParametersInternal0Symbol
+  SFunctionParameterSymbol :: SymbolSing Regular FunctionParameterSymbol
+  SFunctionParameterInternal0Symbol :: SymbolSing Regular FunctionParameterInternal0Symbol
+  SMutFunctionParameterSymbol :: SymbolSing Regular MutFunctionParameterSymbol
+  SRetTypeSymbol :: SymbolSing Regular RetTypeSymbol
   SUninterpretedSpecFunctionSymbol :: SymbolSing Regular UninterpretedSpecFunctionSymbol
   SUsualSpecFunctionSymbol :: SymbolSing Regular UsualSpecFunctionSymbol
   SSpecBodySymbol :: SymbolSing Regular SpecBodySymbol
-  SHiddenSpecBlockMemeberSymbol :: SymbolSing Regular HiddenSpecBlockMemeberSymbol
+  SHidSpecBlockMemeberSymbol :: SymbolSing Regular HidSpecBlockMemeberSymbol
   SSpecApplySymbol :: SymbolSing Regular SpecApplySymbol
   SSpecApplyPatternSymbol :: SymbolSing Regular SpecApplyPatternSymbol
   SSpecApplyNamePatternSymbol :: SymbolSing Regular SpecApplyNamePatternSymbol
   SSpecApplyPatternInternal0Symbol :: SymbolSing Regular SpecApplyPatternInternal0Symbol
   SSpecConditionSymbol :: SymbolSing Regular SpecConditionSymbol
-  SHiddenSpecAbortIfSymbol :: SymbolSing Regular HiddenSpecAbortIfSymbol
+  SHidSpecAbortIfSymbol :: SymbolSing Regular HidSpecAbortIfSymbol
   SConditionPropertiesSymbol :: SymbolSing Regular ConditionPropertiesSymbol
   SSpecPropertySymbol :: SymbolSing Regular SpecPropertySymbol
-  SHiddenSpecAbortWithOrModifiesSymbol :: SymbolSing Regular HiddenSpecAbortWithOrModifiesSymbol
-  SHiddenSpecAbortWithOrModifiesInternal0Symbol :: SymbolSing Regular HiddenSpecAbortWithOrModifiesInternal0Symbol
-  SHiddenSpecConditionSymbol :: SymbolSing Regular HiddenSpecConditionSymbol
-  SHiddenSpecConditionInternal0Symbol :: SymbolSing Regular HiddenSpecConditionInternal0Symbol
-  SHiddenSpecConditionKindSymbol :: SymbolSing Regular HiddenSpecConditionKindSymbol
+  SHidSpecAbortWithOrModifiesSymbol :: SymbolSing Regular HidSpecAbortWithOrModifiesSymbol
+  SHidSpecAbortWithOrModifiesInternal0Symbol :: SymbolSing Regular HidSpecAbortWithOrModifiesInternal0Symbol
+  SHidSpecConditionSymbol :: SymbolSing Regular HidSpecConditionSymbol
+  SHidSpecConditionInternal0Symbol :: SymbolSing Regular HidSpecConditionInternal0Symbol
+  SHidSpecConditionKindSymbol :: SymbolSing Regular HidSpecConditionKindSymbol
   SSpecIncludeSymbol :: SymbolSing Regular SpecIncludeSymbol
   SSpecInvariantSymbol :: SymbolSing Regular SpecInvariantSymbol
   SSpecInvariantInternal0Symbol :: SymbolSing Regular SpecInvariantInternal0Symbol
@@ -2890,24 +2889,13 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SSpecPragmaSymbol :: SymbolSing Regular SpecPragmaSymbol
   SSpecVariableSymbol :: SymbolSing Regular SpecVariableSymbol
   SSpecVariableInternal0Symbol :: SymbolSing Regular SpecVariableInternal0Symbol
-  SUseDeclarationSymbol :: SymbolSing Regular UseDeclarationSymbol
-  SUseDeclarationInternal0Symbol :: SymbolSing Regular UseDeclarationInternal0Symbol
-  SUseFunSymbol :: SymbolSing Regular UseFunSymbol
-  SUseModuleSymbol :: SymbolSing Regular UseModuleSymbol
-  SUseModuleMemberSymbol :: SymbolSing Regular UseModuleMemberSymbol
-  SUseMemberSymbol :: SymbolSing Regular UseMemberSymbol
-  SUseModuleMembersSymbol :: SymbolSing Regular UseModuleMembersSymbol
   SUnitExpressionSymbol :: SymbolSing Regular UnitExpressionSymbol
   SVectorExpressionSymbol :: SymbolSing Regular VectorExpressionSymbol
   SVectorExpressionInternal0Symbol :: SymbolSing Regular VectorExpressionInternal0Symbol
-  SBorrowExpressionSymbol :: SymbolSing Regular BorrowExpressionSymbol
-  SDereferenceExpressionSymbol :: SymbolSing Regular DereferenceExpressionSymbol
   SMoveOrCopyExpressionSymbol :: SymbolSing Regular MoveOrCopyExpressionSymbol
   SMoveOrCopyExpressionInternal0Symbol :: SymbolSing Regular MoveOrCopyExpressionInternal0Symbol
   SUnaryExpressionSymbol :: SymbolSing Regular UnaryExpressionSymbol
   SUnaryOpSymbol :: SymbolSing Regular UnaryOpSymbol
-  SAbortExpressionSymbol :: SymbolSing Regular AbortExpressionSymbol
-  SAssignExpressionSymbol :: SymbolSing Regular AssignExpressionSymbol
   SBinaryExpressionSymbol :: SymbolSing Regular BinaryExpressionSymbol
   SCastExpressionSymbol :: SymbolSing Regular CastExpressionSymbol
   SIdentifiedExpressionSymbol :: SymbolSing Regular IdentifiedExpressionSymbol
@@ -2921,19 +2909,33 @@ data SymbolSing (symbolType :: SymbolType) (symbol :: Symbol symbolType) where
   SQuantifierBindingSymbol :: SymbolSing Regular QuantifierBindingSymbol
   SReturnExpressionSymbol :: SymbolSing Regular ReturnExpressionSymbol
   SWhileExpressionSymbol :: SymbolSing Regular WhileExpressionSymbol
-  SBlockItemSymbol :: SymbolSing Regular BlockItemSymbol
-  SBlockItemInternal0Symbol :: SymbolSing Regular BlockItemInternal0Symbol
-  SLetStatementSymbol :: SymbolSing Regular LetStatementSymbol
-  SMacroFunctionDefinitionSymbol :: SymbolSing Regular MacroFunctionDefinitionSymbol
-  SHiddenMacroSignatureSymbol :: SymbolSing Regular HiddenMacroSignatureSymbol
-  SNativeFunctionDefinitionSymbol :: SymbolSing Regular NativeFunctionDefinitionSymbol
-  SHiddenStructItemSymbol :: SymbolSing Regular HiddenStructItemSymbol
-  SNativeStructDefinitionSymbol :: SymbolSing Regular NativeStructDefinitionSymbol
-  SHiddenStructSignatureSymbol :: SymbolSing Regular HiddenStructSignatureSymbol
-  SStructDefinitionSymbol :: SymbolSing Regular StructDefinitionSymbol
-  SConstantSymbol :: SymbolSing Regular ConstantSymbol
   SFriendDeclarationSymbol :: SymbolSing Regular FriendDeclarationSymbol
   SFriendAccessSymbol :: SymbolSing Regular FriendAccessSymbol
+  SHidEnumItemSymbol :: SymbolSing Regular HidEnumItemSymbol
+  SEnumDefinitionSymbol :: SymbolSing Regular EnumDefinitionSymbol
+  SEnumVariantsSymbol :: SymbolSing Regular EnumVariantsSymbol
+  SVariantSymbol :: SymbolSing Regular VariantSymbol
+  SDatatypeFieldsSymbol :: SymbolSing Regular DatatypeFieldsSymbol
+  SNamedFieldsSymbol :: SymbolSing Regular NamedFieldsSymbol
+  SFieldAnnotationSymbol :: SymbolSing Regular FieldAnnotationSymbol
+  SPositionalFieldsSymbol :: SymbolSing Regular PositionalFieldsSymbol
+  SHidVariantIdentifierSymbol :: SymbolSing Regular HidVariantIdentifierSymbol
+  SHidEnumSignatureSymbol :: SymbolSing Regular HidEnumSignatureSymbol
+  SAbilityDeclsSymbol :: SymbolSing Regular AbilityDeclsSymbol
+  SHidEnumIdentifierSymbol :: SymbolSing Regular HidEnumIdentifierSymbol
+  SPostfixAbilityDeclsSymbol :: SymbolSing Regular PostfixAbilityDeclsSymbol
+  SHidFunctionItemSymbol :: SymbolSing Regular HidFunctionItemSymbol
+  SFunctionDefinitionSymbol :: SymbolSing Regular FunctionDefinitionSymbol
+  SHidFunctionSignatureSymbol :: SymbolSing Regular HidFunctionSignatureSymbol
+  SModifierSymbol :: SymbolSing Regular ModifierSymbol
+  SModifierInternal0Symbol :: SymbolSing Regular ModifierInternal0Symbol
+  SMacroFunctionDefinitionSymbol :: SymbolSing Regular MacroFunctionDefinitionSymbol
+  SHidMacroSignatureSymbol :: SymbolSing Regular HidMacroSignatureSymbol
+  SNativeFunctionDefinitionSymbol :: SymbolSing Regular NativeFunctionDefinitionSymbol
+  SHidStructItemSymbol :: SymbolSing Regular HidStructItemSymbol
+  SNativeStructDefinitionSymbol :: SymbolSing Regular NativeStructDefinitionSymbol
+  SHidStructSignatureSymbol :: SymbolSing Regular HidStructSignatureSymbol
+  SStructDefinitionSymbol :: SymbolSing Regular StructDefinitionSymbol
   SExclamationMarkTokSymbol :: SymbolSing Anonymous ExclamationMarkTokSymbol
   SExclamationMarkEqualsSignTokSymbol :: SymbolSing Anonymous ExclamationMarkEqualsSignTokSymbol
   SNumberSignLeftSquareBracketTokSymbol :: SymbolSing Anonymous NumberSignLeftSquareBracketTokSymbol
@@ -3063,30 +3065,27 @@ decSymbolSing SModuleDefinitionSymbol SModuleDefinitionSymbol = Just (Refl, HRef
 decSymbolSing SModuleBodySymbol SModuleBodySymbol = Just (Refl, HRefl)
 decSymbolSing SModuleBodyInternal0Symbol SModuleBodyInternal0Symbol = Just (Refl, HRefl)
 decSymbolSing SModuleBodyInternal1Symbol SModuleBodyInternal1Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenEnumItemSymbol SHiddenEnumItemSymbol = Just (Refl, HRefl)
-decSymbolSing SEnumDefinitionSymbol SEnumDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenEnumSignatureSymbol SHiddenEnumSignatureSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenEnumIdentifierSymbol SHiddenEnumIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SIdentifierSymbol SIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SAbilityDeclsSymbol SAbilityDeclsSymbol = Just (Refl, HRefl)
-decSymbolSing SAbilitySymbol SAbilitySymbol = Just (Refl, HRefl)
-decSymbolSing STypeParametersSymbol STypeParametersSymbol = Just (Refl, HRefl)
-decSymbolSing STypeParameterSymbol STypeParameterSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenTypeParameterIdentifierSymbol SHiddenTypeParameterIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SEnumVariantsSymbol SEnumVariantsSymbol = Just (Refl, HRefl)
-decSymbolSing SVariantSymbol SVariantSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenVariantIdentifierSymbol SHiddenVariantIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SDatatypeFieldsSymbol SDatatypeFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SNamedFieldsSymbol SNamedFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SFieldAnnotationSymbol SFieldAnnotationSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenFieldIdentifierSymbol SHiddenFieldIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenTypeSymbol SHiddenTypeSymbol = Just (Refl, HRefl)
+decSymbolSing SConstantSymbol SConstantSymbol = Just (Refl, HRefl)
+decSymbolSing SHidExpressionSymbol SHidExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SAbortExpressionSymbol SAbortExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SAssignExpressionSymbol SAssignExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidUnaryExpressionSymbol SHidUnaryExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidUnaryExpressionInternal0Symbol SHidUnaryExpressionInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SBorrowExpressionSymbol SBorrowExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidReferenceSymbol SHidReferenceSymbol = Just (Refl, HRefl)
+decSymbolSing SImmRefSymbol SImmRefSymbol = Just (Refl, HRefl)
+decSymbolSing SMutRefSymbol SMutRefSymbol = Just (Refl, HRefl)
+decSymbolSing SDereferenceExpressionSymbol SDereferenceExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidExpressionTermSymbol SHidExpressionTermSymbol = Just (Refl, HRefl)
+decSymbolSing SAnnotationExpressionSymbol SAnnotationExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidTypeSymbol SHidTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SApplyTypeSymbol SApplyTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SModuleAccessSymbol SModuleAccessSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenModuleIdentifierSymbol SHiddenModuleIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenReservedIdentifierSymbol SHiddenReservedIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenExistsSymbol SHiddenExistsSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenForallSymbol SHiddenForallSymbol = Just (Refl, HRefl)
+decSymbolSing SHidModuleIdentifierSymbol SHidModuleIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SIdentifierSymbol SIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SHidReservedIdentifierSymbol SHidReservedIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SHidExistsSymbol SHidExistsSymbol = Just (Refl, HRefl)
+decSymbolSing SHidForallSymbol SHidForallSymbol = Just (Refl, HRefl)
 decSymbolSing SModuleIdentitySymbol SModuleIdentitySymbol = Just (Refl, HRefl)
 decSymbolSing SModuleIdentityInternal0Symbol SModuleIdentityInternal0Symbol = Just (Refl, HRefl)
 decSymbolSing SNumLiteralSymbol SNumLiteralSymbol = Just (Refl, HRefl)
@@ -3096,41 +3095,45 @@ decSymbolSing SFunctionTypeSymbol SFunctionTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SFunctionTypeParametersSymbol SFunctionTypeParametersSymbol = Just (Refl, HRefl)
 decSymbolSing SPrimitiveTypeSymbol SPrimitiveTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SRefTypeSymbol SRefTypeSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenReferenceSymbol SHiddenReferenceSymbol = Just (Refl, HRefl)
-decSymbolSing SImmRefSymbol SImmRefSymbol = Just (Refl, HRefl)
-decSymbolSing SMutRefSymbol SMutRefSymbol = Just (Refl, HRefl)
 decSymbolSing STupleTypeSymbol STupleTypeSymbol = Just (Refl, HRefl)
-decSymbolSing SPositionalFieldsSymbol SPositionalFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SPostfixAbilityDeclsSymbol SPostfixAbilityDeclsSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenFunctionItemSymbol SHiddenFunctionItemSymbol = Just (Refl, HRefl)
-decSymbolSing SFunctionDefinitionSymbol SFunctionDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenFunctionSignatureSymbol SHiddenFunctionSignatureSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenFunctionIdentifierSymbol SHiddenFunctionIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SFunctionParametersSymbol SFunctionParametersSymbol = Just (Refl, HRefl)
-decSymbolSing SFunctionParametersInternal0Symbol SFunctionParametersInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SFunctionParameterSymbol SFunctionParameterSymbol = Just (Refl, HRefl)
-decSymbolSing SFunctionParameterInternal0Symbol SFunctionParameterInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenVariableIdentifierSymbol SHiddenVariableIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SMutFunctionParameterSymbol SMutFunctionParameterSymbol = Just (Refl, HRefl)
-decSymbolSing SModifierSymbol SModifierSymbol = Just (Refl, HRefl)
-decSymbolSing SModifierInternal0Symbol SModifierInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SRetTypeSymbol SRetTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SBlockSymbol SBlockSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenExpressionSymbol SHiddenExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenUnaryExpressionSymbol SHiddenUnaryExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenUnaryExpressionInternal0Symbol SHiddenUnaryExpressionInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenExpressionTermSymbol SHiddenExpressionTermSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenLiteralValueSymbol SHiddenLiteralValueSymbol = Just (Refl, HRefl)
+decSymbolSing SBlockItemSymbol SBlockItemSymbol = Just (Refl, HRefl)
+decSymbolSing SBlockItemInternal0Symbol SBlockItemInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SLetStatementSymbol SLetStatementSymbol = Just (Refl, HRefl)
+decSymbolSing SBindListSymbol SBindListSymbol = Just (Refl, HRefl)
+decSymbolSing SCommaBindListSymbol SCommaBindListSymbol = Just (Refl, HRefl)
+decSymbolSing SHidBindSymbol SHidBindSymbol = Just (Refl, HRefl)
+decSymbolSing SAtBindSymbol SAtBindSymbol = Just (Refl, HRefl)
+decSymbolSing SHidVariableIdentifierSymbol SHidVariableIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SBindUnpackSymbol SBindUnpackSymbol = Just (Refl, HRefl)
+decSymbolSing SBindFieldsSymbol SBindFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SBindNamedFieldsSymbol SBindNamedFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SBindNamedFieldsInternal0Symbol SBindNamedFieldsInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SBindFieldSymbol SBindFieldSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpreadOperatorSymbol SHidSpreadOperatorSymbol = Just (Refl, HRefl)
+decSymbolSing SMutBindFieldSymbol SMutBindFieldSymbol = Just (Refl, HRefl)
+decSymbolSing SBindPositionalFieldsSymbol SBindPositionalFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SNameExpressionSymbol SNameExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidBindInternal0Symbol SHidBindInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SMutBindVarSymbol SMutBindVarSymbol = Just (Refl, HRefl)
+decSymbolSing SHidLiteralValueSymbol SHidLiteralValueSymbol = Just (Refl, HRefl)
 decSymbolSing SAddressLiteralSymbol SAddressLiteralSymbol = Just (Refl, HRefl)
 decSymbolSing SBoolLiteralSymbol SBoolLiteralSymbol = Just (Refl, HRefl)
 decSymbolSing SByteStringLiteralSymbol SByteStringLiteralSymbol = Just (Refl, HRefl)
 decSymbolSing SHexStringLiteralSymbol SHexStringLiteralSymbol = Just (Refl, HRefl)
-decSymbolSing SAnnotationExpressionSymbol SAnnotationExpressionSymbol = Just (Refl, HRefl)
+decSymbolSing SOrBindListSymbol SOrBindListSymbol = Just (Refl, HRefl)
+decSymbolSing SUseDeclarationSymbol SUseDeclarationSymbol = Just (Refl, HRefl)
+decSymbolSing SUseDeclarationInternal0Symbol SUseDeclarationInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SUseFunSymbol SUseFunSymbol = Just (Refl, HRefl)
+decSymbolSing SHidFunctionIdentifierSymbol SHidFunctionIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SUseModuleSymbol SUseModuleSymbol = Just (Refl, HRefl)
+decSymbolSing SUseModuleMemberSymbol SUseModuleMemberSymbol = Just (Refl, HRefl)
+decSymbolSing SUseMemberSymbol SUseMemberSymbol = Just (Refl, HRefl)
+decSymbolSing SUseModuleMembersSymbol SUseModuleMembersSymbol = Just (Refl, HRefl)
 decSymbolSing SBreakExpressionSymbol SBreakExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SLabelSymbol SLabelSymbol = Just (Refl, HRefl)
 decSymbolSing SCallExpressionSymbol SCallExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SArgListSymbol SArgListSymbol = Just (Refl, HRefl)
-decSymbolSing SNameExpressionSymbol SNameExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SContinueExpressionSymbol SContinueExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SDotExpressionSymbol SDotExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SExpressionListSymbol SExpressionListSymbol = Just (Refl, HRefl)
@@ -3139,52 +3142,48 @@ decSymbolSing SIndexExpressionSymbol SIndexExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SMacroCallExpressionSymbol SMacroCallExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SMacroModuleAccessSymbol SMacroModuleAccessSymbol = Just (Refl, HRefl)
 decSymbolSing SMatchExpressionSymbol SMatchExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenMatchBodySymbol SHiddenMatchBodySymbol = Just (Refl, HRefl)
+decSymbolSing SHidMatchBodySymbol SHidMatchBodySymbol = Just (Refl, HRefl)
 decSymbolSing SMatchArmSymbol SMatchArmSymbol = Just (Refl, HRefl)
-decSymbolSing SBindListSymbol SBindListSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenBindSymbol SHiddenBindSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenBindInternal0Symbol SHiddenBindInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SMutBindVarSymbol SMutBindVarSymbol = Just (Refl, HRefl)
-decSymbolSing SAtBindSymbol SAtBindSymbol = Just (Refl, HRefl)
-decSymbolSing SBindUnpackSymbol SBindUnpackSymbol = Just (Refl, HRefl)
-decSymbolSing SBindFieldsSymbol SBindFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SBindNamedFieldsSymbol SBindNamedFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SBindNamedFieldsInternal0Symbol SBindNamedFieldsInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SBindFieldSymbol SBindFieldSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpreadOperatorSymbol SHiddenSpreadOperatorSymbol = Just (Refl, HRefl)
-decSymbolSing SMutBindFieldSymbol SMutBindFieldSymbol = Just (Refl, HRefl)
-decSymbolSing SBindPositionalFieldsSymbol SBindPositionalFieldsSymbol = Just (Refl, HRefl)
-decSymbolSing SCommaBindListSymbol SCommaBindListSymbol = Just (Refl, HRefl)
-decSymbolSing SOrBindListSymbol SOrBindListSymbol = Just (Refl, HRefl)
 decSymbolSing SMatchConditionSymbol SMatchConditionSymbol = Just (Refl, HRefl)
 decSymbolSing SPackExpressionSymbol SPackExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SFieldInitializeListSymbol SFieldInitializeListSymbol = Just (Refl, HRefl)
 decSymbolSing SExpFieldSymbol SExpFieldSymbol = Just (Refl, HRefl)
+decSymbolSing SHidFieldIdentifierSymbol SHidFieldIdentifierSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockSymbol SSpecBlockSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockInternal0Symbol SSpecBlockInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecBlockTargetSymbol SHiddenSpecBlockTargetSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecBlockTargetSymbol SHidSpecBlockTargetSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBlockTargetSchemaSymbol SSpecBlockTargetSchemaSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenStructIdentifierSymbol SHiddenStructIdentifierSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecFunctionSymbol SHiddenSpecFunctionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidStructIdentifierSymbol SHidStructIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing STypeParametersSymbol STypeParametersSymbol = Just (Refl, HRefl)
+decSymbolSing STypeParameterSymbol STypeParameterSymbol = Just (Refl, HRefl)
+decSymbolSing SAbilitySymbol SAbilitySymbol = Just (Refl, HRefl)
+decSymbolSing SHidTypeParameterIdentifierSymbol SHidTypeParameterIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecFunctionSymbol SHidSpecFunctionSymbol = Just (Refl, HRefl)
 decSymbolSing SNativeSpecFunctionSymbol SNativeSpecFunctionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecFunctionSignatureSymbol SHiddenSpecFunctionSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecFunctionSignatureSymbol SHidSpecFunctionSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SFunctionParametersSymbol SFunctionParametersSymbol = Just (Refl, HRefl)
+decSymbolSing SFunctionParametersInternal0Symbol SFunctionParametersInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SFunctionParameterSymbol SFunctionParameterSymbol = Just (Refl, HRefl)
+decSymbolSing SFunctionParameterInternal0Symbol SFunctionParameterInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SMutFunctionParameterSymbol SMutFunctionParameterSymbol = Just (Refl, HRefl)
+decSymbolSing SRetTypeSymbol SRetTypeSymbol = Just (Refl, HRefl)
 decSymbolSing SUninterpretedSpecFunctionSymbol SUninterpretedSpecFunctionSymbol = Just (Refl, HRefl)
 decSymbolSing SUsualSpecFunctionSymbol SUsualSpecFunctionSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecBodySymbol SSpecBodySymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecBlockMemeberSymbol SHiddenSpecBlockMemeberSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecBlockMemeberSymbol SHidSpecBlockMemeberSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecApplySymbol SSpecApplySymbol = Just (Refl, HRefl)
 decSymbolSing SSpecApplyPatternSymbol SSpecApplyPatternSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecApplyNamePatternSymbol SSpecApplyNamePatternSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecApplyPatternInternal0Symbol SSpecApplyPatternInternal0Symbol = Just (Refl, HRefl)
 decSymbolSing SSpecConditionSymbol SSpecConditionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecAbortIfSymbol SHiddenSpecAbortIfSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecAbortIfSymbol SHidSpecAbortIfSymbol = Just (Refl, HRefl)
 decSymbolSing SConditionPropertiesSymbol SConditionPropertiesSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecPropertySymbol SSpecPropertySymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecAbortWithOrModifiesSymbol SHiddenSpecAbortWithOrModifiesSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecAbortWithOrModifiesInternal0Symbol SHiddenSpecAbortWithOrModifiesInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecConditionSymbol SHiddenSpecConditionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecConditionInternal0Symbol SHiddenSpecConditionInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SHiddenSpecConditionKindSymbol SHiddenSpecConditionKindSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecAbortWithOrModifiesSymbol SHidSpecAbortWithOrModifiesSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecAbortWithOrModifiesInternal0Symbol SHidSpecAbortWithOrModifiesInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecConditionSymbol SHidSpecConditionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecConditionInternal0Symbol SHidSpecConditionInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SHidSpecConditionKindSymbol SHidSpecConditionKindSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecIncludeSymbol SSpecIncludeSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecInvariantSymbol SSpecInvariantSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecInvariantInternal0Symbol SSpecInvariantInternal0Symbol = Just (Refl, HRefl)
@@ -3192,24 +3191,13 @@ decSymbolSing SSpecLetSymbol SSpecLetSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecPragmaSymbol SSpecPragmaSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecVariableSymbol SSpecVariableSymbol = Just (Refl, HRefl)
 decSymbolSing SSpecVariableInternal0Symbol SSpecVariableInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SUseDeclarationSymbol SUseDeclarationSymbol = Just (Refl, HRefl)
-decSymbolSing SUseDeclarationInternal0Symbol SUseDeclarationInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SUseFunSymbol SUseFunSymbol = Just (Refl, HRefl)
-decSymbolSing SUseModuleSymbol SUseModuleSymbol = Just (Refl, HRefl)
-decSymbolSing SUseModuleMemberSymbol SUseModuleMemberSymbol = Just (Refl, HRefl)
-decSymbolSing SUseMemberSymbol SUseMemberSymbol = Just (Refl, HRefl)
-decSymbolSing SUseModuleMembersSymbol SUseModuleMembersSymbol = Just (Refl, HRefl)
 decSymbolSing SUnitExpressionSymbol SUnitExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SVectorExpressionSymbol SVectorExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SVectorExpressionInternal0Symbol SVectorExpressionInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SBorrowExpressionSymbol SBorrowExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SDereferenceExpressionSymbol SDereferenceExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SMoveOrCopyExpressionSymbol SMoveOrCopyExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SMoveOrCopyExpressionInternal0Symbol SMoveOrCopyExpressionInternal0Symbol = Just (Refl, HRefl)
 decSymbolSing SUnaryExpressionSymbol SUnaryExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SUnaryOpSymbol SUnaryOpSymbol = Just (Refl, HRefl)
-decSymbolSing SAbortExpressionSymbol SAbortExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SAssignExpressionSymbol SAssignExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SBinaryExpressionSymbol SBinaryExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SCastExpressionSymbol SCastExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SIdentifiedExpressionSymbol SIdentifiedExpressionSymbol = Just (Refl, HRefl)
@@ -3223,19 +3211,33 @@ decSymbolSing SQuantifierBindingsSymbol SQuantifierBindingsSymbol = Just (Refl, 
 decSymbolSing SQuantifierBindingSymbol SQuantifierBindingSymbol = Just (Refl, HRefl)
 decSymbolSing SReturnExpressionSymbol SReturnExpressionSymbol = Just (Refl, HRefl)
 decSymbolSing SWhileExpressionSymbol SWhileExpressionSymbol = Just (Refl, HRefl)
-decSymbolSing SBlockItemSymbol SBlockItemSymbol = Just (Refl, HRefl)
-decSymbolSing SBlockItemInternal0Symbol SBlockItemInternal0Symbol = Just (Refl, HRefl)
-decSymbolSing SLetStatementSymbol SLetStatementSymbol = Just (Refl, HRefl)
-decSymbolSing SMacroFunctionDefinitionSymbol SMacroFunctionDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenMacroSignatureSymbol SHiddenMacroSignatureSymbol = Just (Refl, HRefl)
-decSymbolSing SNativeFunctionDefinitionSymbol SNativeFunctionDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenStructItemSymbol SHiddenStructItemSymbol = Just (Refl, HRefl)
-decSymbolSing SNativeStructDefinitionSymbol SNativeStructDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SHiddenStructSignatureSymbol SHiddenStructSignatureSymbol = Just (Refl, HRefl)
-decSymbolSing SStructDefinitionSymbol SStructDefinitionSymbol = Just (Refl, HRefl)
-decSymbolSing SConstantSymbol SConstantSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendDeclarationSymbol SFriendDeclarationSymbol = Just (Refl, HRefl)
 decSymbolSing SFriendAccessSymbol SFriendAccessSymbol = Just (Refl, HRefl)
+decSymbolSing SHidEnumItemSymbol SHidEnumItemSymbol = Just (Refl, HRefl)
+decSymbolSing SEnumDefinitionSymbol SEnumDefinitionSymbol = Just (Refl, HRefl)
+decSymbolSing SEnumVariantsSymbol SEnumVariantsSymbol = Just (Refl, HRefl)
+decSymbolSing SVariantSymbol SVariantSymbol = Just (Refl, HRefl)
+decSymbolSing SDatatypeFieldsSymbol SDatatypeFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SNamedFieldsSymbol SNamedFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SFieldAnnotationSymbol SFieldAnnotationSymbol = Just (Refl, HRefl)
+decSymbolSing SPositionalFieldsSymbol SPositionalFieldsSymbol = Just (Refl, HRefl)
+decSymbolSing SHidVariantIdentifierSymbol SHidVariantIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SHidEnumSignatureSymbol SHidEnumSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SAbilityDeclsSymbol SAbilityDeclsSymbol = Just (Refl, HRefl)
+decSymbolSing SHidEnumIdentifierSymbol SHidEnumIdentifierSymbol = Just (Refl, HRefl)
+decSymbolSing SPostfixAbilityDeclsSymbol SPostfixAbilityDeclsSymbol = Just (Refl, HRefl)
+decSymbolSing SHidFunctionItemSymbol SHidFunctionItemSymbol = Just (Refl, HRefl)
+decSymbolSing SFunctionDefinitionSymbol SFunctionDefinitionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidFunctionSignatureSymbol SHidFunctionSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SModifierSymbol SModifierSymbol = Just (Refl, HRefl)
+decSymbolSing SModifierInternal0Symbol SModifierInternal0Symbol = Just (Refl, HRefl)
+decSymbolSing SMacroFunctionDefinitionSymbol SMacroFunctionDefinitionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidMacroSignatureSymbol SHidMacroSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SNativeFunctionDefinitionSymbol SNativeFunctionDefinitionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidStructItemSymbol SHidStructItemSymbol = Just (Refl, HRefl)
+decSymbolSing SNativeStructDefinitionSymbol SNativeStructDefinitionSymbol = Just (Refl, HRefl)
+decSymbolSing SHidStructSignatureSymbol SHidStructSignatureSymbol = Just (Refl, HRefl)
+decSymbolSing SStructDefinitionSymbol SStructDefinitionSymbol = Just (Refl, HRefl)
 decSymbolSing SExclamationMarkTokSymbol SExclamationMarkTokSymbol = Just (Refl, HRefl)
 decSymbolSing SExclamationMarkEqualsSignTokSymbol SExclamationMarkEqualsSignTokSymbol = Just (Refl, HRefl)
 decSymbolSing SNumberSignLeftSquareBracketTokSymbol SNumberSignLeftSquareBracketTokSymbol = Just (Refl, HRefl)
@@ -3390,30 +3392,27 @@ symbolMap = Map.fromList
     , ("module_body", SomeRegularSymbolSing SModuleBodySymbol)
     , ("module_body_internal0", SomeRegularSymbolSing SModuleBodyInternal0Symbol)
     , ("module_body_internal1", SomeRegularSymbolSing SModuleBodyInternal1Symbol)
-    , ("_enum_item", SomeRegularSymbolSing SHiddenEnumItemSymbol)
-    , ("enum_definition", SomeRegularSymbolSing SEnumDefinitionSymbol)
-    , ("_enum_signature", SomeRegularSymbolSing SHiddenEnumSignatureSymbol)
-    , ("_enum_identifier", SomeRegularSymbolSing SHiddenEnumIdentifierSymbol)
-    , ("identifier", SomeRegularSymbolSing SIdentifierSymbol)
-    , ("ability_decls", SomeRegularSymbolSing SAbilityDeclsSymbol)
-    , ("ability", SomeRegularSymbolSing SAbilitySymbol)
-    , ("type_parameters", SomeRegularSymbolSing STypeParametersSymbol)
-    , ("type_parameter", SomeRegularSymbolSing STypeParameterSymbol)
-    , ("_type_parameter_identifier", SomeRegularSymbolSing SHiddenTypeParameterIdentifierSymbol)
-    , ("enum_variants", SomeRegularSymbolSing SEnumVariantsSymbol)
-    , ("variant", SomeRegularSymbolSing SVariantSymbol)
-    , ("_variant_identifier", SomeRegularSymbolSing SHiddenVariantIdentifierSymbol)
-    , ("datatype_fields", SomeRegularSymbolSing SDatatypeFieldsSymbol)
-    , ("named_fields", SomeRegularSymbolSing SNamedFieldsSymbol)
-    , ("field_annotation", SomeRegularSymbolSing SFieldAnnotationSymbol)
-    , ("_field_identifier", SomeRegularSymbolSing SHiddenFieldIdentifierSymbol)
-    , ("_type", SomeRegularSymbolSing SHiddenTypeSymbol)
+    , ("constant", SomeRegularSymbolSing SConstantSymbol)
+    , ("hid_expression", SomeRegularSymbolSing SHidExpressionSymbol)
+    , ("abort_expression", SomeRegularSymbolSing SAbortExpressionSymbol)
+    , ("assign_expression", SomeRegularSymbolSing SAssignExpressionSymbol)
+    , ("hid_unary_expression", SomeRegularSymbolSing SHidUnaryExpressionSymbol)
+    , ("hid_unary_expression_internal0", SomeRegularSymbolSing SHidUnaryExpressionInternal0Symbol)
+    , ("borrow_expression", SomeRegularSymbolSing SBorrowExpressionSymbol)
+    , ("hid_reference", SomeRegularSymbolSing SHidReferenceSymbol)
+    , ("imm_ref", SomeRegularSymbolSing SImmRefSymbol)
+    , ("mut_ref", SomeRegularSymbolSing SMutRefSymbol)
+    , ("dereference_expression", SomeRegularSymbolSing SDereferenceExpressionSymbol)
+    , ("hid_expression_term", SomeRegularSymbolSing SHidExpressionTermSymbol)
+    , ("annotation_expression", SomeRegularSymbolSing SAnnotationExpressionSymbol)
+    , ("hid_type", SomeRegularSymbolSing SHidTypeSymbol)
     , ("apply_type", SomeRegularSymbolSing SApplyTypeSymbol)
     , ("module_access", SomeRegularSymbolSing SModuleAccessSymbol)
-    , ("_module_identifier", SomeRegularSymbolSing SHiddenModuleIdentifierSymbol)
-    , ("_reserved_identifier", SomeRegularSymbolSing SHiddenReservedIdentifierSymbol)
-    , ("_exists", SomeRegularSymbolSing SHiddenExistsSymbol)
-    , ("_forall", SomeRegularSymbolSing SHiddenForallSymbol)
+    , ("hid_module_identifier", SomeRegularSymbolSing SHidModuleIdentifierSymbol)
+    , ("identifier", SomeRegularSymbolSing SIdentifierSymbol)
+    , ("hid_reserved_identifier", SomeRegularSymbolSing SHidReservedIdentifierSymbol)
+    , ("hid_exists", SomeRegularSymbolSing SHidExistsSymbol)
+    , ("hid_forall", SomeRegularSymbolSing SHidForallSymbol)
     , ("module_identity", SomeRegularSymbolSing SModuleIdentitySymbol)
     , ("module_identity_internal0", SomeRegularSymbolSing SModuleIdentityInternal0Symbol)
     , ("num_literal", SomeRegularSymbolSing SNumLiteralSymbol)
@@ -3423,41 +3422,45 @@ symbolMap = Map.fromList
     , ("function_type_parameters", SomeRegularSymbolSing SFunctionTypeParametersSymbol)
     , ("primitive_type", SomeRegularSymbolSing SPrimitiveTypeSymbol)
     , ("ref_type", SomeRegularSymbolSing SRefTypeSymbol)
-    , ("_reference", SomeRegularSymbolSing SHiddenReferenceSymbol)
-    , ("imm_ref", SomeRegularSymbolSing SImmRefSymbol)
-    , ("mut_ref", SomeRegularSymbolSing SMutRefSymbol)
     , ("tuple_type", SomeRegularSymbolSing STupleTypeSymbol)
-    , ("positional_fields", SomeRegularSymbolSing SPositionalFieldsSymbol)
-    , ("postfix_ability_decls", SomeRegularSymbolSing SPostfixAbilityDeclsSymbol)
-    , ("_function_item", SomeRegularSymbolSing SHiddenFunctionItemSymbol)
-    , ("function_definition", SomeRegularSymbolSing SFunctionDefinitionSymbol)
-    , ("_function_signature", SomeRegularSymbolSing SHiddenFunctionSignatureSymbol)
-    , ("_function_identifier", SomeRegularSymbolSing SHiddenFunctionIdentifierSymbol)
-    , ("function_parameters", SomeRegularSymbolSing SFunctionParametersSymbol)
-    , ("function_parameters_internal0", SomeRegularSymbolSing SFunctionParametersInternal0Symbol)
-    , ("function_parameter", SomeRegularSymbolSing SFunctionParameterSymbol)
-    , ("function_parameter_internal0", SomeRegularSymbolSing SFunctionParameterInternal0Symbol)
-    , ("_variable_identifier", SomeRegularSymbolSing SHiddenVariableIdentifierSymbol)
-    , ("mut_function_parameter", SomeRegularSymbolSing SMutFunctionParameterSymbol)
-    , ("modifier", SomeRegularSymbolSing SModifierSymbol)
-    , ("modifier_internal0", SomeRegularSymbolSing SModifierInternal0Symbol)
-    , ("ret_type", SomeRegularSymbolSing SRetTypeSymbol)
     , ("block", SomeRegularSymbolSing SBlockSymbol)
-    , ("_expression", SomeRegularSymbolSing SHiddenExpressionSymbol)
-    , ("_unary_expression", SomeRegularSymbolSing SHiddenUnaryExpressionSymbol)
-    , ("_unary_expression_internal0", SomeRegularSymbolSing SHiddenUnaryExpressionInternal0Symbol)
-    , ("_expression_term", SomeRegularSymbolSing SHiddenExpressionTermSymbol)
-    , ("_literal_value", SomeRegularSymbolSing SHiddenLiteralValueSymbol)
+    , ("block_item", SomeRegularSymbolSing SBlockItemSymbol)
+    , ("block_item_internal0", SomeRegularSymbolSing SBlockItemInternal0Symbol)
+    , ("let_statement", SomeRegularSymbolSing SLetStatementSymbol)
+    , ("bind_list", SomeRegularSymbolSing SBindListSymbol)
+    , ("comma_bind_list", SomeRegularSymbolSing SCommaBindListSymbol)
+    , ("hid_bind", SomeRegularSymbolSing SHidBindSymbol)
+    , ("at_bind", SomeRegularSymbolSing SAtBindSymbol)
+    , ("hid_variable_identifier", SomeRegularSymbolSing SHidVariableIdentifierSymbol)
+    , ("bind_unpack", SomeRegularSymbolSing SBindUnpackSymbol)
+    , ("bind_fields", SomeRegularSymbolSing SBindFieldsSymbol)
+    , ("bind_named_fields", SomeRegularSymbolSing SBindNamedFieldsSymbol)
+    , ("bind_named_fields_internal0", SomeRegularSymbolSing SBindNamedFieldsInternal0Symbol)
+    , ("bind_field", SomeRegularSymbolSing SBindFieldSymbol)
+    , ("hid_spread_operator", SomeRegularSymbolSing SHidSpreadOperatorSymbol)
+    , ("mut_bind_field", SomeRegularSymbolSing SMutBindFieldSymbol)
+    , ("bind_positional_fields", SomeRegularSymbolSing SBindPositionalFieldsSymbol)
+    , ("name_expression", SomeRegularSymbolSing SNameExpressionSymbol)
+    , ("hid_bind_internal0", SomeRegularSymbolSing SHidBindInternal0Symbol)
+    , ("mut_bind_var", SomeRegularSymbolSing SMutBindVarSymbol)
+    , ("hid_literal_value", SomeRegularSymbolSing SHidLiteralValueSymbol)
     , ("address_literal", SomeRegularSymbolSing SAddressLiteralSymbol)
     , ("bool_literal", SomeRegularSymbolSing SBoolLiteralSymbol)
     , ("byte_string_literal", SomeRegularSymbolSing SByteStringLiteralSymbol)
     , ("hex_string_literal", SomeRegularSymbolSing SHexStringLiteralSymbol)
-    , ("annotation_expression", SomeRegularSymbolSing SAnnotationExpressionSymbol)
+    , ("or_bind_list", SomeRegularSymbolSing SOrBindListSymbol)
+    , ("use_declaration", SomeRegularSymbolSing SUseDeclarationSymbol)
+    , ("use_declaration_internal0", SomeRegularSymbolSing SUseDeclarationInternal0Symbol)
+    , ("use_fun", SomeRegularSymbolSing SUseFunSymbol)
+    , ("hid_function_identifier", SomeRegularSymbolSing SHidFunctionIdentifierSymbol)
+    , ("use_module", SomeRegularSymbolSing SUseModuleSymbol)
+    , ("use_module_member", SomeRegularSymbolSing SUseModuleMemberSymbol)
+    , ("use_member", SomeRegularSymbolSing SUseMemberSymbol)
+    , ("use_module_members", SomeRegularSymbolSing SUseModuleMembersSymbol)
     , ("break_expression", SomeRegularSymbolSing SBreakExpressionSymbol)
     , ("label", SomeRegularSymbolSing SLabelSymbol)
     , ("call_expression", SomeRegularSymbolSing SCallExpressionSymbol)
     , ("arg_list", SomeRegularSymbolSing SArgListSymbol)
-    , ("name_expression", SomeRegularSymbolSing SNameExpressionSymbol)
     , ("continue_expression", SomeRegularSymbolSing SContinueExpressionSymbol)
     , ("dot_expression", SomeRegularSymbolSing SDotExpressionSymbol)
     , ("expression_list", SomeRegularSymbolSing SExpressionListSymbol)
@@ -3466,52 +3469,48 @@ symbolMap = Map.fromList
     , ("macro_call_expression", SomeRegularSymbolSing SMacroCallExpressionSymbol)
     , ("macro_module_access", SomeRegularSymbolSing SMacroModuleAccessSymbol)
     , ("match_expression", SomeRegularSymbolSing SMatchExpressionSymbol)
-    , ("_match_body", SomeRegularSymbolSing SHiddenMatchBodySymbol)
+    , ("hid_match_body", SomeRegularSymbolSing SHidMatchBodySymbol)
     , ("match_arm", SomeRegularSymbolSing SMatchArmSymbol)
-    , ("bind_list", SomeRegularSymbolSing SBindListSymbol)
-    , ("_bind", SomeRegularSymbolSing SHiddenBindSymbol)
-    , ("_bind_internal0", SomeRegularSymbolSing SHiddenBindInternal0Symbol)
-    , ("mut_bind_var", SomeRegularSymbolSing SMutBindVarSymbol)
-    , ("at_bind", SomeRegularSymbolSing SAtBindSymbol)
-    , ("bind_unpack", SomeRegularSymbolSing SBindUnpackSymbol)
-    , ("bind_fields", SomeRegularSymbolSing SBindFieldsSymbol)
-    , ("bind_named_fields", SomeRegularSymbolSing SBindNamedFieldsSymbol)
-    , ("bind_named_fields_internal0", SomeRegularSymbolSing SBindNamedFieldsInternal0Symbol)
-    , ("bind_field", SomeRegularSymbolSing SBindFieldSymbol)
-    , ("_spread_operator", SomeRegularSymbolSing SHiddenSpreadOperatorSymbol)
-    , ("mut_bind_field", SomeRegularSymbolSing SMutBindFieldSymbol)
-    , ("bind_positional_fields", SomeRegularSymbolSing SBindPositionalFieldsSymbol)
-    , ("comma_bind_list", SomeRegularSymbolSing SCommaBindListSymbol)
-    , ("or_bind_list", SomeRegularSymbolSing SOrBindListSymbol)
     , ("match_condition", SomeRegularSymbolSing SMatchConditionSymbol)
     , ("pack_expression", SomeRegularSymbolSing SPackExpressionSymbol)
     , ("field_initialize_list", SomeRegularSymbolSing SFieldInitializeListSymbol)
     , ("exp_field", SomeRegularSymbolSing SExpFieldSymbol)
+    , ("hid_field_identifier", SomeRegularSymbolSing SHidFieldIdentifierSymbol)
     , ("spec_block", SomeRegularSymbolSing SSpecBlockSymbol)
     , ("spec_block_internal0", SomeRegularSymbolSing SSpecBlockInternal0Symbol)
-    , ("_spec_block_target", SomeRegularSymbolSing SHiddenSpecBlockTargetSymbol)
+    , ("hid_spec_block_target", SomeRegularSymbolSing SHidSpecBlockTargetSymbol)
     , ("spec_block_target_schema", SomeRegularSymbolSing SSpecBlockTargetSchemaSymbol)
-    , ("_struct_identifier", SomeRegularSymbolSing SHiddenStructIdentifierSymbol)
-    , ("_spec_function", SomeRegularSymbolSing SHiddenSpecFunctionSymbol)
+    , ("hid_struct_identifier", SomeRegularSymbolSing SHidStructIdentifierSymbol)
+    , ("type_parameters", SomeRegularSymbolSing STypeParametersSymbol)
+    , ("type_parameter", SomeRegularSymbolSing STypeParameterSymbol)
+    , ("ability", SomeRegularSymbolSing SAbilitySymbol)
+    , ("hid_type_parameter_identifier", SomeRegularSymbolSing SHidTypeParameterIdentifierSymbol)
+    , ("hid_spec_function", SomeRegularSymbolSing SHidSpecFunctionSymbol)
     , ("native_spec_function", SomeRegularSymbolSing SNativeSpecFunctionSymbol)
-    , ("_spec_function_signature", SomeRegularSymbolSing SHiddenSpecFunctionSignatureSymbol)
+    , ("hid_spec_function_signature", SomeRegularSymbolSing SHidSpecFunctionSignatureSymbol)
+    , ("function_parameters", SomeRegularSymbolSing SFunctionParametersSymbol)
+    , ("function_parameters_internal0", SomeRegularSymbolSing SFunctionParametersInternal0Symbol)
+    , ("function_parameter", SomeRegularSymbolSing SFunctionParameterSymbol)
+    , ("function_parameter_internal0", SomeRegularSymbolSing SFunctionParameterInternal0Symbol)
+    , ("mut_function_parameter", SomeRegularSymbolSing SMutFunctionParameterSymbol)
+    , ("ret_type", SomeRegularSymbolSing SRetTypeSymbol)
     , ("uninterpreted_spec_function", SomeRegularSymbolSing SUninterpretedSpecFunctionSymbol)
     , ("usual_spec_function", SomeRegularSymbolSing SUsualSpecFunctionSymbol)
     , ("spec_body", SomeRegularSymbolSing SSpecBodySymbol)
-    , ("_spec_block_memeber", SomeRegularSymbolSing SHiddenSpecBlockMemeberSymbol)
+    , ("hid_spec_block_memeber", SomeRegularSymbolSing SHidSpecBlockMemeberSymbol)
     , ("spec_apply", SomeRegularSymbolSing SSpecApplySymbol)
     , ("spec_apply_pattern", SomeRegularSymbolSing SSpecApplyPatternSymbol)
     , ("spec_apply_name_pattern", SomeRegularSymbolSing SSpecApplyNamePatternSymbol)
     , ("spec_apply_pattern_internal0", SomeRegularSymbolSing SSpecApplyPatternInternal0Symbol)
     , ("spec_condition", SomeRegularSymbolSing SSpecConditionSymbol)
-    , ("_spec_abort_if", SomeRegularSymbolSing SHiddenSpecAbortIfSymbol)
+    , ("hid_spec_abort_if", SomeRegularSymbolSing SHidSpecAbortIfSymbol)
     , ("condition_properties", SomeRegularSymbolSing SConditionPropertiesSymbol)
     , ("spec_property", SomeRegularSymbolSing SSpecPropertySymbol)
-    , ("_spec_abort_with_or_modifies", SomeRegularSymbolSing SHiddenSpecAbortWithOrModifiesSymbol)
-    , ("_spec_abort_with_or_modifies_internal0", SomeRegularSymbolSing SHiddenSpecAbortWithOrModifiesInternal0Symbol)
-    , ("_spec_condition", SomeRegularSymbolSing SHiddenSpecConditionSymbol)
-    , ("_spec_condition_internal0", SomeRegularSymbolSing SHiddenSpecConditionInternal0Symbol)
-    , ("_spec_condition_kind", SomeRegularSymbolSing SHiddenSpecConditionKindSymbol)
+    , ("hid_spec_abort_with_or_modifies", SomeRegularSymbolSing SHidSpecAbortWithOrModifiesSymbol)
+    , ("hid_spec_abort_with_or_modifies_internal0", SomeRegularSymbolSing SHidSpecAbortWithOrModifiesInternal0Symbol)
+    , ("hid_spec_condition", SomeRegularSymbolSing SHidSpecConditionSymbol)
+    , ("hid_spec_condition_internal0", SomeRegularSymbolSing SHidSpecConditionInternal0Symbol)
+    , ("hid_spec_condition_kind", SomeRegularSymbolSing SHidSpecConditionKindSymbol)
     , ("spec_include", SomeRegularSymbolSing SSpecIncludeSymbol)
     , ("spec_invariant", SomeRegularSymbolSing SSpecInvariantSymbol)
     , ("spec_invariant_internal0", SomeRegularSymbolSing SSpecInvariantInternal0Symbol)
@@ -3519,24 +3518,13 @@ symbolMap = Map.fromList
     , ("spec_pragma", SomeRegularSymbolSing SSpecPragmaSymbol)
     , ("spec_variable", SomeRegularSymbolSing SSpecVariableSymbol)
     , ("spec_variable_internal0", SomeRegularSymbolSing SSpecVariableInternal0Symbol)
-    , ("use_declaration", SomeRegularSymbolSing SUseDeclarationSymbol)
-    , ("use_declaration_internal0", SomeRegularSymbolSing SUseDeclarationInternal0Symbol)
-    , ("use_fun", SomeRegularSymbolSing SUseFunSymbol)
-    , ("use_module", SomeRegularSymbolSing SUseModuleSymbol)
-    , ("use_module_member", SomeRegularSymbolSing SUseModuleMemberSymbol)
-    , ("use_member", SomeRegularSymbolSing SUseMemberSymbol)
-    , ("use_module_members", SomeRegularSymbolSing SUseModuleMembersSymbol)
     , ("unit_expression", SomeRegularSymbolSing SUnitExpressionSymbol)
     , ("vector_expression", SomeRegularSymbolSing SVectorExpressionSymbol)
     , ("vector_expression_internal0", SomeRegularSymbolSing SVectorExpressionInternal0Symbol)
-    , ("borrow_expression", SomeRegularSymbolSing SBorrowExpressionSymbol)
-    , ("dereference_expression", SomeRegularSymbolSing SDereferenceExpressionSymbol)
     , ("move_or_copy_expression", SomeRegularSymbolSing SMoveOrCopyExpressionSymbol)
     , ("move_or_copy_expression_internal0", SomeRegularSymbolSing SMoveOrCopyExpressionInternal0Symbol)
     , ("unary_expression", SomeRegularSymbolSing SUnaryExpressionSymbol)
     , ("unary_op", SomeRegularSymbolSing SUnaryOpSymbol)
-    , ("abort_expression", SomeRegularSymbolSing SAbortExpressionSymbol)
-    , ("assign_expression", SomeRegularSymbolSing SAssignExpressionSymbol)
     , ("binary_expression", SomeRegularSymbolSing SBinaryExpressionSymbol)
     , ("cast_expression", SomeRegularSymbolSing SCastExpressionSymbol)
     , ("identified_expression", SomeRegularSymbolSing SIdentifiedExpressionSymbol)
@@ -3550,19 +3538,33 @@ symbolMap = Map.fromList
     , ("quantifier_binding", SomeRegularSymbolSing SQuantifierBindingSymbol)
     , ("return_expression", SomeRegularSymbolSing SReturnExpressionSymbol)
     , ("while_expression", SomeRegularSymbolSing SWhileExpressionSymbol)
-    , ("block_item", SomeRegularSymbolSing SBlockItemSymbol)
-    , ("block_item_internal0", SomeRegularSymbolSing SBlockItemInternal0Symbol)
-    , ("let_statement", SomeRegularSymbolSing SLetStatementSymbol)
-    , ("macro_function_definition", SomeRegularSymbolSing SMacroFunctionDefinitionSymbol)
-    , ("_macro_signature", SomeRegularSymbolSing SHiddenMacroSignatureSymbol)
-    , ("native_function_definition", SomeRegularSymbolSing SNativeFunctionDefinitionSymbol)
-    , ("_struct_item", SomeRegularSymbolSing SHiddenStructItemSymbol)
-    , ("native_struct_definition", SomeRegularSymbolSing SNativeStructDefinitionSymbol)
-    , ("_struct_signature", SomeRegularSymbolSing SHiddenStructSignatureSymbol)
-    , ("struct_definition", SomeRegularSymbolSing SStructDefinitionSymbol)
-    , ("constant", SomeRegularSymbolSing SConstantSymbol)
     , ("friend_declaration", SomeRegularSymbolSing SFriendDeclarationSymbol)
     , ("friend_access", SomeRegularSymbolSing SFriendAccessSymbol)
+    , ("hid_enum_item", SomeRegularSymbolSing SHidEnumItemSymbol)
+    , ("enum_definition", SomeRegularSymbolSing SEnumDefinitionSymbol)
+    , ("enum_variants", SomeRegularSymbolSing SEnumVariantsSymbol)
+    , ("variant", SomeRegularSymbolSing SVariantSymbol)
+    , ("datatype_fields", SomeRegularSymbolSing SDatatypeFieldsSymbol)
+    , ("named_fields", SomeRegularSymbolSing SNamedFieldsSymbol)
+    , ("field_annotation", SomeRegularSymbolSing SFieldAnnotationSymbol)
+    , ("positional_fields", SomeRegularSymbolSing SPositionalFieldsSymbol)
+    , ("hid_variant_identifier", SomeRegularSymbolSing SHidVariantIdentifierSymbol)
+    , ("hid_enum_signature", SomeRegularSymbolSing SHidEnumSignatureSymbol)
+    , ("ability_decls", SomeRegularSymbolSing SAbilityDeclsSymbol)
+    , ("hid_enum_identifier", SomeRegularSymbolSing SHidEnumIdentifierSymbol)
+    , ("postfix_ability_decls", SomeRegularSymbolSing SPostfixAbilityDeclsSymbol)
+    , ("hid_function_item", SomeRegularSymbolSing SHidFunctionItemSymbol)
+    , ("function_definition", SomeRegularSymbolSing SFunctionDefinitionSymbol)
+    , ("hid_function_signature", SomeRegularSymbolSing SHidFunctionSignatureSymbol)
+    , ("modifier", SomeRegularSymbolSing SModifierSymbol)
+    , ("modifier_internal0", SomeRegularSymbolSing SModifierInternal0Symbol)
+    , ("macro_function_definition", SomeRegularSymbolSing SMacroFunctionDefinitionSymbol)
+    , ("hid_macro_signature", SomeRegularSymbolSing SHidMacroSignatureSymbol)
+    , ("native_function_definition", SomeRegularSymbolSing SNativeFunctionDefinitionSymbol)
+    , ("hid_struct_item", SomeRegularSymbolSing SHidStructItemSymbol)
+    , ("native_struct_definition", SomeRegularSymbolSing SNativeStructDefinitionSymbol)
+    , ("hid_struct_signature", SomeRegularSymbolSing SHidStructSignatureSymbol)
+    , ("struct_definition", SomeRegularSymbolSing SStructDefinitionSymbol)
     , ("!", SomeAnonymousSymbolSing SExclamationMarkTokSymbol)
     , ("!=", SomeAnonymousSymbolSing SExclamationMarkEqualsSignTokSymbol)
     , ("#[", SomeAnonymousSymbolSing SNumberSignLeftSquareBracketTokSymbol)
@@ -3703,30 +3705,27 @@ moveSigNames =
    , ''ModuleBody
    , ''ModuleBodyInternal0
    , ''ModuleBodyInternal1
-   , ''HiddenEnumItem
-   , ''EnumDefinition
-   , ''HiddenEnumSignature
-   , ''HiddenEnumIdentifier
-   , ''Identifier
-   , ''AbilityDecls
-   , ''Ability
-   , ''TypeParameters
-   , ''TypeParameter
-   , ''HiddenTypeParameterIdentifier
-   , ''EnumVariants
-   , ''Variant
-   , ''HiddenVariantIdentifier
-   , ''DatatypeFields
-   , ''NamedFields
-   , ''FieldAnnotation
-   , ''HiddenFieldIdentifier
-   , ''HiddenType
+   , ''Constant
+   , ''HidExpression
+   , ''AbortExpression
+   , ''AssignExpression
+   , ''HidUnaryExpression
+   , ''HidUnaryExpressionInternal0
+   , ''BorrowExpression
+   , ''HidReference
+   , ''ImmRef
+   , ''MutRef
+   , ''DereferenceExpression
+   , ''HidExpressionTerm
+   , ''AnnotationExpression
+   , ''HidType
    , ''ApplyType
    , ''ModuleAccess
-   , ''HiddenModuleIdentifier
-   , ''HiddenReservedIdentifier
-   , ''HiddenExists
-   , ''HiddenForall
+   , ''HidModuleIdentifier
+   , ''Identifier
+   , ''HidReservedIdentifier
+   , ''HidExists
+   , ''HidForall
    , ''ModuleIdentity
    , ''ModuleIdentityInternal0
    , ''NumLiteral
@@ -3736,41 +3735,45 @@ moveSigNames =
    , ''FunctionTypeParameters
    , ''PrimitiveType
    , ''RefType
-   , ''HiddenReference
-   , ''ImmRef
-   , ''MutRef
    , ''TupleType
-   , ''PositionalFields
-   , ''PostfixAbilityDecls
-   , ''HiddenFunctionItem
-   , ''FunctionDefinition
-   , ''HiddenFunctionSignature
-   , ''HiddenFunctionIdentifier
-   , ''FunctionParameters
-   , ''FunctionParametersInternal0
-   , ''FunctionParameter
-   , ''FunctionParameterInternal0
-   , ''HiddenVariableIdentifier
-   , ''MutFunctionParameter
-   , ''Modifier
-   , ''ModifierInternal0
-   , ''RetType
    , ''Block
-   , ''HiddenExpression
-   , ''HiddenUnaryExpression
-   , ''HiddenUnaryExpressionInternal0
-   , ''HiddenExpressionTerm
-   , ''HiddenLiteralValue
+   , ''BlockItem
+   , ''BlockItemInternal0
+   , ''LetStatement
+   , ''BindList
+   , ''CommaBindList
+   , ''HidBind
+   , ''AtBind
+   , ''HidVariableIdentifier
+   , ''BindUnpack
+   , ''BindFields
+   , ''BindNamedFields
+   , ''BindNamedFieldsInternal0
+   , ''BindField
+   , ''HidSpreadOperator
+   , ''MutBindField
+   , ''BindPositionalFields
+   , ''NameExpression
+   , ''HidBindInternal0
+   , ''MutBindVar
+   , ''HidLiteralValue
    , ''AddressLiteral
    , ''BoolLiteral
    , ''ByteStringLiteral
    , ''HexStringLiteral
-   , ''AnnotationExpression
+   , ''OrBindList
+   , ''UseDeclaration
+   , ''UseDeclarationInternal0
+   , ''UseFun
+   , ''HidFunctionIdentifier
+   , ''UseModule
+   , ''UseModuleMember
+   , ''UseMember
+   , ''UseModuleMembers
    , ''BreakExpression
    , ''Label
    , ''CallExpression
    , ''ArgList
-   , ''NameExpression
    , ''ContinueExpression
    , ''DotExpression
    , ''ExpressionList
@@ -3779,52 +3782,48 @@ moveSigNames =
    , ''MacroCallExpression
    , ''MacroModuleAccess
    , ''MatchExpression
-   , ''HiddenMatchBody
+   , ''HidMatchBody
    , ''MatchArm
-   , ''BindList
-   , ''HiddenBind
-   , ''HiddenBindInternal0
-   , ''MutBindVar
-   , ''AtBind
-   , ''BindUnpack
-   , ''BindFields
-   , ''BindNamedFields
-   , ''BindNamedFieldsInternal0
-   , ''BindField
-   , ''HiddenSpreadOperator
-   , ''MutBindField
-   , ''BindPositionalFields
-   , ''CommaBindList
-   , ''OrBindList
    , ''MatchCondition
    , ''PackExpression
    , ''FieldInitializeList
    , ''ExpField
+   , ''HidFieldIdentifier
    , ''SpecBlock
    , ''SpecBlockInternal0
-   , ''HiddenSpecBlockTarget
+   , ''HidSpecBlockTarget
    , ''SpecBlockTargetSchema
-   , ''HiddenStructIdentifier
-   , ''HiddenSpecFunction
+   , ''HidStructIdentifier
+   , ''TypeParameters
+   , ''TypeParameter
+   , ''Ability
+   , ''HidTypeParameterIdentifier
+   , ''HidSpecFunction
    , ''NativeSpecFunction
-   , ''HiddenSpecFunctionSignature
+   , ''HidSpecFunctionSignature
+   , ''FunctionParameters
+   , ''FunctionParametersInternal0
+   , ''FunctionParameter
+   , ''FunctionParameterInternal0
+   , ''MutFunctionParameter
+   , ''RetType
    , ''UninterpretedSpecFunction
    , ''UsualSpecFunction
    , ''SpecBody
-   , ''HiddenSpecBlockMemeber
+   , ''HidSpecBlockMemeber
    , ''SpecApply
    , ''SpecApplyPattern
    , ''SpecApplyNamePattern
    , ''SpecApplyPatternInternal0
    , ''SpecCondition
-   , ''HiddenSpecAbortIf
+   , ''HidSpecAbortIf
    , ''ConditionProperties
    , ''SpecProperty
-   , ''HiddenSpecAbortWithOrModifies
-   , ''HiddenSpecAbortWithOrModifiesInternal0
-   , ''HiddenSpecCondition
-   , ''HiddenSpecConditionInternal0
-   , ''HiddenSpecConditionKind
+   , ''HidSpecAbortWithOrModifies
+   , ''HidSpecAbortWithOrModifiesInternal0
+   , ''HidSpecCondition
+   , ''HidSpecConditionInternal0
+   , ''HidSpecConditionKind
    , ''SpecInclude
    , ''SpecInvariant
    , ''SpecInvariantInternal0
@@ -3832,24 +3831,13 @@ moveSigNames =
    , ''SpecPragma
    , ''SpecVariable
    , ''SpecVariableInternal0
-   , ''UseDeclaration
-   , ''UseDeclarationInternal0
-   , ''UseFun
-   , ''UseModule
-   , ''UseModuleMember
-   , ''UseMember
-   , ''UseModuleMembers
    , ''UnitExpression
    , ''VectorExpression
    , ''VectorExpressionInternal0
-   , ''BorrowExpression
-   , ''DereferenceExpression
    , ''MoveOrCopyExpression
    , ''MoveOrCopyExpressionInternal0
    , ''UnaryExpression
    , ''UnaryOp
-   , ''AbortExpression
-   , ''AssignExpression
    , ''BinaryExpression
    , ''CastExpression
    , ''IdentifiedExpression
@@ -3863,19 +3851,33 @@ moveSigNames =
    , ''QuantifierBinding
    , ''ReturnExpression
    , ''WhileExpression
-   , ''BlockItem
-   , ''BlockItemInternal0
-   , ''LetStatement
-   , ''MacroFunctionDefinition
-   , ''HiddenMacroSignature
-   , ''NativeFunctionDefinition
-   , ''HiddenStructItem
-   , ''NativeStructDefinition
-   , ''HiddenStructSignature
-   , ''StructDefinition
-   , ''Constant
    , ''FriendDeclaration
    , ''FriendAccess
+   , ''HidEnumItem
+   , ''EnumDefinition
+   , ''EnumVariants
+   , ''Variant
+   , ''DatatypeFields
+   , ''NamedFields
+   , ''FieldAnnotation
+   , ''PositionalFields
+   , ''HidVariantIdentifier
+   , ''HidEnumSignature
+   , ''AbilityDecls
+   , ''HidEnumIdentifier
+   , ''PostfixAbilityDecls
+   , ''HidFunctionItem
+   , ''FunctionDefinition
+   , ''HidFunctionSignature
+   , ''Modifier
+   , ''ModifierInternal0
+   , ''MacroFunctionDefinition
+   , ''HidMacroSignature
+   , ''NativeFunctionDefinition
+   , ''HidStructItem
+   , ''NativeStructDefinition
+   , ''HidStructSignature
+   , ''StructDefinition
    , ''Token
    , ''Syntax.PairF
    , ''Syntax.MaybeF

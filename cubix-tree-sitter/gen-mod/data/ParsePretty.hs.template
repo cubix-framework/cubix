@@ -20,7 +20,6 @@ import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
-import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
@@ -54,109 +53,38 @@ parse path =
 -- --------------------------------------------------------------------------------
 -- -- Parser 
 -- --------------------------------------------------------------------------------
-type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
-
-instance IsString (NonEmpty Char) where
-  fromString [] = error "NonEmpty.fromString: empty string"
-  fromString (s:ss) = s :| ss
-
-pSymbol
-  :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
-   . NonEmpty Char
-  -> SymbolSing symbolType symbol
-  -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
-pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
-  SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
-    Just (Refl, HRefl) -> Just symSing
-    Nothing -> Nothing
-
-pContent :: Cubix.TreeSitter.Token a -> Parser Text
-pContent = Megaparsec.TreeSitter.pContent
-
--- reify the types to aid inference, that might get broken
-{-+}
-pMaybe :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term (Maybe a))
-{+-}
-pMaybe = Megaparsec.Cubix.pMaybe
-
-{-+}
-pPair :: (Typeable a, Typeable b) => Parser (${grammarName}Term a) -> Parser (${grammarName}Term b) -> Parser (${grammarName}Term (a , b))
-{+-}
-pPair = Megaparsec.Cubix.pPair
-
-{-+}
-pSome :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term [a])
-{+-}
-pSome = Megaparsec.Cubix.pSome
-
-{-+}
-pMany :: Typeable a => Parser (${grammarName}Term a) -> Parser (${grammarName}Term [a])
-{+-}
-pMany = Megaparsec.Cubix.pMany
-
-{-+}
-pSepBy :: Typeable a
-       => Parser (${grammarName}Term a)
-       -> Parser (${grammarName}Term sep)
-       -> Parser (${grammarName}Term [a])
-{+-}
-pSepBy = Megaparsec.Cubix.pSepBy
-
-{-+}
-pSepBy1 :: Typeable a
-       => Parser (${grammarName}Term a)
-       -> Parser (${grammarName}Term sep)
-       -> Parser (${grammarName}Term [a])
-{+-}
-pSepBy1 = Megaparsec.Cubix.pSepBy1
-
-{-+}
-pBetween :: Typeable a
-       => Parser (${grammarName}Term open)
-       -> Parser (${grammarName}Term close)
-       -> Parser (${grammarName}Term a)
-       -> Parser (${grammarName}Term a)
-{+-}
-pBetween = Megaparsec.Cubix.pBetween
-
-{-+}
-pRoot :: Parser (${grammarName}Term (RootSort ${grammarName}Sig))
-pRoot = p${startSort.camelCase} <* Megaparsec.eof
-{+-}
+type SomeTerm = E ${grammarName}Term
+type ${grammarName}Parser t = Parser NoHole (Sum ${grammarName}Sig) (K ()) t
+type ${grammarName}TermParser l = ${grammarName}Parser (${grammarName}Term l)
+type SomeTermParser = Parser (E ${grammarName}Term)
 
 {-+}
 ${for(tokens)}
-p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.sort})
-p${it.name.camelCase} = pSymbol "${it.symbol}" S${it.name.camelCase}Symbol $$> i${it.name.camelCase}
+p${it.name.camelCase} :: TermParser ${it.name.sort}
+p${it.name.camelCase} = pure ${it.name.camelCase}' <* Megaparsec.eof
 
 ${endfor}
 {+-}
 
 {-+}
 ${for(data)}
-${if(it.hasSymbol)}
-p${it.name.camelCase} :: Parser (${grammarName}Term ${it.name.sort})
-p${it.name.camelCase} = do
-  _sym <- pSymbol "${it.name.text}" S${it.name.camelCase}Symbol
-${else}
-p${it.name.camelCase} :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ${it.name.sort})
-p${it.name.camelCase} _sym = do
-${endif}
+p${it.name.camelCase} :: TermParser ${it.name.sort}
+p${it.name.camelCase} =
 ${if(it.sum)}
-  choice [ Megaparsec.try (${for(it.constructors)}p${it.name.camelCase}${sep} _sym)
-         , Megaparsec.try (${endfor} _sym)
+  choice [ Megaparsec.try ${for(it.constructors)}p${it.name.camelCase}${sep}
+         , Megaparsec.try ${endfor}
          ]
 ${else}
 ${for(it.constructors)}
-  ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase} <$$> ${it.parser}
+  ${if(it.hasChildren)}${else}pure ${endif}${it.name.camelCase}' <$$> ${it.parser}
 ${endfor}
 ${endif}
 ${if(it.sum)}
   where
 ${for(it.constructors)}
-    p${it.name.camelCase} :: Cubix.TreeSitter.Token a -> Parser (${grammarName}Term ${it.type.sort})
-    p${it.name.camelCase} _sym =
-      ${if(it.hasChildren)}${else}pure ${endif}i${it.name.camelCase} <$$> ${it.parser}
+    p${it.name.camelCase} :: Parser (${grammarName}Term ${it.type.sort})
+    p${it.name.camelCase} =
+      ${if(it.hasChildren)}${else}pure ${endif}${it.name.camelCase}' <$$> ${it.parser}
 ${endfor}
 ${endif}
 

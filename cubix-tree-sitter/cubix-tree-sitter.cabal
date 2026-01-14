@@ -63,6 +63,7 @@ common dependencies
     , base-compat-constptr ^>=0.1
     , bytestring ^>= 0.12
     , containers >= 0.6.8
+    , compstrat ^>= 0.1.0.3
     , comptrans >= 0.1.0.7
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2

@@ -18,7 +18,6 @@ import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
-import Cubix.ParsePretty
 import Cubix.Language.SuiMove.Modularized
 import Cubix.TreeSitter
 
@@ -48,2109 +47,1930 @@ parse path =
 -- --------------------------------------------------------------------------------
 -- -- Parser 
 -- --------------------------------------------------------------------------------
-type Parser = Megaparsec.TreeSitter.Parser SomeSymbolSing
+type SomeTerm = E ${grammarName}Term
+type ${grammarName}Parser t = Parser NoHole (Sum ${grammarName}Sig) (K ()) t
+type ${grammarName}TermParser l = ${grammarName}Parser (${grammarName}Term l)
+type SomeTermParser = Parser (E ${grammarName}Term)
 
-instance IsString (NonEmpty Char) where
-  fromString [] = error "NonEmpty.fromString: empty string"
-  fromString (s:ss) = s :| ss
+pExclamationMarkTok :: TermParser ExclamationMarkTokL
+pExclamationMarkTok = pure ExclamationMarkTok' <* Megaparsec.eof
 
-pSymbol
-  :: forall (symbolType :: SymbolType) (symbol :: Symbol symbolType)
-   . NonEmpty Char
-  -> SymbolSing symbolType symbol
-  -> Parser (Cubix.TreeSitter.Token (SymbolSing symbolType symbol))
-pSymbol expected sym = Megaparsec.TreeSitter.pToken expected $ \case
-  SomeSymbolSing _isReal symSing -> case decSymbolSing sym symSing of
-    Just (Refl, HRefl) -> Just symSing
-    Nothing -> Nothing
+pExclamationMarkEqualsSignTok :: TermParser ExclamationMarkEqualsSignTokL
+pExclamationMarkEqualsSignTok = pure ExclamationMarkEqualsSignTok' <* Megaparsec.eof
 
-pContent :: Cubix.TreeSitter.Token a -> Parser Text
-pContent = Megaparsec.TreeSitter.pContent
+pNumberSignLeftSquareBracketTok :: TermParser NumberSignLeftSquareBracketTokL
+pNumberSignLeftSquareBracketTok = pure NumberSignLeftSquareBracketTok' <* Megaparsec.eof
 
--- reify the types to aid inference, that might get broken
-pMaybe :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm (Maybe a))
-pMaybe = Megaparsec.Cubix.pMaybe
+pDollarSignTok :: TermParser DollarSignTokL
+pDollarSignTok = pure DollarSignTok' <* Megaparsec.eof
 
-pPair :: (Typeable a, Typeable b) => Parser (MoveTerm a) -> Parser (MoveTerm b) -> Parser (MoveTerm (a , b))
-pPair = Megaparsec.Cubix.pPair
+pPercentSignTok :: TermParser PercentSignTokL
+pPercentSignTok = pure PercentSignTok' <* Megaparsec.eof
 
-pSome :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
-pSome = Megaparsec.Cubix.pSome
+pAmpersandTok :: TermParser AmpersandTokL
+pAmpersandTok = pure AmpersandTok' <* Megaparsec.eof
 
-pMany :: Typeable a => Parser (MoveTerm a) -> Parser (MoveTerm [a])
-pMany = Megaparsec.Cubix.pMany
+pAmpersandAmpersandTok :: TermParser AmpersandAmpersandTokL
+pAmpersandAmpersandTok = pure AmpersandAmpersandTok' <* Megaparsec.eof
 
-pSepBy :: Typeable a
-       => Parser (MoveTerm a)
-       -> Parser (MoveTerm sep)
-       -> Parser (MoveTerm [a])
-pSepBy = Megaparsec.Cubix.pSepBy
+pApostropheTok :: TermParser ApostropheTokL
+pApostropheTok = pure ApostropheTok' <* Megaparsec.eof
 
-pSepBy1 :: Typeable a
-       => Parser (MoveTerm a)
-       -> Parser (MoveTerm sep)
-       -> Parser (MoveTerm [a])
-pSepBy1 = Megaparsec.Cubix.pSepBy1
+pLeftParenthesisTok :: TermParser LeftParenthesisTokL
+pLeftParenthesisTok = pure LeftParenthesisTok' <* Megaparsec.eof
 
-pBetween :: Typeable a
-       => Parser (MoveTerm open)
-       -> Parser (MoveTerm close)
-       -> Parser (MoveTerm a)
-       -> Parser (MoveTerm a)
-pBetween = Megaparsec.Cubix.pBetween
+pRightParenthesisTok :: TermParser RightParenthesisTokL
+pRightParenthesisTok = pure RightParenthesisTok' <* Megaparsec.eof
 
-pRoot :: Parser (MoveTerm (RootSort MoveSig))
-pRoot = pSourceFile <* Megaparsec.eof
+pAsteriskTok :: TermParser AsteriskTokL
+pAsteriskTok = pure AsteriskTok' <* Megaparsec.eof
 
-pExclamationMarkTok :: Parser (MoveTerm ExclamationMarkTokL)
-pExclamationMarkTok = pSymbol "!" SExclamationMarkTokSymbol $> iExclamationMarkTok
+pPlusSignTok :: TermParser PlusSignTokL
+pPlusSignTok = pure PlusSignTok' <* Megaparsec.eof
 
-pExclamationMarkEqualsSignTok :: Parser (MoveTerm ExclamationMarkEqualsSignTokL)
-pExclamationMarkEqualsSignTok = pSymbol "!=" SExclamationMarkEqualsSignTokSymbol $> iExclamationMarkEqualsSignTok
+pCommaTok :: TermParser CommaTokL
+pCommaTok = pure CommaTok' <* Megaparsec.eof
 
-pNumberSignLeftSquareBracketTok :: Parser (MoveTerm NumberSignLeftSquareBracketTokL)
-pNumberSignLeftSquareBracketTok = pSymbol "#[" SNumberSignLeftSquareBracketTokSymbol $> iNumberSignLeftSquareBracketTok
+pHyphenMinusTok :: TermParser HyphenMinusTokL
+pHyphenMinusTok = pure HyphenMinusTok' <* Megaparsec.eof
 
-pDollarSignTok :: Parser (MoveTerm DollarSignTokL)
-pDollarSignTok = pSymbol "$" SDollarSignTokSymbol $> iDollarSignTok
+pHyphenMinusGreaterThanSignTok :: TermParser HyphenMinusGreaterThanSignTokL
+pHyphenMinusGreaterThanSignTok = pure HyphenMinusGreaterThanSignTok' <* Megaparsec.eof
 
-pPercentSignTok :: Parser (MoveTerm PercentSignTokL)
-pPercentSignTok = pSymbol "%" SPercentSignTokSymbol $> iPercentSignTok
+pFullStopTok :: TermParser FullStopTokL
+pFullStopTok = pure FullStopTok' <* Megaparsec.eof
 
-pAmpersandTok :: Parser (MoveTerm AmpersandTokL)
-pAmpersandTok = pSymbol "&" SAmpersandTokSymbol $> iAmpersandTok
+pFullStopFullStopTok :: TermParser FullStopFullStopTokL
+pFullStopFullStopTok = pure FullStopFullStopTok' <* Megaparsec.eof
 
-pAmpersandAmpersandTok :: Parser (MoveTerm AmpersandAmpersandTokL)
-pAmpersandAmpersandTok = pSymbol "&&" SAmpersandAmpersandTokSymbol $> iAmpersandAmpersandTok
+pSolidusTok :: TermParser SolidusTokL
+pSolidusTok = pure SolidusTok' <* Megaparsec.eof
 
-pApostropheTok :: Parser (MoveTerm ApostropheTokL)
-pApostropheTok = pSymbol "'" SApostropheTokSymbol $> iApostropheTok
+pSolidusAsteriskTok :: TermParser SolidusAsteriskTokL
+pSolidusAsteriskTok = pure SolidusAsteriskTok' <* Megaparsec.eof
 
-pLeftParenthesisTok :: Parser (MoveTerm LeftParenthesisTokL)
-pLeftParenthesisTok = pSymbol "(" SLeftParenthesisTokSymbol $> iLeftParenthesisTok
+pSolidusSolidusTok :: TermParser SolidusSolidusTokL
+pSolidusSolidusTok = pure SolidusSolidusTok' <* Megaparsec.eof
 
-pRightParenthesisTok :: Parser (MoveTerm RightParenthesisTokL)
-pRightParenthesisTok = pSymbol ")" SRightParenthesisTokSymbol $> iRightParenthesisTok
+pColonTok :: TermParser ColonTokL
+pColonTok = pure ColonTok' <* Megaparsec.eof
 
-pAsteriskTok :: Parser (MoveTerm AsteriskTokL)
-pAsteriskTok = pSymbol "*" SAsteriskTokSymbol $> iAsteriskTok
+pColonColonTok :: TermParser ColonColonTokL
+pColonColonTok = pure ColonColonTok' <* Megaparsec.eof
 
-pPlusSignTok :: Parser (MoveTerm PlusSignTokL)
-pPlusSignTok = pSymbol "+" SPlusSignTokSymbol $> iPlusSignTok
+pSemicolonTok :: TermParser SemicolonTokL
+pSemicolonTok = pure SemicolonTok' <* Megaparsec.eof
 
-pCommaTok :: Parser (MoveTerm CommaTokL)
-pCommaTok = pSymbol "," SCommaTokSymbol $> iCommaTok
+pLessThanSignTok :: TermParser LessThanSignTokL
+pLessThanSignTok = pure LessThanSignTok' <* Megaparsec.eof
 
-pHyphenMinusTok :: Parser (MoveTerm HyphenMinusTokL)
-pHyphenMinusTok = pSymbol "-" SHyphenMinusTokSymbol $> iHyphenMinusTok
+pLessThanSignLessThanSignTok :: TermParser LessThanSignLessThanSignTokL
+pLessThanSignLessThanSignTok = pure LessThanSignLessThanSignTok' <* Megaparsec.eof
 
-pHyphenMinusGreaterThanSignTok :: Parser (MoveTerm HyphenMinusGreaterThanSignTokL)
-pHyphenMinusGreaterThanSignTok = pSymbol "->" SHyphenMinusGreaterThanSignTokSymbol $> iHyphenMinusGreaterThanSignTok
+pLessThanSignEqualsSignTok :: TermParser LessThanSignEqualsSignTokL
+pLessThanSignEqualsSignTok = pure LessThanSignEqualsSignTok' <* Megaparsec.eof
 
-pFullStopTok :: Parser (MoveTerm FullStopTokL)
-pFullStopTok = pSymbol "." SFullStopTokSymbol $> iFullStopTok
+pEqualsSignTok :: TermParser EqualsSignTokL
+pEqualsSignTok = pure EqualsSignTok' <* Megaparsec.eof
 
-pFullStopFullStopTok :: Parser (MoveTerm FullStopFullStopTokL)
-pFullStopFullStopTok = pSymbol ".." SFullStopFullStopTokSymbol $> iFullStopFullStopTok
+pEqualsSignEqualsSignTok :: TermParser EqualsSignEqualsSignTokL
+pEqualsSignEqualsSignTok = pure EqualsSignEqualsSignTok' <* Megaparsec.eof
 
-pSolidusTok :: Parser (MoveTerm SolidusTokL)
-pSolidusTok = pSymbol "/" SSolidusTokSymbol $> iSolidusTok
+pEqualsSignEqualsSignGreaterThanSignTok :: TermParser EqualsSignEqualsSignGreaterThanSignTokL
+pEqualsSignEqualsSignGreaterThanSignTok = pure EqualsSignEqualsSignGreaterThanSignTok' <* Megaparsec.eof
 
-pSolidusAsteriskTok :: Parser (MoveTerm SolidusAsteriskTokL)
-pSolidusAsteriskTok = pSymbol "/*" SSolidusAsteriskTokSymbol $> iSolidusAsteriskTok
+pEqualsSignGreaterThanSignTok :: TermParser EqualsSignGreaterThanSignTokL
+pEqualsSignGreaterThanSignTok = pure EqualsSignGreaterThanSignTok' <* Megaparsec.eof
 
-pSolidusSolidusTok :: Parser (MoveTerm SolidusSolidusTokL)
-pSolidusSolidusTok = pSymbol "//" SSolidusSolidusTokSymbol $> iSolidusSolidusTok
+pGreaterThanSignTok :: TermParser GreaterThanSignTokL
+pGreaterThanSignTok = pure GreaterThanSignTok' <* Megaparsec.eof
 
-pColonTok :: Parser (MoveTerm ColonTokL)
-pColonTok = pSymbol ":" SColonTokSymbol $> iColonTok
+pGreaterThanSignEqualsSignTok :: TermParser GreaterThanSignEqualsSignTokL
+pGreaterThanSignEqualsSignTok = pure GreaterThanSignEqualsSignTok' <* Megaparsec.eof
 
-pColonColonTok :: Parser (MoveTerm ColonColonTokL)
-pColonColonTok = pSymbol "::" SColonColonTokSymbol $> iColonColonTok
+pGreaterThanSignGreaterThanSignTok :: TermParser GreaterThanSignGreaterThanSignTokL
+pGreaterThanSignGreaterThanSignTok = pure GreaterThanSignGreaterThanSignTok' <* Megaparsec.eof
 
-pSemicolonTok :: Parser (MoveTerm SemicolonTokL)
-pSemicolonTok = pSymbol ";" SSemicolonTokSymbol $> iSemicolonTok
+pCommercialAtTok :: TermParser CommercialAtTokL
+pCommercialAtTok = pure CommercialAtTok' <* Megaparsec.eof
 
-pLessThanSignTok :: Parser (MoveTerm LessThanSignTokL)
-pLessThanSignTok = pSymbol "<" SLessThanSignTokSymbol $> iLessThanSignTok
+pLeftSquareBracketTok :: TermParser LeftSquareBracketTokL
+pLeftSquareBracketTok = pure LeftSquareBracketTok' <* Megaparsec.eof
 
-pLessThanSignLessThanSignTok :: Parser (MoveTerm LessThanSignLessThanSignTokL)
-pLessThanSignLessThanSignTok = pSymbol "<<" SLessThanSignLessThanSignTokSymbol $> iLessThanSignLessThanSignTok
+pRightSquareBracketTok :: TermParser RightSquareBracketTokL
+pRightSquareBracketTok = pure RightSquareBracketTok' <* Megaparsec.eof
 
-pLessThanSignEqualsSignTok :: Parser (MoveTerm LessThanSignEqualsSignTokL)
-pLessThanSignEqualsSignTok = pSymbol "<=" SLessThanSignEqualsSignTokSymbol $> iLessThanSignEqualsSignTok
+pCircumflexAccentTok :: TermParser CircumflexAccentTokL
+pCircumflexAccentTok = pure CircumflexAccentTok' <* Megaparsec.eof
 
-pEqualsSignTok :: Parser (MoveTerm EqualsSignTokL)
-pEqualsSignTok = pSymbol "=" SEqualsSignTokSymbol $> iEqualsSignTok
+pAbortTok :: TermParser AbortTokL
+pAbortTok = pure AbortTok' <* Megaparsec.eof
 
-pEqualsSignEqualsSignTok :: Parser (MoveTerm EqualsSignEqualsSignTokL)
-pEqualsSignEqualsSignTok = pSymbol "==" SEqualsSignEqualsSignTokSymbol $> iEqualsSignEqualsSignTok
+pAbortsIfTok :: TermParser AbortsIfTokL
+pAbortsIfTok = pure AbortsIfTok' <* Megaparsec.eof
 
-pEqualsSignEqualsSignGreaterThanSignTok :: Parser (MoveTerm EqualsSignEqualsSignGreaterThanSignTokL)
-pEqualsSignEqualsSignGreaterThanSignTok = pSymbol "==>" SEqualsSignEqualsSignGreaterThanSignTokSymbol $> iEqualsSignEqualsSignGreaterThanSignTok
+pAbortsWithTok :: TermParser AbortsWithTokL
+pAbortsWithTok = pure AbortsWithTok' <* Megaparsec.eof
 
-pEqualsSignGreaterThanSignTok :: Parser (MoveTerm EqualsSignGreaterThanSignTokL)
-pEqualsSignGreaterThanSignTok = pSymbol "=>" SEqualsSignGreaterThanSignTokSymbol $> iEqualsSignGreaterThanSignTok
+pAddressTok :: TermParser AddressTokL
+pAddressTok = pure AddressTok' <* Megaparsec.eof
 
-pGreaterThanSignTok :: Parser (MoveTerm GreaterThanSignTokL)
-pGreaterThanSignTok = pSymbol ">" SGreaterThanSignTokSymbol $> iGreaterThanSignTok
+pApplyTok :: TermParser ApplyTokL
+pApplyTok = pure ApplyTok' <* Megaparsec.eof
 
-pGreaterThanSignEqualsSignTok :: Parser (MoveTerm GreaterThanSignEqualsSignTokL)
-pGreaterThanSignEqualsSignTok = pSymbol ">=" SGreaterThanSignEqualsSignTokSymbol $> iGreaterThanSignEqualsSignTok
+pAsTok :: TermParser AsTokL
+pAsTok = pure AsTok' <* Megaparsec.eof
 
-pGreaterThanSignGreaterThanSignTok :: Parser (MoveTerm GreaterThanSignGreaterThanSignTokL)
-pGreaterThanSignGreaterThanSignTok = pSymbol ">>" SGreaterThanSignGreaterThanSignTokSymbol $> iGreaterThanSignGreaterThanSignTok
+pAssertTok :: TermParser AssertTokL
+pAssertTok = pure AssertTok' <* Megaparsec.eof
 
-pCommercialAtTok :: Parser (MoveTerm CommercialAtTokL)
-pCommercialAtTok = pSymbol "@" SCommercialAtTokSymbol $> iCommercialAtTok
+pAssumeTok :: TermParser AssumeTokL
+pAssumeTok = pure AssumeTok' <* Megaparsec.eof
 
-pLeftSquareBracketTok :: Parser (MoveTerm LeftSquareBracketTokL)
-pLeftSquareBracketTok = pSymbol "[" SLeftSquareBracketTokSymbol $> iLeftSquareBracketTok
+pBoolTok :: TermParser BoolTokL
+pBoolTok = pure BoolTok' <* Megaparsec.eof
 
-pRightSquareBracketTok :: Parser (MoveTerm RightSquareBracketTokL)
-pRightSquareBracketTok = pSymbol "]" SRightSquareBracketTokSymbol $> iRightSquareBracketTok
+pBreakTok :: TermParser BreakTokL
+pBreakTok = pure BreakTok' <* Megaparsec.eof
 
-pCircumflexAccentTok :: Parser (MoveTerm CircumflexAccentTokL)
-pCircumflexAccentTok = pSymbol "^" SCircumflexAccentTokSymbol $> iCircumflexAccentTok
+pBytearrayTok :: TermParser BytearrayTokL
+pBytearrayTok = pure BytearrayTok' <* Megaparsec.eof
 
-pAbortTok :: Parser (MoveTerm AbortTokL)
-pAbortTok = pSymbol "abort" SAbortTokSymbol $> iAbortTok
+pConstTok :: TermParser ConstTokL
+pConstTok = pure ConstTok' <* Megaparsec.eof
 
-pAbortsIfTok :: Parser (MoveTerm AbortsIfTokL)
-pAbortsIfTok = pSymbol "aborts_if" SAbortsIfTokSymbol $> iAbortsIfTok
+pContinueTok :: TermParser ContinueTokL
+pContinueTok = pure ContinueTok' <* Megaparsec.eof
 
-pAbortsWithTok :: Parser (MoveTerm AbortsWithTokL)
-pAbortsWithTok = pSymbol "aborts_with" SAbortsWithTokSymbol $> iAbortsWithTok
+pCopyTok :: TermParser CopyTokL
+pCopyTok = pure CopyTok' <* Megaparsec.eof
 
-pAddressTok :: Parser (MoveTerm AddressTokL)
-pAddressTok = pSymbol "address" SAddressTokSymbol $> iAddressTok
+pDecreasesTok :: TermParser DecreasesTokL
+pDecreasesTok = pure DecreasesTok' <* Megaparsec.eof
 
-pApplyTok :: Parser (MoveTerm ApplyTokL)
-pApplyTok = pSymbol "apply" SApplyTokSymbol $> iApplyTok
+pDropTok :: TermParser DropTokL
+pDropTok = pure DropTok' <* Megaparsec.eof
 
-pAsTok :: Parser (MoveTerm AsTokL)
-pAsTok = pSymbol "as" SAsTokSymbol $> iAsTok
+pElseTok :: TermParser ElseTokL
+pElseTok = pure ElseTok' <* Megaparsec.eof
 
-pAssertTok :: Parser (MoveTerm AssertTokL)
-pAssertTok = pSymbol "assert" SAssertTokSymbol $> iAssertTok
+pEnsuresTok :: TermParser EnsuresTokL
+pEnsuresTok = pure EnsuresTok' <* Megaparsec.eof
 
-pAssumeTok :: Parser (MoveTerm AssumeTokL)
-pAssumeTok = pSymbol "assume" SAssumeTokSymbol $> iAssumeTok
+pEntryTok :: TermParser EntryTokL
+pEntryTok = pure EntryTok' <* Megaparsec.eof
 
-pBoolTok :: Parser (MoveTerm BoolTokL)
-pBoolTok = pSymbol "bool" SBoolTokSymbol $> iBoolTok
+pEnumTok :: TermParser EnumTokL
+pEnumTok = pure EnumTok' <* Megaparsec.eof
 
-pBreakTok :: Parser (MoveTerm BreakTokL)
-pBreakTok = pSymbol "break" SBreakTokSymbol $> iBreakTok
+pExceptTok :: TermParser ExceptTokL
+pExceptTok = pure ExceptTok' <* Megaparsec.eof
 
-pBytearrayTok :: Parser (MoveTerm BytearrayTokL)
-pBytearrayTok = pSymbol "bytearray" SBytearrayTokSymbol $> iBytearrayTok
+pExistsTok :: TermParser ExistsTokL
+pExistsTok = pure ExistsTok' <* Megaparsec.eof
 
-pConstTok :: Parser (MoveTerm ConstTokL)
-pConstTok = pSymbol "const" SConstTokSymbol $> iConstTok
+pFalseTok :: TermParser FalseTokL
+pFalseTok = pure FalseTok' <* Megaparsec.eof
 
-pContinueTok :: Parser (MoveTerm ContinueTokL)
-pContinueTok = pSymbol "continue" SContinueTokSymbol $> iContinueTok
+pForallTok :: TermParser ForallTokL
+pForallTok = pure ForallTok' <* Megaparsec.eof
 
-pCopyTok :: Parser (MoveTerm CopyTokL)
-pCopyTok = pSymbol "copy" SCopyTokSymbol $> iCopyTok
+pFriendTok :: TermParser FriendTokL
+pFriendTok = pure FriendTok' <* Megaparsec.eof
 
-pDecreasesTok :: Parser (MoveTerm DecreasesTokL)
-pDecreasesTok = pSymbol "decreases" SDecreasesTokSymbol $> iDecreasesTok
+pFunTok :: TermParser FunTokL
+pFunTok = pure FunTok' <* Megaparsec.eof
 
-pDropTok :: Parser (MoveTerm DropTokL)
-pDropTok = pSymbol "drop" SDropTokSymbol $> iDropTok
+pGlobalTok :: TermParser GlobalTokL
+pGlobalTok = pure GlobalTok' <* Megaparsec.eof
 
-pElseTok :: Parser (MoveTerm ElseTokL)
-pElseTok = pSymbol "else" SElseTokSymbol $> iElseTok
+pHasTok :: TermParser HasTokL
+pHasTok = pure HasTok' <* Megaparsec.eof
 
-pEnsuresTok :: Parser (MoveTerm EnsuresTokL)
-pEnsuresTok = pSymbol "ensures" SEnsuresTokSymbol $> iEnsuresTok
+pIfTok :: TermParser IfTokL
+pIfTok = pure IfTok' <* Megaparsec.eof
 
-pEntryTok :: Parser (MoveTerm EntryTokL)
-pEntryTok = pSymbol "entry" SEntryTokSymbol $> iEntryTok
+pInTok :: TermParser InTokL
+pInTok = pure InTok' <* Megaparsec.eof
 
-pEnumTok :: Parser (MoveTerm EnumTokL)
-pEnumTok = pSymbol "enum" SEnumTokSymbol $> iEnumTok
+pIncludeTok :: TermParser IncludeTokL
+pIncludeTok = pure IncludeTok' <* Megaparsec.eof
 
-pExceptTok :: Parser (MoveTerm ExceptTokL)
-pExceptTok = pSymbol "except" SExceptTokSymbol $> iExceptTok
+pInternalTok :: TermParser InternalTokL
+pInternalTok = pure InternalTok' <* Megaparsec.eof
 
-pExistsTok :: Parser (MoveTerm ExistsTokL)
-pExistsTok = pSymbol "exists" SExistsTokSymbol $> iExistsTok
+pInvariantTok :: TermParser InvariantTokL
+pInvariantTok = pure InvariantTok' <* Megaparsec.eof
 
-pFalseTok :: Parser (MoveTerm FalseTokL)
-pFalseTok = pSymbol "false" SFalseTokSymbol $> iFalseTok
+pKeyTok :: TermParser KeyTokL
+pKeyTok = pure KeyTok' <* Megaparsec.eof
 
-pForallTok :: Parser (MoveTerm ForallTokL)
-pForallTok = pSymbol "forall" SForallTokSymbol $> iForallTok
+pLetTok :: TermParser LetTokL
+pLetTok = pure LetTok' <* Megaparsec.eof
 
-pFriendTok :: Parser (MoveTerm FriendTokL)
-pFriendTok = pSymbol "friend" SFriendTokSymbol $> iFriendTok
+pLocalTok :: TermParser LocalTokL
+pLocalTok = pure LocalTok' <* Megaparsec.eof
 
-pFunTok :: Parser (MoveTerm FunTokL)
-pFunTok = pSymbol "fun" SFunTokSymbol $> iFunTok
+pLoopTok :: TermParser LoopTokL
+pLoopTok = pure LoopTok' <* Megaparsec.eof
 
-pGlobalTok :: Parser (MoveTerm GlobalTokL)
-pGlobalTok = pSymbol "global" SGlobalTokSymbol $> iGlobalTok
+pMacroTok :: TermParser MacroTokL
+pMacroTok = pure MacroTok' <* Megaparsec.eof
 
-pHasTok :: Parser (MoveTerm HasTokL)
-pHasTok = pSymbol "has" SHasTokSymbol $> iHasTok
+pMatchTok :: TermParser MatchTokL
+pMatchTok = pure MatchTok' <* Megaparsec.eof
 
-pIfTok :: Parser (MoveTerm IfTokL)
-pIfTok = pSymbol "if" SIfTokSymbol $> iIfTok
+pModifiesTok :: TermParser ModifiesTokL
+pModifiesTok = pure ModifiesTok' <* Megaparsec.eof
 
-pInTok :: Parser (MoveTerm InTokL)
-pInTok = pSymbol "in" SInTokSymbol $> iInTok
+pModuleTok :: TermParser ModuleTokL
+pModuleTok = pure ModuleTok' <* Megaparsec.eof
 
-pIncludeTok :: Parser (MoveTerm IncludeTokL)
-pIncludeTok = pSymbol "include" SIncludeTokSymbol $> iIncludeTok
+pMoveTok :: TermParser MoveTokL
+pMoveTok = pure MoveTok' <* Megaparsec.eof
 
-pInternalTok :: Parser (MoveTerm InternalTokL)
-pInternalTok = pSymbol "internal" SInternalTokSymbol $> iInternalTok
+pMutTok :: TermParser MutTokL
+pMutTok = pure MutTok' <* Megaparsec.eof
 
-pInvariantTok :: Parser (MoveTerm InvariantTokL)
-pInvariantTok = pSymbol "invariant" SInvariantTokSymbol $> iInvariantTok
+pNativeTok :: TermParser NativeTokL
+pNativeTok = pure NativeTok' <* Megaparsec.eof
 
-pKeyTok :: Parser (MoveTerm KeyTokL)
-pKeyTok = pSymbol "key" SKeyTokSymbol $> iKeyTok
+pPackTok :: TermParser PackTokL
+pPackTok = pure PackTok' <* Megaparsec.eof
 
-pLetTok :: Parser (MoveTerm LetTokL)
-pLetTok = pSymbol "let" SLetTokSymbol $> iLetTok
+pPackageTok :: TermParser PackageTokL
+pPackageTok = pure PackageTok' <* Megaparsec.eof
 
-pLocalTok :: Parser (MoveTerm LocalTokL)
-pLocalTok = pSymbol "local" SLocalTokSymbol $> iLocalTok
+pPhantomTok :: TermParser PhantomTokL
+pPhantomTok = pure PhantomTok' <* Megaparsec.eof
 
-pLoopTok :: Parser (MoveTerm LoopTokL)
-pLoopTok = pSymbol "loop" SLoopTokSymbol $> iLoopTok
+pPostTok :: TermParser PostTokL
+pPostTok = pure PostTok' <* Megaparsec.eof
 
-pMacroTok :: Parser (MoveTerm MacroTokL)
-pMacroTok = pSymbol "macro" SMacroTokSymbol $> iMacroTok
+pPragmaTok :: TermParser PragmaTokL
+pPragmaTok = pure PragmaTok' <* Megaparsec.eof
 
-pMatchTok :: Parser (MoveTerm MatchTokL)
-pMatchTok = pSymbol "match" SMatchTokSymbol $> iMatchTok
+pPublicTok :: TermParser PublicTokL
+pPublicTok = pure PublicTok' <* Megaparsec.eof
 
-pModifiesTok :: Parser (MoveTerm ModifiesTokL)
-pModifiesTok = pSymbol "modifies" SModifiesTokSymbol $> iModifiesTok
+pRequiresTok :: TermParser RequiresTokL
+pRequiresTok = pure RequiresTok' <* Megaparsec.eof
 
-pModuleTok :: Parser (MoveTerm ModuleTokL)
-pModuleTok = pSymbol "module" SModuleTokSymbol $> iModuleTok
+pReturnTok :: TermParser ReturnTokL
+pReturnTok = pure ReturnTok' <* Megaparsec.eof
 
-pMoveTok :: Parser (MoveTerm MoveTokL)
-pMoveTok = pSymbol "move" SMoveTokSymbol $> iMoveTok
+pSchemaTok :: TermParser SchemaTokL
+pSchemaTok = pure SchemaTok' <* Megaparsec.eof
 
-pMutTok :: Parser (MoveTerm MutTokL)
-pMutTok = pSymbol "mut" SMutTokSymbol $> iMutTok
+pSignerTok :: TermParser SignerTokL
+pSignerTok = pure SignerTok' <* Megaparsec.eof
 
-pNativeTok :: Parser (MoveTerm NativeTokL)
-pNativeTok = pSymbol "native" SNativeTokSymbol $> iNativeTok
+pSpecTok :: TermParser SpecTokL
+pSpecTok = pure SpecTok' <* Megaparsec.eof
 
-pPackTok :: Parser (MoveTerm PackTokL)
-pPackTok = pSymbol "pack" SPackTokSymbol $> iPackTok
+pStoreTok :: TermParser StoreTokL
+pStoreTok = pure StoreTok' <* Megaparsec.eof
 
-pPackageTok :: Parser (MoveTerm PackageTokL)
-pPackageTok = pSymbol "package" SPackageTokSymbol $> iPackageTok
+pStructTok :: TermParser StructTokL
+pStructTok = pure StructTok' <* Megaparsec.eof
 
-pPhantomTok :: Parser (MoveTerm PhantomTokL)
-pPhantomTok = pSymbol "phantom" SPhantomTokSymbol $> iPhantomTok
+pSucceedsIfTok :: TermParser SucceedsIfTokL
+pSucceedsIfTok = pure SucceedsIfTok' <* Megaparsec.eof
 
-pPostTok :: Parser (MoveTerm PostTokL)
-pPostTok = pSymbol "post" SPostTokSymbol $> iPostTok
+pToTok :: TermParser ToTokL
+pToTok = pure ToTok' <* Megaparsec.eof
 
-pPragmaTok :: Parser (MoveTerm PragmaTokL)
-pPragmaTok = pSymbol "pragma" SPragmaTokSymbol $> iPragmaTok
+pTrueTok :: TermParser TrueTokL
+pTrueTok = pure TrueTok' <* Megaparsec.eof
 
-pPublicTok :: Parser (MoveTerm PublicTokL)
-pPublicTok = pSymbol "public" SPublicTokSymbol $> iPublicTok
+pU128Tok :: TermParser U128TokL
+pU128Tok = pure U128Tok' <* Megaparsec.eof
 
-pRequiresTok :: Parser (MoveTerm RequiresTokL)
-pRequiresTok = pSymbol "requires" SRequiresTokSymbol $> iRequiresTok
+pU16Tok :: TermParser U16TokL
+pU16Tok = pure U16Tok' <* Megaparsec.eof
 
-pReturnTok :: Parser (MoveTerm ReturnTokL)
-pReturnTok = pSymbol "return" SReturnTokSymbol $> iReturnTok
+pU256Tok :: TermParser U256TokL
+pU256Tok = pure U256Tok' <* Megaparsec.eof
 
-pSchemaTok :: Parser (MoveTerm SchemaTokL)
-pSchemaTok = pSymbol "schema" SSchemaTokSymbol $> iSchemaTok
+pU32Tok :: TermParser U32TokL
+pU32Tok = pure U32Tok' <* Megaparsec.eof
 
-pSignerTok :: Parser (MoveTerm SignerTokL)
-pSignerTok = pSymbol "signer" SSignerTokSymbol $> iSignerTok
+pU64Tok :: TermParser U64TokL
+pU64Tok = pure U64Tok' <* Megaparsec.eof
 
-pSpecTok :: Parser (MoveTerm SpecTokL)
-pSpecTok = pSymbol "spec" SSpecTokSymbol $> iSpecTok
+pU8Tok :: TermParser U8TokL
+pU8Tok = pure U8Tok' <* Megaparsec.eof
 
-pStoreTok :: Parser (MoveTerm StoreTokL)
-pStoreTok = pSymbol "store" SStoreTokSymbol $> iStoreTok
+pUnpackTok :: TermParser UnpackTokL
+pUnpackTok = pure UnpackTok' <* Megaparsec.eof
 
-pStructTok :: Parser (MoveTerm StructTokL)
-pStructTok = pSymbol "struct" SStructTokSymbol $> iStructTok
+pUpdateTok :: TermParser UpdateTokL
+pUpdateTok = pure UpdateTok' <* Megaparsec.eof
 
-pSucceedsIfTok :: Parser (MoveTerm SucceedsIfTokL)
-pSucceedsIfTok = pSymbol "succeeds_if" SSucceedsIfTokSymbol $> iSucceedsIfTok
+pUseTok :: TermParser UseTokL
+pUseTok = pure UseTok' <* Megaparsec.eof
 
-pToTok :: Parser (MoveTerm ToTokL)
-pToTok = pSymbol "to" SToTokSymbol $> iToTok
+pVectorLessThanSignTok :: TermParser VectorLessThanSignTokL
+pVectorLessThanSignTok = pure VectorLessThanSignTok' <* Megaparsec.eof
 
-pTrueTok :: Parser (MoveTerm TrueTokL)
-pTrueTok = pSymbol "true" STrueTokSymbol $> iTrueTok
+pVectorLeftSquareBracketTok :: TermParser VectorLeftSquareBracketTokL
+pVectorLeftSquareBracketTok = pure VectorLeftSquareBracketTok' <* Megaparsec.eof
 
-pU128Tok :: Parser (MoveTerm U128TokL)
-pU128Tok = pSymbol "u128" SU128TokSymbol $> iU128Tok
+pWhereTok :: TermParser WhereTokL
+pWhereTok = pure WhereTok' <* Megaparsec.eof
 
-pU16Tok :: Parser (MoveTerm U16TokL)
-pU16Tok = pSymbol "u16" SU16TokSymbol $> iU16Tok
+pWhileTok :: TermParser WhileTokL
+pWhileTok = pure WhileTok' <* Megaparsec.eof
 
-pU256Tok :: Parser (MoveTerm U256TokL)
-pU256Tok = pSymbol "u256" SU256TokSymbol $> iU256Tok
+pWithTok :: TermParser WithTokL
+pWithTok = pure WithTok' <* Megaparsec.eof
 
-pU32Tok :: Parser (MoveTerm U32TokL)
-pU32Tok = pSymbol "u32" SU32TokSymbol $> iU32Tok
+pLeftCurlyBracketTok :: TermParser LeftCurlyBracketTokL
+pLeftCurlyBracketTok = pure LeftCurlyBracketTok' <* Megaparsec.eof
 
-pU64Tok :: Parser (MoveTerm U64TokL)
-pU64Tok = pSymbol "u64" SU64TokSymbol $> iU64Tok
+pVerticalLineTok :: TermParser VerticalLineTokL
+pVerticalLineTok = pure VerticalLineTok' <* Megaparsec.eof
 
-pU8Tok :: Parser (MoveTerm U8TokL)
-pU8Tok = pSymbol "u8" SU8TokSymbol $> iU8Tok
+pVerticalLineVerticalLineTok :: TermParser VerticalLineVerticalLineTokL
+pVerticalLineVerticalLineTok = pure VerticalLineVerticalLineTok' <* Megaparsec.eof
 
-pUnpackTok :: Parser (MoveTerm UnpackTokL)
-pUnpackTok = pSymbol "unpack" SUnpackTokSymbol $> iUnpackTok
+pRightCurlyBracketTok :: TermParser RightCurlyBracketTokL
+pRightCurlyBracketTok = pure RightCurlyBracketTok' <* Megaparsec.eof
 
-pUpdateTok :: Parser (MoveTerm UpdateTokL)
-pUpdateTok = pSymbol "update" SUpdateTokSymbol $> iUpdateTok
+pSourceFile :: TermParser SourceFileL
+pSourceFile =
+  SourceFile' <$> pMany pModuleDefinition
 
-pUseTok :: Parser (MoveTerm UseTokL)
-pUseTok = pSymbol "use" SUseTokSymbol $> iUseTok
+pModuleDefinition :: TermParser ModuleDefinitionL
+pModuleDefinition =
+  ModuleDefinition' <$> pModuleTok <*> pModuleIdentity <*> pModuleBody
 
-pVectorLessThanSignTok :: Parser (MoveTerm VectorLessThanSignTokL)
-pVectorLessThanSignTok = pSymbol "vector<" SVectorLessThanSignTokSymbol $> iVectorLessThanSignTok
+pModuleBody :: TermParser ModuleBodyL
+pModuleBody =
+  ModuleBody' <$> (pModuleBodyInternal0 _sym) <*> pMany (pModuleBodyInternal1 _sym) <*> pMaybe pRightCurlyBracketTok
 
-pVectorLeftSquareBracketTok :: Parser (MoveTerm VectorLeftSquareBracketTokL)
-pVectorLeftSquareBracketTok = pSymbol "vector[" SVectorLeftSquareBracketTokSymbol $> iVectorLeftSquareBracketTok
-
-pWhereTok :: Parser (MoveTerm WhereTokL)
-pWhereTok = pSymbol "where" SWhereTokSymbol $> iWhereTok
-
-pWhileTok :: Parser (MoveTerm WhileTokL)
-pWhileTok = pSymbol "while" SWhileTokSymbol $> iWhileTok
-
-pWithTok :: Parser (MoveTerm WithTokL)
-pWithTok = pSymbol "with" SWithTokSymbol $> iWithTok
-
-pLeftCurlyBracketTok :: Parser (MoveTerm LeftCurlyBracketTokL)
-pLeftCurlyBracketTok = pSymbol "{" SLeftCurlyBracketTokSymbol $> iLeftCurlyBracketTok
-
-pVerticalLineTok :: Parser (MoveTerm VerticalLineTokL)
-pVerticalLineTok = pSymbol "|" SVerticalLineTokSymbol $> iVerticalLineTok
-
-pVerticalLineVerticalLineTok :: Parser (MoveTerm VerticalLineVerticalLineTokL)
-pVerticalLineVerticalLineTok = pSymbol "||" SVerticalLineVerticalLineTokSymbol $> iVerticalLineVerticalLineTok
-
-pRightCurlyBracketTok :: Parser (MoveTerm RightCurlyBracketTokL)
-pRightCurlyBracketTok = pSymbol "}" SRightCurlyBracketTokSymbol $> iRightCurlyBracketTok
-
-pSourceFile :: Parser (MoveTerm SourceFileL)
-pSourceFile = do
-  _sym <- pSymbol "source_file" SSourceFileSymbol
-  iSourceFile <$> pMany pModuleDefinition
-
-pModuleDefinition :: Parser (MoveTerm ModuleDefinitionL)
-pModuleDefinition = do
-  _sym <- pSymbol "module_definition" SModuleDefinitionSymbol
-  iModuleDefinition <$> pModuleTok <*> pModuleIdentity <*> pModuleBody
-
-pModuleBody :: Parser (MoveTerm ModuleBodyL)
-pModuleBody = do
-  _sym <- pSymbol "module_body" SModuleBodySymbol
-  iModuleBody <$> (pModuleBodyInternal0 _sym) <*> pMany (pModuleBodyInternal1 _sym) <*> pMaybe pRightCurlyBracketTok
-
-pModuleBodyInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal0L)
-pModuleBodyInternal0 _sym = do
-  choice [ Megaparsec.try (pModuleBodyInternal0Semicolon _sym)
-         , Megaparsec.try (pModuleBodyInternal0LeftCurlyBracket _sym)
+pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
+pModuleBodyInternal0 =
+  choice [ Megaparsec.try pModuleBodyInternal0Semicolon
+         , Megaparsec.try pModuleBodyInternal0LeftCurlyBracket
          ]
   where
-    pModuleBodyInternal0Semicolon :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal0L)
-    pModuleBodyInternal0Semicolon _sym =
-      iModuleBodyInternal0Semicolon <$> pSemicolonTok
-    pModuleBodyInternal0LeftCurlyBracket :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal0L)
-    pModuleBodyInternal0LeftCurlyBracket _sym =
-      iModuleBodyInternal0LeftCurlyBracket <$> pLeftCurlyBracketTok
+    pModuleBodyInternal0Semicolon :: Parser (MoveTerm ModuleBodyInternal0L)
+    pModuleBodyInternal0Semicolon =
+      ModuleBodyInternal0Semicolon' <$> pSemicolonTok
+    pModuleBodyInternal0LeftCurlyBracket :: Parser (MoveTerm ModuleBodyInternal0L)
+    pModuleBodyInternal0LeftCurlyBracket =
+      ModuleBodyInternal0LeftCurlyBracket' <$> pLeftCurlyBracketTok
 
-pModuleBodyInternal1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-pModuleBodyInternal1 _sym = do
-  choice [ Megaparsec.try (pModuleBodyInternal1UseDeclaration _sym)
-         , Megaparsec.try (pModuleBodyInternal1FriendDeclaration _sym)
-         , Megaparsec.try (pModuleBodyInternal1Constant _sym)
-         , Megaparsec.try (pModuleBodyInternal1FunctionItem _sym)
-         , Megaparsec.try (pModuleBodyInternal1StructItem _sym)
-         , Megaparsec.try (pModuleBodyInternal1EnumItem _sym)
-         , Megaparsec.try (pModuleBodyInternal1SpecBlock _sym)
+pModuleBodyInternal1 :: TermParser ModuleBodyInternal1L
+pModuleBodyInternal1 =
+  choice [ Megaparsec.try pModuleBodyInternal1UseDeclaration
+         , Megaparsec.try pModuleBodyInternal1FriendDeclaration
+         , Megaparsec.try pModuleBodyInternal1Constant
+         , Megaparsec.try pModuleBodyInternal1HidFunctionItem
+         , Megaparsec.try pModuleBodyInternal1HidStructItem
+         , Megaparsec.try pModuleBodyInternal1HidEnumItem
+         , Megaparsec.try pModuleBodyInternal1SpecBlock
          ]
   where
-    pModuleBodyInternal1UseDeclaration :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1UseDeclaration _sym =
-      iModuleBodyInternal1UseDeclaration <$> pUseDeclaration
-    pModuleBodyInternal1FriendDeclaration :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1FriendDeclaration _sym =
-      iModuleBodyInternal1FriendDeclaration <$> pFriendDeclaration
-    pModuleBodyInternal1Constant :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1Constant _sym =
-      iModuleBodyInternal1Constant <$> pConstant
-    pModuleBodyInternal1FunctionItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1FunctionItem _sym =
-      iModuleBodyInternal1FunctionItem <$> (pHiddenFunctionItem _sym)
-    pModuleBodyInternal1StructItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1StructItem _sym =
-      iModuleBodyInternal1StructItem <$> (pHiddenStructItem _sym)
-    pModuleBodyInternal1EnumItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1EnumItem _sym =
-      iModuleBodyInternal1EnumItem <$> (pHiddenEnumItem _sym)
-    pModuleBodyInternal1SpecBlock :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleBodyInternal1L)
-    pModuleBodyInternal1SpecBlock _sym =
-      iModuleBodyInternal1SpecBlock <$> pSpecBlock
+    pModuleBodyInternal1UseDeclaration :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1UseDeclaration =
+      ModuleBodyInternal1UseDeclaration' <$> pUseDeclaration
+    pModuleBodyInternal1FriendDeclaration :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1FriendDeclaration =
+      ModuleBodyInternal1FriendDeclaration' <$> pFriendDeclaration
+    pModuleBodyInternal1Constant :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1Constant =
+      ModuleBodyInternal1Constant' <$> pConstant
+    pModuleBodyInternal1HidFunctionItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidFunctionItem =
+      ModuleBodyInternal1HidFunctionItem' <$> pHidFunctionItem
+    pModuleBodyInternal1HidStructItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidStructItem =
+      ModuleBodyInternal1HidStructItem' <$> pHidStructItem
+    pModuleBodyInternal1HidEnumItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidEnumItem =
+      ModuleBodyInternal1HidEnumItem' <$> pHidEnumItem
+    pModuleBodyInternal1SpecBlock :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1SpecBlock =
+      ModuleBodyInternal1SpecBlock' <$> pSpecBlock
 
-pHiddenEnumItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenEnumItemL)
-pHiddenEnumItem _sym = do
-  iHiddenEnumItem <$> pEnumDefinition
+pConstant :: TermParser ConstantL
+pConstant =
+  Constant' <$> pBetween pConstTok pColonTok pIdentifier <*> pHidType <*> pBetween pEqualsSignTok pSemicolonTok pHidExpression
 
-pEnumDefinition :: Parser (MoveTerm EnumDefinitionL)
-pEnumDefinition = do
-  _sym <- pSymbol "enum_definition" SEnumDefinitionSymbol
-  iEnumDefinition <$> pMaybe pPublicTok <*> (pHiddenEnumSignature _sym) <*> pEnumVariants <*> pMaybe pPostfixAbilityDecls
-
-pHiddenEnumSignature :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenEnumSignatureL)
-pHiddenEnumSignature _sym = do
-  iHiddenEnumSignature <$> pEnumTok <*> (pHiddenEnumIdentifier _sym) <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
-
-pHiddenEnumIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenEnumIdentifierL)
-pHiddenEnumIdentifier _sym = do
-  iHiddenEnumIdentifier <$> pIdentifier
-
-pIdentifier :: Parser (MoveTerm IdentifierL)
-pIdentifier = do
-  _sym <- pSymbol "identifier" SIdentifierSymbol
-  iIdentifier <$> pContent _sym
-
-pAbilityDecls :: Parser (MoveTerm AbilityDeclsL)
-pAbilityDecls = do
-  _sym <- pSymbol "ability_decls" SAbilityDeclsSymbol
-  iAbilityDecls <$> pHasTok <*> pSepBy pAbility pCommaTok
-
-pAbility :: Parser (MoveTerm AbilityL)
-pAbility = do
-  _sym <- pSymbol "ability" SAbilitySymbol
-  choice [ Megaparsec.try (pAbilityCopy _sym)
-         , Megaparsec.try (pAbilityDrop _sym)
-         , Megaparsec.try (pAbilityStore _sym)
-         , Megaparsec.try (pAbilityKey _sym)
+pHidExpression :: TermParser HidExpressionL
+pHidExpression =
+  choice [ Megaparsec.try pHidExpressionCallExpression
+         , Megaparsec.try pHidExpressionMacroCallExpression
+         , Megaparsec.try pHidExpressionLambdaExpression
+         , Megaparsec.try pHidExpressionIfExpression
+         , Megaparsec.try pHidExpressionWhileExpression
+         , Megaparsec.try pHidExpressionReturnExpression
+         , Megaparsec.try pHidExpressionAbortExpression
+         , Megaparsec.try pHidExpressionAssignExpression
+         , Megaparsec.try pHidExpressionHidUnaryExpression
+         , Megaparsec.try pHidExpressionBinaryExpression
+         , Megaparsec.try pHidExpressionCastExpression
+         , Megaparsec.try pHidExpressionQuantifierExpression
+         , Megaparsec.try pHidExpressionMatchExpression
+         , Megaparsec.try pHidExpressionVectorExpression
+         , Megaparsec.try pHidExpressionLoopExpression
+         , Megaparsec.try pHidExpressionIdentifiedExpression
          ]
   where
-    pAbilityCopy :: Cubix.TreeSitter.Token a -> Parser (MoveTerm AbilityL)
-    pAbilityCopy _sym =
-      iAbilityCopy <$> pCopyTok
-    pAbilityDrop :: Cubix.TreeSitter.Token a -> Parser (MoveTerm AbilityL)
-    pAbilityDrop _sym =
-      iAbilityDrop <$> pDropTok
-    pAbilityStore :: Cubix.TreeSitter.Token a -> Parser (MoveTerm AbilityL)
-    pAbilityStore _sym =
-      iAbilityStore <$> pStoreTok
-    pAbilityKey :: Cubix.TreeSitter.Token a -> Parser (MoveTerm AbilityL)
-    pAbilityKey _sym =
-      iAbilityKey <$> pKeyTok
+    pHidExpressionCallExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionCallExpression =
+      HidExpressionCallExpression' <$> pCallExpression
+    pHidExpressionMacroCallExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionMacroCallExpression =
+      HidExpressionMacroCallExpression' <$> pMacroCallExpression
+    pHidExpressionLambdaExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionLambdaExpression =
+      HidExpressionLambdaExpression' <$> pLambdaExpression
+    pHidExpressionIfExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionIfExpression =
+      HidExpressionIfExpression' <$> pIfExpression
+    pHidExpressionWhileExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionWhileExpression =
+      HidExpressionWhileExpression' <$> pWhileExpression
+    pHidExpressionReturnExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionReturnExpression =
+      HidExpressionReturnExpression' <$> pReturnExpression
+    pHidExpressionAbortExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionAbortExpression =
+      HidExpressionAbortExpression' <$> pAbortExpression
+    pHidExpressionAssignExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionAssignExpression =
+      HidExpressionAssignExpression' <$> pAssignExpression
+    pHidExpressionHidUnaryExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionHidUnaryExpression =
+      HidExpressionHidUnaryExpression' <$> pHidUnaryExpression
+    pHidExpressionBinaryExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionBinaryExpression =
+      HidExpressionBinaryExpression' <$> pBinaryExpression
+    pHidExpressionCastExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionCastExpression =
+      HidExpressionCastExpression' <$> pCastExpression
+    pHidExpressionQuantifierExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionQuantifierExpression =
+      HidExpressionQuantifierExpression' <$> pQuantifierExpression
+    pHidExpressionMatchExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionMatchExpression =
+      HidExpressionMatchExpression' <$> pMatchExpression
+    pHidExpressionVectorExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionVectorExpression =
+      HidExpressionVectorExpression' <$> pVectorExpression
+    pHidExpressionLoopExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionLoopExpression =
+      HidExpressionLoopExpression' <$> pLoopExpression
+    pHidExpressionIdentifiedExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionIdentifiedExpression =
+      HidExpressionIdentifiedExpression' <$> pIdentifiedExpression
 
-pTypeParameters :: Parser (MoveTerm TypeParametersL)
-pTypeParameters = do
-  _sym <- pSymbol "type_parameters" STypeParametersSymbol
-  iTypeParameters <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 pTypeParameter pCommaTok)
+pAbortExpression :: TermParser AbortExpressionL
+pAbortExpression =
+  AbortExpression' <$> pAbortTok <*> pMaybe pHidExpression
 
-pTypeParameter :: Parser (MoveTerm TypeParameterL)
-pTypeParameter = do
-  _sym <- pSymbol "type_parameter" STypeParameterSymbol
-  iTypeParameter <$> pMaybe pDollarSignTok <*> pMaybe pPhantomTok <*> (pHiddenTypeParameterIdentifier _sym) <*> pMaybe (pPair pColonTok (pSepBy1 pAbility pPlusSignTok))
+pAssignExpression :: TermParser AssignExpressionL
+pAssignExpression =
+  AssignExpression' <$> pPair (pPair pHidUnaryExpression pEqualsSignTok) pHidExpression
 
-pHiddenTypeParameterIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeParameterIdentifierL)
-pHiddenTypeParameterIdentifier _sym = do
-  iHiddenTypeParameterIdentifier <$> pIdentifier
+pHidUnaryExpression :: TermParser HidUnaryExpressionL
+pHidUnaryExpression =
+  HidUnaryExpression' <$> (pHidUnaryExpressionInternal0 _sym)
 
-pEnumVariants :: Parser (MoveTerm EnumVariantsL)
-pEnumVariants = do
-  _sym <- pSymbol "enum_variants" SEnumVariantsSymbol
-  iEnumVariants <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pVariant pCommaTok)
-
-pVariant :: Parser (MoveTerm VariantL)
-pVariant = do
-  _sym <- pSymbol "variant" SVariantSymbol
-  iVariant <$> (pHiddenVariantIdentifier _sym) <*> pMaybe pDatatypeFields
-
-pHiddenVariantIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenVariantIdentifierL)
-pHiddenVariantIdentifier _sym = do
-  iHiddenVariantIdentifier <$> pIdentifier
-
-pDatatypeFields :: Parser (MoveTerm DatatypeFieldsL)
-pDatatypeFields = do
-  _sym <- pSymbol "datatype_fields" SDatatypeFieldsSymbol
-  choice [ Megaparsec.try (pDatatypeFieldsPositionalFields _sym)
-         , Megaparsec.try (pDatatypeFieldsNamedFields _sym)
+pHidUnaryExpressionInternal0 :: TermParser HidUnaryExpressionInternal0L
+pHidUnaryExpressionInternal0 =
+  choice [ Megaparsec.try pHidUnaryExpressionInternal0UnaryExpression
+         , Megaparsec.try pHidUnaryExpressionInternal0BorrowExpression
+         , Megaparsec.try pHidUnaryExpressionInternal0DereferenceExpression
+         , Megaparsec.try pHidUnaryExpressionInternal0MoveOrCopyExpression
+         , Megaparsec.try pHidUnaryExpressionInternal0HidExpressionTerm
          ]
   where
-    pDatatypeFieldsPositionalFields :: Cubix.TreeSitter.Token a -> Parser (MoveTerm DatatypeFieldsL)
-    pDatatypeFieldsPositionalFields _sym =
-      iDatatypeFieldsPositionalFields <$> pPositionalFields
-    pDatatypeFieldsNamedFields :: Cubix.TreeSitter.Token a -> Parser (MoveTerm DatatypeFieldsL)
-    pDatatypeFieldsNamedFields _sym =
-      iDatatypeFieldsNamedFields <$> pNamedFields
+    pHidUnaryExpressionInternal0UnaryExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0UnaryExpression =
+      HidUnaryExpressionInternal0UnaryExpression' <$> pUnaryExpression
+    pHidUnaryExpressionInternal0BorrowExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0BorrowExpression =
+      HidUnaryExpressionInternal0BorrowExpression' <$> pBorrowExpression
+    pHidUnaryExpressionInternal0DereferenceExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0DereferenceExpression =
+      HidUnaryExpressionInternal0DereferenceExpression' <$> pDereferenceExpression
+    pHidUnaryExpressionInternal0MoveOrCopyExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0MoveOrCopyExpression =
+      HidUnaryExpressionInternal0MoveOrCopyExpression' <$> pMoveOrCopyExpression
+    pHidUnaryExpressionInternal0HidExpressionTerm :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0HidExpressionTerm =
+      HidUnaryExpressionInternal0HidExpressionTerm' <$> pHidExpressionTerm
 
-pNamedFields :: Parser (MoveTerm NamedFieldsL)
-pNamedFields = do
-  _sym <- pSymbol "named_fields" SNamedFieldsSymbol
-  iNamedFields <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pFieldAnnotation pCommaTok)
+pBorrowExpression :: TermParser BorrowExpressionL
+pBorrowExpression =
+  BorrowExpression' <$> pPair pHidReference pHidExpression
 
-pFieldAnnotation :: Parser (MoveTerm FieldAnnotationL)
-pFieldAnnotation = do
-  _sym <- pSymbol "field_annotation" SFieldAnnotationSymbol
-  iFieldAnnotation <$> (pHiddenFieldIdentifier _sym) <*> pColonTok <*> (pHiddenType _sym)
-
-pHiddenFieldIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFieldIdentifierL)
-pHiddenFieldIdentifier _sym = do
-  iHiddenFieldIdentifier <$> pIdentifier
-
-pHiddenType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-pHiddenType _sym = do
-  choice [ Megaparsec.try (pHiddenTypeApplyType _sym)
-         , Megaparsec.try (pHiddenTypeRefType _sym)
-         , Megaparsec.try (pHiddenTypeTupleType _sym)
-         , Megaparsec.try (pHiddenTypeFunctionType _sym)
-         , Megaparsec.try (pHiddenTypePrimitiveType _sym)
+pHidReference :: TermParser HidReferenceL
+pHidReference =
+  choice [ Megaparsec.try pHidReferenceImmRef
+         , Megaparsec.try pHidReferenceMutRef
          ]
   where
-    pHiddenTypeApplyType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-    pHiddenTypeApplyType _sym =
-      iHiddenTypeApplyType <$> pApplyType
-    pHiddenTypeRefType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-    pHiddenTypeRefType _sym =
-      iHiddenTypeRefType <$> pRefType
-    pHiddenTypeTupleType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-    pHiddenTypeTupleType _sym =
-      iHiddenTypeTupleType <$> pTupleType
-    pHiddenTypeFunctionType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-    pHiddenTypeFunctionType _sym =
-      iHiddenTypeFunctionType <$> pFunctionType
-    pHiddenTypePrimitiveType :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenTypeL)
-    pHiddenTypePrimitiveType _sym =
-      iHiddenTypePrimitiveType <$> pPrimitiveType
+    pHidReferenceImmRef :: Parser (MoveTerm HidReferenceL)
+    pHidReferenceImmRef =
+      HidReferenceImmRef' <$> pImmRef
+    pHidReferenceMutRef :: Parser (MoveTerm HidReferenceL)
+    pHidReferenceMutRef =
+      HidReferenceMutRef' <$> pMutRef
 
-pApplyType :: Parser (MoveTerm ApplyTypeL)
-pApplyType = do
-  _sym <- pSymbol "apply_type" SApplyTypeSymbol
-  iApplyType <$> pPair pModuleAccess (pMaybe pTypeArguments)
+pImmRef :: TermParser ImmRefL
+pImmRef =
+  ImmRef' <$> pAmpersandTok
 
-pModuleAccess :: Parser (MoveTerm ModuleAccessL)
-pModuleAccess = do
-  _sym <- pSymbol "module_access" SModuleAccessSymbol
-  choice [ Megaparsec.try (pModuleAccess1 _sym)
-         , Megaparsec.try (pModuleAccess2 _sym)
-         , Megaparsec.try (pModuleAccess3 _sym)
-         , Megaparsec.try (pModuleAccess4 _sym)
-         , Megaparsec.try (pModuleAccess5 _sym)
-         , Megaparsec.try (pModuleAccess6 _sym)
-         , Megaparsec.try (pModuleAccess7 _sym)
-         , Megaparsec.try (pModuleAccess8 _sym)
-         , Megaparsec.try (pModuleAccessMember _sym)
+pMutRef :: TermParser MutRefL
+pMutRef =
+  MutRef' <$> pAmpersandTok <*> pMutTok
+
+pDereferenceExpression :: TermParser DereferenceExpressionL
+pDereferenceExpression =
+  DereferenceExpression' <$> pPair pAsteriskTok pHidExpression
+
+pHidExpressionTerm :: TermParser HidExpressionTermL
+pHidExpressionTerm =
+  choice [ Megaparsec.try pHidExpressionTermCallExpression
+         , Megaparsec.try pHidExpressionTermBreakExpression
+         , Megaparsec.try pHidExpressionTermContinueExpression
+         , Megaparsec.try pHidExpressionTermNameExpression
+         , Megaparsec.try pHidExpressionTermMacroCallExpression
+         , Megaparsec.try pHidExpressionTermPackExpression
+         , Megaparsec.try pHidExpressionTermHidLiteralValue
+         , Megaparsec.try pHidExpressionTermUnitExpression
+         , Megaparsec.try pHidExpressionTermExpressionList
+         , Megaparsec.try pHidExpressionTermAnnotationExpression
+         , Megaparsec.try pHidExpressionTermBlock
+         , Megaparsec.try pHidExpressionTermSpecBlock
+         , Megaparsec.try pHidExpressionTermIfExpression
+         , Megaparsec.try pHidExpressionTermDotExpression
+         , Megaparsec.try pHidExpressionTermIndexExpression
+         , Megaparsec.try pHidExpressionTermVectorExpression
+         , Megaparsec.try pHidExpressionTermMatchExpression
          ]
   where
-    pModuleAccess1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess1 _sym =
-      iModuleAccess1 <$> pDollarSignTok <*> pIdentifier
-    pModuleAccess2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess2 _sym =
-      iModuleAccess2 <$> pCommercialAtTok <*> pIdentifier
-    pModuleAccess3 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess3 _sym =
-      iModuleAccess3 <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess4 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess4 _sym =
-      iModuleAccess4 <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pTypeArguments
-    pModuleAccess5 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess5 _sym =
-      iModuleAccess5 <$> pModuleIdentity <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess6 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess6 _sym =
-      iModuleAccess6 <$> (pHiddenModuleIdentifier _sym) <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess7 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess7 _sym =
-      iModuleAccess7 <$> pModuleIdentity <*> pMaybe pTypeArguments
-    pModuleAccess8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccess8 _sym =
-      iModuleAccess8 <$> pIdentifier <*> pMaybe pTypeArguments
-    pModuleAccessMember :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleAccessL)
-    pModuleAccessMember _sym =
-      iModuleAccessMember <$> (pHiddenReservedIdentifier _sym)
+    pHidExpressionTermCallExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermCallExpression =
+      HidExpressionTermCallExpression' <$> pCallExpression
+    pHidExpressionTermBreakExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermBreakExpression =
+      HidExpressionTermBreakExpression' <$> pBreakExpression
+    pHidExpressionTermContinueExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermContinueExpression =
+      HidExpressionTermContinueExpression' <$> pContinueExpression
+    pHidExpressionTermNameExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermNameExpression =
+      HidExpressionTermNameExpression' <$> pNameExpression
+    pHidExpressionTermMacroCallExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermMacroCallExpression =
+      HidExpressionTermMacroCallExpression' <$> pMacroCallExpression
+    pHidExpressionTermPackExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermPackExpression =
+      HidExpressionTermPackExpression' <$> pPackExpression
+    pHidExpressionTermHidLiteralValue :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermHidLiteralValue =
+      HidExpressionTermHidLiteralValue' <$> pHidLiteralValue
+    pHidExpressionTermUnitExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermUnitExpression =
+      HidExpressionTermUnitExpression' <$> pUnitExpression
+    pHidExpressionTermExpressionList :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermExpressionList =
+      HidExpressionTermExpressionList' <$> pExpressionList
+    pHidExpressionTermAnnotationExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermAnnotationExpression =
+      HidExpressionTermAnnotationExpression' <$> pAnnotationExpression
+    pHidExpressionTermBlock :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermBlock =
+      HidExpressionTermBlock' <$> pBlock
+    pHidExpressionTermSpecBlock :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermSpecBlock =
+      HidExpressionTermSpecBlock' <$> pSpecBlock
+    pHidExpressionTermIfExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermIfExpression =
+      HidExpressionTermIfExpression' <$> pIfExpression
+    pHidExpressionTermDotExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermDotExpression =
+      HidExpressionTermDotExpression' <$> pDotExpression
+    pHidExpressionTermIndexExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermIndexExpression =
+      HidExpressionTermIndexExpression' <$> pIndexExpression
+    pHidExpressionTermVectorExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermVectorExpression =
+      HidExpressionTermVectorExpression' <$> pVectorExpression
+    pHidExpressionTermMatchExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermMatchExpression =
+      HidExpressionTermMatchExpression' <$> pMatchExpression
 
-pHiddenModuleIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenModuleIdentifierL)
-pHiddenModuleIdentifier _sym = do
-  iHiddenModuleIdentifier <$> pIdentifier
+pAnnotationExpression :: TermParser AnnotationExpressionL
+pAnnotationExpression =
+  AnnotationExpression' <$> pBetween pLeftParenthesisTok pColonTok pHidExpression <*> pHidType <*> pRightParenthesisTok
 
-pHiddenReservedIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReservedIdentifierL)
-pHiddenReservedIdentifier _sym = do
-  choice [ Megaparsec.try (pHiddenReservedIdentifierForall _sym)
-         , Megaparsec.try (pHiddenReservedIdentifierExists _sym)
+pHidType :: TermParser HidTypeL
+pHidType =
+  choice [ Megaparsec.try pHidTypeApplyType
+         , Megaparsec.try pHidTypeRefType
+         , Megaparsec.try pHidTypeTupleType
+         , Megaparsec.try pHidTypeFunctionType
+         , Megaparsec.try pHidTypePrimitiveType
          ]
   where
-    pHiddenReservedIdentifierForall :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReservedIdentifierL)
-    pHiddenReservedIdentifierForall _sym =
-      iHiddenReservedIdentifierForall <$> (pHiddenForall _sym)
-    pHiddenReservedIdentifierExists :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReservedIdentifierL)
-    pHiddenReservedIdentifierExists _sym =
-      iHiddenReservedIdentifierExists <$> (pHiddenExists _sym)
+    pHidTypeApplyType :: Parser (MoveTerm HidTypeL)
+    pHidTypeApplyType =
+      HidTypeApplyType' <$> pApplyType
+    pHidTypeRefType :: Parser (MoveTerm HidTypeL)
+    pHidTypeRefType =
+      HidTypeRefType' <$> pRefType
+    pHidTypeTupleType :: Parser (MoveTerm HidTypeL)
+    pHidTypeTupleType =
+      HidTypeTupleType' <$> pTupleType
+    pHidTypeFunctionType :: Parser (MoveTerm HidTypeL)
+    pHidTypeFunctionType =
+      HidTypeFunctionType' <$> pFunctionType
+    pHidTypePrimitiveType :: Parser (MoveTerm HidTypeL)
+    pHidTypePrimitiveType =
+      HidTypePrimitiveType' <$> pPrimitiveType
 
-pHiddenExists :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExistsL)
-pHiddenExists _sym = do
-  iHiddenExists <$> pExistsTok
+pApplyType :: TermParser ApplyTypeL
+pApplyType =
+  ApplyType' <$> pPair pModuleAccess (pMaybe pTypeArguments)
 
-pHiddenForall :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenForallL)
-pHiddenForall _sym = do
-  iHiddenForall <$> pForallTok
-
-pModuleIdentity :: Parser (MoveTerm ModuleIdentityL)
-pModuleIdentity = do
-  _sym <- pSymbol "module_identity" SModuleIdentitySymbol
-  iModuleIdentity <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> (pHiddenModuleIdentifier _sym)
-
-pModuleIdentityInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleIdentityInternal0L)
-pModuleIdentityInternal0 _sym = do
-  choice [ Megaparsec.try (pModuleIdentityInternal0NumLiteral _sym)
-         , Megaparsec.try (pModuleIdentityInternal0ModuleIdentifier _sym)
+pModuleAccess :: TermParser ModuleAccessL
+pModuleAccess =
+  choice [ Megaparsec.try pModuleAccess1
+         , Megaparsec.try pModuleAccess2
+         , Megaparsec.try pModuleAccess3
+         , Megaparsec.try pModuleAccess4
+         , Megaparsec.try pModuleAccess5
+         , Megaparsec.try pModuleAccess6
+         , Megaparsec.try pModuleAccess7
+         , Megaparsec.try pModuleAccess8
+         , Megaparsec.try pModuleAccessMember
          ]
   where
-    pModuleIdentityInternal0NumLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleIdentityInternal0L)
-    pModuleIdentityInternal0NumLiteral _sym =
-      iModuleIdentityInternal0NumLiteral <$> pNumLiteral
-    pModuleIdentityInternal0ModuleIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModuleIdentityInternal0L)
-    pModuleIdentityInternal0ModuleIdentifier _sym =
-      iModuleIdentityInternal0ModuleIdentifier <$> (pHiddenModuleIdentifier _sym)
+    pModuleAccess1 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess1 =
+      ModuleAccess1' <$> pDollarSignTok <*> pIdentifier
+    pModuleAccess2 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess2 =
+      ModuleAccess2' <$> pCommercialAtTok <*> pIdentifier
+    pModuleAccess3 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess3 =
+      ModuleAccess3' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+    pModuleAccess4 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess4 =
+      ModuleAccess4' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pTypeArguments
+    pModuleAccess5 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess5 =
+      ModuleAccess5' <$> pModuleIdentity <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+    pModuleAccess6 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess6 =
+      ModuleAccess6' <$> pHidModuleIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+    pModuleAccess7 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess7 =
+      ModuleAccess7' <$> pModuleIdentity <*> pMaybe pTypeArguments
+    pModuleAccess8 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess8 =
+      ModuleAccess8' <$> pIdentifier <*> pMaybe pTypeArguments
+    pModuleAccessMember :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccessMember =
+      ModuleAccessMember' <$> pHidReservedIdentifier
 
-pNumLiteral :: Parser (MoveTerm NumLiteralL)
-pNumLiteral = do
-  _sym <- pSymbol "num_literal" SNumLiteralSymbol
-  iNumLiteral <$> pContent _sym <*> pMaybe (pNumLiteralInternal0 _sym)
+pHidModuleIdentifier :: TermParser HidModuleIdentifierL
+pHidModuleIdentifier =
+  HidModuleIdentifier' <$> pIdentifier
 
-pNumLiteralInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-pNumLiteralInternal0 _sym = do
-  choice [ Megaparsec.try (pNumLiteralInternal0U8 _sym)
-         , Megaparsec.try (pNumLiteralInternal0U16 _sym)
-         , Megaparsec.try (pNumLiteralInternal0U32 _sym)
-         , Megaparsec.try (pNumLiteralInternal0U64 _sym)
-         , Megaparsec.try (pNumLiteralInternal0U128 _sym)
-         , Megaparsec.try (pNumLiteralInternal0U256 _sym)
+pIdentifier :: TermParser IdentifierL
+pIdentifier =
+  Identifier' <$> pContent _sym
+
+pHidReservedIdentifier :: TermParser HidReservedIdentifierL
+pHidReservedIdentifier =
+  choice [ Megaparsec.try pHidReservedIdentifierHidForall
+         , Megaparsec.try pHidReservedIdentifierHidExists
          ]
   where
-    pNumLiteralInternal0U8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U8 _sym =
-      iNumLiteralInternal0U8 <$> pU8Tok
-    pNumLiteralInternal0U16 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U16 _sym =
-      iNumLiteralInternal0U16 <$> pU16Tok
-    pNumLiteralInternal0U32 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U32 _sym =
-      iNumLiteralInternal0U32 <$> pU32Tok
-    pNumLiteralInternal0U64 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U64 _sym =
-      iNumLiteralInternal0U64 <$> pU64Tok
-    pNumLiteralInternal0U128 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U128 _sym =
-      iNumLiteralInternal0U128 <$> pU128Tok
-    pNumLiteralInternal0U256 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm NumLiteralInternal0L)
-    pNumLiteralInternal0U256 _sym =
-      iNumLiteralInternal0U256 <$> pU256Tok
+    pHidReservedIdentifierHidForall :: Parser (MoveTerm HidReservedIdentifierL)
+    pHidReservedIdentifierHidForall =
+      HidReservedIdentifierHidForall' <$> pHidForall
+    pHidReservedIdentifierHidExists :: Parser (MoveTerm HidReservedIdentifierL)
+    pHidReservedIdentifierHidExists =
+      HidReservedIdentifierHidExists' <$> pHidExists
 
-pTypeArguments :: Parser (MoveTerm TypeArgumentsL)
-pTypeArguments = do
-  _sym <- pSymbol "type_arguments" STypeArgumentsSymbol
-  iTypeArguments <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 (pHiddenType _sym) pCommaTok)
+pHidExists :: TermParser HidExistsL
+pHidExists =
+  HidExists' <$> pExistsTok
 
-pFunctionType :: Parser (MoveTerm FunctionTypeL)
-pFunctionType = do
-  _sym <- pSymbol "function_type" SFunctionTypeSymbol
-  iFunctionType <$> pFunctionTypeParameters <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok (pHiddenType _sym))
+pHidForall :: TermParser HidForallL
+pHidForall =
+  HidForall' <$> pForallTok
 
-pFunctionTypeParameters :: Parser (MoveTerm FunctionTypeParametersL)
-pFunctionTypeParameters = do
-  _sym <- pSymbol "function_type_parameters" SFunctionTypeParametersSymbol
-  iFunctionTypeParameters <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy (pHiddenType _sym) pCommaTok)
+pModuleIdentity :: TermParser ModuleIdentityL
+pModuleIdentity =
+  ModuleIdentity' <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> pHidModuleIdentifier
 
-pPrimitiveType :: Parser (MoveTerm PrimitiveTypeL)
-pPrimitiveType = do
-  _sym <- pSymbol "primitive_type" SPrimitiveTypeSymbol
-  choice [ Megaparsec.try (pPrimitiveTypeU8 _sym)
-         , Megaparsec.try (pPrimitiveTypeU16 _sym)
-         , Megaparsec.try (pPrimitiveTypeU32 _sym)
-         , Megaparsec.try (pPrimitiveTypeU64 _sym)
-         , Megaparsec.try (pPrimitiveTypeU128 _sym)
-         , Megaparsec.try (pPrimitiveTypeU256 _sym)
-         , Megaparsec.try (pPrimitiveTypeBool _sym)
-         , Megaparsec.try (pPrimitiveTypeAddress _sym)
-         , Megaparsec.try (pPrimitiveTypeSigner _sym)
-         , Megaparsec.try (pPrimitiveTypeBytearray _sym)
+pModuleIdentityInternal0 :: TermParser ModuleIdentityInternal0L
+pModuleIdentityInternal0 =
+  choice [ Megaparsec.try pModuleIdentityInternal0NumLiteral
+         , Megaparsec.try pModuleIdentityInternal0HidModuleIdentifier
          ]
   where
-    pPrimitiveTypeU8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU8 _sym =
-      iPrimitiveTypeU8 <$> pU8Tok
-    pPrimitiveTypeU16 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU16 _sym =
-      iPrimitiveTypeU16 <$> pU16Tok
-    pPrimitiveTypeU32 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU32 _sym =
-      iPrimitiveTypeU32 <$> pU32Tok
-    pPrimitiveTypeU64 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU64 _sym =
-      iPrimitiveTypeU64 <$> pU64Tok
-    pPrimitiveTypeU128 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU128 _sym =
-      iPrimitiveTypeU128 <$> pU128Tok
-    pPrimitiveTypeU256 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeU256 _sym =
-      iPrimitiveTypeU256 <$> pU256Tok
-    pPrimitiveTypeBool :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeBool _sym =
-      iPrimitiveTypeBool <$> pBoolTok
-    pPrimitiveTypeAddress :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeAddress _sym =
-      iPrimitiveTypeAddress <$> pAddressTok
-    pPrimitiveTypeSigner :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeSigner _sym =
-      iPrimitiveTypeSigner <$> pSignerTok
-    pPrimitiveTypeBytearray :: Cubix.TreeSitter.Token a -> Parser (MoveTerm PrimitiveTypeL)
-    pPrimitiveTypeBytearray _sym =
-      iPrimitiveTypeBytearray <$> pBytearrayTok
+    pModuleIdentityInternal0NumLiteral :: Parser (MoveTerm ModuleIdentityInternal0L)
+    pModuleIdentityInternal0NumLiteral =
+      ModuleIdentityInternal0NumLiteral' <$> pNumLiteral
+    pModuleIdentityInternal0HidModuleIdentifier :: Parser (MoveTerm ModuleIdentityInternal0L)
+    pModuleIdentityInternal0HidModuleIdentifier =
+      ModuleIdentityInternal0HidModuleIdentifier' <$> pHidModuleIdentifier
 
-pRefType :: Parser (MoveTerm RefTypeL)
-pRefType = do
-  _sym <- pSymbol "ref_type" SRefTypeSymbol
-  iRefType <$> (pHiddenReference _sym) <*> (pHiddenType _sym)
+pNumLiteral :: TermParser NumLiteralL
+pNumLiteral =
+  NumLiteral' <$> pContent _sym <*> pMaybe (pNumLiteralInternal0 _sym)
 
-pHiddenReference :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReferenceL)
-pHiddenReference _sym = do
-  choice [ Megaparsec.try (pHiddenReferenceImmRef _sym)
-         , Megaparsec.try (pHiddenReferenceMutRef _sym)
+pNumLiteralInternal0 :: TermParser NumLiteralInternal0L
+pNumLiteralInternal0 =
+  choice [ Megaparsec.try pNumLiteralInternal0U8
+         , Megaparsec.try pNumLiteralInternal0U16
+         , Megaparsec.try pNumLiteralInternal0U32
+         , Megaparsec.try pNumLiteralInternal0U64
+         , Megaparsec.try pNumLiteralInternal0U128
+         , Megaparsec.try pNumLiteralInternal0U256
          ]
   where
-    pHiddenReferenceImmRef :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReferenceL)
-    pHiddenReferenceImmRef _sym =
-      iHiddenReferenceImmRef <$> pImmRef
-    pHiddenReferenceMutRef :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenReferenceL)
-    pHiddenReferenceMutRef _sym =
-      iHiddenReferenceMutRef <$> pMutRef
+    pNumLiteralInternal0U8 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U8 =
+      NumLiteralInternal0U8' <$> pU8Tok
+    pNumLiteralInternal0U16 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U16 =
+      NumLiteralInternal0U16' <$> pU16Tok
+    pNumLiteralInternal0U32 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U32 =
+      NumLiteralInternal0U32' <$> pU32Tok
+    pNumLiteralInternal0U64 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U64 =
+      NumLiteralInternal0U64' <$> pU64Tok
+    pNumLiteralInternal0U128 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U128 =
+      NumLiteralInternal0U128' <$> pU128Tok
+    pNumLiteralInternal0U256 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U256 =
+      NumLiteralInternal0U256' <$> pU256Tok
 
-pImmRef :: Parser (MoveTerm ImmRefL)
-pImmRef = do
-  _sym <- pSymbol "imm_ref" SImmRefSymbol
-  iImmRef <$> pAmpersandTok
+pTypeArguments :: TermParser TypeArgumentsL
+pTypeArguments =
+  TypeArguments' <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 pHidType pCommaTok)
 
-pMutRef :: Parser (MoveTerm MutRefL)
-pMutRef = do
-  _sym <- pSymbol "mut_ref" SMutRefSymbol
-  iMutRef <$> pAmpersandTok <*> pMutTok
+pFunctionType :: TermParser FunctionTypeL
+pFunctionType =
+  FunctionType' <$> pFunctionTypeParameters <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok pHidType)
 
-pTupleType :: Parser (MoveTerm TupleTypeL)
-pTupleType = do
-  _sym <- pSymbol "tuple_type" STupleTypeSymbol
-  iTupleType <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pHiddenType _sym) pCommaTok)
+pFunctionTypeParameters :: TermParser FunctionTypeParametersL
+pFunctionTypeParameters =
+  FunctionTypeParameters' <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy pHidType pCommaTok)
 
-pPositionalFields :: Parser (MoveTerm PositionalFieldsL)
-pPositionalFields = do
-  _sym <- pSymbol "positional_fields" SPositionalFieldsSymbol
-  iPositionalFields <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pHiddenType _sym) pCommaTok)
-
-pPostfixAbilityDecls :: Parser (MoveTerm PostfixAbilityDeclsL)
-pPostfixAbilityDecls = do
-  _sym <- pSymbol "postfix_ability_decls" SPostfixAbilityDeclsSymbol
-  iPostfixAbilityDecls <$> pBetween pHasTok pSemicolonTok (pSepBy pAbility pCommaTok)
-
-pHiddenFunctionItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionItemL)
-pHiddenFunctionItem _sym = do
-  choice [ Megaparsec.try (pHiddenFunctionItemNativeFunctionDefinition _sym)
-         , Megaparsec.try (pHiddenFunctionItemMacroFunctionDefinition _sym)
-         , Megaparsec.try (pHiddenFunctionItemFunctionDefinition _sym)
+pPrimitiveType :: TermParser PrimitiveTypeL
+pPrimitiveType =
+  choice [ Megaparsec.try pPrimitiveTypeU8
+         , Megaparsec.try pPrimitiveTypeU16
+         , Megaparsec.try pPrimitiveTypeU32
+         , Megaparsec.try pPrimitiveTypeU64
+         , Megaparsec.try pPrimitiveTypeU128
+         , Megaparsec.try pPrimitiveTypeU256
+         , Megaparsec.try pPrimitiveTypeBool
+         , Megaparsec.try pPrimitiveTypeAddress
+         , Megaparsec.try pPrimitiveTypeSigner
+         , Megaparsec.try pPrimitiveTypeBytearray
          ]
   where
-    pHiddenFunctionItemNativeFunctionDefinition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionItemL)
-    pHiddenFunctionItemNativeFunctionDefinition _sym =
-      iHiddenFunctionItemNativeFunctionDefinition <$> pNativeFunctionDefinition
-    pHiddenFunctionItemMacroFunctionDefinition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionItemL)
-    pHiddenFunctionItemMacroFunctionDefinition _sym =
-      iHiddenFunctionItemMacroFunctionDefinition <$> pMacroFunctionDefinition
-    pHiddenFunctionItemFunctionDefinition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionItemL)
-    pHiddenFunctionItemFunctionDefinition _sym =
-      iHiddenFunctionItemFunctionDefinition <$> pFunctionDefinition
+    pPrimitiveTypeU8 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU8 =
+      PrimitiveTypeU8' <$> pU8Tok
+    pPrimitiveTypeU16 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU16 =
+      PrimitiveTypeU16' <$> pU16Tok
+    pPrimitiveTypeU32 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU32 =
+      PrimitiveTypeU32' <$> pU32Tok
+    pPrimitiveTypeU64 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU64 =
+      PrimitiveTypeU64' <$> pU64Tok
+    pPrimitiveTypeU128 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU128 =
+      PrimitiveTypeU128' <$> pU128Tok
+    pPrimitiveTypeU256 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU256 =
+      PrimitiveTypeU256' <$> pU256Tok
+    pPrimitiveTypeBool :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeBool =
+      PrimitiveTypeBool' <$> pBoolTok
+    pPrimitiveTypeAddress :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeAddress =
+      PrimitiveTypeAddress' <$> pAddressTok
+    pPrimitiveTypeSigner :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeSigner =
+      PrimitiveTypeSigner' <$> pSignerTok
+    pPrimitiveTypeBytearray :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeBytearray =
+      PrimitiveTypeBytearray' <$> pBytearrayTok
 
-pFunctionDefinition :: Parser (MoveTerm FunctionDefinitionL)
-pFunctionDefinition = do
-  _sym <- pSymbol "function_definition" SFunctionDefinitionSymbol
-  iFunctionDefinition <$> (pHiddenFunctionSignature _sym) <*> pBlock
+pRefType :: TermParser RefTypeL
+pRefType =
+  RefType' <$> pHidReference <*> pHidType
 
-pHiddenFunctionSignature :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionSignatureL)
-pHiddenFunctionSignature _sym = do
-  iHiddenFunctionSignature <$> pMaybe pModifier <*> pMaybe pModifier <*> pMaybe pModifier <*> pFunTok <*> (pHiddenFunctionIdentifier _sym) <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
+pTupleType :: TermParser TupleTypeL
+pTupleType =
+  TupleType' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidType pCommaTok)
 
-pHiddenFunctionIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenFunctionIdentifierL)
-pHiddenFunctionIdentifier _sym = do
-  iHiddenFunctionIdentifier <$> pIdentifier
+pBlock :: TermParser BlockL
+pBlock =
+  Block' <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany pBlockItem <*> pMaybe pHidExpression <*> pRightCurlyBracketTok
 
-pFunctionParameters :: Parser (MoveTerm FunctionParametersL)
-pFunctionParameters = do
-  _sym <- pSymbol "function_parameters" SFunctionParametersSymbol
-  iFunctionParameters <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pFunctionParametersInternal0 _sym) pCommaTok)
+pBlockItem :: TermParser BlockItemL
+pBlockItem =
+  BlockItem' <$> (pBlockItemInternal0 _sym) <*> pSemicolonTok
 
-pFunctionParametersInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParametersInternal0L)
-pFunctionParametersInternal0 _sym = do
-  choice [ Megaparsec.try (pFunctionParametersInternal0MutFunctionParameter _sym)
-         , Megaparsec.try (pFunctionParametersInternal0FunctionParameter _sym)
+pBlockItemInternal0 :: TermParser BlockItemInternal0L
+pBlockItemInternal0 =
+  choice [ Megaparsec.try pBlockItemInternal0HidExpression
+         , Megaparsec.try pBlockItemInternal0LetStatement
          ]
   where
-    pFunctionParametersInternal0MutFunctionParameter :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParametersInternal0L)
-    pFunctionParametersInternal0MutFunctionParameter _sym =
-      iFunctionParametersInternal0MutFunctionParameter <$> pMutFunctionParameter
-    pFunctionParametersInternal0FunctionParameter :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParametersInternal0L)
-    pFunctionParametersInternal0FunctionParameter _sym =
-      iFunctionParametersInternal0FunctionParameter <$> pFunctionParameter
+    pBlockItemInternal0HidExpression :: Parser (MoveTerm BlockItemInternal0L)
+    pBlockItemInternal0HidExpression =
+      BlockItemInternal0HidExpression' <$> pHidExpression
+    pBlockItemInternal0LetStatement :: Parser (MoveTerm BlockItemInternal0L)
+    pBlockItemInternal0LetStatement =
+      BlockItemInternal0LetStatement' <$> pLetStatement
 
-pFunctionParameter :: Parser (MoveTerm FunctionParameterL)
-pFunctionParameter = do
-  _sym <- pSymbol "function_parameter" SFunctionParameterSymbol
-  iFunctionParameter <$> (pFunctionParameterInternal0 _sym) <*> pColonTok <*> (pHiddenType _sym)
+pLetStatement :: TermParser LetStatementL
+pLetStatement =
+  LetStatement' <$> pLetTok <*> pBindList <*> pMaybe (pPair pColonTok pHidType) <*> pMaybe (pPair pEqualsSignTok pHidExpression)
 
-pFunctionParameterInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParameterInternal0L)
-pFunctionParameterInternal0 _sym = do
-  choice [ Megaparsec.try (pFunctionParameterInternal0Name _sym)
-         , Megaparsec.try (pFunctionParameterInternal02 _sym)
+pBindList :: TermParser BindListL
+pBindList =
+  choice [ Megaparsec.try pBindListHidBind
+         , Megaparsec.try pBindListCommaBindList
+         , Megaparsec.try pBindListOrBindList
          ]
   where
-    pFunctionParameterInternal0Name :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParameterInternal0L)
-    pFunctionParameterInternal0Name _sym =
-      iFunctionParameterInternal0Name <$> (pHiddenVariableIdentifier _sym)
-    pFunctionParameterInternal02 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FunctionParameterInternal0L)
-    pFunctionParameterInternal02 _sym =
-      iFunctionParameterInternal02 <$> pDollarSignTok <*> (pHiddenVariableIdentifier _sym)
+    pBindListHidBind :: Parser (MoveTerm BindListL)
+    pBindListHidBind =
+      BindListHidBind' <$> pHidBind
+    pBindListCommaBindList :: Parser (MoveTerm BindListL)
+    pBindListCommaBindList =
+      BindListCommaBindList' <$> pCommaBindList
+    pBindListOrBindList :: Parser (MoveTerm BindListL)
+    pBindListOrBindList =
+      BindListOrBindList' <$> pOrBindList
 
-pHiddenVariableIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenVariableIdentifierL)
-pHiddenVariableIdentifier _sym = do
-  iHiddenVariableIdentifier <$> pIdentifier
+pCommaBindList :: TermParser CommaBindListL
+pCommaBindList =
+  CommaBindList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidBind pCommaTok)
 
-pMutFunctionParameter :: Parser (MoveTerm MutFunctionParameterL)
-pMutFunctionParameter = do
-  _sym <- pSymbol "mut_function_parameter" SMutFunctionParameterSymbol
-  iMutFunctionParameter <$> pMutTok <*> pFunctionParameter
-
-pModifier :: Parser (MoveTerm ModifierL)
-pModifier = do
-  _sym <- pSymbol "modifier" SModifierSymbol
-  choice [ Megaparsec.try (pModifier1 _sym)
-         , Megaparsec.try (pModifierEntry _sym)
-         , Megaparsec.try (pModifierNative _sym)
+pHidBind :: TermParser HidBindL
+pHidBind =
+  choice [ Megaparsec.try pHidBindHidBindInternal0
+         , Megaparsec.try pHidBindBindUnpack
+         , Megaparsec.try pHidBindAtBind
+         , Megaparsec.try pHidBindHidLiteralValue
          ]
   where
-    pModifier1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierL)
-    pModifier1 _sym =
-      iModifier1 <$> pPublicTok <*> pMaybe (pBetween pLeftParenthesisTok pRightParenthesisTok (pModifierInternal0 _sym))
-    pModifierEntry :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierL)
-    pModifierEntry _sym =
-      iModifierEntry <$> pEntryTok
-    pModifierNative :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierL)
-    pModifierNative _sym =
-      iModifierNative <$> pNativeTok
+    pHidBindHidBindInternal0 :: Parser (MoveTerm HidBindL)
+    pHidBindHidBindInternal0 =
+      HidBindHidBindInternal0' <$> (pHidBindInternal0 _sym)
+    pHidBindBindUnpack :: Parser (MoveTerm HidBindL)
+    pHidBindBindUnpack =
+      HidBindBindUnpack' <$> pBindUnpack
+    pHidBindAtBind :: Parser (MoveTerm HidBindL)
+    pHidBindAtBind =
+      HidBindAtBind' <$> pAtBind
+    pHidBindHidLiteralValue :: Parser (MoveTerm HidBindL)
+    pHidBindHidLiteralValue =
+      HidBindHidLiteralValue' <$> pHidLiteralValue
 
-pModifierInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierInternal0L)
-pModifierInternal0 _sym = do
-  choice [ Megaparsec.try (pModifierInternal0Package _sym)
-         , Megaparsec.try (pModifierInternal0Friend _sym)
+pAtBind :: TermParser AtBindL
+pAtBind =
+  AtBind' <$> pHidVariableIdentifier <*> pCommercialAtTok <*> pBindList
+
+pHidVariableIdentifier :: TermParser HidVariableIdentifierL
+pHidVariableIdentifier =
+  HidVariableIdentifier' <$> pIdentifier
+
+pBindUnpack :: TermParser BindUnpackL
+pBindUnpack =
+  BindUnpack' <$> pNameExpression <*> pMaybe pBindFields
+
+pBindFields :: TermParser BindFieldsL
+pBindFields =
+  choice [ Megaparsec.try pBindFieldsBindPositionalFields
+         , Megaparsec.try pBindFieldsBindNamedFields
          ]
   where
-    pModifierInternal0Package :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierInternal0L)
-    pModifierInternal0Package _sym =
-      iModifierInternal0Package <$> pPackageTok
-    pModifierInternal0Friend :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ModifierInternal0L)
-    pModifierInternal0Friend _sym =
-      iModifierInternal0Friend <$> pFriendTok
+    pBindFieldsBindPositionalFields :: Parser (MoveTerm BindFieldsL)
+    pBindFieldsBindPositionalFields =
+      BindFieldsBindPositionalFields' <$> pBindPositionalFields
+    pBindFieldsBindNamedFields :: Parser (MoveTerm BindFieldsL)
+    pBindFieldsBindNamedFields =
+      BindFieldsBindNamedFields' <$> pBindNamedFields
 
-pRetType :: Parser (MoveTerm RetTypeL)
-pRetType = do
-  _sym <- pSymbol "ret_type" SRetTypeSymbol
-  iRetType <$> pColonTok <*> (pHiddenType _sym)
+pBindNamedFields :: TermParser BindNamedFieldsL
+pBindNamedFields =
+  BindNamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
 
-pBlock :: Parser (MoveTerm BlockL)
-pBlock = do
-  _sym <- pSymbol "block" SBlockSymbol
-  iBlock <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany pBlockItem <*> pMaybe (pHiddenExpression _sym) <*> pRightCurlyBracketTok
-
-pHiddenExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-pHiddenExpression _sym = do
-  choice [ Megaparsec.try (pHiddenExpressionCallExpression _sym)
-         , Megaparsec.try (pHiddenExpressionMacroCallExpression _sym)
-         , Megaparsec.try (pHiddenExpressionLambdaExpression _sym)
-         , Megaparsec.try (pHiddenExpressionIfExpression _sym)
-         , Megaparsec.try (pHiddenExpressionWhileExpression _sym)
-         , Megaparsec.try (pHiddenExpressionReturnExpression _sym)
-         , Megaparsec.try (pHiddenExpressionAbortExpression _sym)
-         , Megaparsec.try (pHiddenExpressionAssignExpression _sym)
-         , Megaparsec.try (pHiddenExpressionUnaryExpression _sym)
-         , Megaparsec.try (pHiddenExpressionBinaryExpression _sym)
-         , Megaparsec.try (pHiddenExpressionCastExpression _sym)
-         , Megaparsec.try (pHiddenExpressionQuantifierExpression _sym)
-         , Megaparsec.try (pHiddenExpressionMatchExpression _sym)
-         , Megaparsec.try (pHiddenExpressionVectorExpression _sym)
-         , Megaparsec.try (pHiddenExpressionLoopExpression _sym)
-         , Megaparsec.try (pHiddenExpressionIdentifiedExpression _sym)
+pBindNamedFieldsInternal0 :: TermParser BindNamedFieldsInternal0L
+pBindNamedFieldsInternal0 =
+  choice [ Megaparsec.try pBindNamedFieldsInternal0BindField
+         , Megaparsec.try pBindNamedFieldsInternal0MutBindField
          ]
   where
-    pHiddenExpressionCallExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionCallExpression _sym =
-      iHiddenExpressionCallExpression <$> pCallExpression
-    pHiddenExpressionMacroCallExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionMacroCallExpression _sym =
-      iHiddenExpressionMacroCallExpression <$> pMacroCallExpression
-    pHiddenExpressionLambdaExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionLambdaExpression _sym =
-      iHiddenExpressionLambdaExpression <$> pLambdaExpression
-    pHiddenExpressionIfExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionIfExpression _sym =
-      iHiddenExpressionIfExpression <$> pIfExpression
-    pHiddenExpressionWhileExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionWhileExpression _sym =
-      iHiddenExpressionWhileExpression <$> pWhileExpression
-    pHiddenExpressionReturnExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionReturnExpression _sym =
-      iHiddenExpressionReturnExpression <$> pReturnExpression
-    pHiddenExpressionAbortExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionAbortExpression _sym =
-      iHiddenExpressionAbortExpression <$> pAbortExpression
-    pHiddenExpressionAssignExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionAssignExpression _sym =
-      iHiddenExpressionAssignExpression <$> pAssignExpression
-    pHiddenExpressionUnaryExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionUnaryExpression _sym =
-      iHiddenExpressionUnaryExpression <$> (pHiddenUnaryExpression _sym)
-    pHiddenExpressionBinaryExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionBinaryExpression _sym =
-      iHiddenExpressionBinaryExpression <$> pBinaryExpression
-    pHiddenExpressionCastExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionCastExpression _sym =
-      iHiddenExpressionCastExpression <$> pCastExpression
-    pHiddenExpressionQuantifierExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionQuantifierExpression _sym =
-      iHiddenExpressionQuantifierExpression <$> pQuantifierExpression
-    pHiddenExpressionMatchExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionMatchExpression _sym =
-      iHiddenExpressionMatchExpression <$> pMatchExpression
-    pHiddenExpressionVectorExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionVectorExpression _sym =
-      iHiddenExpressionVectorExpression <$> pVectorExpression
-    pHiddenExpressionLoopExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionLoopExpression _sym =
-      iHiddenExpressionLoopExpression <$> pLoopExpression
-    pHiddenExpressionIdentifiedExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionL)
-    pHiddenExpressionIdentifiedExpression _sym =
-      iHiddenExpressionIdentifiedExpression <$> pIdentifiedExpression
+    pBindNamedFieldsInternal0BindField :: Parser (MoveTerm BindNamedFieldsInternal0L)
+    pBindNamedFieldsInternal0BindField =
+      BindNamedFieldsInternal0BindField' <$> pBindField
+    pBindNamedFieldsInternal0MutBindField :: Parser (MoveTerm BindNamedFieldsInternal0L)
+    pBindNamedFieldsInternal0MutBindField =
+      BindNamedFieldsInternal0MutBindField' <$> pMutBindField
 
-pHiddenUnaryExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionL)
-pHiddenUnaryExpression _sym = do
-  iHiddenUnaryExpression <$> (pHiddenUnaryExpressionInternal0 _sym)
-
-pHiddenUnaryExpressionInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-pHiddenUnaryExpressionInternal0 _sym = do
-  choice [ Megaparsec.try (pHiddenUnaryExpressionInternal0UnaryExpression _sym)
-         , Megaparsec.try (pHiddenUnaryExpressionInternal0BorrowExpression _sym)
-         , Megaparsec.try (pHiddenUnaryExpressionInternal0DereferenceExpression _sym)
-         , Megaparsec.try (pHiddenUnaryExpressionInternal0MoveOrCopyExpression _sym)
-         , Megaparsec.try (pHiddenUnaryExpressionInternal0ExpressionTerm _sym)
+pBindField :: TermParser BindFieldL
+pBindField =
+  choice [ Megaparsec.try pBindField1
+         , Megaparsec.try pBindFieldHidSpreadOperator
          ]
   where
-    pHiddenUnaryExpressionInternal0UnaryExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-    pHiddenUnaryExpressionInternal0UnaryExpression _sym =
-      iHiddenUnaryExpressionInternal0UnaryExpression <$> pUnaryExpression
-    pHiddenUnaryExpressionInternal0BorrowExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-    pHiddenUnaryExpressionInternal0BorrowExpression _sym =
-      iHiddenUnaryExpressionInternal0BorrowExpression <$> pBorrowExpression
-    pHiddenUnaryExpressionInternal0DereferenceExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-    pHiddenUnaryExpressionInternal0DereferenceExpression _sym =
-      iHiddenUnaryExpressionInternal0DereferenceExpression <$> pDereferenceExpression
-    pHiddenUnaryExpressionInternal0MoveOrCopyExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-    pHiddenUnaryExpressionInternal0MoveOrCopyExpression _sym =
-      iHiddenUnaryExpressionInternal0MoveOrCopyExpression <$> pMoveOrCopyExpression
-    pHiddenUnaryExpressionInternal0ExpressionTerm :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenUnaryExpressionInternal0L)
-    pHiddenUnaryExpressionInternal0ExpressionTerm _sym =
-      iHiddenUnaryExpressionInternal0ExpressionTerm <$> (pHiddenExpressionTerm _sym)
+    pBindField1 :: Parser (MoveTerm BindFieldL)
+    pBindField1 =
+      BindField1' <$> pBindList <*> pMaybe (pPair pColonTok pBindList)
+    pBindFieldHidSpreadOperator :: Parser (MoveTerm BindFieldL)
+    pBindFieldHidSpreadOperator =
+      BindFieldHidSpreadOperator' <$> pHidSpreadOperator
 
-pHiddenExpressionTerm :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-pHiddenExpressionTerm _sym = do
-  choice [ Megaparsec.try (pHiddenExpressionTermCallExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermBreakExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermContinueExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermNameExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermMacroCallExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermPackExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermLiteralValue _sym)
-         , Megaparsec.try (pHiddenExpressionTermUnitExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermExpressionList _sym)
-         , Megaparsec.try (pHiddenExpressionTermAnnotationExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermBlock _sym)
-         , Megaparsec.try (pHiddenExpressionTermSpecBlock _sym)
-         , Megaparsec.try (pHiddenExpressionTermIfExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermDotExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermIndexExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermVectorExpression _sym)
-         , Megaparsec.try (pHiddenExpressionTermMatchExpression _sym)
+pHidSpreadOperator :: TermParser HidSpreadOperatorL
+pHidSpreadOperator =
+  HidSpreadOperator' <$> pFullStopFullStopTok
+
+pMutBindField :: TermParser MutBindFieldL
+pMutBindField =
+  MutBindField' <$> pMutTok <*> pBindField
+
+pBindPositionalFields :: TermParser BindPositionalFieldsL
+pBindPositionalFields =
+  BindPositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
+
+pNameExpression :: TermParser NameExpressionL
+pNameExpression =
+  NameExpression' <$> pMaybe pColonColonTok <*> pModuleAccess
+
+pHidBindInternal0 :: TermParser HidBindInternal0L
+pHidBindInternal0 =
+  choice [ Megaparsec.try pHidBindInternal0MutBindVar
+         , Megaparsec.try pHidBindInternal0HidVariableIdentifier
          ]
   where
-    pHiddenExpressionTermCallExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermCallExpression _sym =
-      iHiddenExpressionTermCallExpression <$> pCallExpression
-    pHiddenExpressionTermBreakExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermBreakExpression _sym =
-      iHiddenExpressionTermBreakExpression <$> pBreakExpression
-    pHiddenExpressionTermContinueExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermContinueExpression _sym =
-      iHiddenExpressionTermContinueExpression <$> pContinueExpression
-    pHiddenExpressionTermNameExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermNameExpression _sym =
-      iHiddenExpressionTermNameExpression <$> pNameExpression
-    pHiddenExpressionTermMacroCallExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermMacroCallExpression _sym =
-      iHiddenExpressionTermMacroCallExpression <$> pMacroCallExpression
-    pHiddenExpressionTermPackExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermPackExpression _sym =
-      iHiddenExpressionTermPackExpression <$> pPackExpression
-    pHiddenExpressionTermLiteralValue :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermLiteralValue _sym =
-      iHiddenExpressionTermLiteralValue <$> (pHiddenLiteralValue _sym)
-    pHiddenExpressionTermUnitExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermUnitExpression _sym =
-      iHiddenExpressionTermUnitExpression <$> pUnitExpression
-    pHiddenExpressionTermExpressionList :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermExpressionList _sym =
-      iHiddenExpressionTermExpressionList <$> pExpressionList
-    pHiddenExpressionTermAnnotationExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermAnnotationExpression _sym =
-      iHiddenExpressionTermAnnotationExpression <$> pAnnotationExpression
-    pHiddenExpressionTermBlock :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermBlock _sym =
-      iHiddenExpressionTermBlock <$> pBlock
-    pHiddenExpressionTermSpecBlock :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermSpecBlock _sym =
-      iHiddenExpressionTermSpecBlock <$> pSpecBlock
-    pHiddenExpressionTermIfExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermIfExpression _sym =
-      iHiddenExpressionTermIfExpression <$> pIfExpression
-    pHiddenExpressionTermDotExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermDotExpression _sym =
-      iHiddenExpressionTermDotExpression <$> pDotExpression
-    pHiddenExpressionTermIndexExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermIndexExpression _sym =
-      iHiddenExpressionTermIndexExpression <$> pIndexExpression
-    pHiddenExpressionTermVectorExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermVectorExpression _sym =
-      iHiddenExpressionTermVectorExpression <$> pVectorExpression
-    pHiddenExpressionTermMatchExpression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenExpressionTermL)
-    pHiddenExpressionTermMatchExpression _sym =
-      iHiddenExpressionTermMatchExpression <$> pMatchExpression
+    pHidBindInternal0MutBindVar :: Parser (MoveTerm HidBindInternal0L)
+    pHidBindInternal0MutBindVar =
+      HidBindInternal0MutBindVar' <$> pMutBindVar
+    pHidBindInternal0HidVariableIdentifier :: Parser (MoveTerm HidBindInternal0L)
+    pHidBindInternal0HidVariableIdentifier =
+      HidBindInternal0HidVariableIdentifier' <$> pHidVariableIdentifier
 
-pHiddenLiteralValue :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-pHiddenLiteralValue _sym = do
-  choice [ Megaparsec.try (pHiddenLiteralValueAddressLiteral _sym)
-         , Megaparsec.try (pHiddenLiteralValueBoolLiteral _sym)
-         , Megaparsec.try (pHiddenLiteralValueNumLiteral _sym)
-         , Megaparsec.try (pHiddenLiteralValueHexStringLiteral _sym)
-         , Megaparsec.try (pHiddenLiteralValueByteStringLiteral _sym)
+pMutBindVar :: TermParser MutBindVarL
+pMutBindVar =
+  MutBindVar' <$> pMutTok <*> pHidVariableIdentifier
+
+pHidLiteralValue :: TermParser HidLiteralValueL
+pHidLiteralValue =
+  choice [ Megaparsec.try pHidLiteralValueAddressLiteral
+         , Megaparsec.try pHidLiteralValueBoolLiteral
+         , Megaparsec.try pHidLiteralValueNumLiteral
+         , Megaparsec.try pHidLiteralValueHexStringLiteral
+         , Megaparsec.try pHidLiteralValueByteStringLiteral
          ]
   where
-    pHiddenLiteralValueAddressLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-    pHiddenLiteralValueAddressLiteral _sym =
-      iHiddenLiteralValueAddressLiteral <$> pAddressLiteral
-    pHiddenLiteralValueBoolLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-    pHiddenLiteralValueBoolLiteral _sym =
-      iHiddenLiteralValueBoolLiteral <$> pBoolLiteral
-    pHiddenLiteralValueNumLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-    pHiddenLiteralValueNumLiteral _sym =
-      iHiddenLiteralValueNumLiteral <$> pNumLiteral
-    pHiddenLiteralValueHexStringLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-    pHiddenLiteralValueHexStringLiteral _sym =
-      iHiddenLiteralValueHexStringLiteral <$> pHexStringLiteral
-    pHiddenLiteralValueByteStringLiteral :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenLiteralValueL)
-    pHiddenLiteralValueByteStringLiteral _sym =
-      iHiddenLiteralValueByteStringLiteral <$> pByteStringLiteral
+    pHidLiteralValueAddressLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueAddressLiteral =
+      HidLiteralValueAddressLiteral' <$> pAddressLiteral
+    pHidLiteralValueBoolLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueBoolLiteral =
+      HidLiteralValueBoolLiteral' <$> pBoolLiteral
+    pHidLiteralValueNumLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueNumLiteral =
+      HidLiteralValueNumLiteral' <$> pNumLiteral
+    pHidLiteralValueHexStringLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueHexStringLiteral =
+      HidLiteralValueHexStringLiteral' <$> pHexStringLiteral
+    pHidLiteralValueByteStringLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueByteStringLiteral =
+      HidLiteralValueByteStringLiteral' <$> pByteStringLiteral
 
-pAddressLiteral :: Parser (MoveTerm AddressLiteralL)
-pAddressLiteral = do
-  _sym <- pSymbol "address_literal" SAddressLiteralSymbol
-  iAddressLiteral <$> pContent _sym
+pAddressLiteral :: TermParser AddressLiteralL
+pAddressLiteral =
+  AddressLiteral' <$> pContent _sym
 
-pBoolLiteral :: Parser (MoveTerm BoolLiteralL)
-pBoolLiteral = do
-  _sym <- pSymbol "bool_literal" SBoolLiteralSymbol
-  choice [ Megaparsec.try (pBoolLiteralTrue _sym)
-         , Megaparsec.try (pBoolLiteralFalse _sym)
+pBoolLiteral :: TermParser BoolLiteralL
+pBoolLiteral =
+  choice [ Megaparsec.try pBoolLiteralTrue
+         , Megaparsec.try pBoolLiteralFalse
          ]
   where
-    pBoolLiteralTrue :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BoolLiteralL)
-    pBoolLiteralTrue _sym =
-      iBoolLiteralTrue <$> pTrueTok
-    pBoolLiteralFalse :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BoolLiteralL)
-    pBoolLiteralFalse _sym =
-      iBoolLiteralFalse <$> pFalseTok
+    pBoolLiteralTrue :: Parser (MoveTerm BoolLiteralL)
+    pBoolLiteralTrue =
+      BoolLiteralTrue' <$> pTrueTok
+    pBoolLiteralFalse :: Parser (MoveTerm BoolLiteralL)
+    pBoolLiteralFalse =
+      BoolLiteralFalse' <$> pFalseTok
 
-pByteStringLiteral :: Parser (MoveTerm ByteStringLiteralL)
-pByteStringLiteral = do
-  _sym <- pSymbol "byte_string_literal" SByteStringLiteralSymbol
-  iByteStringLiteral <$> pContent _sym
+pByteStringLiteral :: TermParser ByteStringLiteralL
+pByteStringLiteral =
+  ByteStringLiteral' <$> pContent _sym
 
-pHexStringLiteral :: Parser (MoveTerm HexStringLiteralL)
-pHexStringLiteral = do
-  _sym <- pSymbol "hex_string_literal" SHexStringLiteralSymbol
-  iHexStringLiteral <$> pContent _sym
+pHexStringLiteral :: TermParser HexStringLiteralL
+pHexStringLiteral =
+  HexStringLiteral' <$> pContent _sym
 
-pAnnotationExpression :: Parser (MoveTerm AnnotationExpressionL)
-pAnnotationExpression = do
-  _sym <- pSymbol "annotation_expression" SAnnotationExpressionSymbol
-  iAnnotationExpression <$> pBetween pLeftParenthesisTok pColonTok (pHiddenExpression _sym) <*> (pHiddenType _sym) <*> pRightParenthesisTok
+pOrBindList :: TermParser OrBindListL
+pOrBindList =
+  OrBindList' <$> pMaybe pLeftParenthesisTok <*> pSepBy1 (pPair (pPair (pMaybe pLeftParenthesisTok) pHidBind) (pMaybe pRightParenthesisTok)) pVerticalLineTok <*> pMaybe pRightParenthesisTok
 
-pBreakExpression :: Parser (MoveTerm BreakExpressionL)
-pBreakExpression = do
-  _sym <- pSymbol "break_expression" SBreakExpressionSymbol
-  iBreakExpression <$> pBreakTok <*> pMaybe pLabel <*> pMaybe (pHiddenExpression _sym)
+pUseDeclaration :: TermParser UseDeclarationL
+pUseDeclaration =
+  UseDeclaration' <$> pMaybe pPublicTok <*> pBetween pUseTok pSemicolonTok (pUseDeclarationInternal0 _sym)
 
-pLabel :: Parser (MoveTerm LabelL)
-pLabel = do
-  _sym <- pSymbol "label" SLabelSymbol
-  iLabel <$> pApostropheTok <*> pIdentifier
-
-pCallExpression :: Parser (MoveTerm CallExpressionL)
-pCallExpression = do
-  _sym <- pSymbol "call_expression" SCallExpressionSymbol
-  iCallExpression <$> pPair pNameExpression pArgList
-
-pArgList :: Parser (MoveTerm ArgListL)
-pArgList = do
-  _sym <- pSymbol "arg_list" SArgListSymbol
-  iArgList <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pHiddenExpression _sym) pCommaTok)
-
-pNameExpression :: Parser (MoveTerm NameExpressionL)
-pNameExpression = do
-  _sym <- pSymbol "name_expression" SNameExpressionSymbol
-  iNameExpression <$> pMaybe pColonColonTok <*> pModuleAccess
-
-pContinueExpression :: Parser (MoveTerm ContinueExpressionL)
-pContinueExpression = do
-  _sym <- pSymbol "continue_expression" SContinueExpressionSymbol
-  iContinueExpression <$> pContinueTok <*> pMaybe pLabel
-
-pDotExpression :: Parser (MoveTerm DotExpressionL)
-pDotExpression = do
-  _sym <- pSymbol "dot_expression" SDotExpressionSymbol
-  iDotExpression <$> pPair (pPair (pHiddenExpressionTerm _sym) pFullStopTok) (pHiddenExpressionTerm _sym)
-
-pExpressionList :: Parser (MoveTerm ExpressionListL)
-pExpressionList = do
-  _sym <- pSymbol "expression_list" SExpressionListSymbol
-  iExpressionList <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy1 (pHiddenExpression _sym) pCommaTok)
-
-pIfExpression :: Parser (MoveTerm IfExpressionL)
-pIfExpression = do
-  _sym <- pSymbol "if_expression" SIfExpressionSymbol
-  iIfExpression <$> pPair (pPair (pPair pIfTok (pBetween pLeftParenthesisTok pRightParenthesisTok (pHiddenExpression _sym))) (pHiddenExpression _sym)) (pMaybe (pPair pElseTok (pHiddenExpression _sym)))
-
-pIndexExpression :: Parser (MoveTerm IndexExpressionL)
-pIndexExpression = do
-  _sym <- pSymbol "index_expression" SIndexExpressionSymbol
-  iIndexExpression <$> pPair (pHiddenExpressionTerm _sym) (pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy (pHiddenExpression _sym) pCommaTok))
-
-pMacroCallExpression :: Parser (MoveTerm MacroCallExpressionL)
-pMacroCallExpression = do
-  _sym <- pSymbol "macro_call_expression" SMacroCallExpressionSymbol
-  iMacroCallExpression <$> pMacroModuleAccess <*> pMaybe pTypeArguments <*> pArgList
-
-pMacroModuleAccess :: Parser (MoveTerm MacroModuleAccessL)
-pMacroModuleAccess = do
-  _sym <- pSymbol "macro_module_access" SMacroModuleAccessSymbol
-  iMacroModuleAccess <$> pModuleAccess <*> pExclamationMarkTok
-
-pMatchExpression :: Parser (MoveTerm MatchExpressionL)
-pMatchExpression = do
-  _sym <- pSymbol "match_expression" SMatchExpressionSymbol
-  iMatchExpression <$> pMatchTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok (pHiddenExpression _sym) <*> (pHiddenMatchBody _sym)
-
-pHiddenMatchBody :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenMatchBodyL)
-pHiddenMatchBody _sym = do
-  iHiddenMatchBody <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pMatchArm pCommaTok)
-
-pMatchArm :: Parser (MoveTerm MatchArmL)
-pMatchArm = do
-  _sym <- pSymbol "match_arm" SMatchArmSymbol
-  iMatchArm <$> pBindList <*> pMaybe pMatchCondition <*> pEqualsSignGreaterThanSignTok <*> (pHiddenExpression _sym)
-
-pBindList :: Parser (MoveTerm BindListL)
-pBindList = do
-  _sym <- pSymbol "bind_list" SBindListSymbol
-  choice [ Megaparsec.try (pBindListBind _sym)
-         , Megaparsec.try (pBindListCommaBindList _sym)
-         , Megaparsec.try (pBindListOrBindList _sym)
+pUseDeclarationInternal0 :: TermParser UseDeclarationInternal0L
+pUseDeclarationInternal0 =
+  choice [ Megaparsec.try pUseDeclarationInternal0UseFun
+         , Megaparsec.try pUseDeclarationInternal0UseModule
+         , Megaparsec.try pUseDeclarationInternal0UseModuleMember
+         , Megaparsec.try pUseDeclarationInternal0UseModuleMembers
          ]
   where
-    pBindListBind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindListL)
-    pBindListBind _sym =
-      iBindListBind <$> (pHiddenBind _sym)
-    pBindListCommaBindList :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindListL)
-    pBindListCommaBindList _sym =
-      iBindListCommaBindList <$> pCommaBindList
-    pBindListOrBindList :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindListL)
-    pBindListOrBindList _sym =
-      iBindListOrBindList <$> pOrBindList
+    pUseDeclarationInternal0UseFun :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseFun =
+      UseDeclarationInternal0UseFun' <$> pUseFun
+    pUseDeclarationInternal0UseModule :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModule =
+      UseDeclarationInternal0UseModule' <$> pUseModule
+    pUseDeclarationInternal0UseModuleMember :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModuleMember =
+      UseDeclarationInternal0UseModuleMember' <$> pUseModuleMember
+    pUseDeclarationInternal0UseModuleMembers :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModuleMembers =
+      UseDeclarationInternal0UseModuleMembers' <$> pUseModuleMembers
 
-pHiddenBind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindL)
-pHiddenBind _sym = do
-  choice [ Megaparsec.try (pHiddenBindBindInternal0 _sym)
-         , Megaparsec.try (pHiddenBindBindUnpack _sym)
-         , Megaparsec.try (pHiddenBindAtBind _sym)
-         , Megaparsec.try (pHiddenBindLiteralValue _sym)
+pUseFun :: TermParser UseFunL
+pUseFun =
+  UseFun' <$> pBetween pFunTok pAsTok pModuleAccess <*> pPair (pPair pModuleAccess pFullStopTok) pHidFunctionIdentifier
+
+pHidFunctionIdentifier :: TermParser HidFunctionIdentifierL
+pHidFunctionIdentifier =
+  HidFunctionIdentifier' <$> pIdentifier
+
+pUseModule :: TermParser UseModuleL
+pUseModule =
+  UseModule' <$> pModuleIdentity <*> pMaybe (pPair pAsTok pHidModuleIdentifier)
+
+pUseModuleMember :: TermParser UseModuleMemberL
+pUseModuleMember =
+  UseModuleMember' <$> pModuleIdentity <*> pColonColonTok <*> pUseMember
+
+pUseMember :: TermParser UseMemberL
+pUseMember =
+  choice [ Megaparsec.try pUseMember1
+         , Megaparsec.try pUseMember2
+         , Megaparsec.try pUseMember3
          ]
   where
-    pHiddenBindBindInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindL)
-    pHiddenBindBindInternal0 _sym =
-      iHiddenBindBindInternal0 <$> (pHiddenBindInternal0 _sym)
-    pHiddenBindBindUnpack :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindL)
-    pHiddenBindBindUnpack _sym =
-      iHiddenBindBindUnpack <$> pBindUnpack
-    pHiddenBindAtBind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindL)
-    pHiddenBindAtBind _sym =
-      iHiddenBindAtBind <$> pAtBind
-    pHiddenBindLiteralValue :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindL)
-    pHiddenBindLiteralValue _sym =
-      iHiddenBindLiteralValue <$> (pHiddenLiteralValue _sym)
+    pUseMember1 :: Parser (MoveTerm UseMemberL)
+    pUseMember1 =
+      UseMember1' <$> pIdentifier <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+    pUseMember2 :: Parser (MoveTerm UseMemberL)
+    pUseMember2 =
+      UseMember2' <$> pIdentifier <*> pColonColonTok <*> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
+    pUseMember3 :: Parser (MoveTerm UseMemberL)
+    pUseMember3 =
+      UseMember3' <$> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
 
-pHiddenBindInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindInternal0L)
-pHiddenBindInternal0 _sym = do
-  choice [ Megaparsec.try (pHiddenBindInternal0MutBindVar _sym)
-         , Megaparsec.try (pHiddenBindInternal0VariableIdentifier _sym)
+pUseModuleMembers :: TermParser UseModuleMembersL
+pUseModuleMembers =
+  choice [ Megaparsec.try pUseModuleMembers1
+         , Megaparsec.try pUseModuleMembers2
          ]
   where
-    pHiddenBindInternal0MutBindVar :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindInternal0L)
-    pHiddenBindInternal0MutBindVar _sym =
-      iHiddenBindInternal0MutBindVar <$> pMutBindVar
-    pHiddenBindInternal0VariableIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenBindInternal0L)
-    pHiddenBindInternal0VariableIdentifier _sym =
-      iHiddenBindInternal0VariableIdentifier <$> (pHiddenVariableIdentifier _sym)
+    pUseModuleMembers1 :: Parser (MoveTerm UseModuleMembersL)
+    pUseModuleMembers1 =
+      UseModuleMembers1' <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+    pUseModuleMembers2 :: Parser (MoveTerm UseModuleMembersL)
+    pUseModuleMembers2 =
+      UseModuleMembers2' <$> pModuleIdentity <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
 
-pMutBindVar :: Parser (MoveTerm MutBindVarL)
-pMutBindVar = do
-  _sym <- pSymbol "mut_bind_var" SMutBindVarSymbol
-  iMutBindVar <$> pMutTok <*> (pHiddenVariableIdentifier _sym)
+pBreakExpression :: TermParser BreakExpressionL
+pBreakExpression =
+  BreakExpression' <$> pBreakTok <*> pMaybe pLabel <*> pMaybe pHidExpression
 
-pAtBind :: Parser (MoveTerm AtBindL)
-pAtBind = do
-  _sym <- pSymbol "at_bind" SAtBindSymbol
-  iAtBind <$> (pHiddenVariableIdentifier _sym) <*> pCommercialAtTok <*> pBindList
+pLabel :: TermParser LabelL
+pLabel =
+  Label' <$> pApostropheTok <*> pIdentifier
 
-pBindUnpack :: Parser (MoveTerm BindUnpackL)
-pBindUnpack = do
-  _sym <- pSymbol "bind_unpack" SBindUnpackSymbol
-  iBindUnpack <$> pNameExpression <*> pMaybe pBindFields
+pCallExpression :: TermParser CallExpressionL
+pCallExpression =
+  CallExpression' <$> pPair pNameExpression pArgList
 
-pBindFields :: Parser (MoveTerm BindFieldsL)
-pBindFields = do
-  _sym <- pSymbol "bind_fields" SBindFieldsSymbol
-  choice [ Megaparsec.try (pBindFieldsBindPositionalFields _sym)
-         , Megaparsec.try (pBindFieldsBindNamedFields _sym)
+pArgList :: TermParser ArgListL
+pArgList =
+  ArgList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidExpression pCommaTok)
+
+pContinueExpression :: TermParser ContinueExpressionL
+pContinueExpression =
+  ContinueExpression' <$> pContinueTok <*> pMaybe pLabel
+
+pDotExpression :: TermParser DotExpressionL
+pDotExpression =
+  DotExpression' <$> pPair (pPair pHidExpressionTerm pFullStopTok) pHidExpressionTerm
+
+pExpressionList :: TermParser ExpressionListL
+pExpressionList =
+  ExpressionList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy1 pHidExpression pCommaTok)
+
+pIfExpression :: TermParser IfExpressionL
+pIfExpression =
+  IfExpression' <$> pPair (pPair (pPair pIfTok (pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression)) pHidExpression) (pMaybe (pPair pElseTok pHidExpression))
+
+pIndexExpression :: TermParser IndexExpressionL
+pIndexExpression =
+  IndexExpression' <$> pPair pHidExpressionTerm (pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy pHidExpression pCommaTok))
+
+pMacroCallExpression :: TermParser MacroCallExpressionL
+pMacroCallExpression =
+  MacroCallExpression' <$> pMacroModuleAccess <*> pMaybe pTypeArguments <*> pArgList
+
+pMacroModuleAccess :: TermParser MacroModuleAccessL
+pMacroModuleAccess =
+  MacroModuleAccess' <$> pModuleAccess <*> pExclamationMarkTok
+
+pMatchExpression :: TermParser MatchExpressionL
+pMatchExpression =
+  MatchExpression' <$> pMatchTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression <*> pHidMatchBody
+
+pHidMatchBody :: TermParser HidMatchBodyL
+pHidMatchBody =
+  HidMatchBody' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pMatchArm pCommaTok)
+
+pMatchArm :: TermParser MatchArmL
+pMatchArm =
+  MatchArm' <$> pBindList <*> pMaybe pMatchCondition <*> pEqualsSignGreaterThanSignTok <*> pHidExpression
+
+pMatchCondition :: TermParser MatchConditionL
+pMatchCondition =
+  MatchCondition' <$> pIfTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression
+
+pPackExpression :: TermParser PackExpressionL
+pPackExpression =
+  PackExpression' <$> pNameExpression <*> pFieldInitializeList
+
+pFieldInitializeList :: TermParser FieldInitializeListL
+pFieldInitializeList =
+  FieldInitializeList' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pExpField pCommaTok)
+
+pExpField :: TermParser ExpFieldL
+pExpField =
+  ExpField' <$> pHidFieldIdentifier <*> pMaybe (pPair pColonTok pHidExpression)
+
+pHidFieldIdentifier :: TermParser HidFieldIdentifierL
+pHidFieldIdentifier =
+  HidFieldIdentifier' <$> pIdentifier
+
+pSpecBlock :: TermParser SpecBlockL
+pSpecBlock =
+  SpecBlock' <$> pSpecTok <*> (pSpecBlockInternal0 _sym)
+
+pSpecBlockInternal0 :: TermParser SpecBlockInternal0L
+pSpecBlockInternal0 =
+  choice [ Megaparsec.try pSpecBlockInternal01
+         , Megaparsec.try pSpecBlockInternal0HidSpecFunction
          ]
   where
-    pBindFieldsBindPositionalFields :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindFieldsL)
-    pBindFieldsBindPositionalFields _sym =
-      iBindFieldsBindPositionalFields <$> pBindPositionalFields
-    pBindFieldsBindNamedFields :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindFieldsL)
-    pBindFieldsBindNamedFields _sym =
-      iBindFieldsBindNamedFields <$> pBindNamedFields
+    pSpecBlockInternal01 :: Parser (MoveTerm SpecBlockInternal0L)
+    pSpecBlockInternal01 =
+      SpecBlockInternal01' <$> pMaybe pHidSpecBlockTarget <*> pSpecBody
+    pSpecBlockInternal0HidSpecFunction :: Parser (MoveTerm SpecBlockInternal0L)
+    pSpecBlockInternal0HidSpecFunction =
+      SpecBlockInternal0HidSpecFunction' <$> pHidSpecFunction
 
-pBindNamedFields :: Parser (MoveTerm BindNamedFieldsL)
-pBindNamedFields = do
-  _sym <- pSymbol "bind_named_fields" SBindNamedFieldsSymbol
-  iBindNamedFields <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
-
-pBindNamedFieldsInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindNamedFieldsInternal0L)
-pBindNamedFieldsInternal0 _sym = do
-  choice [ Megaparsec.try (pBindNamedFieldsInternal0BindField _sym)
-         , Megaparsec.try (pBindNamedFieldsInternal0MutBindField _sym)
+pHidSpecBlockTarget :: TermParser HidSpecBlockTargetL
+pHidSpecBlockTarget =
+  choice [ Megaparsec.try pHidSpecBlockTargetIdentifier
+         , Megaparsec.try pHidSpecBlockTargetModule
+         , Megaparsec.try pHidSpecBlockTargetSpecBlockTargetSchema
          ]
   where
-    pBindNamedFieldsInternal0BindField :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindNamedFieldsInternal0L)
-    pBindNamedFieldsInternal0BindField _sym =
-      iBindNamedFieldsInternal0BindField <$> pBindField
-    pBindNamedFieldsInternal0MutBindField :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindNamedFieldsInternal0L)
-    pBindNamedFieldsInternal0MutBindField _sym =
-      iBindNamedFieldsInternal0MutBindField <$> pMutBindField
+    pHidSpecBlockTargetIdentifier :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetIdentifier =
+      HidSpecBlockTargetIdentifier' <$> pIdentifier
+    pHidSpecBlockTargetModule :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetModule =
+      HidSpecBlockTargetModule' <$> pModuleTok
+    pHidSpecBlockTargetSpecBlockTargetSchema :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetSpecBlockTargetSchema =
+      HidSpecBlockTargetSpecBlockTargetSchema' <$> pSpecBlockTargetSchema
 
-pBindField :: Parser (MoveTerm BindFieldL)
-pBindField = do
-  _sym <- pSymbol "bind_field" SBindFieldSymbol
-  choice [ Megaparsec.try (pBindField1 _sym)
-         , Megaparsec.try (pBindFieldSpreadOperator _sym)
+pSpecBlockTargetSchema :: TermParser SpecBlockTargetSchemaL
+pSpecBlockTargetSchema =
+  SpecBlockTargetSchema' <$> pSchemaTok <*> pHidStructIdentifier <*> pMaybe pTypeParameters
+
+pHidStructIdentifier :: TermParser HidStructIdentifierL
+pHidStructIdentifier =
+  HidStructIdentifier' <$> pIdentifier
+
+pTypeParameters :: TermParser TypeParametersL
+pTypeParameters =
+  TypeParameters' <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 pTypeParameter pCommaTok)
+
+pTypeParameter :: TermParser TypeParameterL
+pTypeParameter =
+  TypeParameter' <$> pMaybe pDollarSignTok <*> pMaybe pPhantomTok <*> pHidTypeParameterIdentifier <*> pMaybe (pPair pColonTok (pSepBy1 pAbility pPlusSignTok))
+
+pAbility :: TermParser AbilityL
+pAbility =
+  choice [ Megaparsec.try pAbilityCopy
+         , Megaparsec.try pAbilityDrop
+         , Megaparsec.try pAbilityStore
+         , Megaparsec.try pAbilityKey
          ]
   where
-    pBindField1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindFieldL)
-    pBindField1 _sym =
-      iBindField1 <$> pBindList <*> pMaybe (pPair pColonTok pBindList)
-    pBindFieldSpreadOperator :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BindFieldL)
-    pBindFieldSpreadOperator _sym =
-      iBindFieldSpreadOperator <$> (pHiddenSpreadOperator _sym)
+    pAbilityCopy :: Parser (MoveTerm AbilityL)
+    pAbilityCopy =
+      AbilityCopy' <$> pCopyTok
+    pAbilityDrop :: Parser (MoveTerm AbilityL)
+    pAbilityDrop =
+      AbilityDrop' <$> pDropTok
+    pAbilityStore :: Parser (MoveTerm AbilityL)
+    pAbilityStore =
+      AbilityStore' <$> pStoreTok
+    pAbilityKey :: Parser (MoveTerm AbilityL)
+    pAbilityKey =
+      AbilityKey' <$> pKeyTok
 
-pHiddenSpreadOperator :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpreadOperatorL)
-pHiddenSpreadOperator _sym = do
-  iHiddenSpreadOperator <$> pFullStopFullStopTok
+pHidTypeParameterIdentifier :: TermParser HidTypeParameterIdentifierL
+pHidTypeParameterIdentifier =
+  HidTypeParameterIdentifier' <$> pIdentifier
 
-pMutBindField :: Parser (MoveTerm MutBindFieldL)
-pMutBindField = do
-  _sym <- pSymbol "mut_bind_field" SMutBindFieldSymbol
-  iMutBindField <$> pMutTok <*> pBindField
-
-pBindPositionalFields :: Parser (MoveTerm BindPositionalFieldsL)
-pBindPositionalFields = do
-  _sym <- pSymbol "bind_positional_fields" SBindPositionalFieldsSymbol
-  iBindPositionalFields <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
-
-pCommaBindList :: Parser (MoveTerm CommaBindListL)
-pCommaBindList = do
-  _sym <- pSymbol "comma_bind_list" SCommaBindListSymbol
-  iCommaBindList <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pHiddenBind _sym) pCommaTok)
-
-pOrBindList :: Parser (MoveTerm OrBindListL)
-pOrBindList = do
-  _sym <- pSymbol "or_bind_list" SOrBindListSymbol
-  let pBind = choice [ pHiddenBind _sym
-                     , between pLeftParenthesisTok pRightParenthesisTok (pHiddenBind _sym)
-                     ]
-      pInternal = pSepBy1 pBind pVerticalLineTok
-  iOrBindList
-    <$> choice [ Megaparsec.try pInternal
-               , between pLeftParenthesisTok pRightParenthesisTok pInternal
-               ]
-
-pMatchCondition :: Parser (MoveTerm MatchConditionL)
-pMatchCondition = do
-  _sym <- pSymbol "match_condition" SMatchConditionSymbol
-  iMatchCondition <$> pIfTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok (pHiddenExpression _sym)
-
-pPackExpression :: Parser (MoveTerm PackExpressionL)
-pPackExpression = do
-  _sym <- pSymbol "pack_expression" SPackExpressionSymbol
-  iPackExpression <$> pNameExpression <*> pFieldInitializeList
-
-pFieldInitializeList :: Parser (MoveTerm FieldInitializeListL)
-pFieldInitializeList = do
-  _sym <- pSymbol "field_initialize_list" SFieldInitializeListSymbol
-  iFieldInitializeList <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pExpField pCommaTok)
-
-pExpField :: Parser (MoveTerm ExpFieldL)
-pExpField = do
-  _sym <- pSymbol "exp_field" SExpFieldSymbol
-  iExpField <$> (pHiddenFieldIdentifier _sym) <*> pMaybe (pPair pColonTok (pHiddenExpression _sym))
-
-pSpecBlock :: Parser (MoveTerm SpecBlockL)
-pSpecBlock = do
-  _sym <- pSymbol "spec_block" SSpecBlockSymbol
-  iSpecBlock <$> pSpecTok <*> (pSpecBlockInternal0 _sym)
-
-pSpecBlockInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecBlockInternal0L)
-pSpecBlockInternal0 _sym = do
-  choice [ Megaparsec.try (pSpecBlockInternal01 _sym)
-         , Megaparsec.try (pSpecBlockInternal0SpecFunction _sym)
+pHidSpecFunction :: TermParser HidSpecFunctionL
+pHidSpecFunction =
+  choice [ Megaparsec.try pHidSpecFunctionNativeSpecFunction
+         , Megaparsec.try pHidSpecFunctionUsualSpecFunction
+         , Megaparsec.try pHidSpecFunctionUninterpretedSpecFunction
          ]
   where
-    pSpecBlockInternal01 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecBlockInternal0L)
-    pSpecBlockInternal01 _sym =
-      iSpecBlockInternal01 <$> pMaybe (pHiddenSpecBlockTarget _sym) <*> pSpecBody
-    pSpecBlockInternal0SpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecBlockInternal0L)
-    pSpecBlockInternal0SpecFunction _sym =
-      iSpecBlockInternal0SpecFunction <$> (pHiddenSpecFunction _sym)
+    pHidSpecFunctionNativeSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionNativeSpecFunction =
+      HidSpecFunctionNativeSpecFunction' <$> pNativeSpecFunction
+    pHidSpecFunctionUsualSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionUsualSpecFunction =
+      HidSpecFunctionUsualSpecFunction' <$> pUsualSpecFunction
+    pHidSpecFunctionUninterpretedSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionUninterpretedSpecFunction =
+      HidSpecFunctionUninterpretedSpecFunction' <$> pUninterpretedSpecFunction
 
-pHiddenSpecBlockTarget :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockTargetL)
-pHiddenSpecBlockTarget _sym = do
-  choice [ Megaparsec.try (pHiddenSpecBlockTargetIdentifier _sym)
-         , Megaparsec.try (pHiddenSpecBlockTargetModule _sym)
-         , Megaparsec.try (pHiddenSpecBlockTargetSpecBlockTargetSchema _sym)
+pNativeSpecFunction :: TermParser NativeSpecFunctionL
+pNativeSpecFunction =
+  NativeSpecFunction' <$> pNativeTok <*> pBetween pFunTok pSemicolonTok pHidSpecFunctionSignature
+
+pHidSpecFunctionSignature :: TermParser HidSpecFunctionSignatureL
+pHidSpecFunctionSignature =
+  HidSpecFunctionSignature' <$> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pRetType
+
+pFunctionParameters :: TermParser FunctionParametersL
+pFunctionParameters =
+  FunctionParameters' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pFunctionParametersInternal0 _sym) pCommaTok)
+
+pFunctionParametersInternal0 :: TermParser FunctionParametersInternal0L
+pFunctionParametersInternal0 =
+  choice [ Megaparsec.try pFunctionParametersInternal0MutFunctionParameter
+         , Megaparsec.try pFunctionParametersInternal0FunctionParameter
          ]
   where
-    pHiddenSpecBlockTargetIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockTargetL)
-    pHiddenSpecBlockTargetIdentifier _sym =
-      iHiddenSpecBlockTargetIdentifier <$> pIdentifier
-    pHiddenSpecBlockTargetModule :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockTargetL)
-    pHiddenSpecBlockTargetModule _sym =
-      iHiddenSpecBlockTargetModule <$> pModuleTok
-    pHiddenSpecBlockTargetSpecBlockTargetSchema :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockTargetL)
-    pHiddenSpecBlockTargetSpecBlockTargetSchema _sym =
-      iHiddenSpecBlockTargetSpecBlockTargetSchema <$> pSpecBlockTargetSchema
+    pFunctionParametersInternal0MutFunctionParameter :: Parser (MoveTerm FunctionParametersInternal0L)
+    pFunctionParametersInternal0MutFunctionParameter =
+      FunctionParametersInternal0MutFunctionParameter' <$> pMutFunctionParameter
+    pFunctionParametersInternal0FunctionParameter :: Parser (MoveTerm FunctionParametersInternal0L)
+    pFunctionParametersInternal0FunctionParameter =
+      FunctionParametersInternal0FunctionParameter' <$> pFunctionParameter
 
-pSpecBlockTargetSchema :: Parser (MoveTerm SpecBlockTargetSchemaL)
-pSpecBlockTargetSchema = do
-  _sym <- pSymbol "spec_block_target_schema" SSpecBlockTargetSchemaSymbol
-  iSpecBlockTargetSchema <$> pSchemaTok <*> (pHiddenStructIdentifier _sym) <*> pMaybe pTypeParameters
+pFunctionParameter :: TermParser FunctionParameterL
+pFunctionParameter =
+  FunctionParameter' <$> (pFunctionParameterInternal0 _sym) <*> pColonTok <*> pHidType
 
-pHiddenStructIdentifier :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenStructIdentifierL)
-pHiddenStructIdentifier _sym = do
-  iHiddenStructIdentifier <$> pIdentifier
-
-pHiddenSpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecFunctionL)
-pHiddenSpecFunction _sym = do
-  choice [ Megaparsec.try (pHiddenSpecFunctionNativeSpecFunction _sym)
-         , Megaparsec.try (pHiddenSpecFunctionUsualSpecFunction _sym)
-         , Megaparsec.try (pHiddenSpecFunctionUninterpretedSpecFunction _sym)
+pFunctionParameterInternal0 :: TermParser FunctionParameterInternal0L
+pFunctionParameterInternal0 =
+  choice [ Megaparsec.try pFunctionParameterInternal0Name
+         , Megaparsec.try pFunctionParameterInternal02
          ]
   where
-    pHiddenSpecFunctionNativeSpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecFunctionL)
-    pHiddenSpecFunctionNativeSpecFunction _sym =
-      iHiddenSpecFunctionNativeSpecFunction <$> pNativeSpecFunction
-    pHiddenSpecFunctionUsualSpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecFunctionL)
-    pHiddenSpecFunctionUsualSpecFunction _sym =
-      iHiddenSpecFunctionUsualSpecFunction <$> pUsualSpecFunction
-    pHiddenSpecFunctionUninterpretedSpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecFunctionL)
-    pHiddenSpecFunctionUninterpretedSpecFunction _sym =
-      iHiddenSpecFunctionUninterpretedSpecFunction <$> pUninterpretedSpecFunction
+    pFunctionParameterInternal0Name :: Parser (MoveTerm FunctionParameterInternal0L)
+    pFunctionParameterInternal0Name =
+      FunctionParameterInternal0Name' <$> pHidVariableIdentifier
+    pFunctionParameterInternal02 :: Parser (MoveTerm FunctionParameterInternal0L)
+    pFunctionParameterInternal02 =
+      FunctionParameterInternal02' <$> pDollarSignTok <*> pHidVariableIdentifier
 
-pNativeSpecFunction :: Parser (MoveTerm NativeSpecFunctionL)
-pNativeSpecFunction = do
-  _sym <- pSymbol "native_spec_function" SNativeSpecFunctionSymbol
-  iNativeSpecFunction <$> pNativeTok <*> pBetween pFunTok pSemicolonTok (pHiddenSpecFunctionSignature _sym)
+pMutFunctionParameter :: TermParser MutFunctionParameterL
+pMutFunctionParameter =
+  MutFunctionParameter' <$> pMutTok <*> pFunctionParameter
 
-pHiddenSpecFunctionSignature :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecFunctionSignatureL)
-pHiddenSpecFunctionSignature _sym = do
-  iHiddenSpecFunctionSignature <$> (pHiddenFunctionIdentifier _sym) <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pRetType
+pRetType :: TermParser RetTypeL
+pRetType =
+  RetType' <$> pColonTok <*> pHidType
 
-pUninterpretedSpecFunction :: Parser (MoveTerm UninterpretedSpecFunctionL)
-pUninterpretedSpecFunction = do
-  _sym <- pSymbol "uninterpreted_spec_function" SUninterpretedSpecFunctionSymbol
-  iUninterpretedSpecFunction <$> pBetween pFunTok pSemicolonTok (pHiddenSpecFunctionSignature _sym)
+pUninterpretedSpecFunction :: TermParser UninterpretedSpecFunctionL
+pUninterpretedSpecFunction =
+  UninterpretedSpecFunction' <$> pBetween pFunTok pSemicolonTok pHidSpecFunctionSignature
 
-pUsualSpecFunction :: Parser (MoveTerm UsualSpecFunctionL)
-pUsualSpecFunction = do
-  _sym <- pSymbol "usual_spec_function" SUsualSpecFunctionSymbol
-  iUsualSpecFunction <$> pFunTok <*> (pHiddenSpecFunctionSignature _sym) <*> pBlock
+pUsualSpecFunction :: TermParser UsualSpecFunctionL
+pUsualSpecFunction =
+  UsualSpecFunction' <$> pFunTok <*> pHidSpecFunctionSignature <*> pBlock
 
-pSpecBody :: Parser (MoveTerm SpecBodyL)
-pSpecBody = do
-  _sym <- pSymbol "spec_body" SSpecBodySymbol
-  iSpecBody <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany (pHiddenSpecBlockMemeber _sym) <*> pRightCurlyBracketTok
+pSpecBody :: TermParser SpecBodyL
+pSpecBody =
+  SpecBody' <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany pHidSpecBlockMemeber <*> pRightCurlyBracketTok
 
-pHiddenSpecBlockMemeber :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-pHiddenSpecBlockMemeber _sym = do
-  choice [ Megaparsec.try (pHiddenSpecBlockMemeberSpecInvariant _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecFunction _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecCondition _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecInclude _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecApply _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecPragma _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecVariable _sym)
-         , Megaparsec.try (pHiddenSpecBlockMemeberSpecLet _sym)
+pHidSpecBlockMemeber :: TermParser HidSpecBlockMemeberL
+pHidSpecBlockMemeber =
+  choice [ Megaparsec.try pHidSpecBlockMemeberSpecInvariant
+         , Megaparsec.try pHidSpecBlockMemeberHidSpecFunction
+         , Megaparsec.try pHidSpecBlockMemeberSpecCondition
+         , Megaparsec.try pHidSpecBlockMemeberSpecInclude
+         , Megaparsec.try pHidSpecBlockMemeberSpecApply
+         , Megaparsec.try pHidSpecBlockMemeberSpecPragma
+         , Megaparsec.try pHidSpecBlockMemeberSpecVariable
+         , Megaparsec.try pHidSpecBlockMemeberSpecLet
          ]
   where
-    pHiddenSpecBlockMemeberSpecInvariant :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecInvariant _sym =
-      iHiddenSpecBlockMemeberSpecInvariant <$> pSpecInvariant
-    pHiddenSpecBlockMemeberSpecFunction :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecFunction _sym =
-      iHiddenSpecBlockMemeberSpecFunction <$> (pHiddenSpecFunction _sym)
-    pHiddenSpecBlockMemeberSpecCondition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecCondition _sym =
-      iHiddenSpecBlockMemeberSpecCondition <$> pSpecCondition
-    pHiddenSpecBlockMemeberSpecInclude :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecInclude _sym =
-      iHiddenSpecBlockMemeberSpecInclude <$> pSpecInclude
-    pHiddenSpecBlockMemeberSpecApply :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecApply _sym =
-      iHiddenSpecBlockMemeberSpecApply <$> pSpecApply
-    pHiddenSpecBlockMemeberSpecPragma :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecPragma _sym =
-      iHiddenSpecBlockMemeberSpecPragma <$> pSpecPragma
-    pHiddenSpecBlockMemeberSpecVariable :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecVariable _sym =
-      iHiddenSpecBlockMemeberSpecVariable <$> pSpecVariable
-    pHiddenSpecBlockMemeberSpecLet :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecBlockMemeberL)
-    pHiddenSpecBlockMemeberSpecLet _sym =
-      iHiddenSpecBlockMemeberSpecLet <$> pSpecLet
+    pHidSpecBlockMemeberSpecInvariant :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecInvariant =
+      HidSpecBlockMemeberSpecInvariant' <$> pSpecInvariant
+    pHidSpecBlockMemeberHidSpecFunction :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberHidSpecFunction =
+      HidSpecBlockMemeberHidSpecFunction' <$> pHidSpecFunction
+    pHidSpecBlockMemeberSpecCondition :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecCondition =
+      HidSpecBlockMemeberSpecCondition' <$> pSpecCondition
+    pHidSpecBlockMemeberSpecInclude :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecInclude =
+      HidSpecBlockMemeberSpecInclude' <$> pSpecInclude
+    pHidSpecBlockMemeberSpecApply :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecApply =
+      HidSpecBlockMemeberSpecApply' <$> pSpecApply
+    pHidSpecBlockMemeberSpecPragma :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecPragma =
+      HidSpecBlockMemeberSpecPragma' <$> pSpecPragma
+    pHidSpecBlockMemeberSpecVariable :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecVariable =
+      HidSpecBlockMemeberSpecVariable' <$> pSpecVariable
+    pHidSpecBlockMemeberSpecLet :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecLet =
+      HidSpecBlockMemeberSpecLet' <$> pSpecLet
 
-pSpecApply :: Parser (MoveTerm SpecApplyL)
-pSpecApply = do
-  _sym <- pSymbol "spec_apply" SSpecApplySymbol
-  iSpecApply <$> pBetween pApplyTok pToTok (pHiddenExpression _sym) <*> pSepBy1 pSpecApplyPattern pCommaTok <*> pMaybe (pPair pExceptTok (pSepBy1 pSpecApplyPattern pCommaTok)) <*> pSemicolonTok
+pSpecApply :: TermParser SpecApplyL
+pSpecApply =
+  SpecApply' <$> pBetween pApplyTok pToTok pHidExpression <*> pSepBy1 pSpecApplyPattern pCommaTok <*> pMaybe (pPair pExceptTok (pSepBy1 pSpecApplyPattern pCommaTok)) <*> pSemicolonTok
 
-pSpecApplyPattern :: Parser (MoveTerm SpecApplyPatternL)
-pSpecApplyPattern = do
-  _sym <- pSymbol "spec_apply_pattern" SSpecApplyPatternSymbol
-  iSpecApplyPattern <$> pMaybe (pSpecApplyPatternInternal0 _sym) <*> pSpecApplyNamePattern <*> pMaybe pTypeParameters
+pSpecApplyPattern :: TermParser SpecApplyPatternL
+pSpecApplyPattern =
+  SpecApplyPattern' <$> pMaybe (pSpecApplyPatternInternal0 _sym) <*> pSpecApplyNamePattern <*> pMaybe pTypeParameters
 
-pSpecApplyNamePattern :: Parser (MoveTerm SpecApplyNamePatternL)
-pSpecApplyNamePattern = do
-  _sym <- pSymbol "spec_apply_name_pattern" SSpecApplyNamePatternSymbol
-  iSpecApplyNamePattern <$> pContent _sym
+pSpecApplyNamePattern :: TermParser SpecApplyNamePatternL
+pSpecApplyNamePattern =
+  SpecApplyNamePattern' <$> pContent _sym
 
-pSpecApplyPatternInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecApplyPatternInternal0L)
-pSpecApplyPatternInternal0 _sym = do
-  choice [ Megaparsec.try (pSpecApplyPatternInternal0Public _sym)
-         , Megaparsec.try (pSpecApplyPatternInternal0Internal _sym)
+pSpecApplyPatternInternal0 :: TermParser SpecApplyPatternInternal0L
+pSpecApplyPatternInternal0 =
+  choice [ Megaparsec.try pSpecApplyPatternInternal0Public
+         , Megaparsec.try pSpecApplyPatternInternal0Internal
          ]
   where
-    pSpecApplyPatternInternal0Public :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecApplyPatternInternal0L)
-    pSpecApplyPatternInternal0Public _sym =
-      iSpecApplyPatternInternal0Public <$> pPublicTok
-    pSpecApplyPatternInternal0Internal :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecApplyPatternInternal0L)
-    pSpecApplyPatternInternal0Internal _sym =
-      iSpecApplyPatternInternal0Internal <$> pInternalTok
+    pSpecApplyPatternInternal0Public :: Parser (MoveTerm SpecApplyPatternInternal0L)
+    pSpecApplyPatternInternal0Public =
+      SpecApplyPatternInternal0Public' <$> pPublicTok
+    pSpecApplyPatternInternal0Internal :: Parser (MoveTerm SpecApplyPatternInternal0L)
+    pSpecApplyPatternInternal0Internal =
+      SpecApplyPatternInternal0Internal' <$> pInternalTok
 
-pSpecCondition :: Parser (MoveTerm SpecConditionL)
-pSpecCondition = do
-  _sym <- pSymbol "spec_condition" SSpecConditionSymbol
-  choice [ Megaparsec.try (pSpecConditionSpecCondition _sym)
-         , Megaparsec.try (pSpecConditionSpecAbortIf _sym)
-         , Megaparsec.try (pSpecConditionSpecAbortWithOrModifies _sym)
+pSpecCondition :: TermParser SpecConditionL
+pSpecCondition =
+  choice [ Megaparsec.try pSpecConditionHidSpecCondition
+         , Megaparsec.try pSpecConditionHidSpecAbortIf
+         , Megaparsec.try pSpecConditionHidSpecAbortWithOrModifies
          ]
   where
-    pSpecConditionSpecCondition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecConditionL)
-    pSpecConditionSpecCondition _sym =
-      iSpecConditionSpecCondition <$> (pHiddenSpecCondition _sym)
-    pSpecConditionSpecAbortIf :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecConditionL)
-    pSpecConditionSpecAbortIf _sym =
-      iSpecConditionSpecAbortIf <$> (pHiddenSpecAbortIf _sym)
-    pSpecConditionSpecAbortWithOrModifies :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecConditionL)
-    pSpecConditionSpecAbortWithOrModifies _sym =
-      iSpecConditionSpecAbortWithOrModifies <$> (pHiddenSpecAbortWithOrModifies _sym)
+    pSpecConditionHidSpecCondition :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecCondition =
+      SpecConditionHidSpecCondition' <$> pHidSpecCondition
+    pSpecConditionHidSpecAbortIf :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecAbortIf =
+      SpecConditionHidSpecAbortIf' <$> pHidSpecAbortIf
+    pSpecConditionHidSpecAbortWithOrModifies :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecAbortWithOrModifies =
+      SpecConditionHidSpecAbortWithOrModifies' <$> pHidSpecAbortWithOrModifies
 
-pHiddenSpecAbortIf :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecAbortIfL)
-pHiddenSpecAbortIf _sym = do
-  iHiddenSpecAbortIf <$> pAbortsIfTok <*> pMaybe pConditionProperties <*> (pHiddenExpression _sym) <*> pMaybe (pPair pWithTok (pHiddenExpression _sym)) <*> pSemicolonTok
+pHidSpecAbortIf :: TermParser HidSpecAbortIfL
+pHidSpecAbortIf =
+  HidSpecAbortIf' <$> pAbortsIfTok <*> pMaybe pConditionProperties <*> pHidExpression <*> pMaybe (pPair pWithTok pHidExpression) <*> pSemicolonTok
 
-pConditionProperties :: Parser (MoveTerm ConditionPropertiesL)
-pConditionProperties = do
-  _sym <- pSymbol "condition_properties" SConditionPropertiesSymbol
-  iConditionProperties <$> pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy pSpecProperty pCommaTok)
+pConditionProperties :: TermParser ConditionPropertiesL
+pConditionProperties =
+  ConditionProperties' <$> pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy pSpecProperty pCommaTok)
 
-pSpecProperty :: Parser (MoveTerm SpecPropertyL)
-pSpecProperty = do
-  _sym <- pSymbol "spec_property" SSpecPropertySymbol
-  iSpecProperty <$> pIdentifier <*> pMaybe (pPair pEqualsSignTok (pHiddenLiteralValue _sym))
+pSpecProperty :: TermParser SpecPropertyL
+pSpecProperty =
+  SpecProperty' <$> pIdentifier <*> pMaybe (pPair pEqualsSignTok pHidLiteralValue)
 
-pHiddenSpecAbortWithOrModifies :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecAbortWithOrModifiesL)
-pHiddenSpecAbortWithOrModifies _sym = do
-  iHiddenSpecAbortWithOrModifies <$> (pHiddenSpecAbortWithOrModifiesInternal0 _sym) <*> pMaybe pConditionProperties <*> pSepBy1 (pHiddenExpression _sym) pCommaTok <*> pSemicolonTok
+pHidSpecAbortWithOrModifies :: TermParser HidSpecAbortWithOrModifiesL
+pHidSpecAbortWithOrModifies =
+  HidSpecAbortWithOrModifies' <$> (pHidSpecAbortWithOrModifiesInternal0 _sym) <*> pMaybe pConditionProperties <*> pSepBy1 pHidExpression pCommaTok <*> pSemicolonTok
 
-pHiddenSpecAbortWithOrModifiesInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecAbortWithOrModifiesInternal0L)
-pHiddenSpecAbortWithOrModifiesInternal0 _sym = do
-  choice [ Megaparsec.try (pHiddenSpecAbortWithOrModifiesInternal0AbortsWith _sym)
-         , Megaparsec.try (pHiddenSpecAbortWithOrModifiesInternal0Modifies _sym)
+pHidSpecAbortWithOrModifiesInternal0 :: TermParser HidSpecAbortWithOrModifiesInternal0L
+pHidSpecAbortWithOrModifiesInternal0 =
+  choice [ Megaparsec.try pHidSpecAbortWithOrModifiesInternal0AbortsWith
+         , Megaparsec.try pHidSpecAbortWithOrModifiesInternal0Modifies
          ]
   where
-    pHiddenSpecAbortWithOrModifiesInternal0AbortsWith :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecAbortWithOrModifiesInternal0L)
-    pHiddenSpecAbortWithOrModifiesInternal0AbortsWith _sym =
-      iHiddenSpecAbortWithOrModifiesInternal0AbortsWith <$> pAbortsWithTok
-    pHiddenSpecAbortWithOrModifiesInternal0Modifies :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecAbortWithOrModifiesInternal0L)
-    pHiddenSpecAbortWithOrModifiesInternal0Modifies _sym =
-      iHiddenSpecAbortWithOrModifiesInternal0Modifies <$> pModifiesTok
+    pHidSpecAbortWithOrModifiesInternal0AbortsWith :: Parser (MoveTerm HidSpecAbortWithOrModifiesInternal0L)
+    pHidSpecAbortWithOrModifiesInternal0AbortsWith =
+      HidSpecAbortWithOrModifiesInternal0AbortsWith' <$> pAbortsWithTok
+    pHidSpecAbortWithOrModifiesInternal0Modifies :: Parser (MoveTerm HidSpecAbortWithOrModifiesInternal0L)
+    pHidSpecAbortWithOrModifiesInternal0Modifies =
+      HidSpecAbortWithOrModifiesInternal0Modifies' <$> pModifiesTok
 
-pHiddenSpecCondition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionL)
-pHiddenSpecCondition _sym = do
-  iHiddenSpecCondition <$> (pHiddenSpecConditionInternal0 _sym) <*> pMaybe pConditionProperties <*> (pHiddenExpression _sym) <*> pSemicolonTok
+pHidSpecCondition :: TermParser HidSpecConditionL
+pHidSpecCondition =
+  HidSpecCondition' <$> (pHidSpecConditionInternal0 _sym) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
 
-pHiddenSpecConditionInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionInternal0L)
-pHiddenSpecConditionInternal0 _sym = do
-  choice [ Megaparsec.try (pHiddenSpecConditionInternal0Kind _sym)
-         , Megaparsec.try (pHiddenSpecConditionInternal02 _sym)
+pHidSpecConditionInternal0 :: TermParser HidSpecConditionInternal0L
+pHidSpecConditionInternal0 =
+  choice [ Megaparsec.try pHidSpecConditionInternal0Kind
+         , Megaparsec.try pHidSpecConditionInternal02
          ]
   where
-    pHiddenSpecConditionInternal0Kind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionInternal0L)
-    pHiddenSpecConditionInternal0Kind _sym =
-      iHiddenSpecConditionInternal0Kind <$> (pHiddenSpecConditionKind _sym)
-    pHiddenSpecConditionInternal02 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionInternal0L)
-    pHiddenSpecConditionInternal02 _sym =
-      iHiddenSpecConditionInternal02 <$> pRequiresTok <*> pMaybe pModuleTok
+    pHidSpecConditionInternal0Kind :: Parser (MoveTerm HidSpecConditionInternal0L)
+    pHidSpecConditionInternal0Kind =
+      HidSpecConditionInternal0Kind' <$> pHidSpecConditionKind
+    pHidSpecConditionInternal02 :: Parser (MoveTerm HidSpecConditionInternal0L)
+    pHidSpecConditionInternal02 =
+      HidSpecConditionInternal02' <$> pRequiresTok <*> pMaybe pModuleTok
 
-pHiddenSpecConditionKind :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-pHiddenSpecConditionKind _sym = do
-  choice [ Megaparsec.try (pHiddenSpecConditionKindAssert _sym)
-         , Megaparsec.try (pHiddenSpecConditionKindAssume _sym)
-         , Megaparsec.try (pHiddenSpecConditionKindDecreases _sym)
-         , Megaparsec.try (pHiddenSpecConditionKindEnsures _sym)
-         , Megaparsec.try (pHiddenSpecConditionKindSucceedsIf _sym)
+pHidSpecConditionKind :: TermParser HidSpecConditionKindL
+pHidSpecConditionKind =
+  choice [ Megaparsec.try pHidSpecConditionKindAssert
+         , Megaparsec.try pHidSpecConditionKindAssume
+         , Megaparsec.try pHidSpecConditionKindDecreases
+         , Megaparsec.try pHidSpecConditionKindEnsures
+         , Megaparsec.try pHidSpecConditionKindSucceedsIf
          ]
   where
-    pHiddenSpecConditionKindAssert :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-    pHiddenSpecConditionKindAssert _sym =
-      iHiddenSpecConditionKindAssert <$> pAssertTok
-    pHiddenSpecConditionKindAssume :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-    pHiddenSpecConditionKindAssume _sym =
-      iHiddenSpecConditionKindAssume <$> pAssumeTok
-    pHiddenSpecConditionKindDecreases :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-    pHiddenSpecConditionKindDecreases _sym =
-      iHiddenSpecConditionKindDecreases <$> pDecreasesTok
-    pHiddenSpecConditionKindEnsures :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-    pHiddenSpecConditionKindEnsures _sym =
-      iHiddenSpecConditionKindEnsures <$> pEnsuresTok
-    pHiddenSpecConditionKindSucceedsIf :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenSpecConditionKindL)
-    pHiddenSpecConditionKindSucceedsIf _sym =
-      iHiddenSpecConditionKindSucceedsIf <$> pSucceedsIfTok
+    pHidSpecConditionKindAssert :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindAssert =
+      HidSpecConditionKindAssert' <$> pAssertTok
+    pHidSpecConditionKindAssume :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindAssume =
+      HidSpecConditionKindAssume' <$> pAssumeTok
+    pHidSpecConditionKindDecreases :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindDecreases =
+      HidSpecConditionKindDecreases' <$> pDecreasesTok
+    pHidSpecConditionKindEnsures :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindEnsures =
+      HidSpecConditionKindEnsures' <$> pEnsuresTok
+    pHidSpecConditionKindSucceedsIf :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindSucceedsIf =
+      HidSpecConditionKindSucceedsIf' <$> pSucceedsIfTok
 
-pSpecInclude :: Parser (MoveTerm SpecIncludeL)
-pSpecInclude = do
-  _sym <- pSymbol "spec_include" SSpecIncludeSymbol
-  iSpecInclude <$> pBetween pIncludeTok pSemicolonTok (pHiddenExpression _sym)
+pSpecInclude :: TermParser SpecIncludeL
+pSpecInclude =
+  SpecInclude' <$> pBetween pIncludeTok pSemicolonTok pHidExpression
 
-pSpecInvariant :: Parser (MoveTerm SpecInvariantL)
-pSpecInvariant = do
-  _sym <- pSymbol "spec_invariant" SSpecInvariantSymbol
-  iSpecInvariant <$> pInvariantTok <*> pMaybe (pSpecInvariantInternal0 _sym) <*> pMaybe pConditionProperties <*> (pHiddenExpression _sym) <*> pSemicolonTok
+pSpecInvariant :: TermParser SpecInvariantL
+pSpecInvariant =
+  SpecInvariant' <$> pInvariantTok <*> pMaybe (pSpecInvariantInternal0 _sym) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
 
-pSpecInvariantInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecInvariantInternal0L)
-pSpecInvariantInternal0 _sym = do
-  choice [ Megaparsec.try (pSpecInvariantInternal0Update _sym)
-         , Megaparsec.try (pSpecInvariantInternal0Pack _sym)
-         , Megaparsec.try (pSpecInvariantInternal0Unpack _sym)
-         , Megaparsec.try (pSpecInvariantInternal0Module _sym)
+pSpecInvariantInternal0 :: TermParser SpecInvariantInternal0L
+pSpecInvariantInternal0 =
+  choice [ Megaparsec.try pSpecInvariantInternal0Update
+         , Megaparsec.try pSpecInvariantInternal0Pack
+         , Megaparsec.try pSpecInvariantInternal0Unpack
+         , Megaparsec.try pSpecInvariantInternal0Module
          ]
   where
-    pSpecInvariantInternal0Update :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecInvariantInternal0L)
-    pSpecInvariantInternal0Update _sym =
-      iSpecInvariantInternal0Update <$> pUpdateTok
-    pSpecInvariantInternal0Pack :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecInvariantInternal0L)
-    pSpecInvariantInternal0Pack _sym =
-      iSpecInvariantInternal0Pack <$> pPackTok
-    pSpecInvariantInternal0Unpack :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecInvariantInternal0L)
-    pSpecInvariantInternal0Unpack _sym =
-      iSpecInvariantInternal0Unpack <$> pUnpackTok
-    pSpecInvariantInternal0Module :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecInvariantInternal0L)
-    pSpecInvariantInternal0Module _sym =
-      iSpecInvariantInternal0Module <$> pModuleTok
+    pSpecInvariantInternal0Update :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Update =
+      SpecInvariantInternal0Update' <$> pUpdateTok
+    pSpecInvariantInternal0Pack :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Pack =
+      SpecInvariantInternal0Pack' <$> pPackTok
+    pSpecInvariantInternal0Unpack :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Unpack =
+      SpecInvariantInternal0Unpack' <$> pUnpackTok
+    pSpecInvariantInternal0Module :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Module =
+      SpecInvariantInternal0Module' <$> pModuleTok
 
-pSpecLet :: Parser (MoveTerm SpecLetL)
-pSpecLet = do
-  _sym <- pSymbol "spec_let" SSpecLetSymbol
-  iSpecLet <$> pLetTok <*> pMaybe pPostTok <*> pIdentifier <*> pBetween pEqualsSignTok pSemicolonTok (pHiddenExpression _sym)
+pSpecLet :: TermParser SpecLetL
+pSpecLet =
+  SpecLet' <$> pLetTok <*> pMaybe pPostTok <*> pIdentifier <*> pBetween pEqualsSignTok pSemicolonTok pHidExpression
 
-pSpecPragma :: Parser (MoveTerm SpecPragmaL)
-pSpecPragma = do
-  _sym <- pSymbol "spec_pragma" SSpecPragmaSymbol
-  iSpecPragma <$> pBetween pPragmaTok pSemicolonTok (pSepBy pSpecProperty pCommaTok)
+pSpecPragma :: TermParser SpecPragmaL
+pSpecPragma =
+  SpecPragma' <$> pBetween pPragmaTok pSemicolonTok (pSepBy pSpecProperty pCommaTok)
 
-pSpecVariable :: Parser (MoveTerm SpecVariableL)
-pSpecVariable = do
-  _sym <- pSymbol "spec_variable" SSpecVariableSymbol
-  iSpecVariable <$> pMaybe (pSpecVariableInternal0 _sym) <*> pIdentifier <*> pMaybe pTypeParameters <*> pBetween pColonTok pSemicolonTok (pHiddenType _sym)
+pSpecVariable :: TermParser SpecVariableL
+pSpecVariable =
+  SpecVariable' <$> pMaybe (pSpecVariableInternal0 _sym) <*> pIdentifier <*> pMaybe pTypeParameters <*> pBetween pColonTok pSemicolonTok pHidType
 
-pSpecVariableInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecVariableInternal0L)
-pSpecVariableInternal0 _sym = do
-  choice [ Megaparsec.try (pSpecVariableInternal0Global _sym)
-         , Megaparsec.try (pSpecVariableInternal0Local _sym)
+pSpecVariableInternal0 :: TermParser SpecVariableInternal0L
+pSpecVariableInternal0 =
+  choice [ Megaparsec.try pSpecVariableInternal0Global
+         , Megaparsec.try pSpecVariableInternal0Local
          ]
   where
-    pSpecVariableInternal0Global :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecVariableInternal0L)
-    pSpecVariableInternal0Global _sym =
-      iSpecVariableInternal0Global <$> pGlobalTok
-    pSpecVariableInternal0Local :: Cubix.TreeSitter.Token a -> Parser (MoveTerm SpecVariableInternal0L)
-    pSpecVariableInternal0Local _sym =
-      iSpecVariableInternal0Local <$> pLocalTok
+    pSpecVariableInternal0Global :: Parser (MoveTerm SpecVariableInternal0L)
+    pSpecVariableInternal0Global =
+      SpecVariableInternal0Global' <$> pGlobalTok
+    pSpecVariableInternal0Local :: Parser (MoveTerm SpecVariableInternal0L)
+    pSpecVariableInternal0Local =
+      SpecVariableInternal0Local' <$> pLocalTok
 
-pUseDeclaration :: Parser (MoveTerm UseDeclarationL)
-pUseDeclaration = do
-  _sym <- pSymbol "use_declaration" SUseDeclarationSymbol
-  iUseDeclaration <$> pMaybe pPublicTok <*> pBetween pUseTok pSemicolonTok (pUseDeclarationInternal0 _sym)
+pUnitExpression :: TermParser UnitExpressionL
+pUnitExpression =
+  UnitExpression' <$> pLeftParenthesisTok <*> pRightParenthesisTok
 
-pUseDeclarationInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseDeclarationInternal0L)
-pUseDeclarationInternal0 _sym = do
-  choice [ Megaparsec.try (pUseDeclarationInternal0UseFun _sym)
-         , Megaparsec.try (pUseDeclarationInternal0UseModule _sym)
-         , Megaparsec.try (pUseDeclarationInternal0UseModuleMember _sym)
-         , Megaparsec.try (pUseDeclarationInternal0UseModuleMembers _sym)
+pVectorExpression :: TermParser VectorExpressionL
+pVectorExpression =
+  VectorExpression' <$> (pVectorExpressionInternal0 _sym) <*> pSepBy pHidExpression pCommaTok <*> pRightSquareBracketTok
+
+pVectorExpressionInternal0 :: TermParser VectorExpressionInternal0L
+pVectorExpressionInternal0 =
+  choice [ Megaparsec.try pVectorExpressionInternal0VectorLeftSquareBracket
+         , Megaparsec.try pVectorExpressionInternal02
          ]
   where
-    pUseDeclarationInternal0UseFun :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseDeclarationInternal0L)
-    pUseDeclarationInternal0UseFun _sym =
-      iUseDeclarationInternal0UseFun <$> pUseFun
-    pUseDeclarationInternal0UseModule :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseDeclarationInternal0L)
-    pUseDeclarationInternal0UseModule _sym =
-      iUseDeclarationInternal0UseModule <$> pUseModule
-    pUseDeclarationInternal0UseModuleMember :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseDeclarationInternal0L)
-    pUseDeclarationInternal0UseModuleMember _sym =
-      iUseDeclarationInternal0UseModuleMember <$> pUseModuleMember
-    pUseDeclarationInternal0UseModuleMembers :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseDeclarationInternal0L)
-    pUseDeclarationInternal0UseModuleMembers _sym =
-      iUseDeclarationInternal0UseModuleMembers <$> pUseModuleMembers
+    pVectorExpressionInternal0VectorLeftSquareBracket :: Parser (MoveTerm VectorExpressionInternal0L)
+    pVectorExpressionInternal0VectorLeftSquareBracket =
+      VectorExpressionInternal0VectorLeftSquareBracket' <$> pVectorLeftSquareBracketTok
+    pVectorExpressionInternal02 :: Parser (MoveTerm VectorExpressionInternal0L)
+    pVectorExpressionInternal02 =
+      VectorExpressionInternal02' <$> pBetween pVectorLessThanSignTok pGreaterThanSignTok (pSepBy1 pHidType pCommaTok) <*> pLeftSquareBracketTok
 
-pUseFun :: Parser (MoveTerm UseFunL)
-pUseFun = do
-  _sym <- pSymbol "use_fun" SUseFunSymbol
-  iUseFun <$> pBetween pFunTok pAsTok pModuleAccess <*> pPair (pPair pModuleAccess pFullStopTok) (pHiddenFunctionIdentifier _sym)
+pMoveOrCopyExpression :: TermParser MoveOrCopyExpressionL
+pMoveOrCopyExpression =
+  MoveOrCopyExpression' <$> pPair (pMoveOrCopyExpressionInternal0 _sym) pHidExpression
 
-pUseModule :: Parser (MoveTerm UseModuleL)
-pUseModule = do
-  _sym <- pSymbol "use_module" SUseModuleSymbol
-  iUseModule <$> pModuleIdentity <*> pMaybe (pPair pAsTok (pHiddenModuleIdentifier _sym))
-
-pUseModuleMember :: Parser (MoveTerm UseModuleMemberL)
-pUseModuleMember = do
-  _sym <- pSymbol "use_module_member" SUseModuleMemberSymbol
-  iUseModuleMember <$> pModuleIdentity <*> pColonColonTok <*> pUseMember
-
-pUseMember :: Parser (MoveTerm UseMemberL)
-pUseMember = do
-  _sym <- pSymbol "use_member" SUseMemberSymbol
-  choice [ Megaparsec.try (pUseMember1 _sym)
-         , Megaparsec.try (pUseMember2 _sym)
-         , Megaparsec.try (pUseMember3 _sym)
+pMoveOrCopyExpressionInternal0 :: TermParser MoveOrCopyExpressionInternal0L
+pMoveOrCopyExpressionInternal0 =
+  choice [ Megaparsec.try pMoveOrCopyExpressionInternal0Move
+         , Megaparsec.try pMoveOrCopyExpressionInternal0Copy
          ]
   where
-    pUseMember1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseMemberL)
-    pUseMember1 _sym =
-      iUseMember1 <$> pIdentifier <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
-    pUseMember2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseMemberL)
-    pUseMember2 _sym =
-      iUseMember2 <$> pIdentifier <*> pColonColonTok <*> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
-    pUseMember3 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseMemberL)
-    pUseMember3 _sym =
-      iUseMember3 <$> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
+    pMoveOrCopyExpressionInternal0Move :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
+    pMoveOrCopyExpressionInternal0Move =
+      MoveOrCopyExpressionInternal0Move' <$> pMoveTok
+    pMoveOrCopyExpressionInternal0Copy :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
+    pMoveOrCopyExpressionInternal0Copy =
+      MoveOrCopyExpressionInternal0Copy' <$> pCopyTok
 
-pUseModuleMembers :: Parser (MoveTerm UseModuleMembersL)
-pUseModuleMembers = do
-  _sym <- pSymbol "use_module_members" SUseModuleMembersSymbol
-  choice [ Megaparsec.try (pUseModuleMembers1 _sym)
-         , Megaparsec.try (pUseModuleMembers2 _sym)
+pUnaryExpression :: TermParser UnaryExpressionL
+pUnaryExpression =
+  UnaryExpression' <$> pUnaryOp <*> pHidExpression
+
+pUnaryOp :: TermParser UnaryOpL
+pUnaryOp =
+  UnaryOp' <$> pExclamationMarkTok
+
+pBinaryExpression :: TermParser BinaryExpressionL
+pBinaryExpression =
+  choice [ Megaparsec.try pBinaryExpression1
+         , Megaparsec.try pBinaryExpression2
+         , Megaparsec.try pBinaryExpression3
+         , Megaparsec.try pBinaryExpression4
+         , Megaparsec.try pBinaryExpression5
+         , Megaparsec.try pBinaryExpression6
+         , Megaparsec.try pBinaryExpression7
+         , Megaparsec.try pBinaryExpression8
+         , Megaparsec.try pBinaryExpression9
+         , Megaparsec.try pBinaryExpression10
+         , Megaparsec.try pBinaryExpression11
+         , Megaparsec.try pBinaryExpression12
+         , Megaparsec.try pBinaryExpression13
+         , Megaparsec.try pBinaryExpression14
+         , Megaparsec.try pBinaryExpression15
+         , Megaparsec.try pBinaryExpression16
+         , Megaparsec.try pBinaryExpression17
+         , Megaparsec.try pBinaryExpression18
+         , Megaparsec.try pBinaryExpression19
+         , Megaparsec.try pBinaryExpression20
          ]
   where
-    pUseModuleMembers1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseModuleMembersL)
-    pUseModuleMembers1 _sym =
-      iUseModuleMembers1 <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
-    pUseModuleMembers2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm UseModuleMembersL)
-    pUseModuleMembers2 _sym =
-      iUseModuleMembers2 <$> pModuleIdentity <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+    pBinaryExpression1 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression1 =
+      BinaryExpression1' <$> pHidExpression <*> pEqualsSignEqualsSignGreaterThanSignTok <*> pHidExpression
+    pBinaryExpression2 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression2 =
+      BinaryExpression2' <$> pHidExpression <*> pVerticalLineVerticalLineTok <*> pHidExpression
+    pBinaryExpression3 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression3 =
+      BinaryExpression3' <$> pHidExpression <*> pAmpersandAmpersandTok <*> pHidExpression
+    pBinaryExpression4 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression4 =
+      BinaryExpression4' <$> pHidExpression <*> pEqualsSignEqualsSignTok <*> pHidExpression
+    pBinaryExpression5 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression5 =
+      BinaryExpression5' <$> pHidExpression <*> pExclamationMarkEqualsSignTok <*> pHidExpression
+    pBinaryExpression6 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression6 =
+      BinaryExpression6' <$> pHidExpression <*> pLessThanSignTok <*> pHidExpression
+    pBinaryExpression7 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression7 =
+      BinaryExpression7' <$> pHidExpression <*> pGreaterThanSignTok <*> pHidExpression
+    pBinaryExpression8 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression8 =
+      BinaryExpression8' <$> pHidExpression <*> pLessThanSignEqualsSignTok <*> pHidExpression
+    pBinaryExpression9 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression9 =
+      BinaryExpression9' <$> pHidExpression <*> pGreaterThanSignEqualsSignTok <*> pHidExpression
+    pBinaryExpression10 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression10 =
+      BinaryExpression10' <$> pHidExpression <*> pFullStopFullStopTok <*> pHidExpression
+    pBinaryExpression11 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression11 =
+      BinaryExpression11' <$> pHidExpression <*> pVerticalLineTok <*> pHidExpression
+    pBinaryExpression12 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression12 =
+      BinaryExpression12' <$> pHidExpression <*> pCircumflexAccentTok <*> pHidExpression
+    pBinaryExpression13 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression13 =
+      BinaryExpression13' <$> pHidExpression <*> pAmpersandTok <*> pHidExpression
+    pBinaryExpression14 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression14 =
+      BinaryExpression14' <$> pHidExpression <*> pLessThanSignLessThanSignTok <*> pHidExpression
+    pBinaryExpression15 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression15 =
+      BinaryExpression15' <$> pHidExpression <*> pGreaterThanSignGreaterThanSignTok <*> pHidExpression
+    pBinaryExpression16 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression16 =
+      BinaryExpression16' <$> pHidExpression <*> pPlusSignTok <*> pHidExpression
+    pBinaryExpression17 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression17 =
+      BinaryExpression17' <$> pHidExpression <*> pHyphenMinusTok <*> pHidExpression
+    pBinaryExpression18 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression18 =
+      BinaryExpression18' <$> pHidExpression <*> pAsteriskTok <*> pHidExpression
+    pBinaryExpression19 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression19 =
+      BinaryExpression19' <$> pHidExpression <*> pSolidusTok <*> pHidExpression
+    pBinaryExpression20 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression20 =
+      BinaryExpression20' <$> pHidExpression <*> pPercentSignTok <*> pHidExpression
 
-pUnitExpression :: Parser (MoveTerm UnitExpressionL)
-pUnitExpression = do
-  _sym <- pSymbol "unit_expression" SUnitExpressionSymbol
-  iUnitExpression <$> pLeftParenthesisTok <*> pRightParenthesisTok
+pCastExpression :: TermParser CastExpressionL
+pCastExpression =
+  CastExpression' <$> pPair (pPair pHidExpression pAsTok) pHidType
 
-pVectorExpression :: Parser (MoveTerm VectorExpressionL)
-pVectorExpression = do
-  _sym <- pSymbol "vector_expression" SVectorExpressionSymbol
-  iVectorExpression <$> (pVectorExpressionInternal0 _sym) <*> pSepBy (pHiddenExpression _sym) pCommaTok <*> pRightSquareBracketTok
+pIdentifiedExpression :: TermParser IdentifiedExpressionL
+pIdentifiedExpression =
+  IdentifiedExpression' <$> pBlockIdentifier <*> pHidExpression
 
-pVectorExpressionInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm VectorExpressionInternal0L)
-pVectorExpressionInternal0 _sym = do
-  choice [ Megaparsec.try (pVectorExpressionInternal0VectorLeftSquareBracket _sym)
-         , Megaparsec.try (pVectorExpressionInternal02 _sym)
+pBlockIdentifier :: TermParser BlockIdentifierL
+pBlockIdentifier =
+  BlockIdentifier' <$> pLabel <*> pColonTok
+
+pLambdaExpression :: TermParser LambdaExpressionL
+pLambdaExpression =
+  LambdaExpression' <$> pLambdaBindings <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok pHidType) <*> pHidExpression
+
+pLambdaBindings :: TermParser LambdaBindingsL
+pLambdaBindings =
+  LambdaBindings' <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy pLambdaBinding pCommaTok)
+
+pLambdaBinding :: TermParser LambdaBindingL
+pLambdaBinding =
+  choice [ Megaparsec.try pLambdaBindingCommaBindList
+         , Megaparsec.try pLambdaBinding2
          ]
   where
-    pVectorExpressionInternal0VectorLeftSquareBracket :: Cubix.TreeSitter.Token a -> Parser (MoveTerm VectorExpressionInternal0L)
-    pVectorExpressionInternal0VectorLeftSquareBracket _sym =
-      iVectorExpressionInternal0VectorLeftSquareBracket <$> pVectorLeftSquareBracketTok
-    pVectorExpressionInternal02 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm VectorExpressionInternal0L)
-    pVectorExpressionInternal02 _sym =
-      iVectorExpressionInternal02 <$> pBetween pVectorLessThanSignTok pGreaterThanSignTok (pSepBy1 (pHiddenType _sym) pCommaTok) <*> pLeftSquareBracketTok
+    pLambdaBindingCommaBindList :: Parser (MoveTerm LambdaBindingL)
+    pLambdaBindingCommaBindList =
+      LambdaBindingCommaBindList' <$> pCommaBindList
+    pLambdaBinding2 :: Parser (MoveTerm LambdaBindingL)
+    pLambdaBinding2 =
+      LambdaBinding2' <$> pHidBind <*> pMaybe (pPair pColonTok pHidType)
 
-pBorrowExpression :: Parser (MoveTerm BorrowExpressionL)
-pBorrowExpression = do
-  _sym <- pSymbol "borrow_expression" SBorrowExpressionSymbol
-  iBorrowExpression <$> pPair (pHiddenReference _sym) (pHiddenExpression _sym)
+pLoopExpression :: TermParser LoopExpressionL
+pLoopExpression =
+  LoopExpression' <$> pLoopTok <*> pHidExpression
 
-pDereferenceExpression :: Parser (MoveTerm DereferenceExpressionL)
-pDereferenceExpression = do
-  _sym <- pSymbol "dereference_expression" SDereferenceExpressionSymbol
-  iDereferenceExpression <$> pPair pAsteriskTok (pHiddenExpression _sym)
+pQuantifierExpression :: TermParser QuantifierExpressionL
+pQuantifierExpression =
+  QuantifierExpression' <$> pPair (pPair (pPair (pPair pHidReservedIdentifier pQuantifierBindings) (pMaybe (pPair pWhereTok pHidExpression))) pColonTok) pHidExpression
 
-pMoveOrCopyExpression :: Parser (MoveTerm MoveOrCopyExpressionL)
-pMoveOrCopyExpression = do
-  _sym <- pSymbol "move_or_copy_expression" SMoveOrCopyExpressionSymbol
-  iMoveOrCopyExpression <$> pPair (pMoveOrCopyExpressionInternal0 _sym) (pHiddenExpression _sym)
+pQuantifierBindings :: TermParser QuantifierBindingsL
+pQuantifierBindings =
+  QuantifierBindings' <$> pSepBy1 pQuantifierBinding pCommaTok
 
-pMoveOrCopyExpressionInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm MoveOrCopyExpressionInternal0L)
-pMoveOrCopyExpressionInternal0 _sym = do
-  choice [ Megaparsec.try (pMoveOrCopyExpressionInternal0Move _sym)
-         , Megaparsec.try (pMoveOrCopyExpressionInternal0Copy _sym)
+pQuantifierBinding :: TermParser QuantifierBindingL
+pQuantifierBinding =
+  choice [ Megaparsec.try pQuantifierBinding1
+         , Megaparsec.try pQuantifierBinding2
          ]
   where
-    pMoveOrCopyExpressionInternal0Move :: Cubix.TreeSitter.Token a -> Parser (MoveTerm MoveOrCopyExpressionInternal0L)
-    pMoveOrCopyExpressionInternal0Move _sym =
-      iMoveOrCopyExpressionInternal0Move <$> pMoveTok
-    pMoveOrCopyExpressionInternal0Copy :: Cubix.TreeSitter.Token a -> Parser (MoveTerm MoveOrCopyExpressionInternal0L)
-    pMoveOrCopyExpressionInternal0Copy _sym =
-      iMoveOrCopyExpressionInternal0Copy <$> pCopyTok
+    pQuantifierBinding1 :: Parser (MoveTerm QuantifierBindingL)
+    pQuantifierBinding1 =
+      QuantifierBinding1' <$> pIdentifier <*> pColonTok <*> pHidType
+    pQuantifierBinding2 :: Parser (MoveTerm QuantifierBindingL)
+    pQuantifierBinding2 =
+      QuantifierBinding2' <$> pIdentifier <*> pInTok <*> pHidExpression
 
-pUnaryExpression :: Parser (MoveTerm UnaryExpressionL)
-pUnaryExpression = do
-  _sym <- pSymbol "unary_expression" SUnaryExpressionSymbol
-  iUnaryExpression <$> pUnaryOp <*> (pHiddenExpression _sym)
-
-pUnaryOp :: Parser (MoveTerm UnaryOpL)
-pUnaryOp = do
-  _sym <- pSymbol "unary_op" SUnaryOpSymbol
-  iUnaryOp <$> pExclamationMarkTok
-
-pAbortExpression :: Parser (MoveTerm AbortExpressionL)
-pAbortExpression = do
-  _sym <- pSymbol "abort_expression" SAbortExpressionSymbol
-  iAbortExpression <$> pAbortTok <*> pMaybe (pHiddenExpression _sym)
-
-pAssignExpression :: Parser (MoveTerm AssignExpressionL)
-pAssignExpression = do
-  _sym <- pSymbol "assign_expression" SAssignExpressionSymbol
-  iAssignExpression <$> pPair (pPair (pHiddenUnaryExpression _sym) pEqualsSignTok) (pHiddenExpression _sym)
-
-pBinaryExpression :: Parser (MoveTerm BinaryExpressionL)
-pBinaryExpression = do
-  _sym <- pSymbol "binary_expression" SBinaryExpressionSymbol
-  choice [ Megaparsec.try (pBinaryExpression1 _sym)
-         , Megaparsec.try (pBinaryExpression2 _sym)
-         , Megaparsec.try (pBinaryExpression3 _sym)
-         , Megaparsec.try (pBinaryExpression4 _sym)
-         , Megaparsec.try (pBinaryExpression5 _sym)
-         , Megaparsec.try (pBinaryExpression6 _sym)
-         , Megaparsec.try (pBinaryExpression7 _sym)
-         , Megaparsec.try (pBinaryExpression8 _sym)
-         , Megaparsec.try (pBinaryExpression9 _sym)
-         , Megaparsec.try (pBinaryExpression10 _sym)
-         , Megaparsec.try (pBinaryExpression11 _sym)
-         , Megaparsec.try (pBinaryExpression12 _sym)
-         , Megaparsec.try (pBinaryExpression13 _sym)
-         , Megaparsec.try (pBinaryExpression14 _sym)
-         , Megaparsec.try (pBinaryExpression15 _sym)
-         , Megaparsec.try (pBinaryExpression16 _sym)
-         , Megaparsec.try (pBinaryExpression17 _sym)
-         , Megaparsec.try (pBinaryExpression18 _sym)
-         , Megaparsec.try (pBinaryExpression19 _sym)
-         , Megaparsec.try (pBinaryExpression20 _sym)
+pReturnExpression :: TermParser ReturnExpressionL
+pReturnExpression =
+  choice [ Megaparsec.try pReturnExpression1
+         , Megaparsec.try pReturnExpression2
          ]
   where
-    pBinaryExpression1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression1 _sym =
-      iBinaryExpression1 <$> (pHiddenExpression _sym) <*> pEqualsSignEqualsSignGreaterThanSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression2 _sym =
-      iBinaryExpression2 <$> (pHiddenExpression _sym) <*> pVerticalLineVerticalLineTok <*> (pHiddenExpression _sym)
-    pBinaryExpression3 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression3 _sym =
-      iBinaryExpression3 <$> (pHiddenExpression _sym) <*> pAmpersandAmpersandTok <*> (pHiddenExpression _sym)
-    pBinaryExpression4 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression4 _sym =
-      iBinaryExpression4 <$> (pHiddenExpression _sym) <*> pEqualsSignEqualsSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression5 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression5 _sym =
-      iBinaryExpression5 <$> (pHiddenExpression _sym) <*> pExclamationMarkEqualsSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression6 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression6 _sym =
-      iBinaryExpression6 <$> (pHiddenExpression _sym) <*> pLessThanSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression7 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression7 _sym =
-      iBinaryExpression7 <$> (pHiddenExpression _sym) <*> pGreaterThanSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression8 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression8 _sym =
-      iBinaryExpression8 <$> (pHiddenExpression _sym) <*> pLessThanSignEqualsSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression9 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression9 _sym =
-      iBinaryExpression9 <$> (pHiddenExpression _sym) <*> pGreaterThanSignEqualsSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression10 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression10 _sym =
-      iBinaryExpression10 <$> (pHiddenExpression _sym) <*> pFullStopFullStopTok <*> (pHiddenExpression _sym)
-    pBinaryExpression11 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression11 _sym =
-      iBinaryExpression11 <$> (pHiddenExpression _sym) <*> pVerticalLineTok <*> (pHiddenExpression _sym)
-    pBinaryExpression12 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression12 _sym =
-      iBinaryExpression12 <$> (pHiddenExpression _sym) <*> pCircumflexAccentTok <*> (pHiddenExpression _sym)
-    pBinaryExpression13 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression13 _sym =
-      iBinaryExpression13 <$> (pHiddenExpression _sym) <*> pAmpersandTok <*> (pHiddenExpression _sym)
-    pBinaryExpression14 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression14 _sym =
-      iBinaryExpression14 <$> (pHiddenExpression _sym) <*> pLessThanSignLessThanSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression15 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression15 _sym =
-      iBinaryExpression15 <$> (pHiddenExpression _sym) <*> pGreaterThanSignGreaterThanSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression16 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression16 _sym =
-      iBinaryExpression16 <$> (pHiddenExpression _sym) <*> pPlusSignTok <*> (pHiddenExpression _sym)
-    pBinaryExpression17 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression17 _sym =
-      iBinaryExpression17 <$> (pHiddenExpression _sym) <*> pHyphenMinusTok <*> (pHiddenExpression _sym)
-    pBinaryExpression18 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression18 _sym =
-      iBinaryExpression18 <$> (pHiddenExpression _sym) <*> pAsteriskTok <*> (pHiddenExpression _sym)
-    pBinaryExpression19 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression19 _sym =
-      iBinaryExpression19 <$> (pHiddenExpression _sym) <*> pSolidusTok <*> (pHiddenExpression _sym)
-    pBinaryExpression20 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BinaryExpressionL)
-    pBinaryExpression20 _sym =
-      iBinaryExpression20 <$> (pHiddenExpression _sym) <*> pPercentSignTok <*> (pHiddenExpression _sym)
+    pReturnExpression1 :: Parser (MoveTerm ReturnExpressionL)
+    pReturnExpression1 =
+      ReturnExpression1' <$> pReturnTok <*> pMaybe pLabel <*> pHidExpression
+    pReturnExpression2 :: Parser (MoveTerm ReturnExpressionL)
+    pReturnExpression2 =
+      ReturnExpression2' <$> pReturnTok <*> pMaybe pLabel
 
-pCastExpression :: Parser (MoveTerm CastExpressionL)
-pCastExpression = do
-  _sym <- pSymbol "cast_expression" SCastExpressionSymbol
-  iCastExpression <$> pPair (pPair (pHiddenExpression _sym) pAsTok) (pHiddenType _sym)
+pWhileExpression :: TermParser WhileExpressionL
+pWhileExpression =
+  WhileExpression' <$> pWhileTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression <*> pHidExpression
 
-pIdentifiedExpression :: Parser (MoveTerm IdentifiedExpressionL)
-pIdentifiedExpression = do
-  _sym <- pSymbol "identified_expression" SIdentifiedExpressionSymbol
-  iIdentifiedExpression <$> pBlockIdentifier <*> (pHiddenExpression _sym)
+pFriendDeclaration :: TermParser FriendDeclarationL
+pFriendDeclaration =
+  FriendDeclaration' <$> pBetween pFriendTok pSemicolonTok pFriendAccess
 
-pBlockIdentifier :: Parser (MoveTerm BlockIdentifierL)
-pBlockIdentifier = do
-  _sym <- pSymbol "block_identifier" SBlockIdentifierSymbol
-  iBlockIdentifier <$> pLabel <*> pColonTok
-
-pLambdaExpression :: Parser (MoveTerm LambdaExpressionL)
-pLambdaExpression = do
-  _sym <- pSymbol "lambda_expression" SLambdaExpressionSymbol
-  iLambdaExpression <$> pLambdaBindings <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok (pHiddenType _sym)) <*> (pHiddenExpression _sym)
-
-pLambdaBindings :: Parser (MoveTerm LambdaBindingsL)
-pLambdaBindings = do
-  _sym <- pSymbol "lambda_bindings" SLambdaBindingsSymbol
-  iLambdaBindings <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy pLambdaBinding pCommaTok)
-
-pLambdaBinding :: Parser (MoveTerm LambdaBindingL)
-pLambdaBinding = do
-  _sym <- pSymbol "lambda_binding" SLambdaBindingSymbol
-  choice [ Megaparsec.try (pLambdaBindingCommaBindList _sym)
-         , Megaparsec.try (pLambdaBinding2 _sym)
+pFriendAccess :: TermParser FriendAccessL
+pFriendAccess =
+  choice [ Megaparsec.try pFriendAccessLocalModule
+         , Megaparsec.try pFriendAccessFullyQualifiedModule
          ]
   where
-    pLambdaBindingCommaBindList :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
-    pLambdaBindingCommaBindList _sym =
-      iLambdaBindingCommaBindList <$> pCommaBindList
-    pLambdaBinding2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm LambdaBindingL)
-    pLambdaBinding2 _sym =
-      iLambdaBinding2 <$> (pHiddenBind _sym) <*> pMaybe (pPair pColonTok (pHiddenType _sym))
+    pFriendAccessLocalModule :: Parser (MoveTerm FriendAccessL)
+    pFriendAccessLocalModule =
+      FriendAccessLocalModule' <$> pIdentifier
+    pFriendAccessFullyQualifiedModule :: Parser (MoveTerm FriendAccessL)
+    pFriendAccessFullyQualifiedModule =
+      FriendAccessFullyQualifiedModule' <$> pModuleIdentity
 
-pLoopExpression :: Parser (MoveTerm LoopExpressionL)
-pLoopExpression = do
-  _sym <- pSymbol "loop_expression" SLoopExpressionSymbol
-  iLoopExpression <$> pLoopTok <*> (pHiddenExpression _sym)
+pHidEnumItem :: TermParser HidEnumItemL
+pHidEnumItem =
+  HidEnumItem' <$> pEnumDefinition
 
-pQuantifierExpression :: Parser (MoveTerm QuantifierExpressionL)
-pQuantifierExpression = do
-  _sym <- pSymbol "quantifier_expression" SQuantifierExpressionSymbol
-  iQuantifierExpression <$> pPair (pPair (pPair (pPair (pHiddenReservedIdentifier _sym) pQuantifierBindings) (pMaybe (pPair pWhereTok (pHiddenExpression _sym)))) pColonTok) (pHiddenExpression _sym)
+pEnumDefinition :: TermParser EnumDefinitionL
+pEnumDefinition =
+  EnumDefinition' <$> pMaybe pPublicTok <*> pHidEnumSignature <*> pEnumVariants <*> pMaybe pPostfixAbilityDecls
 
-pQuantifierBindings :: Parser (MoveTerm QuantifierBindingsL)
-pQuantifierBindings = do
-  _sym <- pSymbol "quantifier_bindings" SQuantifierBindingsSymbol
-  iQuantifierBindings <$> pSepBy1 pQuantifierBinding pCommaTok
+pEnumVariants :: TermParser EnumVariantsL
+pEnumVariants =
+  EnumVariants' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pVariant pCommaTok)
 
-pQuantifierBinding :: Parser (MoveTerm QuantifierBindingL)
-pQuantifierBinding = do
-  _sym <- pSymbol "quantifier_binding" SQuantifierBindingSymbol
-  choice [ Megaparsec.try (pQuantifierBinding1 _sym)
-         , Megaparsec.try (pQuantifierBinding2 _sym)
+pVariant :: TermParser VariantL
+pVariant =
+  Variant' <$> pHidVariantIdentifier <*> pMaybe pDatatypeFields
+
+pDatatypeFields :: TermParser DatatypeFieldsL
+pDatatypeFields =
+  choice [ Megaparsec.try pDatatypeFieldsPositionalFields
+         , Megaparsec.try pDatatypeFieldsNamedFields
          ]
   where
-    pQuantifierBinding1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm QuantifierBindingL)
-    pQuantifierBinding1 _sym =
-      iQuantifierBinding1 <$> pIdentifier <*> pColonTok <*> (pHiddenType _sym)
-    pQuantifierBinding2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm QuantifierBindingL)
-    pQuantifierBinding2 _sym =
-      iQuantifierBinding2 <$> pIdentifier <*> pInTok <*> (pHiddenExpression _sym)
+    pDatatypeFieldsPositionalFields :: Parser (MoveTerm DatatypeFieldsL)
+    pDatatypeFieldsPositionalFields =
+      DatatypeFieldsPositionalFields' <$> pPositionalFields
+    pDatatypeFieldsNamedFields :: Parser (MoveTerm DatatypeFieldsL)
+    pDatatypeFieldsNamedFields =
+      DatatypeFieldsNamedFields' <$> pNamedFields
 
-pReturnExpression :: Parser (MoveTerm ReturnExpressionL)
-pReturnExpression = do
-  _sym <- pSymbol "return_expression" SReturnExpressionSymbol
-  choice [ Megaparsec.try (pReturnExpression1 _sym)
-         , Megaparsec.try (pReturnExpression2 _sym)
+pNamedFields :: TermParser NamedFieldsL
+pNamedFields =
+  NamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pFieldAnnotation pCommaTok)
+
+pFieldAnnotation :: TermParser FieldAnnotationL
+pFieldAnnotation =
+  FieldAnnotation' <$> pHidFieldIdentifier <*> pColonTok <*> pHidType
+
+pPositionalFields :: TermParser PositionalFieldsL
+pPositionalFields =
+  PositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidType pCommaTok)
+
+pHidVariantIdentifier :: TermParser HidVariantIdentifierL
+pHidVariantIdentifier =
+  HidVariantIdentifier' <$> pIdentifier
+
+pHidEnumSignature :: TermParser HidEnumSignatureL
+pHidEnumSignature =
+  HidEnumSignature' <$> pEnumTok <*> pHidEnumIdentifier <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
+
+pAbilityDecls :: TermParser AbilityDeclsL
+pAbilityDecls =
+  AbilityDecls' <$> pHasTok <*> pSepBy pAbility pCommaTok
+
+pHidEnumIdentifier :: TermParser HidEnumIdentifierL
+pHidEnumIdentifier =
+  HidEnumIdentifier' <$> pIdentifier
+
+pPostfixAbilityDecls :: TermParser PostfixAbilityDeclsL
+pPostfixAbilityDecls =
+  PostfixAbilityDecls' <$> pBetween pHasTok pSemicolonTok (pSepBy pAbility pCommaTok)
+
+pHidFunctionItem :: TermParser HidFunctionItemL
+pHidFunctionItem =
+  choice [ Megaparsec.try pHidFunctionItemNativeFunctionDefinition
+         , Megaparsec.try pHidFunctionItemMacroFunctionDefinition
+         , Megaparsec.try pHidFunctionItemFunctionDefinition
          ]
   where
-    pReturnExpression1 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ReturnExpressionL)
-    pReturnExpression1 _sym =
-      iReturnExpression1 <$> pReturnTok <*> pMaybe pLabel <*> (pHiddenExpression _sym)
-    pReturnExpression2 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm ReturnExpressionL)
-    pReturnExpression2 _sym =
-      iReturnExpression2 <$> pReturnTok <*> pMaybe pLabel
+    pHidFunctionItemNativeFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemNativeFunctionDefinition =
+      HidFunctionItemNativeFunctionDefinition' <$> pNativeFunctionDefinition
+    pHidFunctionItemMacroFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemMacroFunctionDefinition =
+      HidFunctionItemMacroFunctionDefinition' <$> pMacroFunctionDefinition
+    pHidFunctionItemFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemFunctionDefinition =
+      HidFunctionItemFunctionDefinition' <$> pFunctionDefinition
 
-pWhileExpression :: Parser (MoveTerm WhileExpressionL)
-pWhileExpression = do
-  _sym <- pSymbol "while_expression" SWhileExpressionSymbol
-  iWhileExpression <$> pWhileTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok (pHiddenExpression _sym) <*> (pHiddenExpression _sym)
+pFunctionDefinition :: TermParser FunctionDefinitionL
+pFunctionDefinition =
+  FunctionDefinition' <$> pHidFunctionSignature <*> pBlock
 
-pBlockItem :: Parser (MoveTerm BlockItemL)
-pBlockItem = do
-  _sym <- pSymbol "block_item" SBlockItemSymbol
-  iBlockItem <$> (pBlockItemInternal0 _sym) <*> pSemicolonTok
+pHidFunctionSignature :: TermParser HidFunctionSignatureL
+pHidFunctionSignature =
+  HidFunctionSignature' <$> pMaybe pModifier <*> pMaybe pModifier <*> pMaybe pModifier <*> pFunTok <*> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
 
-pBlockItemInternal0 :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BlockItemInternal0L)
-pBlockItemInternal0 _sym = do
-  choice [ Megaparsec.try (pBlockItemInternal0Expression _sym)
-         , Megaparsec.try (pBlockItemInternal0LetStatement _sym)
+pModifier :: TermParser ModifierL
+pModifier =
+  choice [ Megaparsec.try pModifier1
+         , Megaparsec.try pModifierEntry
+         , Megaparsec.try pModifierNative
          ]
   where
-    pBlockItemInternal0Expression :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BlockItemInternal0L)
-    pBlockItemInternal0Expression _sym =
-      iBlockItemInternal0Expression <$> (pHiddenExpression _sym)
-    pBlockItemInternal0LetStatement :: Cubix.TreeSitter.Token a -> Parser (MoveTerm BlockItemInternal0L)
-    pBlockItemInternal0LetStatement _sym =
-      iBlockItemInternal0LetStatement <$> pLetStatement
+    pModifier1 :: Parser (MoveTerm ModifierL)
+    pModifier1 =
+      Modifier1' <$> pPublicTok <*> pMaybe (pBetween pLeftParenthesisTok pRightParenthesisTok (pModifierInternal0 _sym))
+    pModifierEntry :: Parser (MoveTerm ModifierL)
+    pModifierEntry =
+      ModifierEntry' <$> pEntryTok
+    pModifierNative :: Parser (MoveTerm ModifierL)
+    pModifierNative =
+      ModifierNative' <$> pNativeTok
 
-pLetStatement :: Parser (MoveTerm LetStatementL)
-pLetStatement = do
-  _sym <- pSymbol "let_statement" SLetStatementSymbol
-  iLetStatement <$> pLetTok <*> pBindList <*> pMaybe (pPair pColonTok (pHiddenType _sym)) <*> pMaybe (pPair pEqualsSignTok (pHiddenExpression _sym))
-
-pMacroFunctionDefinition :: Parser (MoveTerm MacroFunctionDefinitionL)
-pMacroFunctionDefinition = do
-  _sym <- pSymbol "macro_function_definition" SMacroFunctionDefinitionSymbol
-  iMacroFunctionDefinition <$> pMaybe pModifier <*> pMacroTok <*> (pHiddenMacroSignature _sym) <*> pBlock
-
-pHiddenMacroSignature :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenMacroSignatureL)
-pHiddenMacroSignature _sym = do
-  iHiddenMacroSignature <$> pMaybe pModifier <*> pFunTok <*> (pHiddenFunctionIdentifier _sym) <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
-
-pNativeFunctionDefinition :: Parser (MoveTerm NativeFunctionDefinitionL)
-pNativeFunctionDefinition = do
-  _sym <- pSymbol "native_function_definition" SNativeFunctionDefinitionSymbol
-  iNativeFunctionDefinition <$> (pHiddenFunctionSignature _sym) <*> pSemicolonTok
-
-pHiddenStructItem :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenStructItemL)
-pHiddenStructItem _sym = do
-  choice [ Megaparsec.try (pHiddenStructItemNativeStructDefinition _sym)
-         , Megaparsec.try (pHiddenStructItemStructDefinition _sym)
+pModifierInternal0 :: TermParser ModifierInternal0L
+pModifierInternal0 =
+  choice [ Megaparsec.try pModifierInternal0Package
+         , Megaparsec.try pModifierInternal0Friend
          ]
   where
-    pHiddenStructItemNativeStructDefinition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenStructItemL)
-    pHiddenStructItemNativeStructDefinition _sym =
-      iHiddenStructItemNativeStructDefinition <$> pNativeStructDefinition
-    pHiddenStructItemStructDefinition :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenStructItemL)
-    pHiddenStructItemStructDefinition _sym =
-      iHiddenStructItemStructDefinition <$> pStructDefinition
+    pModifierInternal0Package :: Parser (MoveTerm ModifierInternal0L)
+    pModifierInternal0Package =
+      ModifierInternal0Package' <$> pPackageTok
+    pModifierInternal0Friend :: Parser (MoveTerm ModifierInternal0L)
+    pModifierInternal0Friend =
+      ModifierInternal0Friend' <$> pFriendTok
 
-pNativeStructDefinition :: Parser (MoveTerm NativeStructDefinitionL)
-pNativeStructDefinition = do
-  _sym <- pSymbol "native_struct_definition" SNativeStructDefinitionSymbol
-  iNativeStructDefinition <$> pMaybe pPublicTok <*> pBetween pNativeTok pSemicolonTok (pHiddenStructSignature _sym)
+pMacroFunctionDefinition :: TermParser MacroFunctionDefinitionL
+pMacroFunctionDefinition =
+  MacroFunctionDefinition' <$> pMaybe pModifier <*> pMacroTok <*> pHidMacroSignature <*> pBlock
 
-pHiddenStructSignature :: Cubix.TreeSitter.Token a -> Parser (MoveTerm HiddenStructSignatureL)
-pHiddenStructSignature _sym = do
-  iHiddenStructSignature <$> pStructTok <*> (pHiddenStructIdentifier _sym) <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
+pHidMacroSignature :: TermParser HidMacroSignatureL
+pHidMacroSignature =
+  HidMacroSignature' <$> pMaybe pModifier <*> pFunTok <*> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
 
-pStructDefinition :: Parser (MoveTerm StructDefinitionL)
-pStructDefinition = do
-  _sym <- pSymbol "struct_definition" SStructDefinitionSymbol
-  iStructDefinition <$> pMaybe pPublicTok <*> (pHiddenStructSignature _sym) <*> pDatatypeFields <*> pMaybe pPostfixAbilityDecls
+pNativeFunctionDefinition :: TermParser NativeFunctionDefinitionL
+pNativeFunctionDefinition =
+  NativeFunctionDefinition' <$> pHidFunctionSignature <*> pSemicolonTok
 
-pConstant :: Parser (MoveTerm ConstantL)
-pConstant = do
-  _sym <- pSymbol "constant" SConstantSymbol
-  iConstant <$> pBetween pConstTok pColonTok pIdentifier <*> (pHiddenType _sym) <*> pBetween pEqualsSignTok pSemicolonTok (pHiddenExpression _sym)
-
-pFriendDeclaration :: Parser (MoveTerm FriendDeclarationL)
-pFriendDeclaration = do
-  _sym <- pSymbol "friend_declaration" SFriendDeclarationSymbol
-  iFriendDeclaration <$> pBetween pFriendTok pSemicolonTok pFriendAccess
-
-pFriendAccess :: Parser (MoveTerm FriendAccessL)
-pFriendAccess = do
-  _sym <- pSymbol "friend_access" SFriendAccessSymbol
-  choice [ Megaparsec.try (pFriendAccessLocalModule _sym)
-         , Megaparsec.try (pFriendAccessFullyQualifiedModule _sym)
+pHidStructItem :: TermParser HidStructItemL
+pHidStructItem =
+  choice [ Megaparsec.try pHidStructItemNativeStructDefinition
+         , Megaparsec.try pHidStructItemStructDefinition
          ]
   where
-    pFriendAccessLocalModule :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FriendAccessL)
-    pFriendAccessLocalModule _sym =
-      iFriendAccessLocalModule <$> pIdentifier
-    pFriendAccessFullyQualifiedModule :: Cubix.TreeSitter.Token a -> Parser (MoveTerm FriendAccessL)
-    pFriendAccessFullyQualifiedModule _sym =
-      iFriendAccessFullyQualifiedModule <$> pModuleIdentity
+    pHidStructItemNativeStructDefinition :: Parser (MoveTerm HidStructItemL)
+    pHidStructItemNativeStructDefinition =
+      HidStructItemNativeStructDefinition' <$> pNativeStructDefinition
+    pHidStructItemStructDefinition :: Parser (MoveTerm HidStructItemL)
+    pHidStructItemStructDefinition =
+      HidStructItemStructDefinition' <$> pStructDefinition
+
+pNativeStructDefinition :: TermParser NativeStructDefinitionL
+pNativeStructDefinition =
+  NativeStructDefinition' <$> pMaybe pPublicTok <*> pBetween pNativeTok pSemicolonTok pHidStructSignature
+
+pHidStructSignature :: TermParser HidStructSignatureL
+pHidStructSignature =
+  HidStructSignature' <$> pStructTok <*> pHidStructIdentifier <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
+
+pStructDefinition :: TermParser StructDefinitionL
+pStructDefinition =
+  StructDefinition' <$> pMaybe pPublicTok <*> pHidStructSignature <*> pDatatypeFields <*> pMaybe pPostfixAbilityDecls

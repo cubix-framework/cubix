@@ -1,12 +1,20 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Text.Megaparsec.Cubix where
 
 import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (between, eitherP, many, optional, sepEndBy, sepEndBy1, some)
 -- TODO: CUBIX_NON_EMPTY
 -- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
-import Data.Comp.Multi (Cxt, HFunctor, (:<:))
--- import Data.List.NonEmpty (NonEmpty)
+import Data.Comp.Multi (Cxt, HFunctor, (:<:), OrdHF, KOrd)
+import Data.Comp.Multi.HFunctor (E)
+import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Set qualified as Set
+import Data.String (IsString (..))
 import Data.Typeable (Typeable)
+import Data.Void (Void)
+import Text.Megaparsec qualified
+
 import Cubix.Language.Parametric.Syntax
        ( EitherF
        , InsertF (..)
@@ -76,3 +84,20 @@ pBetween
   :: Alternative m
   => m (Cxt h fs a open) -> m (Cxt h fs a close) -> m (Cxt h fs a l) -> m (Cxt h fs a l)
 pBetween = between
+
+type Tok h fs a = E (Cxt h fs a)
+type Parser h fs a t = Text.Megaparsec.Parsec Void [Tok h fs a] t
+
+-- Use with TypeApplications, eg. `pSort @IdentL`
+-- that is why I've put `l` variable first
+pSort
+  :: forall l h fs a
+  .  (HFunctor fs, OrdHF fs, KOrd a, DynCase (Cxt h fs a) l)
+  => NonEmpty Char -> Parser h fs a (Cxt h fs a l)
+pSort expected = Text.Megaparsec.token
+  (caseE @_ @l)
+  (Set.singleton $ Text.Megaparsec.Label expected)
+
+instance IsString (NonEmpty Char) where
+  fromString [] = error "NonEmpty.fromString: empty string"
+  fromString (s:ss) = s :| ss
