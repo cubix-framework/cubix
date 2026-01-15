@@ -203,12 +203,9 @@ instance ToContext Text Parser where
         let nosym = not $ hasSymbol name
         in par nosym $
             "p" <>
-            Builder.fromText (snakeToCase Upper (hiddenName name)) <>
-            if nosym
-               then " _sym"
-               else mempty
+            Builder.fromText (snakeToCase Upper (hiddenName name))
       Inline name -> par (not $ hasSymbol name) $
-        Builder.fromText ("p" <> snakeToCase Upper (hiddenName name) <> if hasSymbol name then "" else " _sym")
+        Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
       Tok t -> Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
       Seq ps -> mconcat $ intersperseBy (p2t False) inspect (NonEmpty.toList ps)
         -- mconcat (p2t False <$> NonEmpty.toList ps)
@@ -217,7 +214,7 @@ instance ToContext Text Parser where
       Many ps -> par p ("pMany " <> p2t True ps)
       Some ps -> par p ("pSome " <> p2t True ps)
       Skip -> Builder.fromText "pure ()"
-      Extract -> "pContent _sym"
+      Extract -> "pContent"
       SepBy sep content -> par p ("pSepBy " <> p2t True content <> " " <> p2t True sep)
       SepBy1 sep content -> par p ("pSepBy1 " <> p2t True content <> " " <> p2t True sep)
       Between open close content -> par p ("pBetween " <> p2t True open <> " " <> p2t True close <> " " <> p2t True content)

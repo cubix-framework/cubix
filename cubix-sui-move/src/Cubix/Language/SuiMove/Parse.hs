@@ -3,9 +3,18 @@ module Cubix.Language.SuiMove.Parse where
 import Control.Monad ((<=<), unless)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT, ask, asks)
-import Data.ByteString qualified as BS
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Char8 qualified as Char8
 import Data.Comp.Multi.HFunctor
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.Foldable (foldrM)
+import Data.Functor ((<$))
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
@@ -19,7 +28,7 @@ import Cubix.Language.Info
   ( SourcePos (..)
   , SourceSpan (..)
   , SourceRange (..)
-  , mkSourceSpan
+  , rangeLength
   )
 import Prelude hiding (span)
 import Cubix.TreeSitter
@@ -44,39 +53,60 @@ pBoolLiteral = Megaparsec.choice
   ] <* Megaparsec.eof
 
 pTrueTok :: MoveTermParser TrueTokL
-pTrueTok = pure TrueTok' <* Megaparsec.eof
-
-pTrueTokE :: MoveParser (E MoveTerm)
-pTrueTokE = E <$> pTrueTok
+pTrueTok = TrueTok' <$ Megaparsec.eof
 
 pFalseTok :: MoveTermParser FalseTokL
-pFalseTok = pure FalseTok' <* Megaparsec.eof
+pFalseTok = FalseTok' <$ Megaparsec.eof
 
 pIdentifier :: MoveTermParser IdentifierL
 pIdentifier = Identifier' <$> pContent <* Megaparsec.eof
-  
+
+newtype ParseTable = ParseTable {unParseTable :: IntMap SomeMoveTermParser}
+
+symbolMap :: Map String SomeMoveTermParser
+symbolMap = Map.fromList
+  [ ("bool_literal", E <$> pBoolLiteral)
+  , ("identifier", E <$> pIdentifier)
+  , ("false", E <$> pFalseTok)
+  , ("true", E <$> pTrueTok)
+  ]
+
+mkParseTable :: TS.Language -> IO ParseTable
+mkParseTable lang = do
+  count <- fromIntegral <$> TS.languageSymbolCount lang
+  ParseTable <$> foldrM
+    (\id acc -> do
+      symName <- TS.languageSymbolName lang id
+      let mSymSing = Map.lookup (Char8.unpack symName) symbolMap
+      pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
+    )
+    (IM.empty :: IntMap SomeMoveTermParser)
+    [0..count - 1]
+
 parse :: FilePath -> IO SomeMoveTerm
 parse path =
   runReaderT parse' =<<
-    newTreeSitterEnv path tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
+    newTreeSitterEnv path tree_sitter_sui_move
 
 parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeMoveTerm
 parse' = do
   filepath <- getFilePath
+  source <- getSource
+  pTable <- liftIO . mkParseTable =<< getLanguage
   rootNode <- liftIO . TS.treeRootNode =<< getTree
-  syntax filepath rootNode
+  syntax filepath source pTable rootNode
 
-getContent :: ByteString -> Range -> Text
+getContent :: ByteString -> SourceRange -> ByteString
 getContent src range =
   let len = rangeLength range
-      start = _rangeStart rang
-      chunk = ByteString.take len . ByteString.drop start
-  in Text.Encoding.decodeUtf8With Text.Encoding.lenientDecode (chunk src)
+      start = _rangeStart range
+  in ByteString.take len . ByteString.drop start $ src
 
-syntax :: FilePath -> ByteString -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeMoveTerm
-syntax path content = go
+syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeMoveTerm
+syntax path source pTable = go
   where
-    pContent = getContent content
+    pContent = getContent source
+    getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
     go :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeMoveTerm
     go root = do
       extra <- liftIO $ TS.nodeIsExtra root
@@ -87,38 +117,35 @@ syntax path content = go
           span     <- liftIO $ nodeSpan path root
           symbolNo <- liftIO $ TS.nodeSymbol root
           -- liftIO $ traceIO =<< TS.nodeTypeAsString root
-          msym <- getSymbol symbolNo
-          case msym of
+          case getParser symbolNo of
             Nothing -> do
-              pPrintLightBg $ "Unrecognized symbol: " <> show symbolNo
-              pPrintLightBg $ "  at: " <> show span
-              liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
-              error "no parse"
-
-            Just (SomeSymbolSing _ sym) -> do
-              -- pPrintLightBg $ "parsed sym: " <> show sym
+              -- pPrintLightBg $ "Unrecognized symbol: " <> show symbolNo
+              -- pPrintLightBg $ "  at: " <> show span
+              -- liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
+              -- error "no parse"
               childNo <- liftIO $ TS.nodeChildCount root
+              if childNo == 0
+                then do
+                  pure $ E $ NumLiteral' "Test" Nothing'
+                else
+                  head <$> mapM (go <=< (liftIO . TS.nodeChild root)) [0..childNo - 1]
+
+            Just p -> do
+              childNo <- liftIO $ TS.nodeChildCount root
+              -- pPrintLightBg $ "parsed sym: " <> show sym
               -- pPrintLightBg $ "child count: " <> show childNo
-              let p :: MoveParser SomeMoveTerm
-                  p = case decSymbolSing sym SBoolLiteralSymbol of
-                        Just (Refl, HRefl) -> E <$> pBoolLiteral
-                        Nothing ->
-                          case decSymbolSing sym STrueTokSymbol of
-                            Just (Refl, HRefl) -> fmap E pTrueTok
-                            Nothing -> case decSymbolSing sym SFalseTokSymbol of
-                              Just (Refl, HRefl) -> fmap E pFalseTok
-                              Nothing -> case decSymbolSing sym SIdentifierSymbol of
-                                Just (Refl, HRefl) -> fmap E pIdentifier
-                                Nothing -> E <$> pure (NumLiteral' "10" Nothing')
-                  childNums = [0..childNo - 1]
+
+              let childNums = [0..childNo - 1]
+                  content = pContent range
+
               children <- if childNo == 0
                 then do
                   -- pPrintLightBg $ "parsed sym: " <> show sym
                   pure []
                 else
                   mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path children of
-                Left err -> do                  
+              case Megaparsec.runParser p path (Tok content <$> children) of
+                Left err -> do
                   error "no parse"
                 Right item -> do
                   pPrintLightBg item

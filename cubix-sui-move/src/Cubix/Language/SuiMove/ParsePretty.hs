@@ -2,400 +2,461 @@
 module Cubix.Language.SuiMove.ParsePretty where
 
 import Control.Applicative.Combinators
+import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
-import Data.Functor (($>))
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Char8 qualified as Char8
+import Data.Comp.Multi (Cxt, E (..), NoHole, Sum, K)
+import Data.Foldable (foldrM)
+import Data.Functor ((<$), ($>))
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.String (IsString (..))
 import Data.Text
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
-import Streaming.Prelude qualified as Streaming
 
 import TreeSitter qualified as TS
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
+import Text.Megaparsec.Cubix
+  ( pMaybe, pPair, pSome, pMany
+  , pSepBy, pSepBy1, pBetween
+  , pSort, pContent
+  )
 
-import Cubix.Language.SuiMove.Modularized
+import Cubix.Language.Info
+  ( SourcePos (..)
+  , SourceSpan (..)
+  , SourceRange (..)
+  , rangeLength
+  )
 import Cubix.TreeSitter
+import Cubix.Language.SuiMove.Modularized
 
-parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (MoveTerm (RootSort MoveSig)))
+import Text.Pretty.Simple
+
+parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
 parse' = do
   filepath <- getFilePath
-  rootNode <- liftIO . TS.treeRootNode =<< getTree
-  toks <- Streaming.toList_
-    $ Streaming.mapMaybeM
-        (\tok ->
-           fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
-    $ symbols filepath rootNode
-
   source <- getSource
-  let lexed = Megaparsec.TreeSitter.Lexed source toks
-  case Megaparsec.parse pRoot filepath lexed of
-    Right ast -> pure $ Just ast
-    Left err -> do
-      liftIO . putStrLn $ Megaparsec.errorBundlePretty err
-      pure Nothing
+  pTable <- liftIO . mkParseTable =<< getLanguage
+  rootNode <- liftIO . TS.treeRootNode =<< getTree
+  syntax filepath source pTable rootNode
 
-parse :: FilePath -> IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse :: FilePath -> IO SomeTerm
 parse path =
   runReaderT parse' =<<
-    newTreeSitterEnv path tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
+    newTreeSitterEnv path tree_sitter_sui_move
+
+getContent :: ByteString -> SourceRange -> ByteString
+getContent src range =
+  let len = rangeLength range
+      start = _rangeStart range
+  in ByteString.take len . ByteString.drop start $ src
+
+syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+syntax path source pTable = go
+  where
+    pContent = getContent source
+    getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
+    go :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+    go root = do
+      extra <- liftIO $ TS.nodeIsExtra root
+      if extra
+        then pure $ error ""
+        else do
+          range    <- liftIO $ nodeRange root
+          span     <- liftIO $ nodeSpan path root
+          symbolNo <- liftIO $ TS.nodeSymbol root
+          -- liftIO $ traceIO =<< TS.nodeTypeAsString root
+          case getParser symbolNo of
+            Nothing -> do
+              pPrintLightBg $ "Unrecognized symbol: " <> Prelude.show symbolNo
+              pPrintLightBg $ "  at: " <> Prelude.show span
+              liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
+              error "no parse"
+
+            Just p -> do
+              childNo <- liftIO $ TS.nodeChildCount root
+              -- pPrintLightBg $ "parsed sym: " <> show sym
+              -- pPrintLightBg $ "child count: " <> show childNo
+
+              let childNums = [0..childNo - 1]
+                  content = pContent range
+
+              children <- if childNo == 0
+                then do
+                  -- pPrintLightBg $ "parsed sym: " <> show sym
+                  pure []
+                else
+                  mapM (go <=< (liftIO . TS.nodeChild root)) childNums
+              case Megaparsec.runParser p path (Megaparsec.Cubix.Tok content <$> children) of
+                Left err -> do
+                  error "no parse"
+                Right item -> do
+                  pPrintLightBg item
+                  pure item
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 
 -- --------------------------------------------------------------------------------
-type SomeTerm = E ${grammarName}Term
-type ${grammarName}Parser t = Parser NoHole (Sum ${grammarName}Sig) (K ()) t
-type ${grammarName}TermParser l = ${grammarName}Parser (${grammarName}Term l)
-type SomeTermParser = Parser (E ${grammarName}Term)
+type SomeTerm = E MoveTerm
+type Parser t = Megaparsec.Cubix.Parser NoHole (Sum MoveSig) (K ()) t
+type TermParser l = Parser (MoveTerm l)
+type SomeTermParser = Parser (E MoveTerm)
 
 pExclamationMarkTok :: TermParser ExclamationMarkTokL
-pExclamationMarkTok = pure ExclamationMarkTok' <* Megaparsec.eof
+pExclamationMarkTok = ExclamationMarkTok' <$ Megaparsec.eof
 
 pExclamationMarkEqualsSignTok :: TermParser ExclamationMarkEqualsSignTokL
-pExclamationMarkEqualsSignTok = pure ExclamationMarkEqualsSignTok' <* Megaparsec.eof
+pExclamationMarkEqualsSignTok = ExclamationMarkEqualsSignTok' <$ Megaparsec.eof
 
 pNumberSignLeftSquareBracketTok :: TermParser NumberSignLeftSquareBracketTokL
-pNumberSignLeftSquareBracketTok = pure NumberSignLeftSquareBracketTok' <* Megaparsec.eof
+pNumberSignLeftSquareBracketTok = NumberSignLeftSquareBracketTok' <$ Megaparsec.eof
 
 pDollarSignTok :: TermParser DollarSignTokL
-pDollarSignTok = pure DollarSignTok' <* Megaparsec.eof
+pDollarSignTok = DollarSignTok' <$ Megaparsec.eof
 
 pPercentSignTok :: TermParser PercentSignTokL
-pPercentSignTok = pure PercentSignTok' <* Megaparsec.eof
+pPercentSignTok = PercentSignTok' <$ Megaparsec.eof
 
 pAmpersandTok :: TermParser AmpersandTokL
-pAmpersandTok = pure AmpersandTok' <* Megaparsec.eof
+pAmpersandTok = AmpersandTok' <$ Megaparsec.eof
 
 pAmpersandAmpersandTok :: TermParser AmpersandAmpersandTokL
-pAmpersandAmpersandTok = pure AmpersandAmpersandTok' <* Megaparsec.eof
+pAmpersandAmpersandTok = AmpersandAmpersandTok' <$ Megaparsec.eof
 
 pApostropheTok :: TermParser ApostropheTokL
-pApostropheTok = pure ApostropheTok' <* Megaparsec.eof
+pApostropheTok = ApostropheTok' <$ Megaparsec.eof
 
 pLeftParenthesisTok :: TermParser LeftParenthesisTokL
-pLeftParenthesisTok = pure LeftParenthesisTok' <* Megaparsec.eof
+pLeftParenthesisTok = LeftParenthesisTok' <$ Megaparsec.eof
 
 pRightParenthesisTok :: TermParser RightParenthesisTokL
-pRightParenthesisTok = pure RightParenthesisTok' <* Megaparsec.eof
+pRightParenthesisTok = RightParenthesisTok' <$ Megaparsec.eof
 
 pAsteriskTok :: TermParser AsteriskTokL
-pAsteriskTok = pure AsteriskTok' <* Megaparsec.eof
+pAsteriskTok = AsteriskTok' <$ Megaparsec.eof
 
 pPlusSignTok :: TermParser PlusSignTokL
-pPlusSignTok = pure PlusSignTok' <* Megaparsec.eof
+pPlusSignTok = PlusSignTok' <$ Megaparsec.eof
 
 pCommaTok :: TermParser CommaTokL
-pCommaTok = pure CommaTok' <* Megaparsec.eof
+pCommaTok = CommaTok' <$ Megaparsec.eof
 
 pHyphenMinusTok :: TermParser HyphenMinusTokL
-pHyphenMinusTok = pure HyphenMinusTok' <* Megaparsec.eof
+pHyphenMinusTok = HyphenMinusTok' <$ Megaparsec.eof
 
 pHyphenMinusGreaterThanSignTok :: TermParser HyphenMinusGreaterThanSignTokL
-pHyphenMinusGreaterThanSignTok = pure HyphenMinusGreaterThanSignTok' <* Megaparsec.eof
+pHyphenMinusGreaterThanSignTok = HyphenMinusGreaterThanSignTok' <$ Megaparsec.eof
 
 pFullStopTok :: TermParser FullStopTokL
-pFullStopTok = pure FullStopTok' <* Megaparsec.eof
+pFullStopTok = FullStopTok' <$ Megaparsec.eof
 
 pFullStopFullStopTok :: TermParser FullStopFullStopTokL
-pFullStopFullStopTok = pure FullStopFullStopTok' <* Megaparsec.eof
+pFullStopFullStopTok = FullStopFullStopTok' <$ Megaparsec.eof
 
 pSolidusTok :: TermParser SolidusTokL
-pSolidusTok = pure SolidusTok' <* Megaparsec.eof
+pSolidusTok = SolidusTok' <$ Megaparsec.eof
 
 pSolidusAsteriskTok :: TermParser SolidusAsteriskTokL
-pSolidusAsteriskTok = pure SolidusAsteriskTok' <* Megaparsec.eof
+pSolidusAsteriskTok = SolidusAsteriskTok' <$ Megaparsec.eof
 
 pSolidusSolidusTok :: TermParser SolidusSolidusTokL
-pSolidusSolidusTok = pure SolidusSolidusTok' <* Megaparsec.eof
+pSolidusSolidusTok = SolidusSolidusTok' <$ Megaparsec.eof
 
 pColonTok :: TermParser ColonTokL
-pColonTok = pure ColonTok' <* Megaparsec.eof
+pColonTok = ColonTok' <$ Megaparsec.eof
 
 pColonColonTok :: TermParser ColonColonTokL
-pColonColonTok = pure ColonColonTok' <* Megaparsec.eof
+pColonColonTok = ColonColonTok' <$ Megaparsec.eof
 
 pSemicolonTok :: TermParser SemicolonTokL
-pSemicolonTok = pure SemicolonTok' <* Megaparsec.eof
+pSemicolonTok = SemicolonTok' <$ Megaparsec.eof
 
 pLessThanSignTok :: TermParser LessThanSignTokL
-pLessThanSignTok = pure LessThanSignTok' <* Megaparsec.eof
+pLessThanSignTok = LessThanSignTok' <$ Megaparsec.eof
 
 pLessThanSignLessThanSignTok :: TermParser LessThanSignLessThanSignTokL
-pLessThanSignLessThanSignTok = pure LessThanSignLessThanSignTok' <* Megaparsec.eof
+pLessThanSignLessThanSignTok = LessThanSignLessThanSignTok' <$ Megaparsec.eof
 
 pLessThanSignEqualsSignTok :: TermParser LessThanSignEqualsSignTokL
-pLessThanSignEqualsSignTok = pure LessThanSignEqualsSignTok' <* Megaparsec.eof
+pLessThanSignEqualsSignTok = LessThanSignEqualsSignTok' <$ Megaparsec.eof
 
 pEqualsSignTok :: TermParser EqualsSignTokL
-pEqualsSignTok = pure EqualsSignTok' <* Megaparsec.eof
+pEqualsSignTok = EqualsSignTok' <$ Megaparsec.eof
 
 pEqualsSignEqualsSignTok :: TermParser EqualsSignEqualsSignTokL
-pEqualsSignEqualsSignTok = pure EqualsSignEqualsSignTok' <* Megaparsec.eof
+pEqualsSignEqualsSignTok = EqualsSignEqualsSignTok' <$ Megaparsec.eof
 
 pEqualsSignEqualsSignGreaterThanSignTok :: TermParser EqualsSignEqualsSignGreaterThanSignTokL
-pEqualsSignEqualsSignGreaterThanSignTok = pure EqualsSignEqualsSignGreaterThanSignTok' <* Megaparsec.eof
+pEqualsSignEqualsSignGreaterThanSignTok = EqualsSignEqualsSignGreaterThanSignTok' <$ Megaparsec.eof
 
 pEqualsSignGreaterThanSignTok :: TermParser EqualsSignGreaterThanSignTokL
-pEqualsSignGreaterThanSignTok = pure EqualsSignGreaterThanSignTok' <* Megaparsec.eof
+pEqualsSignGreaterThanSignTok = EqualsSignGreaterThanSignTok' <$ Megaparsec.eof
 
 pGreaterThanSignTok :: TermParser GreaterThanSignTokL
-pGreaterThanSignTok = pure GreaterThanSignTok' <* Megaparsec.eof
+pGreaterThanSignTok = GreaterThanSignTok' <$ Megaparsec.eof
 
 pGreaterThanSignEqualsSignTok :: TermParser GreaterThanSignEqualsSignTokL
-pGreaterThanSignEqualsSignTok = pure GreaterThanSignEqualsSignTok' <* Megaparsec.eof
+pGreaterThanSignEqualsSignTok = GreaterThanSignEqualsSignTok' <$ Megaparsec.eof
 
 pGreaterThanSignGreaterThanSignTok :: TermParser GreaterThanSignGreaterThanSignTokL
-pGreaterThanSignGreaterThanSignTok = pure GreaterThanSignGreaterThanSignTok' <* Megaparsec.eof
+pGreaterThanSignGreaterThanSignTok = GreaterThanSignGreaterThanSignTok' <$ Megaparsec.eof
 
 pCommercialAtTok :: TermParser CommercialAtTokL
-pCommercialAtTok = pure CommercialAtTok' <* Megaparsec.eof
+pCommercialAtTok = CommercialAtTok' <$ Megaparsec.eof
 
 pLeftSquareBracketTok :: TermParser LeftSquareBracketTokL
-pLeftSquareBracketTok = pure LeftSquareBracketTok' <* Megaparsec.eof
+pLeftSquareBracketTok = LeftSquareBracketTok' <$ Megaparsec.eof
 
 pRightSquareBracketTok :: TermParser RightSquareBracketTokL
-pRightSquareBracketTok = pure RightSquareBracketTok' <* Megaparsec.eof
+pRightSquareBracketTok = RightSquareBracketTok' <$ Megaparsec.eof
 
 pCircumflexAccentTok :: TermParser CircumflexAccentTokL
-pCircumflexAccentTok = pure CircumflexAccentTok' <* Megaparsec.eof
+pCircumflexAccentTok = CircumflexAccentTok' <$ Megaparsec.eof
 
 pAbortTok :: TermParser AbortTokL
-pAbortTok = pure AbortTok' <* Megaparsec.eof
+pAbortTok = AbortTok' <$ Megaparsec.eof
 
 pAbortsIfTok :: TermParser AbortsIfTokL
-pAbortsIfTok = pure AbortsIfTok' <* Megaparsec.eof
+pAbortsIfTok = AbortsIfTok' <$ Megaparsec.eof
 
 pAbortsWithTok :: TermParser AbortsWithTokL
-pAbortsWithTok = pure AbortsWithTok' <* Megaparsec.eof
+pAbortsWithTok = AbortsWithTok' <$ Megaparsec.eof
 
 pAddressTok :: TermParser AddressTokL
-pAddressTok = pure AddressTok' <* Megaparsec.eof
+pAddressTok = AddressTok' <$ Megaparsec.eof
 
 pApplyTok :: TermParser ApplyTokL
-pApplyTok = pure ApplyTok' <* Megaparsec.eof
+pApplyTok = ApplyTok' <$ Megaparsec.eof
 
 pAsTok :: TermParser AsTokL
-pAsTok = pure AsTok' <* Megaparsec.eof
+pAsTok = AsTok' <$ Megaparsec.eof
 
 pAssertTok :: TermParser AssertTokL
-pAssertTok = pure AssertTok' <* Megaparsec.eof
+pAssertTok = AssertTok' <$ Megaparsec.eof
 
 pAssumeTok :: TermParser AssumeTokL
-pAssumeTok = pure AssumeTok' <* Megaparsec.eof
+pAssumeTok = AssumeTok' <$ Megaparsec.eof
 
 pBoolTok :: TermParser BoolTokL
-pBoolTok = pure BoolTok' <* Megaparsec.eof
+pBoolTok = BoolTok' <$ Megaparsec.eof
 
 pBreakTok :: TermParser BreakTokL
-pBreakTok = pure BreakTok' <* Megaparsec.eof
+pBreakTok = BreakTok' <$ Megaparsec.eof
 
 pBytearrayTok :: TermParser BytearrayTokL
-pBytearrayTok = pure BytearrayTok' <* Megaparsec.eof
+pBytearrayTok = BytearrayTok' <$ Megaparsec.eof
 
 pConstTok :: TermParser ConstTokL
-pConstTok = pure ConstTok' <* Megaparsec.eof
+pConstTok = ConstTok' <$ Megaparsec.eof
 
 pContinueTok :: TermParser ContinueTokL
-pContinueTok = pure ContinueTok' <* Megaparsec.eof
+pContinueTok = ContinueTok' <$ Megaparsec.eof
 
 pCopyTok :: TermParser CopyTokL
-pCopyTok = pure CopyTok' <* Megaparsec.eof
+pCopyTok = CopyTok' <$ Megaparsec.eof
 
 pDecreasesTok :: TermParser DecreasesTokL
-pDecreasesTok = pure DecreasesTok' <* Megaparsec.eof
+pDecreasesTok = DecreasesTok' <$ Megaparsec.eof
 
 pDropTok :: TermParser DropTokL
-pDropTok = pure DropTok' <* Megaparsec.eof
+pDropTok = DropTok' <$ Megaparsec.eof
 
 pElseTok :: TermParser ElseTokL
-pElseTok = pure ElseTok' <* Megaparsec.eof
+pElseTok = ElseTok' <$ Megaparsec.eof
 
 pEnsuresTok :: TermParser EnsuresTokL
-pEnsuresTok = pure EnsuresTok' <* Megaparsec.eof
+pEnsuresTok = EnsuresTok' <$ Megaparsec.eof
 
 pEntryTok :: TermParser EntryTokL
-pEntryTok = pure EntryTok' <* Megaparsec.eof
+pEntryTok = EntryTok' <$ Megaparsec.eof
 
 pEnumTok :: TermParser EnumTokL
-pEnumTok = pure EnumTok' <* Megaparsec.eof
+pEnumTok = EnumTok' <$ Megaparsec.eof
 
 pExceptTok :: TermParser ExceptTokL
-pExceptTok = pure ExceptTok' <* Megaparsec.eof
+pExceptTok = ExceptTok' <$ Megaparsec.eof
 
 pExistsTok :: TermParser ExistsTokL
-pExistsTok = pure ExistsTok' <* Megaparsec.eof
+pExistsTok = ExistsTok' <$ Megaparsec.eof
 
 pFalseTok :: TermParser FalseTokL
-pFalseTok = pure FalseTok' <* Megaparsec.eof
+pFalseTok = FalseTok' <$ Megaparsec.eof
 
 pForallTok :: TermParser ForallTokL
-pForallTok = pure ForallTok' <* Megaparsec.eof
+pForallTok = ForallTok' <$ Megaparsec.eof
 
 pFriendTok :: TermParser FriendTokL
-pFriendTok = pure FriendTok' <* Megaparsec.eof
+pFriendTok = FriendTok' <$ Megaparsec.eof
 
 pFunTok :: TermParser FunTokL
-pFunTok = pure FunTok' <* Megaparsec.eof
+pFunTok = FunTok' <$ Megaparsec.eof
 
 pGlobalTok :: TermParser GlobalTokL
-pGlobalTok = pure GlobalTok' <* Megaparsec.eof
+pGlobalTok = GlobalTok' <$ Megaparsec.eof
 
 pHasTok :: TermParser HasTokL
-pHasTok = pure HasTok' <* Megaparsec.eof
+pHasTok = HasTok' <$ Megaparsec.eof
 
 pIfTok :: TermParser IfTokL
-pIfTok = pure IfTok' <* Megaparsec.eof
+pIfTok = IfTok' <$ Megaparsec.eof
 
 pInTok :: TermParser InTokL
-pInTok = pure InTok' <* Megaparsec.eof
+pInTok = InTok' <$ Megaparsec.eof
 
 pIncludeTok :: TermParser IncludeTokL
-pIncludeTok = pure IncludeTok' <* Megaparsec.eof
+pIncludeTok = IncludeTok' <$ Megaparsec.eof
 
 pInternalTok :: TermParser InternalTokL
-pInternalTok = pure InternalTok' <* Megaparsec.eof
+pInternalTok = InternalTok' <$ Megaparsec.eof
 
 pInvariantTok :: TermParser InvariantTokL
-pInvariantTok = pure InvariantTok' <* Megaparsec.eof
+pInvariantTok = InvariantTok' <$ Megaparsec.eof
 
 pKeyTok :: TermParser KeyTokL
-pKeyTok = pure KeyTok' <* Megaparsec.eof
+pKeyTok = KeyTok' <$ Megaparsec.eof
 
 pLetTok :: TermParser LetTokL
-pLetTok = pure LetTok' <* Megaparsec.eof
+pLetTok = LetTok' <$ Megaparsec.eof
 
 pLocalTok :: TermParser LocalTokL
-pLocalTok = pure LocalTok' <* Megaparsec.eof
+pLocalTok = LocalTok' <$ Megaparsec.eof
 
 pLoopTok :: TermParser LoopTokL
-pLoopTok = pure LoopTok' <* Megaparsec.eof
+pLoopTok = LoopTok' <$ Megaparsec.eof
 
 pMacroTok :: TermParser MacroTokL
-pMacroTok = pure MacroTok' <* Megaparsec.eof
+pMacroTok = MacroTok' <$ Megaparsec.eof
 
 pMatchTok :: TermParser MatchTokL
-pMatchTok = pure MatchTok' <* Megaparsec.eof
+pMatchTok = MatchTok' <$ Megaparsec.eof
 
 pModifiesTok :: TermParser ModifiesTokL
-pModifiesTok = pure ModifiesTok' <* Megaparsec.eof
+pModifiesTok = ModifiesTok' <$ Megaparsec.eof
 
 pModuleTok :: TermParser ModuleTokL
-pModuleTok = pure ModuleTok' <* Megaparsec.eof
+pModuleTok = ModuleTok' <$ Megaparsec.eof
 
 pMoveTok :: TermParser MoveTokL
-pMoveTok = pure MoveTok' <* Megaparsec.eof
+pMoveTok = MoveTok' <$ Megaparsec.eof
 
 pMutTok :: TermParser MutTokL
-pMutTok = pure MutTok' <* Megaparsec.eof
+pMutTok = MutTok' <$ Megaparsec.eof
 
 pNativeTok :: TermParser NativeTokL
-pNativeTok = pure NativeTok' <* Megaparsec.eof
+pNativeTok = NativeTok' <$ Megaparsec.eof
 
 pPackTok :: TermParser PackTokL
-pPackTok = pure PackTok' <* Megaparsec.eof
+pPackTok = PackTok' <$ Megaparsec.eof
 
 pPackageTok :: TermParser PackageTokL
-pPackageTok = pure PackageTok' <* Megaparsec.eof
+pPackageTok = PackageTok' <$ Megaparsec.eof
 
 pPhantomTok :: TermParser PhantomTokL
-pPhantomTok = pure PhantomTok' <* Megaparsec.eof
+pPhantomTok = PhantomTok' <$ Megaparsec.eof
 
 pPostTok :: TermParser PostTokL
-pPostTok = pure PostTok' <* Megaparsec.eof
+pPostTok = PostTok' <$ Megaparsec.eof
 
 pPragmaTok :: TermParser PragmaTokL
-pPragmaTok = pure PragmaTok' <* Megaparsec.eof
+pPragmaTok = PragmaTok' <$ Megaparsec.eof
 
 pPublicTok :: TermParser PublicTokL
-pPublicTok = pure PublicTok' <* Megaparsec.eof
+pPublicTok = PublicTok' <$ Megaparsec.eof
 
 pRequiresTok :: TermParser RequiresTokL
-pRequiresTok = pure RequiresTok' <* Megaparsec.eof
+pRequiresTok = RequiresTok' <$ Megaparsec.eof
 
 pReturnTok :: TermParser ReturnTokL
-pReturnTok = pure ReturnTok' <* Megaparsec.eof
+pReturnTok = ReturnTok' <$ Megaparsec.eof
 
 pSchemaTok :: TermParser SchemaTokL
-pSchemaTok = pure SchemaTok' <* Megaparsec.eof
+pSchemaTok = SchemaTok' <$ Megaparsec.eof
 
 pSignerTok :: TermParser SignerTokL
-pSignerTok = pure SignerTok' <* Megaparsec.eof
+pSignerTok = SignerTok' <$ Megaparsec.eof
 
 pSpecTok :: TermParser SpecTokL
-pSpecTok = pure SpecTok' <* Megaparsec.eof
+pSpecTok = SpecTok' <$ Megaparsec.eof
 
 pStoreTok :: TermParser StoreTokL
-pStoreTok = pure StoreTok' <* Megaparsec.eof
+pStoreTok = StoreTok' <$ Megaparsec.eof
 
 pStructTok :: TermParser StructTokL
-pStructTok = pure StructTok' <* Megaparsec.eof
+pStructTok = StructTok' <$ Megaparsec.eof
 
 pSucceedsIfTok :: TermParser SucceedsIfTokL
-pSucceedsIfTok = pure SucceedsIfTok' <* Megaparsec.eof
+pSucceedsIfTok = SucceedsIfTok' <$ Megaparsec.eof
 
 pToTok :: TermParser ToTokL
-pToTok = pure ToTok' <* Megaparsec.eof
+pToTok = ToTok' <$ Megaparsec.eof
 
 pTrueTok :: TermParser TrueTokL
-pTrueTok = pure TrueTok' <* Megaparsec.eof
+pTrueTok = TrueTok' <$ Megaparsec.eof
 
 pU128Tok :: TermParser U128TokL
-pU128Tok = pure U128Tok' <* Megaparsec.eof
+pU128Tok = U128Tok' <$ Megaparsec.eof
 
 pU16Tok :: TermParser U16TokL
-pU16Tok = pure U16Tok' <* Megaparsec.eof
+pU16Tok = U16Tok' <$ Megaparsec.eof
 
 pU256Tok :: TermParser U256TokL
-pU256Tok = pure U256Tok' <* Megaparsec.eof
+pU256Tok = U256Tok' <$ Megaparsec.eof
 
 pU32Tok :: TermParser U32TokL
-pU32Tok = pure U32Tok' <* Megaparsec.eof
+pU32Tok = U32Tok' <$ Megaparsec.eof
 
 pU64Tok :: TermParser U64TokL
-pU64Tok = pure U64Tok' <* Megaparsec.eof
+pU64Tok = U64Tok' <$ Megaparsec.eof
 
 pU8Tok :: TermParser U8TokL
-pU8Tok = pure U8Tok' <* Megaparsec.eof
+pU8Tok = U8Tok' <$ Megaparsec.eof
 
 pUnpackTok :: TermParser UnpackTokL
-pUnpackTok = pure UnpackTok' <* Megaparsec.eof
+pUnpackTok = UnpackTok' <$ Megaparsec.eof
 
 pUpdateTok :: TermParser UpdateTokL
-pUpdateTok = pure UpdateTok' <* Megaparsec.eof
+pUpdateTok = UpdateTok' <$ Megaparsec.eof
 
 pUseTok :: TermParser UseTokL
-pUseTok = pure UseTok' <* Megaparsec.eof
+pUseTok = UseTok' <$ Megaparsec.eof
 
 pVectorLessThanSignTok :: TermParser VectorLessThanSignTokL
-pVectorLessThanSignTok = pure VectorLessThanSignTok' <* Megaparsec.eof
+pVectorLessThanSignTok = VectorLessThanSignTok' <$ Megaparsec.eof
 
 pVectorLeftSquareBracketTok :: TermParser VectorLeftSquareBracketTokL
-pVectorLeftSquareBracketTok = pure VectorLeftSquareBracketTok' <* Megaparsec.eof
+pVectorLeftSquareBracketTok = VectorLeftSquareBracketTok' <$ Megaparsec.eof
 
 pWhereTok :: TermParser WhereTokL
-pWhereTok = pure WhereTok' <* Megaparsec.eof
+pWhereTok = WhereTok' <$ Megaparsec.eof
 
 pWhileTok :: TermParser WhileTokL
-pWhileTok = pure WhileTok' <* Megaparsec.eof
+pWhileTok = WhileTok' <$ Megaparsec.eof
 
 pWithTok :: TermParser WithTokL
-pWithTok = pure WithTok' <* Megaparsec.eof
+pWithTok = WithTok' <$ Megaparsec.eof
 
 pLeftCurlyBracketTok :: TermParser LeftCurlyBracketTokL
-pLeftCurlyBracketTok = pure LeftCurlyBracketTok' <* Megaparsec.eof
+pLeftCurlyBracketTok = LeftCurlyBracketTok' <$ Megaparsec.eof
 
 pVerticalLineTok :: TermParser VerticalLineTokL
-pVerticalLineTok = pure VerticalLineTok' <* Megaparsec.eof
+pVerticalLineTok = VerticalLineTok' <$ Megaparsec.eof
 
 pVerticalLineVerticalLineTok :: TermParser VerticalLineVerticalLineTokL
-pVerticalLineVerticalLineTok = pure VerticalLineVerticalLineTok' <* Megaparsec.eof
+pVerticalLineVerticalLineTok = VerticalLineVerticalLineTok' <$ Megaparsec.eof
 
 pRightCurlyBracketTok :: TermParser RightCurlyBracketTokL
-pRightCurlyBracketTok = pure RightCurlyBracketTok' <* Megaparsec.eof
+pRightCurlyBracketTok = RightCurlyBracketTok' <$ Megaparsec.eof
 
 pSourceFile :: TermParser SourceFileL
 pSourceFile =
@@ -407,7 +468,7 @@ pModuleDefinition =
 
 pModuleBody :: TermParser ModuleBodyL
 pModuleBody =
-  ModuleBody' <$> (pModuleBodyInternal0 _sym) <*> pMany (pModuleBodyInternal1 _sym) <*> pMaybe pRightCurlyBracketTok
+  ModuleBody' <$> (pModuleBodyInternal0) <*> pMany (pModuleBodyInternal1) <*> pMaybe pRightCurlyBracketTok
 
 pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
 pModuleBodyInternal0 =
@@ -415,10 +476,10 @@ pModuleBodyInternal0 =
          , Megaparsec.try pModuleBodyInternal0LeftCurlyBracket
          ]
   where
-    pModuleBodyInternal0Semicolon :: Parser (MoveTerm ModuleBodyInternal0L)
+    pModuleBodyInternal0Semicolon :: TermParser ModuleBodyInternal0L
     pModuleBodyInternal0Semicolon =
       ModuleBodyInternal0Semicolon' <$> pSemicolonTok
-    pModuleBodyInternal0LeftCurlyBracket :: Parser (MoveTerm ModuleBodyInternal0L)
+    pModuleBodyInternal0LeftCurlyBracket :: TermParser ModuleBodyInternal0L
     pModuleBodyInternal0LeftCurlyBracket =
       ModuleBodyInternal0LeftCurlyBracket' <$> pLeftCurlyBracketTok
 
@@ -433,25 +494,25 @@ pModuleBodyInternal1 =
          , Megaparsec.try pModuleBodyInternal1SpecBlock
          ]
   where
-    pModuleBodyInternal1UseDeclaration :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1UseDeclaration :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1UseDeclaration =
       ModuleBodyInternal1UseDeclaration' <$> pUseDeclaration
-    pModuleBodyInternal1FriendDeclaration :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1FriendDeclaration :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1FriendDeclaration =
       ModuleBodyInternal1FriendDeclaration' <$> pFriendDeclaration
-    pModuleBodyInternal1Constant :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1Constant :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1Constant =
       ModuleBodyInternal1Constant' <$> pConstant
-    pModuleBodyInternal1HidFunctionItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidFunctionItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidFunctionItem =
       ModuleBodyInternal1HidFunctionItem' <$> pHidFunctionItem
-    pModuleBodyInternal1HidStructItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidStructItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidStructItem =
       ModuleBodyInternal1HidStructItem' <$> pHidStructItem
-    pModuleBodyInternal1HidEnumItem :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1HidEnumItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidEnumItem =
       ModuleBodyInternal1HidEnumItem' <$> pHidEnumItem
-    pModuleBodyInternal1SpecBlock :: Parser (MoveTerm ModuleBodyInternal1L)
+    pModuleBodyInternal1SpecBlock :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1SpecBlock =
       ModuleBodyInternal1SpecBlock' <$> pSpecBlock
 
@@ -479,52 +540,52 @@ pHidExpression =
          , Megaparsec.try pHidExpressionIdentifiedExpression
          ]
   where
-    pHidExpressionCallExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionCallExpression :: TermParser HidExpressionL
     pHidExpressionCallExpression =
       HidExpressionCallExpression' <$> pCallExpression
-    pHidExpressionMacroCallExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionMacroCallExpression :: TermParser HidExpressionL
     pHidExpressionMacroCallExpression =
       HidExpressionMacroCallExpression' <$> pMacroCallExpression
-    pHidExpressionLambdaExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionLambdaExpression :: TermParser HidExpressionL
     pHidExpressionLambdaExpression =
       HidExpressionLambdaExpression' <$> pLambdaExpression
-    pHidExpressionIfExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionIfExpression :: TermParser HidExpressionL
     pHidExpressionIfExpression =
       HidExpressionIfExpression' <$> pIfExpression
-    pHidExpressionWhileExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionWhileExpression :: TermParser HidExpressionL
     pHidExpressionWhileExpression =
       HidExpressionWhileExpression' <$> pWhileExpression
-    pHidExpressionReturnExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionReturnExpression :: TermParser HidExpressionL
     pHidExpressionReturnExpression =
       HidExpressionReturnExpression' <$> pReturnExpression
-    pHidExpressionAbortExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionAbortExpression :: TermParser HidExpressionL
     pHidExpressionAbortExpression =
       HidExpressionAbortExpression' <$> pAbortExpression
-    pHidExpressionAssignExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionAssignExpression :: TermParser HidExpressionL
     pHidExpressionAssignExpression =
       HidExpressionAssignExpression' <$> pAssignExpression
-    pHidExpressionHidUnaryExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionHidUnaryExpression :: TermParser HidExpressionL
     pHidExpressionHidUnaryExpression =
       HidExpressionHidUnaryExpression' <$> pHidUnaryExpression
-    pHidExpressionBinaryExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionBinaryExpression :: TermParser HidExpressionL
     pHidExpressionBinaryExpression =
       HidExpressionBinaryExpression' <$> pBinaryExpression
-    pHidExpressionCastExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionCastExpression :: TermParser HidExpressionL
     pHidExpressionCastExpression =
       HidExpressionCastExpression' <$> pCastExpression
-    pHidExpressionQuantifierExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionQuantifierExpression :: TermParser HidExpressionL
     pHidExpressionQuantifierExpression =
       HidExpressionQuantifierExpression' <$> pQuantifierExpression
-    pHidExpressionMatchExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionMatchExpression :: TermParser HidExpressionL
     pHidExpressionMatchExpression =
       HidExpressionMatchExpression' <$> pMatchExpression
-    pHidExpressionVectorExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionVectorExpression :: TermParser HidExpressionL
     pHidExpressionVectorExpression =
       HidExpressionVectorExpression' <$> pVectorExpression
-    pHidExpressionLoopExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionLoopExpression :: TermParser HidExpressionL
     pHidExpressionLoopExpression =
       HidExpressionLoopExpression' <$> pLoopExpression
-    pHidExpressionIdentifiedExpression :: Parser (MoveTerm HidExpressionL)
+    pHidExpressionIdentifiedExpression :: TermParser HidExpressionL
     pHidExpressionIdentifiedExpression =
       HidExpressionIdentifiedExpression' <$> pIdentifiedExpression
 
@@ -538,7 +599,7 @@ pAssignExpression =
 
 pHidUnaryExpression :: TermParser HidUnaryExpressionL
 pHidUnaryExpression =
-  HidUnaryExpression' <$> (pHidUnaryExpressionInternal0 _sym)
+  HidUnaryExpression' <$> (pHidUnaryExpressionInternal0)
 
 pHidUnaryExpressionInternal0 :: TermParser HidUnaryExpressionInternal0L
 pHidUnaryExpressionInternal0 =
@@ -549,19 +610,19 @@ pHidUnaryExpressionInternal0 =
          , Megaparsec.try pHidUnaryExpressionInternal0HidExpressionTerm
          ]
   where
-    pHidUnaryExpressionInternal0UnaryExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0UnaryExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0UnaryExpression =
       HidUnaryExpressionInternal0UnaryExpression' <$> pUnaryExpression
-    pHidUnaryExpressionInternal0BorrowExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0BorrowExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0BorrowExpression =
       HidUnaryExpressionInternal0BorrowExpression' <$> pBorrowExpression
-    pHidUnaryExpressionInternal0DereferenceExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0DereferenceExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0DereferenceExpression =
       HidUnaryExpressionInternal0DereferenceExpression' <$> pDereferenceExpression
-    pHidUnaryExpressionInternal0MoveOrCopyExpression :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0MoveOrCopyExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0MoveOrCopyExpression =
       HidUnaryExpressionInternal0MoveOrCopyExpression' <$> pMoveOrCopyExpression
-    pHidUnaryExpressionInternal0HidExpressionTerm :: Parser (MoveTerm HidUnaryExpressionInternal0L)
+    pHidUnaryExpressionInternal0HidExpressionTerm :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0HidExpressionTerm =
       HidUnaryExpressionInternal0HidExpressionTerm' <$> pHidExpressionTerm
 
@@ -575,10 +636,10 @@ pHidReference =
          , Megaparsec.try pHidReferenceMutRef
          ]
   where
-    pHidReferenceImmRef :: Parser (MoveTerm HidReferenceL)
+    pHidReferenceImmRef :: TermParser HidReferenceL
     pHidReferenceImmRef =
       HidReferenceImmRef' <$> pImmRef
-    pHidReferenceMutRef :: Parser (MoveTerm HidReferenceL)
+    pHidReferenceMutRef :: TermParser HidReferenceL
     pHidReferenceMutRef =
       HidReferenceMutRef' <$> pMutRef
 
@@ -615,55 +676,55 @@ pHidExpressionTerm =
          , Megaparsec.try pHidExpressionTermMatchExpression
          ]
   where
-    pHidExpressionTermCallExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermCallExpression :: TermParser HidExpressionTermL
     pHidExpressionTermCallExpression =
       HidExpressionTermCallExpression' <$> pCallExpression
-    pHidExpressionTermBreakExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermBreakExpression :: TermParser HidExpressionTermL
     pHidExpressionTermBreakExpression =
       HidExpressionTermBreakExpression' <$> pBreakExpression
-    pHidExpressionTermContinueExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermContinueExpression :: TermParser HidExpressionTermL
     pHidExpressionTermContinueExpression =
       HidExpressionTermContinueExpression' <$> pContinueExpression
-    pHidExpressionTermNameExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermNameExpression :: TermParser HidExpressionTermL
     pHidExpressionTermNameExpression =
       HidExpressionTermNameExpression' <$> pNameExpression
-    pHidExpressionTermMacroCallExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermMacroCallExpression :: TermParser HidExpressionTermL
     pHidExpressionTermMacroCallExpression =
       HidExpressionTermMacroCallExpression' <$> pMacroCallExpression
-    pHidExpressionTermPackExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermPackExpression :: TermParser HidExpressionTermL
     pHidExpressionTermPackExpression =
       HidExpressionTermPackExpression' <$> pPackExpression
-    pHidExpressionTermHidLiteralValue :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermHidLiteralValue :: TermParser HidExpressionTermL
     pHidExpressionTermHidLiteralValue =
       HidExpressionTermHidLiteralValue' <$> pHidLiteralValue
-    pHidExpressionTermUnitExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermUnitExpression :: TermParser HidExpressionTermL
     pHidExpressionTermUnitExpression =
       HidExpressionTermUnitExpression' <$> pUnitExpression
-    pHidExpressionTermExpressionList :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermExpressionList :: TermParser HidExpressionTermL
     pHidExpressionTermExpressionList =
       HidExpressionTermExpressionList' <$> pExpressionList
-    pHidExpressionTermAnnotationExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermAnnotationExpression :: TermParser HidExpressionTermL
     pHidExpressionTermAnnotationExpression =
       HidExpressionTermAnnotationExpression' <$> pAnnotationExpression
-    pHidExpressionTermBlock :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermBlock :: TermParser HidExpressionTermL
     pHidExpressionTermBlock =
       HidExpressionTermBlock' <$> pBlock
-    pHidExpressionTermSpecBlock :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermSpecBlock :: TermParser HidExpressionTermL
     pHidExpressionTermSpecBlock =
       HidExpressionTermSpecBlock' <$> pSpecBlock
-    pHidExpressionTermIfExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermIfExpression :: TermParser HidExpressionTermL
     pHidExpressionTermIfExpression =
       HidExpressionTermIfExpression' <$> pIfExpression
-    pHidExpressionTermDotExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermDotExpression :: TermParser HidExpressionTermL
     pHidExpressionTermDotExpression =
       HidExpressionTermDotExpression' <$> pDotExpression
-    pHidExpressionTermIndexExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermIndexExpression :: TermParser HidExpressionTermL
     pHidExpressionTermIndexExpression =
       HidExpressionTermIndexExpression' <$> pIndexExpression
-    pHidExpressionTermVectorExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermVectorExpression :: TermParser HidExpressionTermL
     pHidExpressionTermVectorExpression =
       HidExpressionTermVectorExpression' <$> pVectorExpression
-    pHidExpressionTermMatchExpression :: Parser (MoveTerm HidExpressionTermL)
+    pHidExpressionTermMatchExpression :: TermParser HidExpressionTermL
     pHidExpressionTermMatchExpression =
       HidExpressionTermMatchExpression' <$> pMatchExpression
 
@@ -680,19 +741,19 @@ pHidType =
          , Megaparsec.try pHidTypePrimitiveType
          ]
   where
-    pHidTypeApplyType :: Parser (MoveTerm HidTypeL)
+    pHidTypeApplyType :: TermParser HidTypeL
     pHidTypeApplyType =
       HidTypeApplyType' <$> pApplyType
-    pHidTypeRefType :: Parser (MoveTerm HidTypeL)
+    pHidTypeRefType :: TermParser HidTypeL
     pHidTypeRefType =
       HidTypeRefType' <$> pRefType
-    pHidTypeTupleType :: Parser (MoveTerm HidTypeL)
+    pHidTypeTupleType :: TermParser HidTypeL
     pHidTypeTupleType =
       HidTypeTupleType' <$> pTupleType
-    pHidTypeFunctionType :: Parser (MoveTerm HidTypeL)
+    pHidTypeFunctionType :: TermParser HidTypeL
     pHidTypeFunctionType =
       HidTypeFunctionType' <$> pFunctionType
-    pHidTypePrimitiveType :: Parser (MoveTerm HidTypeL)
+    pHidTypePrimitiveType :: TermParser HidTypeL
     pHidTypePrimitiveType =
       HidTypePrimitiveType' <$> pPrimitiveType
 
@@ -713,31 +774,31 @@ pModuleAccess =
          , Megaparsec.try pModuleAccessMember
          ]
   where
-    pModuleAccess1 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess1 :: TermParser ModuleAccessL
     pModuleAccess1 =
       ModuleAccess1' <$> pDollarSignTok <*> pIdentifier
-    pModuleAccess2 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess2 :: TermParser ModuleAccessL
     pModuleAccess2 =
       ModuleAccess2' <$> pCommercialAtTok <*> pIdentifier
-    pModuleAccess3 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess3 :: TermParser ModuleAccessL
     pModuleAccess3 =
       ModuleAccess3' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess4 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess4 :: TermParser ModuleAccessL
     pModuleAccess4 =
       ModuleAccess4' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pTypeArguments
-    pModuleAccess5 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess5 :: TermParser ModuleAccessL
     pModuleAccess5 =
       ModuleAccess5' <$> pModuleIdentity <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess6 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess6 :: TermParser ModuleAccessL
     pModuleAccess6 =
       ModuleAccess6' <$> pHidModuleIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
-    pModuleAccess7 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess7 :: TermParser ModuleAccessL
     pModuleAccess7 =
       ModuleAccess7' <$> pModuleIdentity <*> pMaybe pTypeArguments
-    pModuleAccess8 :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccess8 :: TermParser ModuleAccessL
     pModuleAccess8 =
       ModuleAccess8' <$> pIdentifier <*> pMaybe pTypeArguments
-    pModuleAccessMember :: Parser (MoveTerm ModuleAccessL)
+    pModuleAccessMember :: TermParser ModuleAccessL
     pModuleAccessMember =
       ModuleAccessMember' <$> pHidReservedIdentifier
 
@@ -747,7 +808,7 @@ pHidModuleIdentifier =
 
 pIdentifier :: TermParser IdentifierL
 pIdentifier =
-  Identifier' <$> pContent _sym
+  Identifier' <$> pContent
 
 pHidReservedIdentifier :: TermParser HidReservedIdentifierL
 pHidReservedIdentifier =
@@ -755,10 +816,10 @@ pHidReservedIdentifier =
          , Megaparsec.try pHidReservedIdentifierHidExists
          ]
   where
-    pHidReservedIdentifierHidForall :: Parser (MoveTerm HidReservedIdentifierL)
+    pHidReservedIdentifierHidForall :: TermParser HidReservedIdentifierL
     pHidReservedIdentifierHidForall =
       HidReservedIdentifierHidForall' <$> pHidForall
-    pHidReservedIdentifierHidExists :: Parser (MoveTerm HidReservedIdentifierL)
+    pHidReservedIdentifierHidExists :: TermParser HidReservedIdentifierL
     pHidReservedIdentifierHidExists =
       HidReservedIdentifierHidExists' <$> pHidExists
 
@@ -772,7 +833,7 @@ pHidForall =
 
 pModuleIdentity :: TermParser ModuleIdentityL
 pModuleIdentity =
-  ModuleIdentity' <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> pHidModuleIdentifier
+  ModuleIdentity' <$> (pModuleIdentityInternal0) <*> pColonColonTok <*> pHidModuleIdentifier
 
 pModuleIdentityInternal0 :: TermParser ModuleIdentityInternal0L
 pModuleIdentityInternal0 =
@@ -780,16 +841,16 @@ pModuleIdentityInternal0 =
          , Megaparsec.try pModuleIdentityInternal0HidModuleIdentifier
          ]
   where
-    pModuleIdentityInternal0NumLiteral :: Parser (MoveTerm ModuleIdentityInternal0L)
+    pModuleIdentityInternal0NumLiteral :: TermParser ModuleIdentityInternal0L
     pModuleIdentityInternal0NumLiteral =
       ModuleIdentityInternal0NumLiteral' <$> pNumLiteral
-    pModuleIdentityInternal0HidModuleIdentifier :: Parser (MoveTerm ModuleIdentityInternal0L)
+    pModuleIdentityInternal0HidModuleIdentifier :: TermParser ModuleIdentityInternal0L
     pModuleIdentityInternal0HidModuleIdentifier =
       ModuleIdentityInternal0HidModuleIdentifier' <$> pHidModuleIdentifier
 
 pNumLiteral :: TermParser NumLiteralL
 pNumLiteral =
-  NumLiteral' <$> pContent _sym <*> pMaybe (pNumLiteralInternal0 _sym)
+  NumLiteral' <$> pContent <*> pMaybe (pNumLiteralInternal0)
 
 pNumLiteralInternal0 :: TermParser NumLiteralInternal0L
 pNumLiteralInternal0 =
@@ -801,22 +862,22 @@ pNumLiteralInternal0 =
          , Megaparsec.try pNumLiteralInternal0U256
          ]
   where
-    pNumLiteralInternal0U8 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U8 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U8 =
       NumLiteralInternal0U8' <$> pU8Tok
-    pNumLiteralInternal0U16 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U16 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U16 =
       NumLiteralInternal0U16' <$> pU16Tok
-    pNumLiteralInternal0U32 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U32 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U32 =
       NumLiteralInternal0U32' <$> pU32Tok
-    pNumLiteralInternal0U64 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U64 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U64 =
       NumLiteralInternal0U64' <$> pU64Tok
-    pNumLiteralInternal0U128 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U128 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U128 =
       NumLiteralInternal0U128' <$> pU128Tok
-    pNumLiteralInternal0U256 :: Parser (MoveTerm NumLiteralInternal0L)
+    pNumLiteralInternal0U256 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U256 =
       NumLiteralInternal0U256' <$> pU256Tok
 
@@ -846,34 +907,34 @@ pPrimitiveType =
          , Megaparsec.try pPrimitiveTypeBytearray
          ]
   where
-    pPrimitiveTypeU8 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU8 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU8 =
       PrimitiveTypeU8' <$> pU8Tok
-    pPrimitiveTypeU16 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU16 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU16 =
       PrimitiveTypeU16' <$> pU16Tok
-    pPrimitiveTypeU32 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU32 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU32 =
       PrimitiveTypeU32' <$> pU32Tok
-    pPrimitiveTypeU64 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU64 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU64 =
       PrimitiveTypeU64' <$> pU64Tok
-    pPrimitiveTypeU128 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU128 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU128 =
       PrimitiveTypeU128' <$> pU128Tok
-    pPrimitiveTypeU256 :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeU256 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU256 =
       PrimitiveTypeU256' <$> pU256Tok
-    pPrimitiveTypeBool :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeBool :: TermParser PrimitiveTypeL
     pPrimitiveTypeBool =
       PrimitiveTypeBool' <$> pBoolTok
-    pPrimitiveTypeAddress :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeAddress :: TermParser PrimitiveTypeL
     pPrimitiveTypeAddress =
       PrimitiveTypeAddress' <$> pAddressTok
-    pPrimitiveTypeSigner :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeSigner :: TermParser PrimitiveTypeL
     pPrimitiveTypeSigner =
       PrimitiveTypeSigner' <$> pSignerTok
-    pPrimitiveTypeBytearray :: Parser (MoveTerm PrimitiveTypeL)
+    pPrimitiveTypeBytearray :: TermParser PrimitiveTypeL
     pPrimitiveTypeBytearray =
       PrimitiveTypeBytearray' <$> pBytearrayTok
 
@@ -891,7 +952,7 @@ pBlock =
 
 pBlockItem :: TermParser BlockItemL
 pBlockItem =
-  BlockItem' <$> (pBlockItemInternal0 _sym) <*> pSemicolonTok
+  BlockItem' <$> (pBlockItemInternal0) <*> pSemicolonTok
 
 pBlockItemInternal0 :: TermParser BlockItemInternal0L
 pBlockItemInternal0 =
@@ -899,10 +960,10 @@ pBlockItemInternal0 =
          , Megaparsec.try pBlockItemInternal0LetStatement
          ]
   where
-    pBlockItemInternal0HidExpression :: Parser (MoveTerm BlockItemInternal0L)
+    pBlockItemInternal0HidExpression :: TermParser BlockItemInternal0L
     pBlockItemInternal0HidExpression =
       BlockItemInternal0HidExpression' <$> pHidExpression
-    pBlockItemInternal0LetStatement :: Parser (MoveTerm BlockItemInternal0L)
+    pBlockItemInternal0LetStatement :: TermParser BlockItemInternal0L
     pBlockItemInternal0LetStatement =
       BlockItemInternal0LetStatement' <$> pLetStatement
 
@@ -917,13 +978,13 @@ pBindList =
          , Megaparsec.try pBindListOrBindList
          ]
   where
-    pBindListHidBind :: Parser (MoveTerm BindListL)
+    pBindListHidBind :: TermParser BindListL
     pBindListHidBind =
       BindListHidBind' <$> pHidBind
-    pBindListCommaBindList :: Parser (MoveTerm BindListL)
+    pBindListCommaBindList :: TermParser BindListL
     pBindListCommaBindList =
       BindListCommaBindList' <$> pCommaBindList
-    pBindListOrBindList :: Parser (MoveTerm BindListL)
+    pBindListOrBindList :: TermParser BindListL
     pBindListOrBindList =
       BindListOrBindList' <$> pOrBindList
 
@@ -939,16 +1000,16 @@ pHidBind =
          , Megaparsec.try pHidBindHidLiteralValue
          ]
   where
-    pHidBindHidBindInternal0 :: Parser (MoveTerm HidBindL)
+    pHidBindHidBindInternal0 :: TermParser HidBindL
     pHidBindHidBindInternal0 =
-      HidBindHidBindInternal0' <$> (pHidBindInternal0 _sym)
-    pHidBindBindUnpack :: Parser (MoveTerm HidBindL)
+      HidBindHidBindInternal0' <$> (pHidBindInternal0)
+    pHidBindBindUnpack :: TermParser HidBindL
     pHidBindBindUnpack =
       HidBindBindUnpack' <$> pBindUnpack
-    pHidBindAtBind :: Parser (MoveTerm HidBindL)
+    pHidBindAtBind :: TermParser HidBindL
     pHidBindAtBind =
       HidBindAtBind' <$> pAtBind
-    pHidBindHidLiteralValue :: Parser (MoveTerm HidBindL)
+    pHidBindHidLiteralValue :: TermParser HidBindL
     pHidBindHidLiteralValue =
       HidBindHidLiteralValue' <$> pHidLiteralValue
 
@@ -970,16 +1031,16 @@ pBindFields =
          , Megaparsec.try pBindFieldsBindNamedFields
          ]
   where
-    pBindFieldsBindPositionalFields :: Parser (MoveTerm BindFieldsL)
+    pBindFieldsBindPositionalFields :: TermParser BindFieldsL
     pBindFieldsBindPositionalFields =
       BindFieldsBindPositionalFields' <$> pBindPositionalFields
-    pBindFieldsBindNamedFields :: Parser (MoveTerm BindFieldsL)
+    pBindFieldsBindNamedFields :: TermParser BindFieldsL
     pBindFieldsBindNamedFields =
       BindFieldsBindNamedFields' <$> pBindNamedFields
 
 pBindNamedFields :: TermParser BindNamedFieldsL
 pBindNamedFields =
-  BindNamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
+  BindNamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy (pBindNamedFieldsInternal0) pCommaTok)
 
 pBindNamedFieldsInternal0 :: TermParser BindNamedFieldsInternal0L
 pBindNamedFieldsInternal0 =
@@ -987,10 +1048,10 @@ pBindNamedFieldsInternal0 =
          , Megaparsec.try pBindNamedFieldsInternal0MutBindField
          ]
   where
-    pBindNamedFieldsInternal0BindField :: Parser (MoveTerm BindNamedFieldsInternal0L)
+    pBindNamedFieldsInternal0BindField :: TermParser BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0BindField =
       BindNamedFieldsInternal0BindField' <$> pBindField
-    pBindNamedFieldsInternal0MutBindField :: Parser (MoveTerm BindNamedFieldsInternal0L)
+    pBindNamedFieldsInternal0MutBindField :: TermParser BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0MutBindField =
       BindNamedFieldsInternal0MutBindField' <$> pMutBindField
 
@@ -1000,10 +1061,10 @@ pBindField =
          , Megaparsec.try pBindFieldHidSpreadOperator
          ]
   where
-    pBindField1 :: Parser (MoveTerm BindFieldL)
+    pBindField1 :: TermParser BindFieldL
     pBindField1 =
       BindField1' <$> pBindList <*> pMaybe (pPair pColonTok pBindList)
-    pBindFieldHidSpreadOperator :: Parser (MoveTerm BindFieldL)
+    pBindFieldHidSpreadOperator :: TermParser BindFieldL
     pBindFieldHidSpreadOperator =
       BindFieldHidSpreadOperator' <$> pHidSpreadOperator
 
@@ -1017,7 +1078,7 @@ pMutBindField =
 
 pBindPositionalFields :: TermParser BindPositionalFieldsL
 pBindPositionalFields =
-  BindPositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pBindNamedFieldsInternal0 _sym) pCommaTok)
+  BindPositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pBindNamedFieldsInternal0) pCommaTok)
 
 pNameExpression :: TermParser NameExpressionL
 pNameExpression =
@@ -1029,10 +1090,10 @@ pHidBindInternal0 =
          , Megaparsec.try pHidBindInternal0HidVariableIdentifier
          ]
   where
-    pHidBindInternal0MutBindVar :: Parser (MoveTerm HidBindInternal0L)
+    pHidBindInternal0MutBindVar :: TermParser HidBindInternal0L
     pHidBindInternal0MutBindVar =
       HidBindInternal0MutBindVar' <$> pMutBindVar
-    pHidBindInternal0HidVariableIdentifier :: Parser (MoveTerm HidBindInternal0L)
+    pHidBindInternal0HidVariableIdentifier :: TermParser HidBindInternal0L
     pHidBindInternal0HidVariableIdentifier =
       HidBindInternal0HidVariableIdentifier' <$> pHidVariableIdentifier
 
@@ -1049,25 +1110,25 @@ pHidLiteralValue =
          , Megaparsec.try pHidLiteralValueByteStringLiteral
          ]
   where
-    pHidLiteralValueAddressLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueAddressLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueAddressLiteral =
       HidLiteralValueAddressLiteral' <$> pAddressLiteral
-    pHidLiteralValueBoolLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueBoolLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueBoolLiteral =
       HidLiteralValueBoolLiteral' <$> pBoolLiteral
-    pHidLiteralValueNumLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueNumLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueNumLiteral =
       HidLiteralValueNumLiteral' <$> pNumLiteral
-    pHidLiteralValueHexStringLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueHexStringLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueHexStringLiteral =
       HidLiteralValueHexStringLiteral' <$> pHexStringLiteral
-    pHidLiteralValueByteStringLiteral :: Parser (MoveTerm HidLiteralValueL)
+    pHidLiteralValueByteStringLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueByteStringLiteral =
       HidLiteralValueByteStringLiteral' <$> pByteStringLiteral
 
 pAddressLiteral :: TermParser AddressLiteralL
 pAddressLiteral =
-  AddressLiteral' <$> pContent _sym
+  AddressLiteral' <$> pContent
 
 pBoolLiteral :: TermParser BoolLiteralL
 pBoolLiteral =
@@ -1075,20 +1136,20 @@ pBoolLiteral =
          , Megaparsec.try pBoolLiteralFalse
          ]
   where
-    pBoolLiteralTrue :: Parser (MoveTerm BoolLiteralL)
+    pBoolLiteralTrue :: TermParser BoolLiteralL
     pBoolLiteralTrue =
       BoolLiteralTrue' <$> pTrueTok
-    pBoolLiteralFalse :: Parser (MoveTerm BoolLiteralL)
+    pBoolLiteralFalse :: TermParser BoolLiteralL
     pBoolLiteralFalse =
       BoolLiteralFalse' <$> pFalseTok
 
 pByteStringLiteral :: TermParser ByteStringLiteralL
 pByteStringLiteral =
-  ByteStringLiteral' <$> pContent _sym
+  ByteStringLiteral' <$> pContent
 
 pHexStringLiteral :: TermParser HexStringLiteralL
 pHexStringLiteral =
-  HexStringLiteral' <$> pContent _sym
+  HexStringLiteral' <$> pContent
 
 pOrBindList :: TermParser OrBindListL
 pOrBindList =
@@ -1096,7 +1157,7 @@ pOrBindList =
 
 pUseDeclaration :: TermParser UseDeclarationL
 pUseDeclaration =
-  UseDeclaration' <$> pMaybe pPublicTok <*> pBetween pUseTok pSemicolonTok (pUseDeclarationInternal0 _sym)
+  UseDeclaration' <$> pMaybe pPublicTok <*> pBetween pUseTok pSemicolonTok (pUseDeclarationInternal0)
 
 pUseDeclarationInternal0 :: TermParser UseDeclarationInternal0L
 pUseDeclarationInternal0 =
@@ -1106,16 +1167,16 @@ pUseDeclarationInternal0 =
          , Megaparsec.try pUseDeclarationInternal0UseModuleMembers
          ]
   where
-    pUseDeclarationInternal0UseFun :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseFun :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseFun =
       UseDeclarationInternal0UseFun' <$> pUseFun
-    pUseDeclarationInternal0UseModule :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModule :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModule =
       UseDeclarationInternal0UseModule' <$> pUseModule
-    pUseDeclarationInternal0UseModuleMember :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModuleMember :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMember =
       UseDeclarationInternal0UseModuleMember' <$> pUseModuleMember
-    pUseDeclarationInternal0UseModuleMembers :: Parser (MoveTerm UseDeclarationInternal0L)
+    pUseDeclarationInternal0UseModuleMembers :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMembers =
       UseDeclarationInternal0UseModuleMembers' <$> pUseModuleMembers
 
@@ -1142,13 +1203,13 @@ pUseMember =
          , Megaparsec.try pUseMember3
          ]
   where
-    pUseMember1 :: Parser (MoveTerm UseMemberL)
+    pUseMember1 :: TermParser UseMemberL
     pUseMember1 =
       UseMember1' <$> pIdentifier <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
-    pUseMember2 :: Parser (MoveTerm UseMemberL)
+    pUseMember2 :: TermParser UseMemberL
     pUseMember2 =
       UseMember2' <$> pIdentifier <*> pColonColonTok <*> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
-    pUseMember3 :: Parser (MoveTerm UseMemberL)
+    pUseMember3 :: TermParser UseMemberL
     pUseMember3 =
       UseMember3' <$> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
 
@@ -1158,10 +1219,10 @@ pUseModuleMembers =
          , Megaparsec.try pUseModuleMembers2
          ]
   where
-    pUseModuleMembers1 :: Parser (MoveTerm UseModuleMembersL)
+    pUseModuleMembers1 :: TermParser UseModuleMembersL
     pUseModuleMembers1 =
-      UseModuleMembers1' <$> (pModuleIdentityInternal0 _sym) <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
-    pUseModuleMembers2 :: Parser (MoveTerm UseModuleMembersL)
+      UseModuleMembers1' <$> (pModuleIdentityInternal0) <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+    pUseModuleMembers2 :: TermParser UseModuleMembersL
     pUseModuleMembers2 =
       UseModuleMembers2' <$> pModuleIdentity <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
 
@@ -1243,7 +1304,7 @@ pHidFieldIdentifier =
 
 pSpecBlock :: TermParser SpecBlockL
 pSpecBlock =
-  SpecBlock' <$> pSpecTok <*> (pSpecBlockInternal0 _sym)
+  SpecBlock' <$> pSpecTok <*> (pSpecBlockInternal0)
 
 pSpecBlockInternal0 :: TermParser SpecBlockInternal0L
 pSpecBlockInternal0 =
@@ -1251,10 +1312,10 @@ pSpecBlockInternal0 =
          , Megaparsec.try pSpecBlockInternal0HidSpecFunction
          ]
   where
-    pSpecBlockInternal01 :: Parser (MoveTerm SpecBlockInternal0L)
+    pSpecBlockInternal01 :: TermParser SpecBlockInternal0L
     pSpecBlockInternal01 =
       SpecBlockInternal01' <$> pMaybe pHidSpecBlockTarget <*> pSpecBody
-    pSpecBlockInternal0HidSpecFunction :: Parser (MoveTerm SpecBlockInternal0L)
+    pSpecBlockInternal0HidSpecFunction :: TermParser SpecBlockInternal0L
     pSpecBlockInternal0HidSpecFunction =
       SpecBlockInternal0HidSpecFunction' <$> pHidSpecFunction
 
@@ -1265,13 +1326,13 @@ pHidSpecBlockTarget =
          , Megaparsec.try pHidSpecBlockTargetSpecBlockTargetSchema
          ]
   where
-    pHidSpecBlockTargetIdentifier :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetIdentifier :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetIdentifier =
       HidSpecBlockTargetIdentifier' <$> pIdentifier
-    pHidSpecBlockTargetModule :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetModule :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetModule =
       HidSpecBlockTargetModule' <$> pModuleTok
-    pHidSpecBlockTargetSpecBlockTargetSchema :: Parser (MoveTerm HidSpecBlockTargetL)
+    pHidSpecBlockTargetSpecBlockTargetSchema :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetSpecBlockTargetSchema =
       HidSpecBlockTargetSpecBlockTargetSchema' <$> pSpecBlockTargetSchema
 
@@ -1299,16 +1360,16 @@ pAbility =
          , Megaparsec.try pAbilityKey
          ]
   where
-    pAbilityCopy :: Parser (MoveTerm AbilityL)
+    pAbilityCopy :: TermParser AbilityL
     pAbilityCopy =
       AbilityCopy' <$> pCopyTok
-    pAbilityDrop :: Parser (MoveTerm AbilityL)
+    pAbilityDrop :: TermParser AbilityL
     pAbilityDrop =
       AbilityDrop' <$> pDropTok
-    pAbilityStore :: Parser (MoveTerm AbilityL)
+    pAbilityStore :: TermParser AbilityL
     pAbilityStore =
       AbilityStore' <$> pStoreTok
-    pAbilityKey :: Parser (MoveTerm AbilityL)
+    pAbilityKey :: TermParser AbilityL
     pAbilityKey =
       AbilityKey' <$> pKeyTok
 
@@ -1323,13 +1384,13 @@ pHidSpecFunction =
          , Megaparsec.try pHidSpecFunctionUninterpretedSpecFunction
          ]
   where
-    pHidSpecFunctionNativeSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionNativeSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionNativeSpecFunction =
       HidSpecFunctionNativeSpecFunction' <$> pNativeSpecFunction
-    pHidSpecFunctionUsualSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionUsualSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionUsualSpecFunction =
       HidSpecFunctionUsualSpecFunction' <$> pUsualSpecFunction
-    pHidSpecFunctionUninterpretedSpecFunction :: Parser (MoveTerm HidSpecFunctionL)
+    pHidSpecFunctionUninterpretedSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionUninterpretedSpecFunction =
       HidSpecFunctionUninterpretedSpecFunction' <$> pUninterpretedSpecFunction
 
@@ -1343,7 +1404,7 @@ pHidSpecFunctionSignature =
 
 pFunctionParameters :: TermParser FunctionParametersL
 pFunctionParameters =
-  FunctionParameters' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pFunctionParametersInternal0 _sym) pCommaTok)
+  FunctionParameters' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pFunctionParametersInternal0) pCommaTok)
 
 pFunctionParametersInternal0 :: TermParser FunctionParametersInternal0L
 pFunctionParametersInternal0 =
@@ -1351,16 +1412,16 @@ pFunctionParametersInternal0 =
          , Megaparsec.try pFunctionParametersInternal0FunctionParameter
          ]
   where
-    pFunctionParametersInternal0MutFunctionParameter :: Parser (MoveTerm FunctionParametersInternal0L)
+    pFunctionParametersInternal0MutFunctionParameter :: TermParser FunctionParametersInternal0L
     pFunctionParametersInternal0MutFunctionParameter =
       FunctionParametersInternal0MutFunctionParameter' <$> pMutFunctionParameter
-    pFunctionParametersInternal0FunctionParameter :: Parser (MoveTerm FunctionParametersInternal0L)
+    pFunctionParametersInternal0FunctionParameter :: TermParser FunctionParametersInternal0L
     pFunctionParametersInternal0FunctionParameter =
       FunctionParametersInternal0FunctionParameter' <$> pFunctionParameter
 
 pFunctionParameter :: TermParser FunctionParameterL
 pFunctionParameter =
-  FunctionParameter' <$> (pFunctionParameterInternal0 _sym) <*> pColonTok <*> pHidType
+  FunctionParameter' <$> (pFunctionParameterInternal0) <*> pColonTok <*> pHidType
 
 pFunctionParameterInternal0 :: TermParser FunctionParameterInternal0L
 pFunctionParameterInternal0 =
@@ -1368,10 +1429,10 @@ pFunctionParameterInternal0 =
          , Megaparsec.try pFunctionParameterInternal02
          ]
   where
-    pFunctionParameterInternal0Name :: Parser (MoveTerm FunctionParameterInternal0L)
+    pFunctionParameterInternal0Name :: TermParser FunctionParameterInternal0L
     pFunctionParameterInternal0Name =
       FunctionParameterInternal0Name' <$> pHidVariableIdentifier
-    pFunctionParameterInternal02 :: Parser (MoveTerm FunctionParameterInternal0L)
+    pFunctionParameterInternal02 :: TermParser FunctionParameterInternal0L
     pFunctionParameterInternal02 =
       FunctionParameterInternal02' <$> pDollarSignTok <*> pHidVariableIdentifier
 
@@ -1407,28 +1468,28 @@ pHidSpecBlockMemeber =
          , Megaparsec.try pHidSpecBlockMemeberSpecLet
          ]
   where
-    pHidSpecBlockMemeberSpecInvariant :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecInvariant :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecInvariant =
       HidSpecBlockMemeberSpecInvariant' <$> pSpecInvariant
-    pHidSpecBlockMemeberHidSpecFunction :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberHidSpecFunction :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberHidSpecFunction =
       HidSpecBlockMemeberHidSpecFunction' <$> pHidSpecFunction
-    pHidSpecBlockMemeberSpecCondition :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecCondition :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecCondition =
       HidSpecBlockMemeberSpecCondition' <$> pSpecCondition
-    pHidSpecBlockMemeberSpecInclude :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecInclude :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecInclude =
       HidSpecBlockMemeberSpecInclude' <$> pSpecInclude
-    pHidSpecBlockMemeberSpecApply :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecApply :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecApply =
       HidSpecBlockMemeberSpecApply' <$> pSpecApply
-    pHidSpecBlockMemeberSpecPragma :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecPragma :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecPragma =
       HidSpecBlockMemeberSpecPragma' <$> pSpecPragma
-    pHidSpecBlockMemeberSpecVariable :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecVariable :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecVariable =
       HidSpecBlockMemeberSpecVariable' <$> pSpecVariable
-    pHidSpecBlockMemeberSpecLet :: Parser (MoveTerm HidSpecBlockMemeberL)
+    pHidSpecBlockMemeberSpecLet :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecLet =
       HidSpecBlockMemeberSpecLet' <$> pSpecLet
 
@@ -1438,11 +1499,11 @@ pSpecApply =
 
 pSpecApplyPattern :: TermParser SpecApplyPatternL
 pSpecApplyPattern =
-  SpecApplyPattern' <$> pMaybe (pSpecApplyPatternInternal0 _sym) <*> pSpecApplyNamePattern <*> pMaybe pTypeParameters
+  SpecApplyPattern' <$> pMaybe (pSpecApplyPatternInternal0) <*> pSpecApplyNamePattern <*> pMaybe pTypeParameters
 
 pSpecApplyNamePattern :: TermParser SpecApplyNamePatternL
 pSpecApplyNamePattern =
-  SpecApplyNamePattern' <$> pContent _sym
+  SpecApplyNamePattern' <$> pContent
 
 pSpecApplyPatternInternal0 :: TermParser SpecApplyPatternInternal0L
 pSpecApplyPatternInternal0 =
@@ -1450,10 +1511,10 @@ pSpecApplyPatternInternal0 =
          , Megaparsec.try pSpecApplyPatternInternal0Internal
          ]
   where
-    pSpecApplyPatternInternal0Public :: Parser (MoveTerm SpecApplyPatternInternal0L)
+    pSpecApplyPatternInternal0Public :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Public =
       SpecApplyPatternInternal0Public' <$> pPublicTok
-    pSpecApplyPatternInternal0Internal :: Parser (MoveTerm SpecApplyPatternInternal0L)
+    pSpecApplyPatternInternal0Internal :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Internal =
       SpecApplyPatternInternal0Internal' <$> pInternalTok
 
@@ -1464,13 +1525,13 @@ pSpecCondition =
          , Megaparsec.try pSpecConditionHidSpecAbortWithOrModifies
          ]
   where
-    pSpecConditionHidSpecCondition :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecCondition :: TermParser SpecConditionL
     pSpecConditionHidSpecCondition =
       SpecConditionHidSpecCondition' <$> pHidSpecCondition
-    pSpecConditionHidSpecAbortIf :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecAbortIf :: TermParser SpecConditionL
     pSpecConditionHidSpecAbortIf =
       SpecConditionHidSpecAbortIf' <$> pHidSpecAbortIf
-    pSpecConditionHidSpecAbortWithOrModifies :: Parser (MoveTerm SpecConditionL)
+    pSpecConditionHidSpecAbortWithOrModifies :: TermParser SpecConditionL
     pSpecConditionHidSpecAbortWithOrModifies =
       SpecConditionHidSpecAbortWithOrModifies' <$> pHidSpecAbortWithOrModifies
 
@@ -1488,7 +1549,7 @@ pSpecProperty =
 
 pHidSpecAbortWithOrModifies :: TermParser HidSpecAbortWithOrModifiesL
 pHidSpecAbortWithOrModifies =
-  HidSpecAbortWithOrModifies' <$> (pHidSpecAbortWithOrModifiesInternal0 _sym) <*> pMaybe pConditionProperties <*> pSepBy1 pHidExpression pCommaTok <*> pSemicolonTok
+  HidSpecAbortWithOrModifies' <$> (pHidSpecAbortWithOrModifiesInternal0) <*> pMaybe pConditionProperties <*> pSepBy1 pHidExpression pCommaTok <*> pSemicolonTok
 
 pHidSpecAbortWithOrModifiesInternal0 :: TermParser HidSpecAbortWithOrModifiesInternal0L
 pHidSpecAbortWithOrModifiesInternal0 =
@@ -1496,16 +1557,16 @@ pHidSpecAbortWithOrModifiesInternal0 =
          , Megaparsec.try pHidSpecAbortWithOrModifiesInternal0Modifies
          ]
   where
-    pHidSpecAbortWithOrModifiesInternal0AbortsWith :: Parser (MoveTerm HidSpecAbortWithOrModifiesInternal0L)
+    pHidSpecAbortWithOrModifiesInternal0AbortsWith :: TermParser HidSpecAbortWithOrModifiesInternal0L
     pHidSpecAbortWithOrModifiesInternal0AbortsWith =
       HidSpecAbortWithOrModifiesInternal0AbortsWith' <$> pAbortsWithTok
-    pHidSpecAbortWithOrModifiesInternal0Modifies :: Parser (MoveTerm HidSpecAbortWithOrModifiesInternal0L)
+    pHidSpecAbortWithOrModifiesInternal0Modifies :: TermParser HidSpecAbortWithOrModifiesInternal0L
     pHidSpecAbortWithOrModifiesInternal0Modifies =
       HidSpecAbortWithOrModifiesInternal0Modifies' <$> pModifiesTok
 
 pHidSpecCondition :: TermParser HidSpecConditionL
 pHidSpecCondition =
-  HidSpecCondition' <$> (pHidSpecConditionInternal0 _sym) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
+  HidSpecCondition' <$> (pHidSpecConditionInternal0) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
 
 pHidSpecConditionInternal0 :: TermParser HidSpecConditionInternal0L
 pHidSpecConditionInternal0 =
@@ -1513,10 +1574,10 @@ pHidSpecConditionInternal0 =
          , Megaparsec.try pHidSpecConditionInternal02
          ]
   where
-    pHidSpecConditionInternal0Kind :: Parser (MoveTerm HidSpecConditionInternal0L)
+    pHidSpecConditionInternal0Kind :: TermParser HidSpecConditionInternal0L
     pHidSpecConditionInternal0Kind =
       HidSpecConditionInternal0Kind' <$> pHidSpecConditionKind
-    pHidSpecConditionInternal02 :: Parser (MoveTerm HidSpecConditionInternal0L)
+    pHidSpecConditionInternal02 :: TermParser HidSpecConditionInternal0L
     pHidSpecConditionInternal02 =
       HidSpecConditionInternal02' <$> pRequiresTok <*> pMaybe pModuleTok
 
@@ -1529,19 +1590,19 @@ pHidSpecConditionKind =
          , Megaparsec.try pHidSpecConditionKindSucceedsIf
          ]
   where
-    pHidSpecConditionKindAssert :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindAssert :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindAssert =
       HidSpecConditionKindAssert' <$> pAssertTok
-    pHidSpecConditionKindAssume :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindAssume :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindAssume =
       HidSpecConditionKindAssume' <$> pAssumeTok
-    pHidSpecConditionKindDecreases :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindDecreases :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindDecreases =
       HidSpecConditionKindDecreases' <$> pDecreasesTok
-    pHidSpecConditionKindEnsures :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindEnsures :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindEnsures =
       HidSpecConditionKindEnsures' <$> pEnsuresTok
-    pHidSpecConditionKindSucceedsIf :: Parser (MoveTerm HidSpecConditionKindL)
+    pHidSpecConditionKindSucceedsIf :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindSucceedsIf =
       HidSpecConditionKindSucceedsIf' <$> pSucceedsIfTok
 
@@ -1551,7 +1612,7 @@ pSpecInclude =
 
 pSpecInvariant :: TermParser SpecInvariantL
 pSpecInvariant =
-  SpecInvariant' <$> pInvariantTok <*> pMaybe (pSpecInvariantInternal0 _sym) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
+  SpecInvariant' <$> pInvariantTok <*> pMaybe (pSpecInvariantInternal0) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
 
 pSpecInvariantInternal0 :: TermParser SpecInvariantInternal0L
 pSpecInvariantInternal0 =
@@ -1561,16 +1622,16 @@ pSpecInvariantInternal0 =
          , Megaparsec.try pSpecInvariantInternal0Module
          ]
   where
-    pSpecInvariantInternal0Update :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Update :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Update =
       SpecInvariantInternal0Update' <$> pUpdateTok
-    pSpecInvariantInternal0Pack :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Pack :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Pack =
       SpecInvariantInternal0Pack' <$> pPackTok
-    pSpecInvariantInternal0Unpack :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Unpack :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Unpack =
       SpecInvariantInternal0Unpack' <$> pUnpackTok
-    pSpecInvariantInternal0Module :: Parser (MoveTerm SpecInvariantInternal0L)
+    pSpecInvariantInternal0Module :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Module =
       SpecInvariantInternal0Module' <$> pModuleTok
 
@@ -1584,7 +1645,7 @@ pSpecPragma =
 
 pSpecVariable :: TermParser SpecVariableL
 pSpecVariable =
-  SpecVariable' <$> pMaybe (pSpecVariableInternal0 _sym) <*> pIdentifier <*> pMaybe pTypeParameters <*> pBetween pColonTok pSemicolonTok pHidType
+  SpecVariable' <$> pMaybe (pSpecVariableInternal0) <*> pIdentifier <*> pMaybe pTypeParameters <*> pBetween pColonTok pSemicolonTok pHidType
 
 pSpecVariableInternal0 :: TermParser SpecVariableInternal0L
 pSpecVariableInternal0 =
@@ -1592,10 +1653,10 @@ pSpecVariableInternal0 =
          , Megaparsec.try pSpecVariableInternal0Local
          ]
   where
-    pSpecVariableInternal0Global :: Parser (MoveTerm SpecVariableInternal0L)
+    pSpecVariableInternal0Global :: TermParser SpecVariableInternal0L
     pSpecVariableInternal0Global =
       SpecVariableInternal0Global' <$> pGlobalTok
-    pSpecVariableInternal0Local :: Parser (MoveTerm SpecVariableInternal0L)
+    pSpecVariableInternal0Local :: TermParser SpecVariableInternal0L
     pSpecVariableInternal0Local =
       SpecVariableInternal0Local' <$> pLocalTok
 
@@ -1605,7 +1666,7 @@ pUnitExpression =
 
 pVectorExpression :: TermParser VectorExpressionL
 pVectorExpression =
-  VectorExpression' <$> (pVectorExpressionInternal0 _sym) <*> pSepBy pHidExpression pCommaTok <*> pRightSquareBracketTok
+  VectorExpression' <$> (pVectorExpressionInternal0) <*> pSepBy pHidExpression pCommaTok <*> pRightSquareBracketTok
 
 pVectorExpressionInternal0 :: TermParser VectorExpressionInternal0L
 pVectorExpressionInternal0 =
@@ -1613,16 +1674,16 @@ pVectorExpressionInternal0 =
          , Megaparsec.try pVectorExpressionInternal02
          ]
   where
-    pVectorExpressionInternal0VectorLeftSquareBracket :: Parser (MoveTerm VectorExpressionInternal0L)
+    pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser VectorExpressionInternal0L
     pVectorExpressionInternal0VectorLeftSquareBracket =
       VectorExpressionInternal0VectorLeftSquareBracket' <$> pVectorLeftSquareBracketTok
-    pVectorExpressionInternal02 :: Parser (MoveTerm VectorExpressionInternal0L)
+    pVectorExpressionInternal02 :: TermParser VectorExpressionInternal0L
     pVectorExpressionInternal02 =
       VectorExpressionInternal02' <$> pBetween pVectorLessThanSignTok pGreaterThanSignTok (pSepBy1 pHidType pCommaTok) <*> pLeftSquareBracketTok
 
 pMoveOrCopyExpression :: TermParser MoveOrCopyExpressionL
 pMoveOrCopyExpression =
-  MoveOrCopyExpression' <$> pPair (pMoveOrCopyExpressionInternal0 _sym) pHidExpression
+  MoveOrCopyExpression' <$> pPair (pMoveOrCopyExpressionInternal0) pHidExpression
 
 pMoveOrCopyExpressionInternal0 :: TermParser MoveOrCopyExpressionInternal0L
 pMoveOrCopyExpressionInternal0 =
@@ -1630,10 +1691,10 @@ pMoveOrCopyExpressionInternal0 =
          , Megaparsec.try pMoveOrCopyExpressionInternal0Copy
          ]
   where
-    pMoveOrCopyExpressionInternal0Move :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
+    pMoveOrCopyExpressionInternal0Move :: TermParser MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Move =
       MoveOrCopyExpressionInternal0Move' <$> pMoveTok
-    pMoveOrCopyExpressionInternal0Copy :: Parser (MoveTerm MoveOrCopyExpressionInternal0L)
+    pMoveOrCopyExpressionInternal0Copy :: TermParser MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Copy =
       MoveOrCopyExpressionInternal0Copy' <$> pCopyTok
 
@@ -1669,64 +1730,64 @@ pBinaryExpression =
          , Megaparsec.try pBinaryExpression20
          ]
   where
-    pBinaryExpression1 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression1 :: TermParser BinaryExpressionL
     pBinaryExpression1 =
       BinaryExpression1' <$> pHidExpression <*> pEqualsSignEqualsSignGreaterThanSignTok <*> pHidExpression
-    pBinaryExpression2 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression2 :: TermParser BinaryExpressionL
     pBinaryExpression2 =
       BinaryExpression2' <$> pHidExpression <*> pVerticalLineVerticalLineTok <*> pHidExpression
-    pBinaryExpression3 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression3 :: TermParser BinaryExpressionL
     pBinaryExpression3 =
       BinaryExpression3' <$> pHidExpression <*> pAmpersandAmpersandTok <*> pHidExpression
-    pBinaryExpression4 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression4 :: TermParser BinaryExpressionL
     pBinaryExpression4 =
       BinaryExpression4' <$> pHidExpression <*> pEqualsSignEqualsSignTok <*> pHidExpression
-    pBinaryExpression5 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression5 :: TermParser BinaryExpressionL
     pBinaryExpression5 =
       BinaryExpression5' <$> pHidExpression <*> pExclamationMarkEqualsSignTok <*> pHidExpression
-    pBinaryExpression6 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression6 :: TermParser BinaryExpressionL
     pBinaryExpression6 =
       BinaryExpression6' <$> pHidExpression <*> pLessThanSignTok <*> pHidExpression
-    pBinaryExpression7 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression7 :: TermParser BinaryExpressionL
     pBinaryExpression7 =
       BinaryExpression7' <$> pHidExpression <*> pGreaterThanSignTok <*> pHidExpression
-    pBinaryExpression8 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression8 :: TermParser BinaryExpressionL
     pBinaryExpression8 =
       BinaryExpression8' <$> pHidExpression <*> pLessThanSignEqualsSignTok <*> pHidExpression
-    pBinaryExpression9 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression9 :: TermParser BinaryExpressionL
     pBinaryExpression9 =
       BinaryExpression9' <$> pHidExpression <*> pGreaterThanSignEqualsSignTok <*> pHidExpression
-    pBinaryExpression10 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression10 :: TermParser BinaryExpressionL
     pBinaryExpression10 =
       BinaryExpression10' <$> pHidExpression <*> pFullStopFullStopTok <*> pHidExpression
-    pBinaryExpression11 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression11 :: TermParser BinaryExpressionL
     pBinaryExpression11 =
       BinaryExpression11' <$> pHidExpression <*> pVerticalLineTok <*> pHidExpression
-    pBinaryExpression12 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression12 :: TermParser BinaryExpressionL
     pBinaryExpression12 =
       BinaryExpression12' <$> pHidExpression <*> pCircumflexAccentTok <*> pHidExpression
-    pBinaryExpression13 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression13 :: TermParser BinaryExpressionL
     pBinaryExpression13 =
       BinaryExpression13' <$> pHidExpression <*> pAmpersandTok <*> pHidExpression
-    pBinaryExpression14 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression14 :: TermParser BinaryExpressionL
     pBinaryExpression14 =
       BinaryExpression14' <$> pHidExpression <*> pLessThanSignLessThanSignTok <*> pHidExpression
-    pBinaryExpression15 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression15 :: TermParser BinaryExpressionL
     pBinaryExpression15 =
       BinaryExpression15' <$> pHidExpression <*> pGreaterThanSignGreaterThanSignTok <*> pHidExpression
-    pBinaryExpression16 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression16 :: TermParser BinaryExpressionL
     pBinaryExpression16 =
       BinaryExpression16' <$> pHidExpression <*> pPlusSignTok <*> pHidExpression
-    pBinaryExpression17 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression17 :: TermParser BinaryExpressionL
     pBinaryExpression17 =
       BinaryExpression17' <$> pHidExpression <*> pHyphenMinusTok <*> pHidExpression
-    pBinaryExpression18 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression18 :: TermParser BinaryExpressionL
     pBinaryExpression18 =
       BinaryExpression18' <$> pHidExpression <*> pAsteriskTok <*> pHidExpression
-    pBinaryExpression19 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression19 :: TermParser BinaryExpressionL
     pBinaryExpression19 =
       BinaryExpression19' <$> pHidExpression <*> pSolidusTok <*> pHidExpression
-    pBinaryExpression20 :: Parser (MoveTerm BinaryExpressionL)
+    pBinaryExpression20 :: TermParser BinaryExpressionL
     pBinaryExpression20 =
       BinaryExpression20' <$> pHidExpression <*> pPercentSignTok <*> pHidExpression
 
@@ -1756,10 +1817,10 @@ pLambdaBinding =
          , Megaparsec.try pLambdaBinding2
          ]
   where
-    pLambdaBindingCommaBindList :: Parser (MoveTerm LambdaBindingL)
+    pLambdaBindingCommaBindList :: TermParser LambdaBindingL
     pLambdaBindingCommaBindList =
       LambdaBindingCommaBindList' <$> pCommaBindList
-    pLambdaBinding2 :: Parser (MoveTerm LambdaBindingL)
+    pLambdaBinding2 :: TermParser LambdaBindingL
     pLambdaBinding2 =
       LambdaBinding2' <$> pHidBind <*> pMaybe (pPair pColonTok pHidType)
 
@@ -1781,10 +1842,10 @@ pQuantifierBinding =
          , Megaparsec.try pQuantifierBinding2
          ]
   where
-    pQuantifierBinding1 :: Parser (MoveTerm QuantifierBindingL)
+    pQuantifierBinding1 :: TermParser QuantifierBindingL
     pQuantifierBinding1 =
       QuantifierBinding1' <$> pIdentifier <*> pColonTok <*> pHidType
-    pQuantifierBinding2 :: Parser (MoveTerm QuantifierBindingL)
+    pQuantifierBinding2 :: TermParser QuantifierBindingL
     pQuantifierBinding2 =
       QuantifierBinding2' <$> pIdentifier <*> pInTok <*> pHidExpression
 
@@ -1794,10 +1855,10 @@ pReturnExpression =
          , Megaparsec.try pReturnExpression2
          ]
   where
-    pReturnExpression1 :: Parser (MoveTerm ReturnExpressionL)
+    pReturnExpression1 :: TermParser ReturnExpressionL
     pReturnExpression1 =
       ReturnExpression1' <$> pReturnTok <*> pMaybe pLabel <*> pHidExpression
-    pReturnExpression2 :: Parser (MoveTerm ReturnExpressionL)
+    pReturnExpression2 :: TermParser ReturnExpressionL
     pReturnExpression2 =
       ReturnExpression2' <$> pReturnTok <*> pMaybe pLabel
 
@@ -1815,10 +1876,10 @@ pFriendAccess =
          , Megaparsec.try pFriendAccessFullyQualifiedModule
          ]
   where
-    pFriendAccessLocalModule :: Parser (MoveTerm FriendAccessL)
+    pFriendAccessLocalModule :: TermParser FriendAccessL
     pFriendAccessLocalModule =
       FriendAccessLocalModule' <$> pIdentifier
-    pFriendAccessFullyQualifiedModule :: Parser (MoveTerm FriendAccessL)
+    pFriendAccessFullyQualifiedModule :: TermParser FriendAccessL
     pFriendAccessFullyQualifiedModule =
       FriendAccessFullyQualifiedModule' <$> pModuleIdentity
 
@@ -1844,10 +1905,10 @@ pDatatypeFields =
          , Megaparsec.try pDatatypeFieldsNamedFields
          ]
   where
-    pDatatypeFieldsPositionalFields :: Parser (MoveTerm DatatypeFieldsL)
+    pDatatypeFieldsPositionalFields :: TermParser DatatypeFieldsL
     pDatatypeFieldsPositionalFields =
       DatatypeFieldsPositionalFields' <$> pPositionalFields
-    pDatatypeFieldsNamedFields :: Parser (MoveTerm DatatypeFieldsL)
+    pDatatypeFieldsNamedFields :: TermParser DatatypeFieldsL
     pDatatypeFieldsNamedFields =
       DatatypeFieldsNamedFields' <$> pNamedFields
 
@@ -1890,13 +1951,13 @@ pHidFunctionItem =
          , Megaparsec.try pHidFunctionItemFunctionDefinition
          ]
   where
-    pHidFunctionItemNativeFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemNativeFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemNativeFunctionDefinition =
       HidFunctionItemNativeFunctionDefinition' <$> pNativeFunctionDefinition
-    pHidFunctionItemMacroFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemMacroFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemMacroFunctionDefinition =
       HidFunctionItemMacroFunctionDefinition' <$> pMacroFunctionDefinition
-    pHidFunctionItemFunctionDefinition :: Parser (MoveTerm HidFunctionItemL)
+    pHidFunctionItemFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemFunctionDefinition =
       HidFunctionItemFunctionDefinition' <$> pFunctionDefinition
 
@@ -1915,13 +1976,13 @@ pModifier =
          , Megaparsec.try pModifierNative
          ]
   where
-    pModifier1 :: Parser (MoveTerm ModifierL)
+    pModifier1 :: TermParser ModifierL
     pModifier1 =
-      Modifier1' <$> pPublicTok <*> pMaybe (pBetween pLeftParenthesisTok pRightParenthesisTok (pModifierInternal0 _sym))
-    pModifierEntry :: Parser (MoveTerm ModifierL)
+      Modifier1' <$> pPublicTok <*> pMaybe (pBetween pLeftParenthesisTok pRightParenthesisTok (pModifierInternal0))
+    pModifierEntry :: TermParser ModifierL
     pModifierEntry =
       ModifierEntry' <$> pEntryTok
-    pModifierNative :: Parser (MoveTerm ModifierL)
+    pModifierNative :: TermParser ModifierL
     pModifierNative =
       ModifierNative' <$> pNativeTok
 
@@ -1931,10 +1992,10 @@ pModifierInternal0 =
          , Megaparsec.try pModifierInternal0Friend
          ]
   where
-    pModifierInternal0Package :: Parser (MoveTerm ModifierInternal0L)
+    pModifierInternal0Package :: TermParser ModifierInternal0L
     pModifierInternal0Package =
       ModifierInternal0Package' <$> pPackageTok
-    pModifierInternal0Friend :: Parser (MoveTerm ModifierInternal0L)
+    pModifierInternal0Friend :: TermParser ModifierInternal0L
     pModifierInternal0Friend =
       ModifierInternal0Friend' <$> pFriendTok
 
@@ -1956,10 +2017,10 @@ pHidStructItem =
          , Megaparsec.try pHidStructItemStructDefinition
          ]
   where
-    pHidStructItemNativeStructDefinition :: Parser (MoveTerm HidStructItemL)
+    pHidStructItemNativeStructDefinition :: TermParser HidStructItemL
     pHidStructItemNativeStructDefinition =
       HidStructItemNativeStructDefinition' <$> pNativeStructDefinition
-    pHidStructItemStructDefinition :: Parser (MoveTerm HidStructItemL)
+    pHidStructItemStructDefinition :: TermParser HidStructItemL
     pHidStructItemStructDefinition =
       HidStructItemStructDefinition' <$> pStructDefinition
 
@@ -1974,3 +2035,318 @@ pHidStructSignature =
 pStructDefinition :: TermParser StructDefinitionL
 pStructDefinition =
   StructDefinition' <$> pMaybe pPublicTok <*> pHidStructSignature <*> pDatatypeFields <*> pMaybe pPostfixAbilityDecls
+
+--------------------------------------------------------------------------------
+-- Parse Table
+--------------------------------------------------------------------------------
+
+newtype ParseTable = SymbolTable {unParseTable :: IntMap SomeTermParser}
+
+symbolMap :: Map String SomeTermParser
+symbolMap = Map.fromList
+    [ ("source_file", E <$> pSourceFile)
+    , ("module_definition", E <$> pModuleDefinition)
+    , ("module_body", E <$> pModuleBody)
+    , ("module_body_internal0", E <$> pModuleBodyInternal0)
+    , ("module_body_internal1", E <$> pModuleBodyInternal1)
+    , ("constant", E <$> pConstant)
+    , ("hid_expression", E <$> pHidExpression)
+    , ("abort_expression", E <$> pAbortExpression)
+    , ("assign_expression", E <$> pAssignExpression)
+    , ("hid_unary_expression", E <$> pHidUnaryExpression)
+    , ("hid_unary_expression_internal0", E <$> pHidUnaryExpressionInternal0)
+    , ("borrow_expression", E <$> pBorrowExpression)
+    , ("hid_reference", E <$> pHidReference)
+    , ("imm_ref", E <$> pImmRef)
+    , ("mut_ref", E <$> pMutRef)
+    , ("dereference_expression", E <$> pDereferenceExpression)
+    , ("hid_expression_term", E <$> pHidExpressionTerm)
+    , ("annotation_expression", E <$> pAnnotationExpression)
+    , ("hid_type", E <$> pHidType)
+    , ("apply_type", E <$> pApplyType)
+    , ("module_access", E <$> pModuleAccess)
+    , ("hid_module_identifier", E <$> pHidModuleIdentifier)
+    , ("identifier", E <$> pIdentifier)
+    , ("hid_reserved_identifier", E <$> pHidReservedIdentifier)
+    , ("hid_exists", E <$> pHidExists)
+    , ("hid_forall", E <$> pHidForall)
+    , ("module_identity", E <$> pModuleIdentity)
+    , ("module_identity_internal0", E <$> pModuleIdentityInternal0)
+    , ("num_literal", E <$> pNumLiteral)
+    , ("num_literal_internal0", E <$> pNumLiteralInternal0)
+    , ("type_arguments", E <$> pTypeArguments)
+    , ("function_type", E <$> pFunctionType)
+    , ("function_type_parameters", E <$> pFunctionTypeParameters)
+    , ("primitive_type", E <$> pPrimitiveType)
+    , ("ref_type", E <$> pRefType)
+    , ("tuple_type", E <$> pTupleType)
+    , ("block", E <$> pBlock)
+    , ("block_item", E <$> pBlockItem)
+    , ("block_item_internal0", E <$> pBlockItemInternal0)
+    , ("let_statement", E <$> pLetStatement)
+    , ("bind_list", E <$> pBindList)
+    , ("comma_bind_list", E <$> pCommaBindList)
+    , ("hid_bind", E <$> pHidBind)
+    , ("at_bind", E <$> pAtBind)
+    , ("hid_variable_identifier", E <$> pHidVariableIdentifier)
+    , ("bind_unpack", E <$> pBindUnpack)
+    , ("bind_fields", E <$> pBindFields)
+    , ("bind_named_fields", E <$> pBindNamedFields)
+    , ("bind_named_fields_internal0", E <$> pBindNamedFieldsInternal0)
+    , ("bind_field", E <$> pBindField)
+    , ("hid_spread_operator", E <$> pHidSpreadOperator)
+    , ("mut_bind_field", E <$> pMutBindField)
+    , ("bind_positional_fields", E <$> pBindPositionalFields)
+    , ("name_expression", E <$> pNameExpression)
+    , ("hid_bind_internal0", E <$> pHidBindInternal0)
+    , ("mut_bind_var", E <$> pMutBindVar)
+    , ("hid_literal_value", E <$> pHidLiteralValue)
+    , ("address_literal", E <$> pAddressLiteral)
+    , ("bool_literal", E <$> pBoolLiteral)
+    , ("byte_string_literal", E <$> pByteStringLiteral)
+    , ("hex_string_literal", E <$> pHexStringLiteral)
+    , ("or_bind_list", E <$> pOrBindList)
+    , ("use_declaration", E <$> pUseDeclaration)
+    , ("use_declaration_internal0", E <$> pUseDeclarationInternal0)
+    , ("use_fun", E <$> pUseFun)
+    , ("hid_function_identifier", E <$> pHidFunctionIdentifier)
+    , ("use_module", E <$> pUseModule)
+    , ("use_module_member", E <$> pUseModuleMember)
+    , ("use_member", E <$> pUseMember)
+    , ("use_module_members", E <$> pUseModuleMembers)
+    , ("break_expression", E <$> pBreakExpression)
+    , ("label", E <$> pLabel)
+    , ("call_expression", E <$> pCallExpression)
+    , ("arg_list", E <$> pArgList)
+    , ("continue_expression", E <$> pContinueExpression)
+    , ("dot_expression", E <$> pDotExpression)
+    , ("expression_list", E <$> pExpressionList)
+    , ("if_expression", E <$> pIfExpression)
+    , ("index_expression", E <$> pIndexExpression)
+    , ("macro_call_expression", E <$> pMacroCallExpression)
+    , ("macro_module_access", E <$> pMacroModuleAccess)
+    , ("match_expression", E <$> pMatchExpression)
+    , ("hid_match_body", E <$> pHidMatchBody)
+    , ("match_arm", E <$> pMatchArm)
+    , ("match_condition", E <$> pMatchCondition)
+    , ("pack_expression", E <$> pPackExpression)
+    , ("field_initialize_list", E <$> pFieldInitializeList)
+    , ("exp_field", E <$> pExpField)
+    , ("hid_field_identifier", E <$> pHidFieldIdentifier)
+    , ("spec_block", E <$> pSpecBlock)
+    , ("spec_block_internal0", E <$> pSpecBlockInternal0)
+    , ("hid_spec_block_target", E <$> pHidSpecBlockTarget)
+    , ("spec_block_target_schema", E <$> pSpecBlockTargetSchema)
+    , ("hid_struct_identifier", E <$> pHidStructIdentifier)
+    , ("type_parameters", E <$> pTypeParameters)
+    , ("type_parameter", E <$> pTypeParameter)
+    , ("ability", E <$> pAbility)
+    , ("hid_type_parameter_identifier", E <$> pHidTypeParameterIdentifier)
+    , ("hid_spec_function", E <$> pHidSpecFunction)
+    , ("native_spec_function", E <$> pNativeSpecFunction)
+    , ("hid_spec_function_signature", E <$> pHidSpecFunctionSignature)
+    , ("function_parameters", E <$> pFunctionParameters)
+    , ("function_parameters_internal0", E <$> pFunctionParametersInternal0)
+    , ("function_parameter", E <$> pFunctionParameter)
+    , ("function_parameter_internal0", E <$> pFunctionParameterInternal0)
+    , ("mut_function_parameter", E <$> pMutFunctionParameter)
+    , ("ret_type", E <$> pRetType)
+    , ("uninterpreted_spec_function", E <$> pUninterpretedSpecFunction)
+    , ("usual_spec_function", E <$> pUsualSpecFunction)
+    , ("spec_body", E <$> pSpecBody)
+    , ("hid_spec_block_memeber", E <$> pHidSpecBlockMemeber)
+    , ("spec_apply", E <$> pSpecApply)
+    , ("spec_apply_pattern", E <$> pSpecApplyPattern)
+    , ("spec_apply_name_pattern", E <$> pSpecApplyNamePattern)
+    , ("spec_apply_pattern_internal0", E <$> pSpecApplyPatternInternal0)
+    , ("spec_condition", E <$> pSpecCondition)
+    , ("hid_spec_abort_if", E <$> pHidSpecAbortIf)
+    , ("condition_properties", E <$> pConditionProperties)
+    , ("spec_property", E <$> pSpecProperty)
+    , ("hid_spec_abort_with_or_modifies", E <$> pHidSpecAbortWithOrModifies)
+    , ("hid_spec_abort_with_or_modifies_internal0", E <$> pHidSpecAbortWithOrModifiesInternal0)
+    , ("hid_spec_condition", E <$> pHidSpecCondition)
+    , ("hid_spec_condition_internal0", E <$> pHidSpecConditionInternal0)
+    , ("hid_spec_condition_kind", E <$> pHidSpecConditionKind)
+    , ("spec_include", E <$> pSpecInclude)
+    , ("spec_invariant", E <$> pSpecInvariant)
+    , ("spec_invariant_internal0", E <$> pSpecInvariantInternal0)
+    , ("spec_let", E <$> pSpecLet)
+    , ("spec_pragma", E <$> pSpecPragma)
+    , ("spec_variable", E <$> pSpecVariable)
+    , ("spec_variable_internal0", E <$> pSpecVariableInternal0)
+    , ("unit_expression", E <$> pUnitExpression)
+    , ("vector_expression", E <$> pVectorExpression)
+    , ("vector_expression_internal0", E <$> pVectorExpressionInternal0)
+    , ("move_or_copy_expression", E <$> pMoveOrCopyExpression)
+    , ("move_or_copy_expression_internal0", E <$> pMoveOrCopyExpressionInternal0)
+    , ("unary_expression", E <$> pUnaryExpression)
+    , ("unary_op", E <$> pUnaryOp)
+    , ("binary_expression", E <$> pBinaryExpression)
+    , ("cast_expression", E <$> pCastExpression)
+    , ("identified_expression", E <$> pIdentifiedExpression)
+    , ("block_identifier", E <$> pBlockIdentifier)
+    , ("lambda_expression", E <$> pLambdaExpression)
+    , ("lambda_bindings", E <$> pLambdaBindings)
+    , ("lambda_binding", E <$> pLambdaBinding)
+    , ("loop_expression", E <$> pLoopExpression)
+    , ("quantifier_expression", E <$> pQuantifierExpression)
+    , ("quantifier_bindings", E <$> pQuantifierBindings)
+    , ("quantifier_binding", E <$> pQuantifierBinding)
+    , ("return_expression", E <$> pReturnExpression)
+    , ("while_expression", E <$> pWhileExpression)
+    , ("friend_declaration", E <$> pFriendDeclaration)
+    , ("friend_access", E <$> pFriendAccess)
+    , ("hid_enum_item", E <$> pHidEnumItem)
+    , ("enum_definition", E <$> pEnumDefinition)
+    , ("enum_variants", E <$> pEnumVariants)
+    , ("variant", E <$> pVariant)
+    , ("datatype_fields", E <$> pDatatypeFields)
+    , ("named_fields", E <$> pNamedFields)
+    , ("field_annotation", E <$> pFieldAnnotation)
+    , ("positional_fields", E <$> pPositionalFields)
+    , ("hid_variant_identifier", E <$> pHidVariantIdentifier)
+    , ("hid_enum_signature", E <$> pHidEnumSignature)
+    , ("ability_decls", E <$> pAbilityDecls)
+    , ("hid_enum_identifier", E <$> pHidEnumIdentifier)
+    , ("postfix_ability_decls", E <$> pPostfixAbilityDecls)
+    , ("hid_function_item", E <$> pHidFunctionItem)
+    , ("function_definition", E <$> pFunctionDefinition)
+    , ("hid_function_signature", E <$> pHidFunctionSignature)
+    , ("modifier", E <$> pModifier)
+    , ("modifier_internal0", E <$> pModifierInternal0)
+    , ("macro_function_definition", E <$> pMacroFunctionDefinition)
+    , ("hid_macro_signature", E <$> pHidMacroSignature)
+    , ("native_function_definition", E <$> pNativeFunctionDefinition)
+    , ("hid_struct_item", E <$> pHidStructItem)
+    , ("native_struct_definition", E <$> pNativeStructDefinition)
+    , ("hid_struct_signature", E <$> pHidStructSignature)
+    , ("struct_definition", E <$> pStructDefinition)
+    , ("!", E <$> pExclamationMarkTok)
+    , ("!=", E <$> pExclamationMarkEqualsSignTok)
+    , ("#[", E <$> pNumberSignLeftSquareBracketTok)
+    , ("$", E <$> pDollarSignTok)
+    , ("%", E <$> pPercentSignTok)
+    , ("&", E <$> pAmpersandTok)
+    , ("&&", E <$> pAmpersandAmpersandTok)
+    , ("'", E <$> pApostropheTok)
+    , ("(", E <$> pLeftParenthesisTok)
+    , (")", E <$> pRightParenthesisTok)
+    , ("*", E <$> pAsteriskTok)
+    , ("+", E <$> pPlusSignTok)
+    , (",", E <$> pCommaTok)
+    , ("-", E <$> pHyphenMinusTok)
+    , ("->", E <$> pHyphenMinusGreaterThanSignTok)
+    , (".", E <$> pFullStopTok)
+    , ("..", E <$> pFullStopFullStopTok)
+    , ("/", E <$> pSolidusTok)
+    , ("/*", E <$> pSolidusAsteriskTok)
+    , ("//", E <$> pSolidusSolidusTok)
+    , (":", E <$> pColonTok)
+    , ("::", E <$> pColonColonTok)
+    , (";", E <$> pSemicolonTok)
+    , ("<", E <$> pLessThanSignTok)
+    , ("<<", E <$> pLessThanSignLessThanSignTok)
+    , ("<=", E <$> pLessThanSignEqualsSignTok)
+    , ("=", E <$> pEqualsSignTok)
+    , ("==", E <$> pEqualsSignEqualsSignTok)
+    , ("==>", E <$> pEqualsSignEqualsSignGreaterThanSignTok)
+    , ("=>", E <$> pEqualsSignGreaterThanSignTok)
+    , (">", E <$> pGreaterThanSignTok)
+    , (">=", E <$> pGreaterThanSignEqualsSignTok)
+    , (">>", E <$> pGreaterThanSignGreaterThanSignTok)
+    , ("@", E <$> pCommercialAtTok)
+    , ("[", E <$> pLeftSquareBracketTok)
+    , ("]", E <$> pRightSquareBracketTok)
+    , ("^", E <$> pCircumflexAccentTok)
+    , ("abort", E <$> pAbortTok)
+    , ("aborts_if", E <$> pAbortsIfTok)
+    , ("aborts_with", E <$> pAbortsWithTok)
+    , ("address", E <$> pAddressTok)
+    , ("apply", E <$> pApplyTok)
+    , ("as", E <$> pAsTok)
+    , ("assert", E <$> pAssertTok)
+    , ("assume", E <$> pAssumeTok)
+    , ("bool", E <$> pBoolTok)
+    , ("break", E <$> pBreakTok)
+    , ("bytearray", E <$> pBytearrayTok)
+    , ("const", E <$> pConstTok)
+    , ("continue", E <$> pContinueTok)
+    , ("copy", E <$> pCopyTok)
+    , ("decreases", E <$> pDecreasesTok)
+    , ("drop", E <$> pDropTok)
+    , ("else", E <$> pElseTok)
+    , ("ensures", E <$> pEnsuresTok)
+    , ("entry", E <$> pEntryTok)
+    , ("enum", E <$> pEnumTok)
+    , ("except", E <$> pExceptTok)
+    , ("exists", E <$> pExistsTok)
+    , ("false", E <$> pFalseTok)
+    , ("forall", E <$> pForallTok)
+    , ("friend", E <$> pFriendTok)
+    , ("fun", E <$> pFunTok)
+    , ("global", E <$> pGlobalTok)
+    , ("has", E <$> pHasTok)
+    , ("if", E <$> pIfTok)
+    , ("in", E <$> pInTok)
+    , ("include", E <$> pIncludeTok)
+    , ("internal", E <$> pInternalTok)
+    , ("invariant", E <$> pInvariantTok)
+    , ("key", E <$> pKeyTok)
+    , ("let", E <$> pLetTok)
+    , ("local", E <$> pLocalTok)
+    , ("loop", E <$> pLoopTok)
+    , ("macro", E <$> pMacroTok)
+    , ("match", E <$> pMatchTok)
+    , ("modifies", E <$> pModifiesTok)
+    , ("module", E <$> pModuleTok)
+    , ("move", E <$> pMoveTok)
+    , ("mut", E <$> pMutTok)
+    , ("native", E <$> pNativeTok)
+    , ("pack", E <$> pPackTok)
+    , ("package", E <$> pPackageTok)
+    , ("phantom", E <$> pPhantomTok)
+    , ("post", E <$> pPostTok)
+    , ("pragma", E <$> pPragmaTok)
+    , ("public", E <$> pPublicTok)
+    , ("requires", E <$> pRequiresTok)
+    , ("return", E <$> pReturnTok)
+    , ("schema", E <$> pSchemaTok)
+    , ("signer", E <$> pSignerTok)
+    , ("spec", E <$> pSpecTok)
+    , ("store", E <$> pStoreTok)
+    , ("struct", E <$> pStructTok)
+    , ("succeeds_if", E <$> pSucceedsIfTok)
+    , ("to", E <$> pToTok)
+    , ("true", E <$> pTrueTok)
+    , ("u128", E <$> pU128Tok)
+    , ("u16", E <$> pU16Tok)
+    , ("u256", E <$> pU256Tok)
+    , ("u32", E <$> pU32Tok)
+    , ("u64", E <$> pU64Tok)
+    , ("u8", E <$> pU8Tok)
+    , ("unpack", E <$> pUnpackTok)
+    , ("update", E <$> pUpdateTok)
+    , ("use", E <$> pUseTok)
+    , ("vector<", E <$> pVectorLessThanSignTok)
+    , ("vector[", E <$> pVectorLeftSquareBracketTok)
+    , ("where", E <$> pWhereTok)
+    , ("while", E <$> pWhileTok)
+    , ("with", E <$> pWithTok)
+    , ("{", E <$> pLeftCurlyBracketTok)
+    , ("|", E <$> pVerticalLineTok)
+    , ("||", E <$> pVerticalLineVerticalLineTok)
+    , ("}", E <$> pRightCurlyBracketTok)
+    ]
+
+mkParseTable :: TS.Language -> IO ParseTable
+mkParseTable lang = do
+  count <- fromIntegral <$> TS.languageSymbolCount lang
+  SymbolTable <$> foldrM
+    (\id acc -> do
+      symName <- TS.languageSymbolName lang id
+      let mSymSing = Map.lookup (Char8.unpack symName) symbolMap
+      pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
+    )
+    (IM.empty :: IntMap SomeTermParser)
+    [0..count - 1]

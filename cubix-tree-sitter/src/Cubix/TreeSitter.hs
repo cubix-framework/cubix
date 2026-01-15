@@ -163,7 +163,7 @@ newParser getLang = do
 data TreeSitterEnv sym = TreeSitterEnv
   { tsParser :: IORef TS.Parser
   , tsLanguage :: IORef TS.Language
-  , tsSymbolTable :: !(IntMap sym)
+  -- , tsSymbolTable :: !(IntMap sym)
   , filepath :: FilePath
   , tsTree :: IORef TS.Tree
   , source :: BS.ByteString
@@ -172,16 +172,15 @@ data TreeSitterEnv sym = TreeSitterEnv
 newTreeSitterEnv
   :: FilePath
   -> IO (ConstPtr lang)
-  -> (TS.Language -> IO (IntMap sym))
   -> IO (TreeSitterEnv sym)
-newTreeSitterEnv filepath getLang mkSymbolTable = do
+newTreeSitterEnv filepath getLang = do
   parser <- newParser getLang
   tsParser <- newIORef parser
 
   language <- TS.parserLanguage parser
   tsLanguage <- newIORef language
 
-  tsSymbolTable <- mkSymbolTable language
+  -- tsSymbolTable <- mkSymbolTable language
 
   source <- BS.readFile filepath
   mTree <- liftIO $ TS.parserParseByteString parser Nothing source
@@ -194,17 +193,21 @@ getParser :: ReaderT (TreeSitterEnv sym) IO TS.Parser
 getParser = liftIO . readIORef . tsParser =<< ask
 {-# INLINEABLE getParser #-}
 
-getSymbolTable :: ReaderT (TreeSitterEnv sym) IO (IntMap sym)
-getSymbolTable = asks tsSymbolTable
-{-# INLINEABLE getSymbolTable #-}
+getLanguage :: ReaderT (TreeSitterEnv sym) IO TS.Language
+getLanguage = liftIO . readIORef . tsLanguage =<< ask
+{-# INLINEABLE getLanguage #-}
+
+-- getSymbolTable :: ReaderT (TreeSitterEnv sym) IO (IntMap sym)
+-- getSymbolTable = asks tsSymbolTable
+-- {-# INLINEABLE getSymbolTable #-}
 
 getTree :: ReaderT (TreeSitterEnv sym) IO TS.Tree
 getTree = liftIO . readIORef . tsTree =<< ask
 {-# INLINEABLE getTree #-}
 
-getSymbol :: Integral a => a -> ReaderT (TreeSitterEnv sym) IO (Maybe sym)
-getSymbol symbol = IM.lookup (fromIntegral symbol) <$> getSymbolTable
-{-# INLINEABLE getSymbol #-}
+-- getSymbol :: Integral a => a -> ReaderT (TreeSitterEnv sym) IO (Maybe sym)
+-- getSymbol symbol = IM.lookup (fromIntegral symbol) <$> getSymbolTable
+-- {-# INLINEABLE getSymbol #-}
 
 getFilePath :: ReaderT (TreeSitterEnv sym) IO FilePath
 getFilePath = asks filepath

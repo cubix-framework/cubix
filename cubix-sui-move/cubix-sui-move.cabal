@@ -85,9 +85,9 @@ library
   exposed-modules:
     Cubix.Language.SuiMove.Parse
     Cubix.Language.SuiMove.ParsePretty
-    Cubix.Language.SuiMove.IPS
-    Cubix.Language.SuiMove.IPS.Trans
-    Cubix.Language.SuiMove.IPS.Types
+    -- Cubix.Language.SuiMove.IPS
+    -- Cubix.Language.SuiMove.IPS.Trans
+    -- Cubix.Language.SuiMove.IPS.Types
     Cubix.Language.SuiMove.Modularized
 
 test-suite unit-tests

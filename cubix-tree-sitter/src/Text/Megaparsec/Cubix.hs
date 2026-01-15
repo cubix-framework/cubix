@@ -3,6 +3,7 @@ module Text.Megaparsec.Cubix where
 
 import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (between, eitherP, many, optional, sepEndBy, sepEndBy1, some)
+import Data.ByteString as ByteString
 -- TODO: CUBIX_NON_EMPTY
 -- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
 import Data.Comp.Multi (Cxt, HFunctor, (:<:), OrdHF, KOrd)
@@ -11,6 +12,9 @@ import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set qualified as Set
 import Data.String (IsString (..))
+import Data.Text (Text)
+import Data.Text.Encoding qualified as Text.Encoding
+import Data.Text.Encoding.Error qualified as Text.Encoding
 import Data.Typeable (Typeable)
 import Data.Void (Void)
 import Text.Megaparsec qualified
@@ -85,7 +89,12 @@ pBetween
   => m (Cxt h fs a open) -> m (Cxt h fs a close) -> m (Cxt h fs a l) -> m (Cxt h fs a l)
 pBetween = between
 
-type Tok h fs a = E (Cxt h fs a)
+data Tok h fs a = Tok
+  -- keep contet lazy as it'll rarely be accessed
+  { content :: ByteString
+  , token   :: E (Cxt h fs a)
+  } deriving (Eq, Ord)
+
 type Parser h fs a t = Text.Megaparsec.Parsec Void [Tok h fs a] t
 
 -- Use with TypeApplications, eg. `pSort @IdentL`
@@ -95,9 +104,21 @@ pSort
   .  (HFunctor fs, OrdHF fs, KOrd a, DynCase (Cxt h fs a) l)
   => NonEmpty Char -> Parser h fs a (Cxt h fs a l)
 pSort expected = Text.Megaparsec.token
-  (caseE @_ @l)
+  (caseE @_ @l . token)
   (Set.singleton $ Text.Megaparsec.Label expected)
 
 instance IsString (NonEmpty Char) where
   fromString [] = error "NonEmpty.fromString: empty string"
   fromString (s:ss) = s :| ss
+
+pContent
+  :: forall h fs a
+  .  (HFunctor fs, OrdHF fs, KOrd a)
+  => Parser h fs a Text
+pContent = Text.Megaparsec.token
+  (Just . text)
+  Set.empty
+  where text :: Tok h fs a -> Text
+        text = Text.Encoding.decodeUtf8With Text.Encoding.lenientDecode . content
+
+  

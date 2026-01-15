@@ -4,64 +4,123 @@ module ${moduleName} where
 {+-}
 
 import Control.Applicative.Combinators
+import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
-import Data.Functor (($>))
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as ByteString
+import Data.ByteString.Char8 qualified as Char8
+import Data.Comp.Multi (Cxt, E (..), NoHole, Sum, K)
+import Data.Foldable (foldrM)
+import Data.Functor ((<$), ($>))
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.String (IsString (..))
 import Data.Text
 import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
 import Data.Typeable (Typeable)
-import Streaming.Prelude qualified as Streaming
 
 import TreeSitter qualified as TS
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
+import Text.Megaparsec.Cubix
+  ( pMaybe, pPair, pSome, pMany
+  , pSepBy, pSepBy1, pBetween
+  , pSort, pContent
+  )
 
-import Cubix.Language.SuiMove.Modularized
+import Cubix.Language.Info
+  ( SourcePos (..)
+  , SourceSpan (..)
+  , SourceRange (..)
+  , rangeLength
+  )
 import Cubix.TreeSitter
+import Cubix.Language.SuiMove.Modularized
 
-{-+}
-parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
-{+-}
+import Text.Pretty.Simple
+
+parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
 parse' = do
   filepath <- getFilePath
-  rootNode <- liftIO . TS.treeRootNode =<< getTree
-  toks <- Streaming.toList_
-    $ Streaming.mapMaybeM
-        (\tok ->
-           fmap (\sym -> tok { tokenValue = sym }) <$> getSymbol (tokenValue tok))
-    $ symbols filepath rootNode
-
   source <- getSource
-  let lexed = Megaparsec.TreeSitter.Lexed source toks
-  case Megaparsec.parse pRoot filepath lexed of
-    Right ast -> pure $ Just ast
-    Left err -> do
-      liftIO . putStrLn $ Megaparsec.errorBundlePretty err
-      pure Nothing
+  pTable <- liftIO . mkParseTable =<< getLanguage
+  rootNode <- liftIO . TS.treeRootNode =<< getTree
+  syntax filepath source pTable rootNode
 
-{-+}
-parse :: FilePath -> IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
-{+-}
+parse :: FilePath -> IO SomeTerm
 parse path =
   runReaderT parse' =<<
-    newTreeSitterEnv path tree_sitter_sui_move (fmap unSymbolTable . mkSymbolTable)
+    newTreeSitterEnv path tree_sitter_sui_move
+
+getContent :: ByteString -> SourceRange -> ByteString
+getContent src range =
+  let len = rangeLength range
+      start = _rangeStart range
+  in ByteString.take len . ByteString.drop start $ src
+
+syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+syntax path source pTable = go
+  where
+    pContent = getContent source
+    getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
+    go :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+    go root = do
+      extra <- liftIO $ TS.nodeIsExtra root
+      if extra
+        then pure $ error ""
+        else do
+          range    <- liftIO $ nodeRange root
+          span     <- liftIO $ nodeSpan path root
+          symbolNo <- liftIO $ TS.nodeSymbol root
+          -- liftIO $ traceIO =<< TS.nodeTypeAsString root
+          case getParser symbolNo of
+            Nothing -> do
+              pPrintLightBg $ "Unrecognized symbol: " <> Prelude.show symbolNo
+              pPrintLightBg $ "  at: " <> Prelude.show span
+              liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
+              error "no parse"
+
+            Just p -> do
+              childNo <- liftIO $ TS.nodeChildCount root
+              -- pPrintLightBg $ "parsed sym: " <> show sym
+              -- pPrintLightBg $ "child count: " <> show childNo
+
+              let childNums = [0..childNo - 1]
+                  content = pContent range
+
+              children <- if childNo == 0
+                then do
+                  -- pPrintLightBg $ "parsed sym: " <> show sym
+                  pure []
+                else
+                  mapM (go <=< (liftIO . TS.nodeChild root)) childNums
+              case Megaparsec.runParser p path (Megaparsec.Cubix.Tok content <$> children) of
+                Left err -> do
+                  error "no parse"
+                Right item -> do
+                  pPrintLightBg item
+                  pure item
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 
 -- --------------------------------------------------------------------------------
+{-+}
 type SomeTerm = E ${grammarName}Term
-type ${grammarName}Parser t = Parser NoHole (Sum ${grammarName}Sig) (K ()) t
-type ${grammarName}TermParser l = ${grammarName}Parser (${grammarName}Term l)
+type Parser t = Megaparsec.Cubix.Parser NoHole (Sum ${grammarName}Sig) (K ()) t
+type TermParser l = Parser (${grammarName}Term l)
 type SomeTermParser = Parser (E ${grammarName}Term)
+{+-}
 
 {-+}
 ${for(tokens)}
 p${it.name.camelCase} :: TermParser ${it.name.sort}
-p${it.name.camelCase} = pure ${it.name.camelCase}' <* Megaparsec.eof
+p${it.name.camelCase} = ${it.name.camelCase}' <$$ Megaparsec.eof
 
 ${endfor}
 {+-}
@@ -82,7 +141,7 @@ ${endif}
 ${if(it.sum)}
   where
 ${for(it.constructors)}
-    p${it.name.camelCase} :: Parser (${grammarName}Term ${it.type.sort})
+    p${it.name.camelCase} :: TermParser ${it.type.sort}
     p${it.name.camelCase} =
       ${if(it.hasChildren)}${else}pure ${endif}${it.name.camelCase}' <$$> ${it.parser}
 ${endfor}
@@ -90,3 +149,36 @@ ${endif}
 
 ${endfor}
 {+-}
+
+--------------------------------------------------------------------------------
+-- Parse Table
+--------------------------------------------------------------------------------
+
+newtype ParseTable = SymbolTable {unParseTable :: IntMap SomeTermParser}
+
+symbolMap :: Map String SomeTermParser
+symbolMap = Map.fromList
+{-+}
+${for(data/first)}
+    [ ("${it.name.text}", E <$$> p${it.name.camelCase})
+${endfor}
+${for(data/rest)}
+    , ("${it.name.text}", E <$$> p${it.name.camelCase})
+${endfor}
+${for(tokens)}
+    , ("${it.symbol}", E <$$> p${it.name.camelCase})
+${endfor}
+    ]
+{+-}
+
+mkParseTable :: TS.Language -> IO ParseTable
+mkParseTable lang = do
+  count <- fromIntegral <$> TS.languageSymbolCount lang
+  SymbolTable <$> foldrM
+    (\id acc -> do
+      symName <- TS.languageSymbolName lang id
+      let mSymSing = Map.lookup (Char8.unpack symName) symbolMap
+      pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
+    )
+    (IM.empty :: IntMap SomeTermParser)
+    [0..count - 1]
