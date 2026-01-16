@@ -6,7 +6,6 @@ module TreeSitter.Grammar.Transform.SepBy (
 
 import Data.Functor.Foldable
 import Data.Map (Map)
-import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Data.Vector.Extra qualified as Vector
 import TreeSitter.Grammar

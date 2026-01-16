@@ -83,7 +83,7 @@ library
   import: dependencies
   hs-source-dirs: src
   exposed-modules:
-    Cubix.Language.SuiMove.Parse
+    -- Cubix.Language.SuiMove.Parse
     Cubix.Language.SuiMove.ParsePretty
     -- Cubix.Language.SuiMove.IPS
     -- Cubix.Language.SuiMove.IPS.Trans

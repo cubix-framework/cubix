@@ -199,14 +199,10 @@ instance ToContext Text Parser where
     hasSymbol :: Name -> Bool
     hasSymbol (getName -> n) = not $ isHidden n || isInternal n
     p2t p = \case
-      Symbol name ->
-        let nosym = not $ hasSymbol name
-        in par nosym $
-            "p" <>
-            Builder.fromText (snakeToCase Upper (hiddenName name))
-      Inline name -> par (not $ hasSymbol name) $
-        Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
-      Tok t -> Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
+      Symbol name -> par p $ name2psort name
+      Inline name -> par p $ name2psort name
+      Tok t -> par p $ name2psort (Name $ t <> "_tok")
+      -- Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
       Seq ps -> mconcat $ intersperseBy (p2t False) inspect (NonEmpty.toList ps)
         -- mconcat (p2t False <$> NonEmpty.toList ps)
       Pair a b -> par p ("pPair "<> p2t True a <> " " <> p2t True b)
@@ -223,7 +219,14 @@ instance ToContext Text Parser where
     -- inspect (Tok _) _ = Builder.fromText " *> "
     -- inspect _ (Tok _) = Builder.fromText " <* "
     inspect _ _ = Builder.fromText " <*> "
-    
+
+    name2psort name =
+      "pSort @" <>
+      Builder.fromText (sortName name) <>
+      " \"" <>
+      Builder.fromText (getName name) <>
+      "\""
+
     intersperseBy :: Monoid b => (a -> b) -> (a -> a -> b) -> [a] -> [b]
     intersperseBy _ _ []     = mempty
     intersperseBy g _ [x]    = [g x]

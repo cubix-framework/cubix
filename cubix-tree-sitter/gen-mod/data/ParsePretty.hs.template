@@ -8,44 +8,35 @@ import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
-import Data.ByteString qualified as ByteString
 import Data.ByteString.Char8 qualified as Char8
-import Data.Comp.Multi (Cxt, E (..), NoHole, Sum, K)
+import Data.Comp.Multi (E (..))
+import Data.Comp.Multi.Strategy.Classification (DynCase)
 import Data.Foldable (foldrM)
-import Data.Functor ((<$), ($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.String (IsString (..))
-import Data.Text
-import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import Data.Proxy (Proxy (..))
+import Data.Text (Text)
 import Data.Typeable (Typeable)
 
 import TreeSitter qualified as TS
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Text.Megaparsec qualified as Megaparsec
-import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
-import Text.Megaparsec.Cubix
-  ( pMaybe, pPair, pSome, pMany
-  , pSepBy, pSepBy1, pBetween
-  , pSort, pContent
-  )
+-- import Text.Megaparsec.Cubix
+--   ( pMaybe, pPair, pSome, pMany
+--   , pSepBy, pSepBy1, pBetween
+--   , pSort, pContent
+--   )
 
-import Cubix.Language.Info
-  ( SourcePos (..)
-  , SourceSpan (..)
-  , SourceRange (..)
-  , rangeLength
-  )
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
 
 import Text.Pretty.Simple
 
-parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+parse' :: ReaderT TreeSitterEnv IO SomeTerm
 parse' = do
   filepath <- getFilePath
   source <- getSource
@@ -58,18 +49,12 @@ parse path =
   runReaderT parse' =<<
     newTreeSitterEnv path tree_sitter_sui_move
 
-getContent :: ByteString -> SourceRange -> ByteString
-getContent src range =
-  let len = rangeLength range
-      start = _rangeStart range
-  in ByteString.take len . ByteString.drop start $ src
-
-syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = go
   where
-    pContent = getContent source
+    pContent = Megaparsec.Cubix.getContent source
     getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
-    go :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+    go :: TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
     go root = do
       extra <- liftIO $ TS.nodeIsExtra root
       if extra
@@ -100,7 +85,7 @@ syntax path source pTable = go
                   pure []
                 else
                   mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path (Megaparsec.Cubix.Tok content <$> children) of
+              case Megaparsec.runParser p path (Megaparsec.Cubix.Input content children) of
                 Left err -> do
                   error "no parse"
                 Right item -> do
@@ -112,10 +97,51 @@ syntax path source pTable = go
 -- --------------------------------------------------------------------------------
 {-+}
 type SomeTerm = E ${grammarName}Term
-type Parser t = Megaparsec.Cubix.Parser NoHole (Sum ${grammarName}Sig) (K ()) t
+type Parser t = Megaparsec.Cubix.Parser ${grammarName}Sig t
 type TermParser l = Parser (${grammarName}Term l)
 type SomeTermParser = Parser (E ${grammarName}Term)
 {+-}
+
+-- reify types
+pMaybe :: Typeable l => TermParser l -> TermParser (Maybe l)
+pMaybe = Megaparsec.Cubix.pMaybe
+{-# INLINABLE pMaybe #-}
+
+pPair :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
+pPair = Megaparsec.Cubix.pPair
+{-# INLINABLE pPair #-}
+
+pSome :: Typeable l => TermParser l -> TermParser [l]
+pSome = Megaparsec.Cubix.pSome
+{-# INLINABLE pSome #-}
+
+pMany :: Typeable l => TermParser l -> TermParser [l]
+pMany = Megaparsec.Cubix.pMany
+{-# INLINABLE pMany #-}
+
+pSepBy :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+pSepBy = Megaparsec.Cubix.pSepBy
+{-# INLINABLE pSepBy #-}
+
+pSepBy1 :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+pSepBy1 = Megaparsec.Cubix.pSepBy1
+{-# INLINABLE pSepBy1 #-}
+
+pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
+pBetween = Megaparsec.Cubix.pBetween
+{-# INLINABLE pBetween #-}
+
+pSort :: forall l. DynCase MoveTerm l => NonEmpty Char -> TermParser l
+pSort = Megaparsec.Cubix.pSort @l
+{-# INLINABLE pSort #-}
+
+pSort' :: forall l. DynCase MoveTerm l => Proxy l -> NonEmpty Char -> TermParser l
+pSort' = Megaparsec.Cubix.pSort' 
+{-# INLINABLE pSort' #-}
+
+pContent :: Parser Text
+pContent = Megaparsec.Cubix.pContent
+{-# INLINABLE pContent #-}
 
 {-+}
 ${for(tokens)}

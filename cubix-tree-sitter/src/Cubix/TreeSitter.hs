@@ -55,7 +55,7 @@ nodeSpan path node = do
   end <- pointToPos' <$> TS.nodeEndPoint node
   pure $ mkSourceSpan path start end
 
-nodes :: FilePath -> TS.Node -> TokenStream TS.Node (ReaderT (TreeSitterEnv sym) IO) ()
+nodes :: FilePath -> TS.Node -> TokenStream TS.Node (ReaderT TreeSitterEnv IO) ()
 nodes path = go
   -- where
   --   go :: TS.Node -> Stream (Of TS.Node) IO ()
@@ -77,7 +77,7 @@ nodes path = go
   --     pure $ Streaming.for childs go
 
   where
-    go :: TS.Node -> TokenStream TS.Node (ReaderT (TreeSitterEnv sym) IO) ()
+    go :: TS.Node -> TokenStream TS.Node (ReaderT TreeSitterEnv IO) ()
     go root = effect $ do
       extra <- liftIO $ TS.nodeIsExtra root
       if extra
@@ -116,10 +116,10 @@ annotate path node = MkToken node <$> nodeSpan path node <*> nodeRange node
 --   name <- liftIO (TS.nodeGrammarTypeAsString (tokenValue tok))
 --   pure tok{ tokenValue = name }
 
-symbols :: FilePath -> TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
+symbols :: FilePath -> TS.Node -> TokenStream TS.Symbol (ReaderT TreeSitterEnv IO) ()
 symbols path = go
   where
-    go :: TS.Node -> TokenStream TS.Symbol (ReaderT (TreeSitterEnv sym) IO) ()
+    go :: TS.Node -> TokenStream TS.Symbol (ReaderT TreeSitterEnv IO) ()
     go root = effect $ do
       extra <- liftIO $ TS.nodeIsExtra root
       if extra
@@ -160,7 +160,7 @@ newParser getLang = do
     error "failed to set parser language"
   pure parser
 
-data TreeSitterEnv sym = TreeSitterEnv
+data TreeSitterEnv = TreeSitterEnv
   { tsParser :: IORef TS.Parser
   , tsLanguage :: IORef TS.Language
   -- , tsSymbolTable :: !(IntMap sym)
@@ -172,7 +172,7 @@ data TreeSitterEnv sym = TreeSitterEnv
 newTreeSitterEnv
   :: FilePath
   -> IO (ConstPtr lang)
-  -> IO (TreeSitterEnv sym)
+  -> IO TreeSitterEnv
 newTreeSitterEnv filepath getLang = do
   parser <- newParser getLang
   tsParser <- newIORef parser
@@ -189,11 +189,11 @@ newTreeSitterEnv filepath getLang = do
 
   pure $ TreeSitterEnv {..}
 
-getParser :: ReaderT (TreeSitterEnv sym) IO TS.Parser
+getParser :: ReaderT TreeSitterEnv IO TS.Parser
 getParser = liftIO . readIORef . tsParser =<< ask
 {-# INLINEABLE getParser #-}
 
-getLanguage :: ReaderT (TreeSitterEnv sym) IO TS.Language
+getLanguage :: ReaderT TreeSitterEnv IO TS.Language
 getLanguage = liftIO . readIORef . tsLanguage =<< ask
 {-# INLINEABLE getLanguage #-}
 
@@ -201,7 +201,7 @@ getLanguage = liftIO . readIORef . tsLanguage =<< ask
 -- getSymbolTable = asks tsSymbolTable
 -- {-# INLINEABLE getSymbolTable #-}
 
-getTree :: ReaderT (TreeSitterEnv sym) IO TS.Tree
+getTree :: ReaderT TreeSitterEnv IO TS.Tree
 getTree = liftIO . readIORef . tsTree =<< ask
 {-# INLINEABLE getTree #-}
 
@@ -209,11 +209,10 @@ getTree = liftIO . readIORef . tsTree =<< ask
 -- getSymbol symbol = IM.lookup (fromIntegral symbol) <$> getSymbolTable
 -- {-# INLINEABLE getSymbol #-}
 
-getFilePath :: ReaderT (TreeSitterEnv sym) IO FilePath
+getFilePath :: ReaderT TreeSitterEnv IO FilePath
 getFilePath = asks filepath
 {-# INLINEABLE getFilePath #-}
 
-getSource :: ReaderT (TreeSitterEnv sym) IO BS.ByteString
+getSource :: ReaderT TreeSitterEnv IO BS.ByteString
 getSource = asks source
 {-# INLINEABLE getSource #-}
-

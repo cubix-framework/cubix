@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fprint-potential-instances #-}
 module Cubix.Language.SuiMove.ParsePretty where
 
 import Control.Applicative.Combinators
@@ -6,44 +7,35 @@ import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
-import Data.ByteString qualified as ByteString
 import Data.ByteString.Char8 qualified as Char8
-import Data.Comp.Multi (Cxt, E (..), NoHole, Sum, K)
+import Data.Comp.Multi (E (..))
+import Data.Comp.Multi.Strategy.Classification (DynCase)
 import Data.Foldable (foldrM)
-import Data.Functor ((<$), ($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.String (IsString (..))
-import Data.Text
-import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import Data.Proxy (Proxy (..))
+import Data.Text (Text)
 import Data.Typeable (Typeable)
 
 import TreeSitter qualified as TS
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Text.Megaparsec qualified as Megaparsec
-import Text.Megaparsec.TreeSitter qualified as Megaparsec.TreeSitter
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
-import Text.Megaparsec.Cubix
-  ( pMaybe, pPair, pSome, pMany
-  , pSepBy, pSepBy1, pBetween
-  , pSort, pContent
-  )
+-- import Text.Megaparsec.Cubix
+--   ( pMaybe, pPair, pSome, pMany
+--   , pSepBy, pSepBy1, pBetween
+--   , pSort, pContent
+--   )
 
-import Cubix.Language.Info
-  ( SourcePos (..)
-  , SourceSpan (..)
-  , SourceRange (..)
-  , rangeLength
-  )
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
 
 import Text.Pretty.Simple
 
-parse' :: ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+parse' :: ReaderT TreeSitterEnv IO SomeTerm
 parse' = do
   filepath <- getFilePath
   source <- getSource
@@ -56,18 +48,12 @@ parse path =
   runReaderT parse' =<<
     newTreeSitterEnv path tree_sitter_sui_move
 
-getContent :: ByteString -> SourceRange -> ByteString
-getContent src range =
-  let len = rangeLength range
-      start = _rangeStart range
-  in ByteString.take len . ByteString.drop start $ src
-
-syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = go
   where
-    pContent = getContent source
+    pContent = Megaparsec.Cubix.getContent source
     getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
-    go :: TS.Node -> ReaderT (TreeSitterEnv SomeSymbolSing) IO SomeTerm
+    go :: TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
     go root = do
       extra <- liftIO $ TS.nodeIsExtra root
       if extra
@@ -98,8 +84,10 @@ syntax path source pTable = go
                   pure []
                 else
                   mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path (Megaparsec.Cubix.Tok content <$> children) of
+              case Megaparsec.runParser p path (Megaparsec.Cubix.Input content children) of
                 Left err -> do
+                  pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
+                  pPrintLightBg children
                   error "no parse"
                 Right item -> do
                   pPrintLightBg item
@@ -109,9 +97,50 @@ syntax path source pTable = go
 -- -- Parser 
 -- --------------------------------------------------------------------------------
 type SomeTerm = E MoveTerm
-type Parser t = Megaparsec.Cubix.Parser NoHole (Sum MoveSig) (K ()) t
+type Parser t = Megaparsec.Cubix.Parser MoveSig t
 type TermParser l = Parser (MoveTerm l)
 type SomeTermParser = Parser (E MoveTerm)
+
+-- reify types
+pMaybe :: Typeable l => TermParser l -> TermParser (Maybe l)
+pMaybe = Megaparsec.Cubix.pMaybe
+{-# INLINABLE pMaybe #-}
+
+pPair :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
+pPair = Megaparsec.Cubix.pPair
+{-# INLINABLE pPair #-}
+
+pSome :: Typeable l => TermParser l -> TermParser [l]
+pSome = Megaparsec.Cubix.pSome
+{-# INLINABLE pSome #-}
+
+pMany :: Typeable l => TermParser l -> TermParser [l]
+pMany = Megaparsec.Cubix.pMany
+{-# INLINABLE pMany #-}
+
+pSepBy :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+pSepBy = Megaparsec.Cubix.pSepBy
+{-# INLINABLE pSepBy #-}
+
+pSepBy1 :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+pSepBy1 = Megaparsec.Cubix.pSepBy1
+{-# INLINABLE pSepBy1 #-}
+
+pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
+pBetween = Megaparsec.Cubix.pBetween
+{-# INLINABLE pBetween #-}
+
+pSort :: forall l. DynCase MoveTerm l => NonEmpty Char -> TermParser l
+pSort = Megaparsec.Cubix.pSort @l
+{-# INLINABLE pSort #-}
+
+pSort' :: forall l. DynCase MoveTerm l => Proxy l -> NonEmpty Char -> TermParser l
+pSort' = Megaparsec.Cubix.pSort' 
+{-# INLINABLE pSort' #-}
+
+pContent :: Parser Text
+pContent = Megaparsec.Cubix.pContent
+{-# INLINABLE pContent #-}
 
 pExclamationMarkTok :: TermParser ExclamationMarkTokL
 pExclamationMarkTok = ExclamationMarkTok' <$ Megaparsec.eof
@@ -460,15 +489,15 @@ pRightCurlyBracketTok = RightCurlyBracketTok' <$ Megaparsec.eof
 
 pSourceFile :: TermParser SourceFileL
 pSourceFile =
-  SourceFile' <$> pMany pModuleDefinition
+  SourceFile' <$> pMany (pSort @ModuleDefinitionL "module_definition")
 
 pModuleDefinition :: TermParser ModuleDefinitionL
 pModuleDefinition =
-  ModuleDefinition' <$> pModuleTok <*> pModuleIdentity <*> pModuleBody
+  ModuleDefinition' <$> pSort @ModuleTokL "module_tok" <*> pSort @ModuleIdentityL "module_identity" <*> pSort @ModuleBodyL "module_body"
 
 pModuleBody :: TermParser ModuleBodyL
 pModuleBody =
-  ModuleBody' <$> (pModuleBodyInternal0) <*> pMany (pModuleBodyInternal1) <*> pMaybe pRightCurlyBracketTok
+  ModuleBody' <$> pSort @ModuleBodyInternal0L "module_body_internal0" <*> pMany (pSort @ModuleBodyInternal1L "module_body_internal1") <*> pMaybe (pSort @RightCurlyBracketTokL "}_tok")
 
 pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
 pModuleBodyInternal0 =
@@ -478,10 +507,10 @@ pModuleBodyInternal0 =
   where
     pModuleBodyInternal0Semicolon :: TermParser ModuleBodyInternal0L
     pModuleBodyInternal0Semicolon =
-      ModuleBodyInternal0Semicolon' <$> pSemicolonTok
+      ModuleBodyInternal0Semicolon' <$> pSort @SemicolonTokL ";_tok"
     pModuleBodyInternal0LeftCurlyBracket :: TermParser ModuleBodyInternal0L
     pModuleBodyInternal0LeftCurlyBracket =
-      ModuleBodyInternal0LeftCurlyBracket' <$> pLeftCurlyBracketTok
+      ModuleBodyInternal0LeftCurlyBracket' <$> pSort @LeftCurlyBracketTokL "{_tok"
 
 pModuleBodyInternal1 :: TermParser ModuleBodyInternal1L
 pModuleBodyInternal1 =
@@ -496,29 +525,29 @@ pModuleBodyInternal1 =
   where
     pModuleBodyInternal1UseDeclaration :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1UseDeclaration =
-      ModuleBodyInternal1UseDeclaration' <$> pUseDeclaration
+      ModuleBodyInternal1UseDeclaration' <$> pSort @UseDeclarationL "use_declaration"
     pModuleBodyInternal1FriendDeclaration :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1FriendDeclaration =
-      ModuleBodyInternal1FriendDeclaration' <$> pFriendDeclaration
+      ModuleBodyInternal1FriendDeclaration' <$> pSort @FriendDeclarationL "friend_declaration"
     pModuleBodyInternal1Constant :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1Constant =
-      ModuleBodyInternal1Constant' <$> pConstant
+      ModuleBodyInternal1Constant' <$> pSort @ConstantL "constant"
     pModuleBodyInternal1HidFunctionItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidFunctionItem =
-      ModuleBodyInternal1HidFunctionItem' <$> pHidFunctionItem
+      ModuleBodyInternal1HidFunctionItem' <$> pSort @HidFunctionItemL "hid_function_item"
     pModuleBodyInternal1HidStructItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidStructItem =
-      ModuleBodyInternal1HidStructItem' <$> pHidStructItem
+      ModuleBodyInternal1HidStructItem' <$> pSort @HidStructItemL "hid_struct_item"
     pModuleBodyInternal1HidEnumItem :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1HidEnumItem =
-      ModuleBodyInternal1HidEnumItem' <$> pHidEnumItem
+      ModuleBodyInternal1HidEnumItem' <$> pSort @HidEnumItemL "hid_enum_item"
     pModuleBodyInternal1SpecBlock :: TermParser ModuleBodyInternal1L
     pModuleBodyInternal1SpecBlock =
-      ModuleBodyInternal1SpecBlock' <$> pSpecBlock
+      ModuleBodyInternal1SpecBlock' <$> pSort @SpecBlockL "spec_block"
 
 pConstant :: TermParser ConstantL
 pConstant =
-  Constant' <$> pBetween pConstTok pColonTok pIdentifier <*> pHidType <*> pBetween pEqualsSignTok pSemicolonTok pHidExpression
+  Constant' <$> pBetween (pSort @ConstTokL "const_tok") (pSort @ColonTokL ":_tok") (pSort @IdentifierL "identifier") <*> pSort @HidTypeL "hid_type" <*> pBetween (pSort @EqualsSignTokL "=_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidExpressionL "hid_expression")
 
 pHidExpression :: TermParser HidExpressionL
 pHidExpression =
@@ -542,64 +571,64 @@ pHidExpression =
   where
     pHidExpressionCallExpression :: TermParser HidExpressionL
     pHidExpressionCallExpression =
-      HidExpressionCallExpression' <$> pCallExpression
+      HidExpressionCallExpression' <$> pSort @CallExpressionL "call_expression"
     pHidExpressionMacroCallExpression :: TermParser HidExpressionL
     pHidExpressionMacroCallExpression =
-      HidExpressionMacroCallExpression' <$> pMacroCallExpression
+      HidExpressionMacroCallExpression' <$> pSort @MacroCallExpressionL "macro_call_expression"
     pHidExpressionLambdaExpression :: TermParser HidExpressionL
     pHidExpressionLambdaExpression =
-      HidExpressionLambdaExpression' <$> pLambdaExpression
+      HidExpressionLambdaExpression' <$> pSort @LambdaExpressionL "lambda_expression"
     pHidExpressionIfExpression :: TermParser HidExpressionL
     pHidExpressionIfExpression =
-      HidExpressionIfExpression' <$> pIfExpression
+      HidExpressionIfExpression' <$> pSort @IfExpressionL "if_expression"
     pHidExpressionWhileExpression :: TermParser HidExpressionL
     pHidExpressionWhileExpression =
-      HidExpressionWhileExpression' <$> pWhileExpression
+      HidExpressionWhileExpression' <$> pSort @WhileExpressionL "while_expression"
     pHidExpressionReturnExpression :: TermParser HidExpressionL
     pHidExpressionReturnExpression =
-      HidExpressionReturnExpression' <$> pReturnExpression
+      HidExpressionReturnExpression' <$> pSort @ReturnExpressionL "return_expression"
     pHidExpressionAbortExpression :: TermParser HidExpressionL
     pHidExpressionAbortExpression =
-      HidExpressionAbortExpression' <$> pAbortExpression
+      HidExpressionAbortExpression' <$> pSort @AbortExpressionL "abort_expression"
     pHidExpressionAssignExpression :: TermParser HidExpressionL
     pHidExpressionAssignExpression =
-      HidExpressionAssignExpression' <$> pAssignExpression
+      HidExpressionAssignExpression' <$> pSort @AssignExpressionL "assign_expression"
     pHidExpressionHidUnaryExpression :: TermParser HidExpressionL
     pHidExpressionHidUnaryExpression =
-      HidExpressionHidUnaryExpression' <$> pHidUnaryExpression
+      HidExpressionHidUnaryExpression' <$> pSort @HidUnaryExpressionL "hid_unary_expression"
     pHidExpressionBinaryExpression :: TermParser HidExpressionL
     pHidExpressionBinaryExpression =
-      HidExpressionBinaryExpression' <$> pBinaryExpression
+      HidExpressionBinaryExpression' <$> pSort @BinaryExpressionL "binary_expression"
     pHidExpressionCastExpression :: TermParser HidExpressionL
     pHidExpressionCastExpression =
-      HidExpressionCastExpression' <$> pCastExpression
+      HidExpressionCastExpression' <$> pSort @CastExpressionL "cast_expression"
     pHidExpressionQuantifierExpression :: TermParser HidExpressionL
     pHidExpressionQuantifierExpression =
-      HidExpressionQuantifierExpression' <$> pQuantifierExpression
+      HidExpressionQuantifierExpression' <$> pSort @QuantifierExpressionL "quantifier_expression"
     pHidExpressionMatchExpression :: TermParser HidExpressionL
     pHidExpressionMatchExpression =
-      HidExpressionMatchExpression' <$> pMatchExpression
+      HidExpressionMatchExpression' <$> pSort @MatchExpressionL "match_expression"
     pHidExpressionVectorExpression :: TermParser HidExpressionL
     pHidExpressionVectorExpression =
-      HidExpressionVectorExpression' <$> pVectorExpression
+      HidExpressionVectorExpression' <$> pSort @VectorExpressionL "vector_expression"
     pHidExpressionLoopExpression :: TermParser HidExpressionL
     pHidExpressionLoopExpression =
-      HidExpressionLoopExpression' <$> pLoopExpression
+      HidExpressionLoopExpression' <$> pSort @LoopExpressionL "loop_expression"
     pHidExpressionIdentifiedExpression :: TermParser HidExpressionL
     pHidExpressionIdentifiedExpression =
-      HidExpressionIdentifiedExpression' <$> pIdentifiedExpression
+      HidExpressionIdentifiedExpression' <$> pSort @IdentifiedExpressionL "identified_expression"
 
 pAbortExpression :: TermParser AbortExpressionL
 pAbortExpression =
-  AbortExpression' <$> pAbortTok <*> pMaybe pHidExpression
+  AbortExpression' <$> pSort @AbortTokL "abort_tok" <*> pMaybe (pSort @HidExpressionL "hid_expression")
 
 pAssignExpression :: TermParser AssignExpressionL
 pAssignExpression =
-  AssignExpression' <$> pPair (pPair pHidUnaryExpression pEqualsSignTok) pHidExpression
+  AssignExpression' <$> pPair (pPair (pSort @HidUnaryExpressionL "hid_unary_expression") (pSort @EqualsSignTokL "=_tok")) (pSort @HidExpressionL "hid_expression")
 
 pHidUnaryExpression :: TermParser HidUnaryExpressionL
 pHidUnaryExpression =
-  HidUnaryExpression' <$> (pHidUnaryExpressionInternal0)
+  HidUnaryExpression' <$> pSort @HidUnaryExpressionInternal0L "hid_unary_expression_internal0"
 
 pHidUnaryExpressionInternal0 :: TermParser HidUnaryExpressionInternal0L
 pHidUnaryExpressionInternal0 =
@@ -612,23 +641,23 @@ pHidUnaryExpressionInternal0 =
   where
     pHidUnaryExpressionInternal0UnaryExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0UnaryExpression =
-      HidUnaryExpressionInternal0UnaryExpression' <$> pUnaryExpression
+      HidUnaryExpressionInternal0UnaryExpression' <$> pSort @UnaryExpressionL "unary_expression"
     pHidUnaryExpressionInternal0BorrowExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0BorrowExpression =
-      HidUnaryExpressionInternal0BorrowExpression' <$> pBorrowExpression
+      HidUnaryExpressionInternal0BorrowExpression' <$> pSort @BorrowExpressionL "borrow_expression"
     pHidUnaryExpressionInternal0DereferenceExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0DereferenceExpression =
-      HidUnaryExpressionInternal0DereferenceExpression' <$> pDereferenceExpression
+      HidUnaryExpressionInternal0DereferenceExpression' <$> pSort @DereferenceExpressionL "dereference_expression"
     pHidUnaryExpressionInternal0MoveOrCopyExpression :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0MoveOrCopyExpression =
-      HidUnaryExpressionInternal0MoveOrCopyExpression' <$> pMoveOrCopyExpression
+      HidUnaryExpressionInternal0MoveOrCopyExpression' <$> pSort @MoveOrCopyExpressionL "move_or_copy_expression"
     pHidUnaryExpressionInternal0HidExpressionTerm :: TermParser HidUnaryExpressionInternal0L
     pHidUnaryExpressionInternal0HidExpressionTerm =
-      HidUnaryExpressionInternal0HidExpressionTerm' <$> pHidExpressionTerm
+      HidUnaryExpressionInternal0HidExpressionTerm' <$> pSort @HidExpressionTermL "hid_expression_term"
 
 pBorrowExpression :: TermParser BorrowExpressionL
 pBorrowExpression =
-  BorrowExpression' <$> pPair pHidReference pHidExpression
+  BorrowExpression' <$> pPair (pSort @HidReferenceL "hid_reference") (pSort @HidExpressionL "hid_expression")
 
 pHidReference :: TermParser HidReferenceL
 pHidReference =
@@ -638,22 +667,22 @@ pHidReference =
   where
     pHidReferenceImmRef :: TermParser HidReferenceL
     pHidReferenceImmRef =
-      HidReferenceImmRef' <$> pImmRef
+      HidReferenceImmRef' <$> pSort @ImmRefL "imm_ref"
     pHidReferenceMutRef :: TermParser HidReferenceL
     pHidReferenceMutRef =
-      HidReferenceMutRef' <$> pMutRef
+      HidReferenceMutRef' <$> pSort @MutRefL "mut_ref"
 
 pImmRef :: TermParser ImmRefL
 pImmRef =
-  ImmRef' <$> pAmpersandTok
+  ImmRef' <$> pSort @AmpersandTokL "&_tok"
 
 pMutRef :: TermParser MutRefL
 pMutRef =
-  MutRef' <$> pAmpersandTok <*> pMutTok
+  MutRef' <$> pSort @AmpersandTokL "&_tok" <*> pSort @MutTokL "mut_tok"
 
 pDereferenceExpression :: TermParser DereferenceExpressionL
 pDereferenceExpression =
-  DereferenceExpression' <$> pPair pAsteriskTok pHidExpression
+  DereferenceExpression' <$> pPair (pSort @AsteriskTokL "*_tok") (pSort @HidExpressionL "hid_expression")
 
 pHidExpressionTerm :: TermParser HidExpressionTermL
 pHidExpressionTerm =
@@ -678,59 +707,59 @@ pHidExpressionTerm =
   where
     pHidExpressionTermCallExpression :: TermParser HidExpressionTermL
     pHidExpressionTermCallExpression =
-      HidExpressionTermCallExpression' <$> pCallExpression
+      HidExpressionTermCallExpression' <$> pSort @CallExpressionL "call_expression"
     pHidExpressionTermBreakExpression :: TermParser HidExpressionTermL
     pHidExpressionTermBreakExpression =
-      HidExpressionTermBreakExpression' <$> pBreakExpression
+      HidExpressionTermBreakExpression' <$> pSort @BreakExpressionL "break_expression"
     pHidExpressionTermContinueExpression :: TermParser HidExpressionTermL
     pHidExpressionTermContinueExpression =
-      HidExpressionTermContinueExpression' <$> pContinueExpression
+      HidExpressionTermContinueExpression' <$> pSort @ContinueExpressionL "continue_expression"
     pHidExpressionTermNameExpression :: TermParser HidExpressionTermL
     pHidExpressionTermNameExpression =
-      HidExpressionTermNameExpression' <$> pNameExpression
+      HidExpressionTermNameExpression' <$> pSort @NameExpressionL "name_expression"
     pHidExpressionTermMacroCallExpression :: TermParser HidExpressionTermL
     pHidExpressionTermMacroCallExpression =
-      HidExpressionTermMacroCallExpression' <$> pMacroCallExpression
+      HidExpressionTermMacroCallExpression' <$> pSort @MacroCallExpressionL "macro_call_expression"
     pHidExpressionTermPackExpression :: TermParser HidExpressionTermL
     pHidExpressionTermPackExpression =
-      HidExpressionTermPackExpression' <$> pPackExpression
+      HidExpressionTermPackExpression' <$> pSort @PackExpressionL "pack_expression"
     pHidExpressionTermHidLiteralValue :: TermParser HidExpressionTermL
     pHidExpressionTermHidLiteralValue =
-      HidExpressionTermHidLiteralValue' <$> pHidLiteralValue
+      HidExpressionTermHidLiteralValue' <$> pSort @HidLiteralValueL "hid_literal_value"
     pHidExpressionTermUnitExpression :: TermParser HidExpressionTermL
     pHidExpressionTermUnitExpression =
-      HidExpressionTermUnitExpression' <$> pUnitExpression
+      HidExpressionTermUnitExpression' <$> pSort @UnitExpressionL "unit_expression"
     pHidExpressionTermExpressionList :: TermParser HidExpressionTermL
     pHidExpressionTermExpressionList =
-      HidExpressionTermExpressionList' <$> pExpressionList
+      HidExpressionTermExpressionList' <$> pSort @ExpressionListL "expression_list"
     pHidExpressionTermAnnotationExpression :: TermParser HidExpressionTermL
     pHidExpressionTermAnnotationExpression =
-      HidExpressionTermAnnotationExpression' <$> pAnnotationExpression
+      HidExpressionTermAnnotationExpression' <$> pSort @AnnotationExpressionL "annotation_expression"
     pHidExpressionTermBlock :: TermParser HidExpressionTermL
     pHidExpressionTermBlock =
-      HidExpressionTermBlock' <$> pBlock
+      HidExpressionTermBlock' <$> pSort @BlockL "block"
     pHidExpressionTermSpecBlock :: TermParser HidExpressionTermL
     pHidExpressionTermSpecBlock =
-      HidExpressionTermSpecBlock' <$> pSpecBlock
+      HidExpressionTermSpecBlock' <$> pSort @SpecBlockL "spec_block"
     pHidExpressionTermIfExpression :: TermParser HidExpressionTermL
     pHidExpressionTermIfExpression =
-      HidExpressionTermIfExpression' <$> pIfExpression
+      HidExpressionTermIfExpression' <$> pSort @IfExpressionL "if_expression"
     pHidExpressionTermDotExpression :: TermParser HidExpressionTermL
     pHidExpressionTermDotExpression =
-      HidExpressionTermDotExpression' <$> pDotExpression
+      HidExpressionTermDotExpression' <$> pSort @DotExpressionL "dot_expression"
     pHidExpressionTermIndexExpression :: TermParser HidExpressionTermL
     pHidExpressionTermIndexExpression =
-      HidExpressionTermIndexExpression' <$> pIndexExpression
+      HidExpressionTermIndexExpression' <$> pSort @IndexExpressionL "index_expression"
     pHidExpressionTermVectorExpression :: TermParser HidExpressionTermL
     pHidExpressionTermVectorExpression =
-      HidExpressionTermVectorExpression' <$> pVectorExpression
+      HidExpressionTermVectorExpression' <$> pSort @VectorExpressionL "vector_expression"
     pHidExpressionTermMatchExpression :: TermParser HidExpressionTermL
     pHidExpressionTermMatchExpression =
-      HidExpressionTermMatchExpression' <$> pMatchExpression
+      HidExpressionTermMatchExpression' <$> pSort @MatchExpressionL "match_expression"
 
 pAnnotationExpression :: TermParser AnnotationExpressionL
 pAnnotationExpression =
-  AnnotationExpression' <$> pBetween pLeftParenthesisTok pColonTok pHidExpression <*> pHidType <*> pRightParenthesisTok
+  AnnotationExpression' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @ColonTokL ":_tok") (pSort @HidExpressionL "hid_expression") <*> pSort @HidTypeL "hid_type" <*> pSort @RightParenthesisTokL ")_tok"
 
 pHidType :: TermParser HidTypeL
 pHidType =
@@ -743,23 +772,23 @@ pHidType =
   where
     pHidTypeApplyType :: TermParser HidTypeL
     pHidTypeApplyType =
-      HidTypeApplyType' <$> pApplyType
+      HidTypeApplyType' <$> pSort @ApplyTypeL "apply_type"
     pHidTypeRefType :: TermParser HidTypeL
     pHidTypeRefType =
-      HidTypeRefType' <$> pRefType
+      HidTypeRefType' <$> pSort @RefTypeL "ref_type"
     pHidTypeTupleType :: TermParser HidTypeL
     pHidTypeTupleType =
-      HidTypeTupleType' <$> pTupleType
+      HidTypeTupleType' <$> pSort @TupleTypeL "tuple_type"
     pHidTypeFunctionType :: TermParser HidTypeL
     pHidTypeFunctionType =
-      HidTypeFunctionType' <$> pFunctionType
+      HidTypeFunctionType' <$> pSort @FunctionTypeL "function_type"
     pHidTypePrimitiveType :: TermParser HidTypeL
     pHidTypePrimitiveType =
-      HidTypePrimitiveType' <$> pPrimitiveType
+      HidTypePrimitiveType' <$> pSort @PrimitiveTypeL "primitive_type"
 
 pApplyType :: TermParser ApplyTypeL
 pApplyType =
-  ApplyType' <$> pPair pModuleAccess (pMaybe pTypeArguments)
+  ApplyType' <$> pPair (pSort @ModuleAccessL "module_access") (pMaybe (pSort @TypeArgumentsL "type_arguments"))
 
 pModuleAccess :: TermParser ModuleAccessL
 pModuleAccess =
@@ -776,35 +805,35 @@ pModuleAccess =
   where
     pModuleAccess1 :: TermParser ModuleAccessL
     pModuleAccess1 =
-      ModuleAccess1' <$> pDollarSignTok <*> pIdentifier
+      ModuleAccess1' <$> pSort @DollarSignTokL "$_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess2 :: TermParser ModuleAccessL
     pModuleAccess2 =
-      ModuleAccess2' <$> pCommercialAtTok <*> pIdentifier
+      ModuleAccess2' <$> pSort @CommercialAtTokL "@_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess3 :: TermParser ModuleAccessL
     pModuleAccess3 =
-      ModuleAccess3' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+      ModuleAccess3' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess4 :: TermParser ModuleAccessL
     pModuleAccess4 =
-      ModuleAccess4' <$> pModuleIdentity <*> pColonColonTok <*> pIdentifier <*> pTypeArguments
+      ModuleAccess4' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pSort @TypeArgumentsL "type_arguments"
     pModuleAccess5 :: TermParser ModuleAccessL
     pModuleAccess5 =
-      ModuleAccess5' <$> pModuleIdentity <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+      ModuleAccess5' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess6 :: TermParser ModuleAccessL
     pModuleAccess6 =
-      ModuleAccess6' <$> pHidModuleIdentifier <*> pMaybe pTypeArguments <*> pColonColonTok <*> pIdentifier
+      ModuleAccess6' <$> pSort @HidModuleIdentifierL "hid_module_identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess7 :: TermParser ModuleAccessL
     pModuleAccess7 =
-      ModuleAccess7' <$> pModuleIdentity <*> pMaybe pTypeArguments
+      ModuleAccess7' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
     pModuleAccess8 :: TermParser ModuleAccessL
     pModuleAccess8 =
-      ModuleAccess8' <$> pIdentifier <*> pMaybe pTypeArguments
+      ModuleAccess8' <$> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
     pModuleAccessMember :: TermParser ModuleAccessL
     pModuleAccessMember =
-      ModuleAccessMember' <$> pHidReservedIdentifier
+      ModuleAccessMember' <$> pSort @HidReservedIdentifierL "hid_reserved_identifier"
 
 pHidModuleIdentifier :: TermParser HidModuleIdentifierL
 pHidModuleIdentifier =
-  HidModuleIdentifier' <$> pIdentifier
+  HidModuleIdentifier' <$> pSort @IdentifierL "identifier"
 
 pIdentifier :: TermParser IdentifierL
 pIdentifier =
@@ -818,22 +847,22 @@ pHidReservedIdentifier =
   where
     pHidReservedIdentifierHidForall :: TermParser HidReservedIdentifierL
     pHidReservedIdentifierHidForall =
-      HidReservedIdentifierHidForall' <$> pHidForall
+      HidReservedIdentifierHidForall' <$> pSort @HidForallL "hid_forall"
     pHidReservedIdentifierHidExists :: TermParser HidReservedIdentifierL
     pHidReservedIdentifierHidExists =
-      HidReservedIdentifierHidExists' <$> pHidExists
+      HidReservedIdentifierHidExists' <$> pSort @HidExistsL "hid_exists"
 
 pHidExists :: TermParser HidExistsL
 pHidExists =
-  HidExists' <$> pExistsTok
+  HidExists' <$> pSort @ExistsTokL "exists_tok"
 
 pHidForall :: TermParser HidForallL
 pHidForall =
-  HidForall' <$> pForallTok
+  HidForall' <$> pSort @ForallTokL "forall_tok"
 
 pModuleIdentity :: TermParser ModuleIdentityL
 pModuleIdentity =
-  ModuleIdentity' <$> (pModuleIdentityInternal0) <*> pColonColonTok <*> pHidModuleIdentifier
+  ModuleIdentity' <$> pSort @ModuleIdentityInternal0L "module_identity_internal0" <*> pSort @ColonColonTokL "::_tok" <*> pSort @HidModuleIdentifierL "hid_module_identifier"
 
 pModuleIdentityInternal0 :: TermParser ModuleIdentityInternal0L
 pModuleIdentityInternal0 =
@@ -843,14 +872,14 @@ pModuleIdentityInternal0 =
   where
     pModuleIdentityInternal0NumLiteral :: TermParser ModuleIdentityInternal0L
     pModuleIdentityInternal0NumLiteral =
-      ModuleIdentityInternal0NumLiteral' <$> pNumLiteral
+      ModuleIdentityInternal0NumLiteral' <$> pSort @NumLiteralL "num_literal"
     pModuleIdentityInternal0HidModuleIdentifier :: TermParser ModuleIdentityInternal0L
     pModuleIdentityInternal0HidModuleIdentifier =
-      ModuleIdentityInternal0HidModuleIdentifier' <$> pHidModuleIdentifier
+      ModuleIdentityInternal0HidModuleIdentifier' <$> pSort @HidModuleIdentifierL "hid_module_identifier"
 
 pNumLiteral :: TermParser NumLiteralL
 pNumLiteral =
-  NumLiteral' <$> pContent <*> pMaybe (pNumLiteralInternal0)
+  NumLiteral' <$> pContent <*> pMaybe (pSort @NumLiteralInternal0L "num_literal_internal0")
 
 pNumLiteralInternal0 :: TermParser NumLiteralInternal0L
 pNumLiteralInternal0 =
@@ -864,34 +893,34 @@ pNumLiteralInternal0 =
   where
     pNumLiteralInternal0U8 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U8 =
-      NumLiteralInternal0U8' <$> pU8Tok
+      NumLiteralInternal0U8' <$> pSort @U8TokL "u8_tok"
     pNumLiteralInternal0U16 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U16 =
-      NumLiteralInternal0U16' <$> pU16Tok
+      NumLiteralInternal0U16' <$> pSort @U16TokL "u16_tok"
     pNumLiteralInternal0U32 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U32 =
-      NumLiteralInternal0U32' <$> pU32Tok
+      NumLiteralInternal0U32' <$> pSort @U32TokL "u32_tok"
     pNumLiteralInternal0U64 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U64 =
-      NumLiteralInternal0U64' <$> pU64Tok
+      NumLiteralInternal0U64' <$> pSort @U64TokL "u64_tok"
     pNumLiteralInternal0U128 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U128 =
-      NumLiteralInternal0U128' <$> pU128Tok
+      NumLiteralInternal0U128' <$> pSort @U128TokL "u128_tok"
     pNumLiteralInternal0U256 :: TermParser NumLiteralInternal0L
     pNumLiteralInternal0U256 =
-      NumLiteralInternal0U256' <$> pU256Tok
+      NumLiteralInternal0U256' <$> pSort @U256TokL "u256_tok"
 
 pTypeArguments :: TermParser TypeArgumentsL
 pTypeArguments =
-  TypeArguments' <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 pHidType pCommaTok)
+  TypeArguments' <$> pBetween (pSort @LessThanSignTokL "<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pSort @HidTypeL "hid_type") (pSort @CommaTokL ",_tok"))
 
 pFunctionType :: TermParser FunctionTypeL
 pFunctionType =
-  FunctionType' <$> pFunctionTypeParameters <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok pHidType)
+  FunctionType' <$> pSort @FunctionTypeParametersL "function_type_parameters" <*> pMaybe (pPair (pSort @HyphenMinusGreaterThanSignTokL "->_tok") (pSort @HidTypeL "hid_type"))
 
 pFunctionTypeParameters :: TermParser FunctionTypeParametersL
 pFunctionTypeParameters =
-  FunctionTypeParameters' <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy pHidType pCommaTok)
+  FunctionTypeParameters' <$> pBetween (pSort @VerticalLineTokL "|_tok") (pSort @VerticalLineTokL "|_tok") (pSepBy (pSort @HidTypeL "hid_type") (pSort @CommaTokL ",_tok"))
 
 pPrimitiveType :: TermParser PrimitiveTypeL
 pPrimitiveType =
@@ -909,50 +938,50 @@ pPrimitiveType =
   where
     pPrimitiveTypeU8 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU8 =
-      PrimitiveTypeU8' <$> pU8Tok
+      PrimitiveTypeU8' <$> pSort @U8TokL "u8_tok"
     pPrimitiveTypeU16 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU16 =
-      PrimitiveTypeU16' <$> pU16Tok
+      PrimitiveTypeU16' <$> pSort @U16TokL "u16_tok"
     pPrimitiveTypeU32 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU32 =
-      PrimitiveTypeU32' <$> pU32Tok
+      PrimitiveTypeU32' <$> pSort @U32TokL "u32_tok"
     pPrimitiveTypeU64 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU64 =
-      PrimitiveTypeU64' <$> pU64Tok
+      PrimitiveTypeU64' <$> pSort @U64TokL "u64_tok"
     pPrimitiveTypeU128 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU128 =
-      PrimitiveTypeU128' <$> pU128Tok
+      PrimitiveTypeU128' <$> pSort @U128TokL "u128_tok"
     pPrimitiveTypeU256 :: TermParser PrimitiveTypeL
     pPrimitiveTypeU256 =
-      PrimitiveTypeU256' <$> pU256Tok
+      PrimitiveTypeU256' <$> pSort @U256TokL "u256_tok"
     pPrimitiveTypeBool :: TermParser PrimitiveTypeL
     pPrimitiveTypeBool =
-      PrimitiveTypeBool' <$> pBoolTok
+      PrimitiveTypeBool' <$> pSort @BoolTokL "bool_tok"
     pPrimitiveTypeAddress :: TermParser PrimitiveTypeL
     pPrimitiveTypeAddress =
-      PrimitiveTypeAddress' <$> pAddressTok
+      PrimitiveTypeAddress' <$> pSort @AddressTokL "address_tok"
     pPrimitiveTypeSigner :: TermParser PrimitiveTypeL
     pPrimitiveTypeSigner =
-      PrimitiveTypeSigner' <$> pSignerTok
+      PrimitiveTypeSigner' <$> pSort @SignerTokL "signer_tok"
     pPrimitiveTypeBytearray :: TermParser PrimitiveTypeL
     pPrimitiveTypeBytearray =
-      PrimitiveTypeBytearray' <$> pBytearrayTok
+      PrimitiveTypeBytearray' <$> pSort @BytearrayTokL "bytearray_tok"
 
 pRefType :: TermParser RefTypeL
 pRefType =
-  RefType' <$> pHidReference <*> pHidType
+  RefType' <$> pSort @HidReferenceL "hid_reference" <*> pSort @HidTypeL "hid_type"
 
 pTupleType :: TermParser TupleTypeL
 pTupleType =
-  TupleType' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidType pCommaTok)
+  TupleType' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @HidTypeL "hid_type") (pSort @CommaTokL ",_tok"))
 
 pBlock :: TermParser BlockL
 pBlock =
-  Block' <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany pBlockItem <*> pMaybe pHidExpression <*> pRightCurlyBracketTok
+  Block' <$> pSort @LeftCurlyBracketTokL "{_tok" <*> pMany (pSort @UseDeclarationL "use_declaration") <*> pMany (pSort @BlockItemL "block_item") <*> pMaybe (pSort @HidExpressionL "hid_expression") <*> pSort @RightCurlyBracketTokL "}_tok"
 
 pBlockItem :: TermParser BlockItemL
 pBlockItem =
-  BlockItem' <$> (pBlockItemInternal0) <*> pSemicolonTok
+  BlockItem' <$> pSort @BlockItemInternal0L "block_item_internal0" <*> pSort @SemicolonTokL ";_tok"
 
 pBlockItemInternal0 :: TermParser BlockItemInternal0L
 pBlockItemInternal0 =
@@ -962,14 +991,14 @@ pBlockItemInternal0 =
   where
     pBlockItemInternal0HidExpression :: TermParser BlockItemInternal0L
     pBlockItemInternal0HidExpression =
-      BlockItemInternal0HidExpression' <$> pHidExpression
+      BlockItemInternal0HidExpression' <$> pSort @HidExpressionL "hid_expression"
     pBlockItemInternal0LetStatement :: TermParser BlockItemInternal0L
     pBlockItemInternal0LetStatement =
-      BlockItemInternal0LetStatement' <$> pLetStatement
+      BlockItemInternal0LetStatement' <$> pSort @LetStatementL "let_statement"
 
 pLetStatement :: TermParser LetStatementL
 pLetStatement =
-  LetStatement' <$> pLetTok <*> pBindList <*> pMaybe (pPair pColonTok pHidType) <*> pMaybe (pPair pEqualsSignTok pHidExpression)
+  LetStatement' <$> pSort @LetTokL "let_tok" <*> pSort @BindListL "bind_list" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSort @HidTypeL "hid_type")) <*> pMaybe (pPair (pSort @EqualsSignTokL "=_tok") (pSort @HidExpressionL "hid_expression"))
 
 pBindList :: TermParser BindListL
 pBindList =
@@ -980,17 +1009,17 @@ pBindList =
   where
     pBindListHidBind :: TermParser BindListL
     pBindListHidBind =
-      BindListHidBind' <$> pHidBind
+      BindListHidBind' <$> pSort @HidBindL "hid_bind"
     pBindListCommaBindList :: TermParser BindListL
     pBindListCommaBindList =
-      BindListCommaBindList' <$> pCommaBindList
+      BindListCommaBindList' <$> pSort @CommaBindListL "comma_bind_list"
     pBindListOrBindList :: TermParser BindListL
     pBindListOrBindList =
-      BindListOrBindList' <$> pOrBindList
+      BindListOrBindList' <$> pSort @OrBindListL "or_bind_list"
 
 pCommaBindList :: TermParser CommaBindListL
 pCommaBindList =
-  CommaBindList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidBind pCommaTok)
+  CommaBindList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @HidBindL "hid_bind") (pSort @CommaTokL ",_tok"))
 
 pHidBind :: TermParser HidBindL
 pHidBind =
@@ -1002,28 +1031,28 @@ pHidBind =
   where
     pHidBindHidBindInternal0 :: TermParser HidBindL
     pHidBindHidBindInternal0 =
-      HidBindHidBindInternal0' <$> (pHidBindInternal0)
+      HidBindHidBindInternal0' <$> pSort @HidBindInternal0L "hid_bind_internal0"
     pHidBindBindUnpack :: TermParser HidBindL
     pHidBindBindUnpack =
-      HidBindBindUnpack' <$> pBindUnpack
+      HidBindBindUnpack' <$> pSort @BindUnpackL "bind_unpack"
     pHidBindAtBind :: TermParser HidBindL
     pHidBindAtBind =
-      HidBindAtBind' <$> pAtBind
+      HidBindAtBind' <$> pSort @AtBindL "at_bind"
     pHidBindHidLiteralValue :: TermParser HidBindL
     pHidBindHidLiteralValue =
-      HidBindHidLiteralValue' <$> pHidLiteralValue
+      HidBindHidLiteralValue' <$> pSort @HidLiteralValueL "hid_literal_value"
 
 pAtBind :: TermParser AtBindL
 pAtBind =
-  AtBind' <$> pHidVariableIdentifier <*> pCommercialAtTok <*> pBindList
+  AtBind' <$> pSort @HidVariableIdentifierL "hid_variable_identifier" <*> pSort @CommercialAtTokL "@_tok" <*> pSort @BindListL "bind_list"
 
 pHidVariableIdentifier :: TermParser HidVariableIdentifierL
 pHidVariableIdentifier =
-  HidVariableIdentifier' <$> pIdentifier
+  HidVariableIdentifier' <$> pSort @IdentifierL "identifier"
 
 pBindUnpack :: TermParser BindUnpackL
 pBindUnpack =
-  BindUnpack' <$> pNameExpression <*> pMaybe pBindFields
+  BindUnpack' <$> pSort @NameExpressionL "name_expression" <*> pMaybe (pSort @BindFieldsL "bind_fields")
 
 pBindFields :: TermParser BindFieldsL
 pBindFields =
@@ -1033,14 +1062,14 @@ pBindFields =
   where
     pBindFieldsBindPositionalFields :: TermParser BindFieldsL
     pBindFieldsBindPositionalFields =
-      BindFieldsBindPositionalFields' <$> pBindPositionalFields
+      BindFieldsBindPositionalFields' <$> pSort @BindPositionalFieldsL "bind_positional_fields"
     pBindFieldsBindNamedFields :: TermParser BindFieldsL
     pBindFieldsBindNamedFields =
-      BindFieldsBindNamedFields' <$> pBindNamedFields
+      BindFieldsBindNamedFields' <$> pSort @BindNamedFieldsL "bind_named_fields"
 
 pBindNamedFields :: TermParser BindNamedFieldsL
 pBindNamedFields =
-  BindNamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy (pBindNamedFieldsInternal0) pCommaTok)
+  BindNamedFields' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @BindNamedFieldsInternal0L "bind_named_fields_internal0") (pSort @CommaTokL ",_tok"))
 
 pBindNamedFieldsInternal0 :: TermParser BindNamedFieldsInternal0L
 pBindNamedFieldsInternal0 =
@@ -1050,10 +1079,10 @@ pBindNamedFieldsInternal0 =
   where
     pBindNamedFieldsInternal0BindField :: TermParser BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0BindField =
-      BindNamedFieldsInternal0BindField' <$> pBindField
+      BindNamedFieldsInternal0BindField' <$> pSort @BindFieldL "bind_field"
     pBindNamedFieldsInternal0MutBindField :: TermParser BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0MutBindField =
-      BindNamedFieldsInternal0MutBindField' <$> pMutBindField
+      BindNamedFieldsInternal0MutBindField' <$> pSort @MutBindFieldL "mut_bind_field"
 
 pBindField :: TermParser BindFieldL
 pBindField =
@@ -1063,26 +1092,26 @@ pBindField =
   where
     pBindField1 :: TermParser BindFieldL
     pBindField1 =
-      BindField1' <$> pBindList <*> pMaybe (pPair pColonTok pBindList)
+      BindField1' <$> pSort @BindListL "bind_list" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSort @BindListL "bind_list"))
     pBindFieldHidSpreadOperator :: TermParser BindFieldL
     pBindFieldHidSpreadOperator =
-      BindFieldHidSpreadOperator' <$> pHidSpreadOperator
+      BindFieldHidSpreadOperator' <$> pSort @HidSpreadOperatorL "hid_spread_operator"
 
 pHidSpreadOperator :: TermParser HidSpreadOperatorL
 pHidSpreadOperator =
-  HidSpreadOperator' <$> pFullStopFullStopTok
+  HidSpreadOperator' <$> pSort @FullStopFullStopTokL ".._tok"
 
 pMutBindField :: TermParser MutBindFieldL
 pMutBindField =
-  MutBindField' <$> pMutTok <*> pBindField
+  MutBindField' <$> pSort @MutTokL "mut_tok" <*> pSort @BindFieldL "bind_field"
 
 pBindPositionalFields :: TermParser BindPositionalFieldsL
 pBindPositionalFields =
-  BindPositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pBindNamedFieldsInternal0) pCommaTok)
+  BindPositionalFields' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @BindNamedFieldsInternal0L "bind_named_fields_internal0") (pSort @CommaTokL ",_tok"))
 
 pNameExpression :: TermParser NameExpressionL
 pNameExpression =
-  NameExpression' <$> pMaybe pColonColonTok <*> pModuleAccess
+  NameExpression' <$> pMaybe (pSort @ColonColonTokL "::_tok") <*> pSort @ModuleAccessL "module_access"
 
 pHidBindInternal0 :: TermParser HidBindInternal0L
 pHidBindInternal0 =
@@ -1092,14 +1121,14 @@ pHidBindInternal0 =
   where
     pHidBindInternal0MutBindVar :: TermParser HidBindInternal0L
     pHidBindInternal0MutBindVar =
-      HidBindInternal0MutBindVar' <$> pMutBindVar
+      HidBindInternal0MutBindVar' <$> pSort @MutBindVarL "mut_bind_var"
     pHidBindInternal0HidVariableIdentifier :: TermParser HidBindInternal0L
     pHidBindInternal0HidVariableIdentifier =
-      HidBindInternal0HidVariableIdentifier' <$> pHidVariableIdentifier
+      HidBindInternal0HidVariableIdentifier' <$> pSort @HidVariableIdentifierL "hid_variable_identifier"
 
 pMutBindVar :: TermParser MutBindVarL
 pMutBindVar =
-  MutBindVar' <$> pMutTok <*> pHidVariableIdentifier
+  MutBindVar' <$> pSort @MutTokL "mut_tok" <*> pSort @HidVariableIdentifierL "hid_variable_identifier"
 
 pHidLiteralValue :: TermParser HidLiteralValueL
 pHidLiteralValue =
@@ -1112,19 +1141,19 @@ pHidLiteralValue =
   where
     pHidLiteralValueAddressLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueAddressLiteral =
-      HidLiteralValueAddressLiteral' <$> pAddressLiteral
+      HidLiteralValueAddressLiteral' <$> pSort @AddressLiteralL "address_literal"
     pHidLiteralValueBoolLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueBoolLiteral =
-      HidLiteralValueBoolLiteral' <$> pBoolLiteral
+      HidLiteralValueBoolLiteral' <$> pSort @BoolLiteralL "bool_literal"
     pHidLiteralValueNumLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueNumLiteral =
-      HidLiteralValueNumLiteral' <$> pNumLiteral
+      HidLiteralValueNumLiteral' <$> pSort @NumLiteralL "num_literal"
     pHidLiteralValueHexStringLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueHexStringLiteral =
-      HidLiteralValueHexStringLiteral' <$> pHexStringLiteral
+      HidLiteralValueHexStringLiteral' <$> pSort @HexStringLiteralL "hex_string_literal"
     pHidLiteralValueByteStringLiteral :: TermParser HidLiteralValueL
     pHidLiteralValueByteStringLiteral =
-      HidLiteralValueByteStringLiteral' <$> pByteStringLiteral
+      HidLiteralValueByteStringLiteral' <$> pSort @ByteStringLiteralL "byte_string_literal"
 
 pAddressLiteral :: TermParser AddressLiteralL
 pAddressLiteral =
@@ -1138,10 +1167,10 @@ pBoolLiteral =
   where
     pBoolLiteralTrue :: TermParser BoolLiteralL
     pBoolLiteralTrue =
-      BoolLiteralTrue' <$> pTrueTok
+      BoolLiteralTrue' <$> pSort @TrueTokL "true_tok"
     pBoolLiteralFalse :: TermParser BoolLiteralL
     pBoolLiteralFalse =
-      BoolLiteralFalse' <$> pFalseTok
+      BoolLiteralFalse' <$> pSort @FalseTokL "false_tok"
 
 pByteStringLiteral :: TermParser ByteStringLiteralL
 pByteStringLiteral =
@@ -1153,11 +1182,11 @@ pHexStringLiteral =
 
 pOrBindList :: TermParser OrBindListL
 pOrBindList =
-  OrBindList' <$> pMaybe pLeftParenthesisTok <*> pSepBy1 (pPair (pPair (pMaybe pLeftParenthesisTok) pHidBind) (pMaybe pRightParenthesisTok)) pVerticalLineTok <*> pMaybe pRightParenthesisTok
+  OrBindList' <$> pMaybe (pSort @LeftParenthesisTokL "(_tok") <*> pSepBy1 (pPair (pPair (pMaybe (pSort @LeftParenthesisTokL "(_tok")) (pSort @HidBindL "hid_bind")) (pMaybe (pSort @RightParenthesisTokL ")_tok"))) (pSort @VerticalLineTokL "|_tok") <*> pMaybe (pSort @RightParenthesisTokL ")_tok")
 
 pUseDeclaration :: TermParser UseDeclarationL
 pUseDeclaration =
-  UseDeclaration' <$> pMaybe pPublicTok <*> pBetween pUseTok pSemicolonTok (pUseDeclarationInternal0)
+  UseDeclaration' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pBetween (pSort @UseTokL "use_tok") (pSort @SemicolonTokL ";_tok") (pSort @UseDeclarationInternal0L "use_declaration_internal0")
 
 pUseDeclarationInternal0 :: TermParser UseDeclarationInternal0L
 pUseDeclarationInternal0 =
@@ -1169,32 +1198,32 @@ pUseDeclarationInternal0 =
   where
     pUseDeclarationInternal0UseFun :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseFun =
-      UseDeclarationInternal0UseFun' <$> pUseFun
+      UseDeclarationInternal0UseFun' <$> pSort @UseFunL "use_fun"
     pUseDeclarationInternal0UseModule :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModule =
-      UseDeclarationInternal0UseModule' <$> pUseModule
+      UseDeclarationInternal0UseModule' <$> pSort @UseModuleL "use_module"
     pUseDeclarationInternal0UseModuleMember :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMember =
-      UseDeclarationInternal0UseModuleMember' <$> pUseModuleMember
+      UseDeclarationInternal0UseModuleMember' <$> pSort @UseModuleMemberL "use_module_member"
     pUseDeclarationInternal0UseModuleMembers :: TermParser UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMembers =
-      UseDeclarationInternal0UseModuleMembers' <$> pUseModuleMembers
+      UseDeclarationInternal0UseModuleMembers' <$> pSort @UseModuleMembersL "use_module_members"
 
 pUseFun :: TermParser UseFunL
 pUseFun =
-  UseFun' <$> pBetween pFunTok pAsTok pModuleAccess <*> pPair (pPair pModuleAccess pFullStopTok) pHidFunctionIdentifier
+  UseFun' <$> pBetween (pSort @FunTokL "fun_tok") (pSort @AsTokL "as_tok") (pSort @ModuleAccessL "module_access") <*> pPair (pPair (pSort @ModuleAccessL "module_access") (pSort @FullStopTokL "._tok")) (pSort @HidFunctionIdentifierL "hid_function_identifier")
 
 pHidFunctionIdentifier :: TermParser HidFunctionIdentifierL
 pHidFunctionIdentifier =
-  HidFunctionIdentifier' <$> pIdentifier
+  HidFunctionIdentifier' <$> pSort @IdentifierL "identifier"
 
 pUseModule :: TermParser UseModuleL
 pUseModule =
-  UseModule' <$> pModuleIdentity <*> pMaybe (pPair pAsTok pHidModuleIdentifier)
+  UseModule' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @HidModuleIdentifierL "hid_module_identifier"))
 
 pUseModuleMember :: TermParser UseModuleMemberL
 pUseModuleMember =
-  UseModuleMember' <$> pModuleIdentity <*> pColonColonTok <*> pUseMember
+  UseModuleMember' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @UseMemberL "use_member"
 
 pUseMember :: TermParser UseMemberL
 pUseMember =
@@ -1205,13 +1234,13 @@ pUseMember =
   where
     pUseMember1 :: TermParser UseMemberL
     pUseMember1 =
-      UseMember1' <$> pIdentifier <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+      UseMember1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
     pUseMember2 :: TermParser UseMemberL
     pUseMember2 =
-      UseMember2' <$> pIdentifier <*> pColonColonTok <*> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
+      UseMember2' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
     pUseMember3 :: TermParser UseMemberL
     pUseMember3 =
-      UseMember3' <$> pIdentifier <*> pMaybe (pPair pAsTok pIdentifier)
+      UseMember3' <$> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
 
 pUseModuleMembers :: TermParser UseModuleMembersL
 pUseModuleMembers =
@@ -1221,90 +1250,90 @@ pUseModuleMembers =
   where
     pUseModuleMembers1 :: TermParser UseModuleMembersL
     pUseModuleMembers1 =
-      UseModuleMembers1' <$> (pModuleIdentityInternal0) <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+      UseModuleMembers1' <$> pSort @ModuleIdentityInternal0L "module_identity_internal0" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
     pUseModuleMembers2 :: TermParser UseModuleMembersL
     pUseModuleMembers2 =
-      UseModuleMembers2' <$> pModuleIdentity <*> pColonColonTok <*> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy1 pUseMember pCommaTok)
+      UseModuleMembers2' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
 
 pBreakExpression :: TermParser BreakExpressionL
 pBreakExpression =
-  BreakExpression' <$> pBreakTok <*> pMaybe pLabel <*> pMaybe pHidExpression
+  BreakExpression' <$> pSort @BreakTokL "break_tok" <*> pMaybe (pSort @LabelL "label") <*> pMaybe (pSort @HidExpressionL "hid_expression")
 
 pLabel :: TermParser LabelL
 pLabel =
-  Label' <$> pApostropheTok <*> pIdentifier
+  Label' <$> pSort @ApostropheTokL "'_tok" <*> pSort @IdentifierL "identifier"
 
 pCallExpression :: TermParser CallExpressionL
 pCallExpression =
-  CallExpression' <$> pPair pNameExpression pArgList
+  CallExpression' <$> pPair (pSort @NameExpressionL "name_expression") (pSort @ArgListL "arg_list")
 
 pArgList :: TermParser ArgListL
 pArgList =
-  ArgList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidExpression pCommaTok)
+  ArgList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @HidExpressionL "hid_expression") (pSort @CommaTokL ",_tok"))
 
 pContinueExpression :: TermParser ContinueExpressionL
 pContinueExpression =
-  ContinueExpression' <$> pContinueTok <*> pMaybe pLabel
+  ContinueExpression' <$> pSort @ContinueTokL "continue_tok" <*> pMaybe (pSort @LabelL "label")
 
 pDotExpression :: TermParser DotExpressionL
 pDotExpression =
-  DotExpression' <$> pPair (pPair pHidExpressionTerm pFullStopTok) pHidExpressionTerm
+  DotExpression' <$> pPair (pPair (pSort @HidExpressionTermL "hid_expression_term") (pSort @FullStopTokL "._tok")) (pSort @HidExpressionTermL "hid_expression_term")
 
 pExpressionList :: TermParser ExpressionListL
 pExpressionList =
-  ExpressionList' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy1 pHidExpression pCommaTok)
+  ExpressionList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy1 (pSort @HidExpressionL "hid_expression") (pSort @CommaTokL ",_tok"))
 
 pIfExpression :: TermParser IfExpressionL
 pIfExpression =
-  IfExpression' <$> pPair (pPair (pPair pIfTok (pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression)) pHidExpression) (pMaybe (pPair pElseTok pHidExpression))
+  IfExpression' <$> pPair (pPair (pPair (pSort @IfTokL "if_tok") (pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSort @HidExpressionL "hid_expression"))) (pSort @HidExpressionL "hid_expression")) (pMaybe (pPair (pSort @ElseTokL "else_tok") (pSort @HidExpressionL "hid_expression")))
 
 pIndexExpression :: TermParser IndexExpressionL
 pIndexExpression =
-  IndexExpression' <$> pPair pHidExpressionTerm (pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy pHidExpression pCommaTok))
+  IndexExpression' <$> pPair (pSort @HidExpressionTermL "hid_expression_term") (pBetween (pSort @LeftSquareBracketTokL "[_tok") (pSort @RightSquareBracketTokL "]_tok") (pSepBy (pSort @HidExpressionL "hid_expression") (pSort @CommaTokL ",_tok")))
 
 pMacroCallExpression :: TermParser MacroCallExpressionL
 pMacroCallExpression =
-  MacroCallExpression' <$> pMacroModuleAccess <*> pMaybe pTypeArguments <*> pArgList
+  MacroCallExpression' <$> pSort @MacroModuleAccessL "macro_module_access" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ArgListL "arg_list"
 
 pMacroModuleAccess :: TermParser MacroModuleAccessL
 pMacroModuleAccess =
-  MacroModuleAccess' <$> pModuleAccess <*> pExclamationMarkTok
+  MacroModuleAccess' <$> pSort @ModuleAccessL "module_access" <*> pSort @ExclamationMarkTokL "!_tok"
 
 pMatchExpression :: TermParser MatchExpressionL
 pMatchExpression =
-  MatchExpression' <$> pMatchTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression <*> pHidMatchBody
+  MatchExpression' <$> pSort @MatchTokL "match_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSort @HidExpressionL "hid_expression") <*> pSort @HidMatchBodyL "hid_match_body"
 
 pHidMatchBody :: TermParser HidMatchBodyL
 pHidMatchBody =
-  HidMatchBody' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pMatchArm pCommaTok)
+  HidMatchBody' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @MatchArmL "match_arm") (pSort @CommaTokL ",_tok"))
 
 pMatchArm :: TermParser MatchArmL
 pMatchArm =
-  MatchArm' <$> pBindList <*> pMaybe pMatchCondition <*> pEqualsSignGreaterThanSignTok <*> pHidExpression
+  MatchArm' <$> pSort @BindListL "bind_list" <*> pMaybe (pSort @MatchConditionL "match_condition") <*> pSort @EqualsSignGreaterThanSignTokL "=>_tok" <*> pSort @HidExpressionL "hid_expression"
 
 pMatchCondition :: TermParser MatchConditionL
 pMatchCondition =
-  MatchCondition' <$> pIfTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression
+  MatchCondition' <$> pSort @IfTokL "if_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSort @HidExpressionL "hid_expression")
 
 pPackExpression :: TermParser PackExpressionL
 pPackExpression =
-  PackExpression' <$> pNameExpression <*> pFieldInitializeList
+  PackExpression' <$> pSort @NameExpressionL "name_expression" <*> pSort @FieldInitializeListL "field_initialize_list"
 
 pFieldInitializeList :: TermParser FieldInitializeListL
 pFieldInitializeList =
-  FieldInitializeList' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pExpField pCommaTok)
+  FieldInitializeList' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @ExpFieldL "exp_field") (pSort @CommaTokL ",_tok"))
 
 pExpField :: TermParser ExpFieldL
 pExpField =
-  ExpField' <$> pHidFieldIdentifier <*> pMaybe (pPair pColonTok pHidExpression)
+  ExpField' <$> pSort @HidFieldIdentifierL "hid_field_identifier" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSort @HidExpressionL "hid_expression"))
 
 pHidFieldIdentifier :: TermParser HidFieldIdentifierL
 pHidFieldIdentifier =
-  HidFieldIdentifier' <$> pIdentifier
+  HidFieldIdentifier' <$> pSort @IdentifierL "identifier"
 
 pSpecBlock :: TermParser SpecBlockL
 pSpecBlock =
-  SpecBlock' <$> pSpecTok <*> (pSpecBlockInternal0)
+  SpecBlock' <$> pSort @SpecTokL "spec_tok" <*> pSort @SpecBlockInternal0L "spec_block_internal0"
 
 pSpecBlockInternal0 :: TermParser SpecBlockInternal0L
 pSpecBlockInternal0 =
@@ -1314,10 +1343,10 @@ pSpecBlockInternal0 =
   where
     pSpecBlockInternal01 :: TermParser SpecBlockInternal0L
     pSpecBlockInternal01 =
-      SpecBlockInternal01' <$> pMaybe pHidSpecBlockTarget <*> pSpecBody
+      SpecBlockInternal01' <$> pMaybe (pSort @HidSpecBlockTargetL "hid_spec_block_target") <*> pSort @SpecBodyL "spec_body"
     pSpecBlockInternal0HidSpecFunction :: TermParser SpecBlockInternal0L
     pSpecBlockInternal0HidSpecFunction =
-      SpecBlockInternal0HidSpecFunction' <$> pHidSpecFunction
+      SpecBlockInternal0HidSpecFunction' <$> pSort @HidSpecFunctionL "hid_spec_function"
 
 pHidSpecBlockTarget :: TermParser HidSpecBlockTargetL
 pHidSpecBlockTarget =
@@ -1328,29 +1357,29 @@ pHidSpecBlockTarget =
   where
     pHidSpecBlockTargetIdentifier :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetIdentifier =
-      HidSpecBlockTargetIdentifier' <$> pIdentifier
+      HidSpecBlockTargetIdentifier' <$> pSort @IdentifierL "identifier"
     pHidSpecBlockTargetModule :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetModule =
-      HidSpecBlockTargetModule' <$> pModuleTok
+      HidSpecBlockTargetModule' <$> pSort @ModuleTokL "module_tok"
     pHidSpecBlockTargetSpecBlockTargetSchema :: TermParser HidSpecBlockTargetL
     pHidSpecBlockTargetSpecBlockTargetSchema =
-      HidSpecBlockTargetSpecBlockTargetSchema' <$> pSpecBlockTargetSchema
+      HidSpecBlockTargetSpecBlockTargetSchema' <$> pSort @SpecBlockTargetSchemaL "spec_block_target_schema"
 
 pSpecBlockTargetSchema :: TermParser SpecBlockTargetSchemaL
 pSpecBlockTargetSchema =
-  SpecBlockTargetSchema' <$> pSchemaTok <*> pHidStructIdentifier <*> pMaybe pTypeParameters
+  SpecBlockTargetSchema' <$> pSort @SchemaTokL "schema_tok" <*> pSort @HidStructIdentifierL "hid_struct_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters")
 
 pHidStructIdentifier :: TermParser HidStructIdentifierL
 pHidStructIdentifier =
-  HidStructIdentifier' <$> pIdentifier
+  HidStructIdentifier' <$> pSort @IdentifierL "identifier"
 
 pTypeParameters :: TermParser TypeParametersL
 pTypeParameters =
-  TypeParameters' <$> pBetween pLessThanSignTok pGreaterThanSignTok (pSepBy1 pTypeParameter pCommaTok)
+  TypeParameters' <$> pBetween (pSort @LessThanSignTokL "<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pSort @TypeParameterL "type_parameter") (pSort @CommaTokL ",_tok"))
 
 pTypeParameter :: TermParser TypeParameterL
 pTypeParameter =
-  TypeParameter' <$> pMaybe pDollarSignTok <*> pMaybe pPhantomTok <*> pHidTypeParameterIdentifier <*> pMaybe (pPair pColonTok (pSepBy1 pAbility pPlusSignTok))
+  TypeParameter' <$> pMaybe (pSort @DollarSignTokL "$_tok") <*> pMaybe (pSort @PhantomTokL "phantom_tok") <*> pSort @HidTypeParameterIdentifierL "hid_type_parameter_identifier" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSepBy1 (pSort @AbilityL "ability") (pSort @PlusSignTokL "+_tok")))
 
 pAbility :: TermParser AbilityL
 pAbility =
@@ -1362,20 +1391,20 @@ pAbility =
   where
     pAbilityCopy :: TermParser AbilityL
     pAbilityCopy =
-      AbilityCopy' <$> pCopyTok
+      AbilityCopy' <$> pSort @CopyTokL "copy_tok"
     pAbilityDrop :: TermParser AbilityL
     pAbilityDrop =
-      AbilityDrop' <$> pDropTok
+      AbilityDrop' <$> pSort @DropTokL "drop_tok"
     pAbilityStore :: TermParser AbilityL
     pAbilityStore =
-      AbilityStore' <$> pStoreTok
+      AbilityStore' <$> pSort @StoreTokL "store_tok"
     pAbilityKey :: TermParser AbilityL
     pAbilityKey =
-      AbilityKey' <$> pKeyTok
+      AbilityKey' <$> pSort @KeyTokL "key_tok"
 
 pHidTypeParameterIdentifier :: TermParser HidTypeParameterIdentifierL
 pHidTypeParameterIdentifier =
-  HidTypeParameterIdentifier' <$> pIdentifier
+  HidTypeParameterIdentifier' <$> pSort @IdentifierL "identifier"
 
 pHidSpecFunction :: TermParser HidSpecFunctionL
 pHidSpecFunction =
@@ -1386,25 +1415,25 @@ pHidSpecFunction =
   where
     pHidSpecFunctionNativeSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionNativeSpecFunction =
-      HidSpecFunctionNativeSpecFunction' <$> pNativeSpecFunction
+      HidSpecFunctionNativeSpecFunction' <$> pSort @NativeSpecFunctionL "native_spec_function"
     pHidSpecFunctionUsualSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionUsualSpecFunction =
-      HidSpecFunctionUsualSpecFunction' <$> pUsualSpecFunction
+      HidSpecFunctionUsualSpecFunction' <$> pSort @UsualSpecFunctionL "usual_spec_function"
     pHidSpecFunctionUninterpretedSpecFunction :: TermParser HidSpecFunctionL
     pHidSpecFunctionUninterpretedSpecFunction =
-      HidSpecFunctionUninterpretedSpecFunction' <$> pUninterpretedSpecFunction
+      HidSpecFunctionUninterpretedSpecFunction' <$> pSort @UninterpretedSpecFunctionL "uninterpreted_spec_function"
 
 pNativeSpecFunction :: TermParser NativeSpecFunctionL
 pNativeSpecFunction =
-  NativeSpecFunction' <$> pNativeTok <*> pBetween pFunTok pSemicolonTok pHidSpecFunctionSignature
+  NativeSpecFunction' <$> pSort @NativeTokL "native_tok" <*> pBetween (pSort @FunTokL "fun_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidSpecFunctionSignatureL "hid_spec_function_signature")
 
 pHidSpecFunctionSignature :: TermParser HidSpecFunctionSignatureL
 pHidSpecFunctionSignature =
-  HidSpecFunctionSignature' <$> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pRetType
+  HidSpecFunctionSignature' <$> pSort @HidFunctionIdentifierL "hid_function_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pSort @RetTypeL "ret_type"
 
 pFunctionParameters :: TermParser FunctionParametersL
 pFunctionParameters =
-  FunctionParameters' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy (pFunctionParametersInternal0) pCommaTok)
+  FunctionParameters' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @FunctionParametersInternal0L "function_parameters_internal0") (pSort @CommaTokL ",_tok"))
 
 pFunctionParametersInternal0 :: TermParser FunctionParametersInternal0L
 pFunctionParametersInternal0 =
@@ -1414,14 +1443,14 @@ pFunctionParametersInternal0 =
   where
     pFunctionParametersInternal0MutFunctionParameter :: TermParser FunctionParametersInternal0L
     pFunctionParametersInternal0MutFunctionParameter =
-      FunctionParametersInternal0MutFunctionParameter' <$> pMutFunctionParameter
+      FunctionParametersInternal0MutFunctionParameter' <$> pSort @MutFunctionParameterL "mut_function_parameter"
     pFunctionParametersInternal0FunctionParameter :: TermParser FunctionParametersInternal0L
     pFunctionParametersInternal0FunctionParameter =
-      FunctionParametersInternal0FunctionParameter' <$> pFunctionParameter
+      FunctionParametersInternal0FunctionParameter' <$> pSort @FunctionParameterL "function_parameter"
 
 pFunctionParameter :: TermParser FunctionParameterL
 pFunctionParameter =
-  FunctionParameter' <$> (pFunctionParameterInternal0) <*> pColonTok <*> pHidType
+  FunctionParameter' <$> pSort @FunctionParameterInternal0L "function_parameter_internal0" <*> pSort @ColonTokL ":_tok" <*> pSort @HidTypeL "hid_type"
 
 pFunctionParameterInternal0 :: TermParser FunctionParameterInternal0L
 pFunctionParameterInternal0 =
@@ -1431,30 +1460,30 @@ pFunctionParameterInternal0 =
   where
     pFunctionParameterInternal0Name :: TermParser FunctionParameterInternal0L
     pFunctionParameterInternal0Name =
-      FunctionParameterInternal0Name' <$> pHidVariableIdentifier
+      FunctionParameterInternal0Name' <$> pSort @HidVariableIdentifierL "hid_variable_identifier"
     pFunctionParameterInternal02 :: TermParser FunctionParameterInternal0L
     pFunctionParameterInternal02 =
-      FunctionParameterInternal02' <$> pDollarSignTok <*> pHidVariableIdentifier
+      FunctionParameterInternal02' <$> pSort @DollarSignTokL "$_tok" <*> pSort @HidVariableIdentifierL "hid_variable_identifier"
 
 pMutFunctionParameter :: TermParser MutFunctionParameterL
 pMutFunctionParameter =
-  MutFunctionParameter' <$> pMutTok <*> pFunctionParameter
+  MutFunctionParameter' <$> pSort @MutTokL "mut_tok" <*> pSort @FunctionParameterL "function_parameter"
 
 pRetType :: TermParser RetTypeL
 pRetType =
-  RetType' <$> pColonTok <*> pHidType
+  RetType' <$> pSort @ColonTokL ":_tok" <*> pSort @HidTypeL "hid_type"
 
 pUninterpretedSpecFunction :: TermParser UninterpretedSpecFunctionL
 pUninterpretedSpecFunction =
-  UninterpretedSpecFunction' <$> pBetween pFunTok pSemicolonTok pHidSpecFunctionSignature
+  UninterpretedSpecFunction' <$> pBetween (pSort @FunTokL "fun_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidSpecFunctionSignatureL "hid_spec_function_signature")
 
 pUsualSpecFunction :: TermParser UsualSpecFunctionL
 pUsualSpecFunction =
-  UsualSpecFunction' <$> pFunTok <*> pHidSpecFunctionSignature <*> pBlock
+  UsualSpecFunction' <$> pSort @FunTokL "fun_tok" <*> pSort @HidSpecFunctionSignatureL "hid_spec_function_signature" <*> pSort @BlockL "block"
 
 pSpecBody :: TermParser SpecBodyL
 pSpecBody =
-  SpecBody' <$> pLeftCurlyBracketTok <*> pMany pUseDeclaration <*> pMany pHidSpecBlockMemeber <*> pRightCurlyBracketTok
+  SpecBody' <$> pSort @LeftCurlyBracketTokL "{_tok" <*> pMany (pSort @UseDeclarationL "use_declaration") <*> pMany (pSort @HidSpecBlockMemeberL "hid_spec_block_memeber") <*> pSort @RightCurlyBracketTokL "}_tok"
 
 pHidSpecBlockMemeber :: TermParser HidSpecBlockMemeberL
 pHidSpecBlockMemeber =
@@ -1470,36 +1499,36 @@ pHidSpecBlockMemeber =
   where
     pHidSpecBlockMemeberSpecInvariant :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecInvariant =
-      HidSpecBlockMemeberSpecInvariant' <$> pSpecInvariant
+      HidSpecBlockMemeberSpecInvariant' <$> pSort @SpecInvariantL "spec_invariant"
     pHidSpecBlockMemeberHidSpecFunction :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberHidSpecFunction =
-      HidSpecBlockMemeberHidSpecFunction' <$> pHidSpecFunction
+      HidSpecBlockMemeberHidSpecFunction' <$> pSort @HidSpecFunctionL "hid_spec_function"
     pHidSpecBlockMemeberSpecCondition :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecCondition =
-      HidSpecBlockMemeberSpecCondition' <$> pSpecCondition
+      HidSpecBlockMemeberSpecCondition' <$> pSort @SpecConditionL "spec_condition"
     pHidSpecBlockMemeberSpecInclude :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecInclude =
-      HidSpecBlockMemeberSpecInclude' <$> pSpecInclude
+      HidSpecBlockMemeberSpecInclude' <$> pSort @SpecIncludeL "spec_include"
     pHidSpecBlockMemeberSpecApply :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecApply =
-      HidSpecBlockMemeberSpecApply' <$> pSpecApply
+      HidSpecBlockMemeberSpecApply' <$> pSort @SpecApplyL "spec_apply"
     pHidSpecBlockMemeberSpecPragma :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecPragma =
-      HidSpecBlockMemeberSpecPragma' <$> pSpecPragma
+      HidSpecBlockMemeberSpecPragma' <$> pSort @SpecPragmaL "spec_pragma"
     pHidSpecBlockMemeberSpecVariable :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecVariable =
-      HidSpecBlockMemeberSpecVariable' <$> pSpecVariable
+      HidSpecBlockMemeberSpecVariable' <$> pSort @SpecVariableL "spec_variable"
     pHidSpecBlockMemeberSpecLet :: TermParser HidSpecBlockMemeberL
     pHidSpecBlockMemeberSpecLet =
-      HidSpecBlockMemeberSpecLet' <$> pSpecLet
+      HidSpecBlockMemeberSpecLet' <$> pSort @SpecLetL "spec_let"
 
 pSpecApply :: TermParser SpecApplyL
 pSpecApply =
-  SpecApply' <$> pBetween pApplyTok pToTok pHidExpression <*> pSepBy1 pSpecApplyPattern pCommaTok <*> pMaybe (pPair pExceptTok (pSepBy1 pSpecApplyPattern pCommaTok)) <*> pSemicolonTok
+  SpecApply' <$> pBetween (pSort @ApplyTokL "apply_tok") (pSort @ToTokL "to_tok") (pSort @HidExpressionL "hid_expression") <*> pSepBy1 (pSort @SpecApplyPatternL "spec_apply_pattern") (pSort @CommaTokL ",_tok") <*> pMaybe (pPair (pSort @ExceptTokL "except_tok") (pSepBy1 (pSort @SpecApplyPatternL "spec_apply_pattern") (pSort @CommaTokL ",_tok"))) <*> pSort @SemicolonTokL ";_tok"
 
 pSpecApplyPattern :: TermParser SpecApplyPatternL
 pSpecApplyPattern =
-  SpecApplyPattern' <$> pMaybe (pSpecApplyPatternInternal0) <*> pSpecApplyNamePattern <*> pMaybe pTypeParameters
+  SpecApplyPattern' <$> pMaybe (pSort @SpecApplyPatternInternal0L "spec_apply_pattern_internal0") <*> pSort @SpecApplyNamePatternL "spec_apply_name_pattern" <*> pMaybe (pSort @TypeParametersL "type_parameters")
 
 pSpecApplyNamePattern :: TermParser SpecApplyNamePatternL
 pSpecApplyNamePattern =
@@ -1513,10 +1542,10 @@ pSpecApplyPatternInternal0 =
   where
     pSpecApplyPatternInternal0Public :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Public =
-      SpecApplyPatternInternal0Public' <$> pPublicTok
+      SpecApplyPatternInternal0Public' <$> pSort @PublicTokL "public_tok"
     pSpecApplyPatternInternal0Internal :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Internal =
-      SpecApplyPatternInternal0Internal' <$> pInternalTok
+      SpecApplyPatternInternal0Internal' <$> pSort @InternalTokL "internal_tok"
 
 pSpecCondition :: TermParser SpecConditionL
 pSpecCondition =
@@ -1527,29 +1556,29 @@ pSpecCondition =
   where
     pSpecConditionHidSpecCondition :: TermParser SpecConditionL
     pSpecConditionHidSpecCondition =
-      SpecConditionHidSpecCondition' <$> pHidSpecCondition
+      SpecConditionHidSpecCondition' <$> pSort @HidSpecConditionL "hid_spec_condition"
     pSpecConditionHidSpecAbortIf :: TermParser SpecConditionL
     pSpecConditionHidSpecAbortIf =
-      SpecConditionHidSpecAbortIf' <$> pHidSpecAbortIf
+      SpecConditionHidSpecAbortIf' <$> pSort @HidSpecAbortIfL "hid_spec_abort_if"
     pSpecConditionHidSpecAbortWithOrModifies :: TermParser SpecConditionL
     pSpecConditionHidSpecAbortWithOrModifies =
-      SpecConditionHidSpecAbortWithOrModifies' <$> pHidSpecAbortWithOrModifies
+      SpecConditionHidSpecAbortWithOrModifies' <$> pSort @HidSpecAbortWithOrModifiesL "hid_spec_abort_with_or_modifies"
 
 pHidSpecAbortIf :: TermParser HidSpecAbortIfL
 pHidSpecAbortIf =
-  HidSpecAbortIf' <$> pAbortsIfTok <*> pMaybe pConditionProperties <*> pHidExpression <*> pMaybe (pPair pWithTok pHidExpression) <*> pSemicolonTok
+  HidSpecAbortIf' <$> pSort @AbortsIfTokL "aborts_if_tok" <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pSort @HidExpressionL "hid_expression" <*> pMaybe (pPair (pSort @WithTokL "with_tok") (pSort @HidExpressionL "hid_expression")) <*> pSort @SemicolonTokL ";_tok"
 
 pConditionProperties :: TermParser ConditionPropertiesL
 pConditionProperties =
-  ConditionProperties' <$> pBetween pLeftSquareBracketTok pRightSquareBracketTok (pSepBy pSpecProperty pCommaTok)
+  ConditionProperties' <$> pBetween (pSort @LeftSquareBracketTokL "[_tok") (pSort @RightSquareBracketTokL "]_tok") (pSepBy (pSort @SpecPropertyL "spec_property") (pSort @CommaTokL ",_tok"))
 
 pSpecProperty :: TermParser SpecPropertyL
 pSpecProperty =
-  SpecProperty' <$> pIdentifier <*> pMaybe (pPair pEqualsSignTok pHidLiteralValue)
+  SpecProperty' <$> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @EqualsSignTokL "=_tok") (pSort @HidLiteralValueL "hid_literal_value"))
 
 pHidSpecAbortWithOrModifies :: TermParser HidSpecAbortWithOrModifiesL
 pHidSpecAbortWithOrModifies =
-  HidSpecAbortWithOrModifies' <$> (pHidSpecAbortWithOrModifiesInternal0) <*> pMaybe pConditionProperties <*> pSepBy1 pHidExpression pCommaTok <*> pSemicolonTok
+  HidSpecAbortWithOrModifies' <$> pSort @HidSpecAbortWithOrModifiesInternal0L "hid_spec_abort_with_or_modifies_internal0" <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pSepBy1 (pSort @HidExpressionL "hid_expression") (pSort @CommaTokL ",_tok") <*> pSort @SemicolonTokL ";_tok"
 
 pHidSpecAbortWithOrModifiesInternal0 :: TermParser HidSpecAbortWithOrModifiesInternal0L
 pHidSpecAbortWithOrModifiesInternal0 =
@@ -1559,14 +1588,14 @@ pHidSpecAbortWithOrModifiesInternal0 =
   where
     pHidSpecAbortWithOrModifiesInternal0AbortsWith :: TermParser HidSpecAbortWithOrModifiesInternal0L
     pHidSpecAbortWithOrModifiesInternal0AbortsWith =
-      HidSpecAbortWithOrModifiesInternal0AbortsWith' <$> pAbortsWithTok
+      HidSpecAbortWithOrModifiesInternal0AbortsWith' <$> pSort @AbortsWithTokL "aborts_with_tok"
     pHidSpecAbortWithOrModifiesInternal0Modifies :: TermParser HidSpecAbortWithOrModifiesInternal0L
     pHidSpecAbortWithOrModifiesInternal0Modifies =
-      HidSpecAbortWithOrModifiesInternal0Modifies' <$> pModifiesTok
+      HidSpecAbortWithOrModifiesInternal0Modifies' <$> pSort @ModifiesTokL "modifies_tok"
 
 pHidSpecCondition :: TermParser HidSpecConditionL
 pHidSpecCondition =
-  HidSpecCondition' <$> (pHidSpecConditionInternal0) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
+  HidSpecCondition' <$> pSort @HidSpecConditionInternal0L "hid_spec_condition_internal0" <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pSort @HidExpressionL "hid_expression" <*> pSort @SemicolonTokL ";_tok"
 
 pHidSpecConditionInternal0 :: TermParser HidSpecConditionInternal0L
 pHidSpecConditionInternal0 =
@@ -1576,10 +1605,10 @@ pHidSpecConditionInternal0 =
   where
     pHidSpecConditionInternal0Kind :: TermParser HidSpecConditionInternal0L
     pHidSpecConditionInternal0Kind =
-      HidSpecConditionInternal0Kind' <$> pHidSpecConditionKind
+      HidSpecConditionInternal0Kind' <$> pSort @HidSpecConditionKindL "hid_spec_condition_kind"
     pHidSpecConditionInternal02 :: TermParser HidSpecConditionInternal0L
     pHidSpecConditionInternal02 =
-      HidSpecConditionInternal02' <$> pRequiresTok <*> pMaybe pModuleTok
+      HidSpecConditionInternal02' <$> pSort @RequiresTokL "requires_tok" <*> pMaybe (pSort @ModuleTokL "module_tok")
 
 pHidSpecConditionKind :: TermParser HidSpecConditionKindL
 pHidSpecConditionKind =
@@ -1592,27 +1621,27 @@ pHidSpecConditionKind =
   where
     pHidSpecConditionKindAssert :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindAssert =
-      HidSpecConditionKindAssert' <$> pAssertTok
+      HidSpecConditionKindAssert' <$> pSort @AssertTokL "assert_tok"
     pHidSpecConditionKindAssume :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindAssume =
-      HidSpecConditionKindAssume' <$> pAssumeTok
+      HidSpecConditionKindAssume' <$> pSort @AssumeTokL "assume_tok"
     pHidSpecConditionKindDecreases :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindDecreases =
-      HidSpecConditionKindDecreases' <$> pDecreasesTok
+      HidSpecConditionKindDecreases' <$> pSort @DecreasesTokL "decreases_tok"
     pHidSpecConditionKindEnsures :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindEnsures =
-      HidSpecConditionKindEnsures' <$> pEnsuresTok
+      HidSpecConditionKindEnsures' <$> pSort @EnsuresTokL "ensures_tok"
     pHidSpecConditionKindSucceedsIf :: TermParser HidSpecConditionKindL
     pHidSpecConditionKindSucceedsIf =
-      HidSpecConditionKindSucceedsIf' <$> pSucceedsIfTok
+      HidSpecConditionKindSucceedsIf' <$> pSort @SucceedsIfTokL "succeeds_if_tok"
 
 pSpecInclude :: TermParser SpecIncludeL
 pSpecInclude =
-  SpecInclude' <$> pBetween pIncludeTok pSemicolonTok pHidExpression
+  SpecInclude' <$> pBetween (pSort @IncludeTokL "include_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidExpressionL "hid_expression")
 
 pSpecInvariant :: TermParser SpecInvariantL
 pSpecInvariant =
-  SpecInvariant' <$> pInvariantTok <*> pMaybe (pSpecInvariantInternal0) <*> pMaybe pConditionProperties <*> pHidExpression <*> pSemicolonTok
+  SpecInvariant' <$> pSort @InvariantTokL "invariant_tok" <*> pMaybe (pSort @SpecInvariantInternal0L "spec_invariant_internal0") <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pSort @HidExpressionL "hid_expression" <*> pSort @SemicolonTokL ";_tok"
 
 pSpecInvariantInternal0 :: TermParser SpecInvariantInternal0L
 pSpecInvariantInternal0 =
@@ -1624,28 +1653,28 @@ pSpecInvariantInternal0 =
   where
     pSpecInvariantInternal0Update :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Update =
-      SpecInvariantInternal0Update' <$> pUpdateTok
+      SpecInvariantInternal0Update' <$> pSort @UpdateTokL "update_tok"
     pSpecInvariantInternal0Pack :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Pack =
-      SpecInvariantInternal0Pack' <$> pPackTok
+      SpecInvariantInternal0Pack' <$> pSort @PackTokL "pack_tok"
     pSpecInvariantInternal0Unpack :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Unpack =
-      SpecInvariantInternal0Unpack' <$> pUnpackTok
+      SpecInvariantInternal0Unpack' <$> pSort @UnpackTokL "unpack_tok"
     pSpecInvariantInternal0Module :: TermParser SpecInvariantInternal0L
     pSpecInvariantInternal0Module =
-      SpecInvariantInternal0Module' <$> pModuleTok
+      SpecInvariantInternal0Module' <$> pSort @ModuleTokL "module_tok"
 
 pSpecLet :: TermParser SpecLetL
 pSpecLet =
-  SpecLet' <$> pLetTok <*> pMaybe pPostTok <*> pIdentifier <*> pBetween pEqualsSignTok pSemicolonTok pHidExpression
+  SpecLet' <$> pSort @LetTokL "let_tok" <*> pMaybe (pSort @PostTokL "post_tok") <*> pSort @IdentifierL "identifier" <*> pBetween (pSort @EqualsSignTokL "=_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidExpressionL "hid_expression")
 
 pSpecPragma :: TermParser SpecPragmaL
 pSpecPragma =
-  SpecPragma' <$> pBetween pPragmaTok pSemicolonTok (pSepBy pSpecProperty pCommaTok)
+  SpecPragma' <$> pBetween (pSort @PragmaTokL "pragma_tok") (pSort @SemicolonTokL ";_tok") (pSepBy (pSort @SpecPropertyL "spec_property") (pSort @CommaTokL ",_tok"))
 
 pSpecVariable :: TermParser SpecVariableL
 pSpecVariable =
-  SpecVariable' <$> pMaybe (pSpecVariableInternal0) <*> pIdentifier <*> pMaybe pTypeParameters <*> pBetween pColonTok pSemicolonTok pHidType
+  SpecVariable' <$> pMaybe (pSort @SpecVariableInternal0L "spec_variable_internal0") <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pBetween (pSort @ColonTokL ":_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidTypeL "hid_type")
 
 pSpecVariableInternal0 :: TermParser SpecVariableInternal0L
 pSpecVariableInternal0 =
@@ -1655,18 +1684,18 @@ pSpecVariableInternal0 =
   where
     pSpecVariableInternal0Global :: TermParser SpecVariableInternal0L
     pSpecVariableInternal0Global =
-      SpecVariableInternal0Global' <$> pGlobalTok
+      SpecVariableInternal0Global' <$> pSort @GlobalTokL "global_tok"
     pSpecVariableInternal0Local :: TermParser SpecVariableInternal0L
     pSpecVariableInternal0Local =
-      SpecVariableInternal0Local' <$> pLocalTok
+      SpecVariableInternal0Local' <$> pSort @LocalTokL "local_tok"
 
 pUnitExpression :: TermParser UnitExpressionL
 pUnitExpression =
-  UnitExpression' <$> pLeftParenthesisTok <*> pRightParenthesisTok
+  UnitExpression' <$> pSort @LeftParenthesisTokL "(_tok" <*> pSort @RightParenthesisTokL ")_tok"
 
 pVectorExpression :: TermParser VectorExpressionL
 pVectorExpression =
-  VectorExpression' <$> (pVectorExpressionInternal0) <*> pSepBy pHidExpression pCommaTok <*> pRightSquareBracketTok
+  VectorExpression' <$> pSort @VectorExpressionInternal0L "vector_expression_internal0" <*> pSepBy (pSort @HidExpressionL "hid_expression") (pSort @CommaTokL ",_tok") <*> pSort @RightSquareBracketTokL "]_tok"
 
 pVectorExpressionInternal0 :: TermParser VectorExpressionInternal0L
 pVectorExpressionInternal0 =
@@ -1676,14 +1705,14 @@ pVectorExpressionInternal0 =
   where
     pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser VectorExpressionInternal0L
     pVectorExpressionInternal0VectorLeftSquareBracket =
-      VectorExpressionInternal0VectorLeftSquareBracket' <$> pVectorLeftSquareBracketTok
+      VectorExpressionInternal0VectorLeftSquareBracket' <$> pSort @VectorLeftSquareBracketTokL "vector[_tok"
     pVectorExpressionInternal02 :: TermParser VectorExpressionInternal0L
     pVectorExpressionInternal02 =
-      VectorExpressionInternal02' <$> pBetween pVectorLessThanSignTok pGreaterThanSignTok (pSepBy1 pHidType pCommaTok) <*> pLeftSquareBracketTok
+      VectorExpressionInternal02' <$> pBetween (pSort @VectorLessThanSignTokL "vector<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pSort @HidTypeL "hid_type") (pSort @CommaTokL ",_tok")) <*> pSort @LeftSquareBracketTokL "[_tok"
 
 pMoveOrCopyExpression :: TermParser MoveOrCopyExpressionL
 pMoveOrCopyExpression =
-  MoveOrCopyExpression' <$> pPair (pMoveOrCopyExpressionInternal0) pHidExpression
+  MoveOrCopyExpression' <$> pPair (pSort @MoveOrCopyExpressionInternal0L "move_or_copy_expression_internal0") (pSort @HidExpressionL "hid_expression")
 
 pMoveOrCopyExpressionInternal0 :: TermParser MoveOrCopyExpressionInternal0L
 pMoveOrCopyExpressionInternal0 =
@@ -1693,18 +1722,18 @@ pMoveOrCopyExpressionInternal0 =
   where
     pMoveOrCopyExpressionInternal0Move :: TermParser MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Move =
-      MoveOrCopyExpressionInternal0Move' <$> pMoveTok
+      MoveOrCopyExpressionInternal0Move' <$> pSort @MoveTokL "move_tok"
     pMoveOrCopyExpressionInternal0Copy :: TermParser MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Copy =
-      MoveOrCopyExpressionInternal0Copy' <$> pCopyTok
+      MoveOrCopyExpressionInternal0Copy' <$> pSort @CopyTokL "copy_tok"
 
 pUnaryExpression :: TermParser UnaryExpressionL
 pUnaryExpression =
-  UnaryExpression' <$> pUnaryOp <*> pHidExpression
+  UnaryExpression' <$> pSort @UnaryOpL "unary_op" <*> pSort @HidExpressionL "hid_expression"
 
 pUnaryOp :: TermParser UnaryOpL
 pUnaryOp =
-  UnaryOp' <$> pExclamationMarkTok
+  UnaryOp' <$> pSort @ExclamationMarkTokL "!_tok"
 
 pBinaryExpression :: TermParser BinaryExpressionL
 pBinaryExpression =
@@ -1732,84 +1761,84 @@ pBinaryExpression =
   where
     pBinaryExpression1 :: TermParser BinaryExpressionL
     pBinaryExpression1 =
-      BinaryExpression1' <$> pHidExpression <*> pEqualsSignEqualsSignGreaterThanSignTok <*> pHidExpression
+      BinaryExpression1' <$> pSort @HidExpressionL "hid_expression" <*> pSort @EqualsSignEqualsSignGreaterThanSignTokL "==>_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression2 :: TermParser BinaryExpressionL
     pBinaryExpression2 =
-      BinaryExpression2' <$> pHidExpression <*> pVerticalLineVerticalLineTok <*> pHidExpression
+      BinaryExpression2' <$> pSort @HidExpressionL "hid_expression" <*> pSort @VerticalLineVerticalLineTokL "||_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression3 :: TermParser BinaryExpressionL
     pBinaryExpression3 =
-      BinaryExpression3' <$> pHidExpression <*> pAmpersandAmpersandTok <*> pHidExpression
+      BinaryExpression3' <$> pSort @HidExpressionL "hid_expression" <*> pSort @AmpersandAmpersandTokL "&&_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression4 :: TermParser BinaryExpressionL
     pBinaryExpression4 =
-      BinaryExpression4' <$> pHidExpression <*> pEqualsSignEqualsSignTok <*> pHidExpression
+      BinaryExpression4' <$> pSort @HidExpressionL "hid_expression" <*> pSort @EqualsSignEqualsSignTokL "==_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression5 :: TermParser BinaryExpressionL
     pBinaryExpression5 =
-      BinaryExpression5' <$> pHidExpression <*> pExclamationMarkEqualsSignTok <*> pHidExpression
+      BinaryExpression5' <$> pSort @HidExpressionL "hid_expression" <*> pSort @ExclamationMarkEqualsSignTokL "!=_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression6 :: TermParser BinaryExpressionL
     pBinaryExpression6 =
-      BinaryExpression6' <$> pHidExpression <*> pLessThanSignTok <*> pHidExpression
+      BinaryExpression6' <$> pSort @HidExpressionL "hid_expression" <*> pSort @LessThanSignTokL "<_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression7 :: TermParser BinaryExpressionL
     pBinaryExpression7 =
-      BinaryExpression7' <$> pHidExpression <*> pGreaterThanSignTok <*> pHidExpression
+      BinaryExpression7' <$> pSort @HidExpressionL "hid_expression" <*> pSort @GreaterThanSignTokL ">_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression8 :: TermParser BinaryExpressionL
     pBinaryExpression8 =
-      BinaryExpression8' <$> pHidExpression <*> pLessThanSignEqualsSignTok <*> pHidExpression
+      BinaryExpression8' <$> pSort @HidExpressionL "hid_expression" <*> pSort @LessThanSignEqualsSignTokL "<=_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression9 :: TermParser BinaryExpressionL
     pBinaryExpression9 =
-      BinaryExpression9' <$> pHidExpression <*> pGreaterThanSignEqualsSignTok <*> pHidExpression
+      BinaryExpression9' <$> pSort @HidExpressionL "hid_expression" <*> pSort @GreaterThanSignEqualsSignTokL ">=_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression10 :: TermParser BinaryExpressionL
     pBinaryExpression10 =
-      BinaryExpression10' <$> pHidExpression <*> pFullStopFullStopTok <*> pHidExpression
+      BinaryExpression10' <$> pSort @HidExpressionL "hid_expression" <*> pSort @FullStopFullStopTokL ".._tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression11 :: TermParser BinaryExpressionL
     pBinaryExpression11 =
-      BinaryExpression11' <$> pHidExpression <*> pVerticalLineTok <*> pHidExpression
+      BinaryExpression11' <$> pSort @HidExpressionL "hid_expression" <*> pSort @VerticalLineTokL "|_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression12 :: TermParser BinaryExpressionL
     pBinaryExpression12 =
-      BinaryExpression12' <$> pHidExpression <*> pCircumflexAccentTok <*> pHidExpression
+      BinaryExpression12' <$> pSort @HidExpressionL "hid_expression" <*> pSort @CircumflexAccentTokL "^_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression13 :: TermParser BinaryExpressionL
     pBinaryExpression13 =
-      BinaryExpression13' <$> pHidExpression <*> pAmpersandTok <*> pHidExpression
+      BinaryExpression13' <$> pSort @HidExpressionL "hid_expression" <*> pSort @AmpersandTokL "&_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression14 :: TermParser BinaryExpressionL
     pBinaryExpression14 =
-      BinaryExpression14' <$> pHidExpression <*> pLessThanSignLessThanSignTok <*> pHidExpression
+      BinaryExpression14' <$> pSort @HidExpressionL "hid_expression" <*> pSort @LessThanSignLessThanSignTokL "<<_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression15 :: TermParser BinaryExpressionL
     pBinaryExpression15 =
-      BinaryExpression15' <$> pHidExpression <*> pGreaterThanSignGreaterThanSignTok <*> pHidExpression
+      BinaryExpression15' <$> pSort @HidExpressionL "hid_expression" <*> pSort @GreaterThanSignGreaterThanSignTokL ">>_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression16 :: TermParser BinaryExpressionL
     pBinaryExpression16 =
-      BinaryExpression16' <$> pHidExpression <*> pPlusSignTok <*> pHidExpression
+      BinaryExpression16' <$> pSort @HidExpressionL "hid_expression" <*> pSort @PlusSignTokL "+_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression17 :: TermParser BinaryExpressionL
     pBinaryExpression17 =
-      BinaryExpression17' <$> pHidExpression <*> pHyphenMinusTok <*> pHidExpression
+      BinaryExpression17' <$> pSort @HidExpressionL "hid_expression" <*> pSort @HyphenMinusTokL "-_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression18 :: TermParser BinaryExpressionL
     pBinaryExpression18 =
-      BinaryExpression18' <$> pHidExpression <*> pAsteriskTok <*> pHidExpression
+      BinaryExpression18' <$> pSort @HidExpressionL "hid_expression" <*> pSort @AsteriskTokL "*_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression19 :: TermParser BinaryExpressionL
     pBinaryExpression19 =
-      BinaryExpression19' <$> pHidExpression <*> pSolidusTok <*> pHidExpression
+      BinaryExpression19' <$> pSort @HidExpressionL "hid_expression" <*> pSort @SolidusTokL "/_tok" <*> pSort @HidExpressionL "hid_expression"
     pBinaryExpression20 :: TermParser BinaryExpressionL
     pBinaryExpression20 =
-      BinaryExpression20' <$> pHidExpression <*> pPercentSignTok <*> pHidExpression
+      BinaryExpression20' <$> pSort @HidExpressionL "hid_expression" <*> pSort @PercentSignTokL "%_tok" <*> pSort @HidExpressionL "hid_expression"
 
 pCastExpression :: TermParser CastExpressionL
 pCastExpression =
-  CastExpression' <$> pPair (pPair pHidExpression pAsTok) pHidType
+  CastExpression' <$> pPair (pPair (pSort @HidExpressionL "hid_expression") (pSort @AsTokL "as_tok")) (pSort @HidTypeL "hid_type")
 
 pIdentifiedExpression :: TermParser IdentifiedExpressionL
 pIdentifiedExpression =
-  IdentifiedExpression' <$> pBlockIdentifier <*> pHidExpression
+  IdentifiedExpression' <$> pSort @BlockIdentifierL "block_identifier" <*> pSort @HidExpressionL "hid_expression"
 
 pBlockIdentifier :: TermParser BlockIdentifierL
 pBlockIdentifier =
-  BlockIdentifier' <$> pLabel <*> pColonTok
+  BlockIdentifier' <$> pSort @LabelL "label" <*> pSort @ColonTokL ":_tok"
 
 pLambdaExpression :: TermParser LambdaExpressionL
 pLambdaExpression =
-  LambdaExpression' <$> pLambdaBindings <*> pMaybe (pPair pHyphenMinusGreaterThanSignTok pHidType) <*> pHidExpression
+  LambdaExpression' <$> pSort @LambdaBindingsL "lambda_bindings" <*> pMaybe (pPair (pSort @HyphenMinusGreaterThanSignTokL "->_tok") (pSort @HidTypeL "hid_type")) <*> pSort @HidExpressionL "hid_expression"
 
 pLambdaBindings :: TermParser LambdaBindingsL
 pLambdaBindings =
-  LambdaBindings' <$> pBetween pVerticalLineTok pVerticalLineTok (pSepBy pLambdaBinding pCommaTok)
+  LambdaBindings' <$> pBetween (pSort @VerticalLineTokL "|_tok") (pSort @VerticalLineTokL "|_tok") (pSepBy (pSort @LambdaBindingL "lambda_binding") (pSort @CommaTokL ",_tok"))
 
 pLambdaBinding :: TermParser LambdaBindingL
 pLambdaBinding =
@@ -1819,22 +1848,22 @@ pLambdaBinding =
   where
     pLambdaBindingCommaBindList :: TermParser LambdaBindingL
     pLambdaBindingCommaBindList =
-      LambdaBindingCommaBindList' <$> pCommaBindList
+      LambdaBindingCommaBindList' <$> pSort @CommaBindListL "comma_bind_list"
     pLambdaBinding2 :: TermParser LambdaBindingL
     pLambdaBinding2 =
-      LambdaBinding2' <$> pHidBind <*> pMaybe (pPair pColonTok pHidType)
+      LambdaBinding2' <$> pSort @HidBindL "hid_bind" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSort @HidTypeL "hid_type"))
 
 pLoopExpression :: TermParser LoopExpressionL
 pLoopExpression =
-  LoopExpression' <$> pLoopTok <*> pHidExpression
+  LoopExpression' <$> pSort @LoopTokL "loop_tok" <*> pSort @HidExpressionL "hid_expression"
 
 pQuantifierExpression :: TermParser QuantifierExpressionL
 pQuantifierExpression =
-  QuantifierExpression' <$> pPair (pPair (pPair (pPair pHidReservedIdentifier pQuantifierBindings) (pMaybe (pPair pWhereTok pHidExpression))) pColonTok) pHidExpression
+  QuantifierExpression' <$> pPair (pPair (pPair (pPair (pSort @HidReservedIdentifierL "hid_reserved_identifier") (pSort @QuantifierBindingsL "quantifier_bindings")) (pMaybe (pPair (pSort @WhereTokL "where_tok") (pSort @HidExpressionL "hid_expression")))) (pSort @ColonTokL ":_tok")) (pSort @HidExpressionL "hid_expression")
 
 pQuantifierBindings :: TermParser QuantifierBindingsL
 pQuantifierBindings =
-  QuantifierBindings' <$> pSepBy1 pQuantifierBinding pCommaTok
+  QuantifierBindings' <$> pSepBy1 (pSort @QuantifierBindingL "quantifier_binding") (pSort @CommaTokL ",_tok")
 
 pQuantifierBinding :: TermParser QuantifierBindingL
 pQuantifierBinding =
@@ -1844,10 +1873,10 @@ pQuantifierBinding =
   where
     pQuantifierBinding1 :: TermParser QuantifierBindingL
     pQuantifierBinding1 =
-      QuantifierBinding1' <$> pIdentifier <*> pColonTok <*> pHidType
+      QuantifierBinding1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonTokL ":_tok" <*> pSort @HidTypeL "hid_type"
     pQuantifierBinding2 :: TermParser QuantifierBindingL
     pQuantifierBinding2 =
-      QuantifierBinding2' <$> pIdentifier <*> pInTok <*> pHidExpression
+      QuantifierBinding2' <$> pSort @IdentifierL "identifier" <*> pSort @InTokL "in_tok" <*> pSort @HidExpressionL "hid_expression"
 
 pReturnExpression :: TermParser ReturnExpressionL
 pReturnExpression =
@@ -1857,18 +1886,18 @@ pReturnExpression =
   where
     pReturnExpression1 :: TermParser ReturnExpressionL
     pReturnExpression1 =
-      ReturnExpression1' <$> pReturnTok <*> pMaybe pLabel <*> pHidExpression
+      ReturnExpression1' <$> pSort @ReturnTokL "return_tok" <*> pMaybe (pSort @LabelL "label") <*> pSort @HidExpressionL "hid_expression"
     pReturnExpression2 :: TermParser ReturnExpressionL
     pReturnExpression2 =
-      ReturnExpression2' <$> pReturnTok <*> pMaybe pLabel
+      ReturnExpression2' <$> pSort @ReturnTokL "return_tok" <*> pMaybe (pSort @LabelL "label")
 
 pWhileExpression :: TermParser WhileExpressionL
 pWhileExpression =
-  WhileExpression' <$> pWhileTok <*> pBetween pLeftParenthesisTok pRightParenthesisTok pHidExpression <*> pHidExpression
+  WhileExpression' <$> pSort @WhileTokL "while_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSort @HidExpressionL "hid_expression") <*> pSort @HidExpressionL "hid_expression"
 
 pFriendDeclaration :: TermParser FriendDeclarationL
 pFriendDeclaration =
-  FriendDeclaration' <$> pBetween pFriendTok pSemicolonTok pFriendAccess
+  FriendDeclaration' <$> pBetween (pSort @FriendTokL "friend_tok") (pSort @SemicolonTokL ";_tok") (pSort @FriendAccessL "friend_access")
 
 pFriendAccess :: TermParser FriendAccessL
 pFriendAccess =
@@ -1878,26 +1907,26 @@ pFriendAccess =
   where
     pFriendAccessLocalModule :: TermParser FriendAccessL
     pFriendAccessLocalModule =
-      FriendAccessLocalModule' <$> pIdentifier
+      FriendAccessLocalModule' <$> pSort @IdentifierL "identifier"
     pFriendAccessFullyQualifiedModule :: TermParser FriendAccessL
     pFriendAccessFullyQualifiedModule =
-      FriendAccessFullyQualifiedModule' <$> pModuleIdentity
+      FriendAccessFullyQualifiedModule' <$> pSort @ModuleIdentityL "module_identity"
 
 pHidEnumItem :: TermParser HidEnumItemL
 pHidEnumItem =
-  HidEnumItem' <$> pEnumDefinition
+  HidEnumItem' <$> pSort @EnumDefinitionL "enum_definition"
 
 pEnumDefinition :: TermParser EnumDefinitionL
 pEnumDefinition =
-  EnumDefinition' <$> pMaybe pPublicTok <*> pHidEnumSignature <*> pEnumVariants <*> pMaybe pPostfixAbilityDecls
+  EnumDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pSort @HidEnumSignatureL "hid_enum_signature" <*> pSort @EnumVariantsL "enum_variants" <*> pMaybe (pSort @PostfixAbilityDeclsL "postfix_ability_decls")
 
 pEnumVariants :: TermParser EnumVariantsL
 pEnumVariants =
-  EnumVariants' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pVariant pCommaTok)
+  EnumVariants' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @VariantL "variant") (pSort @CommaTokL ",_tok"))
 
 pVariant :: TermParser VariantL
 pVariant =
-  Variant' <$> pHidVariantIdentifier <*> pMaybe pDatatypeFields
+  Variant' <$> pSort @HidVariantIdentifierL "hid_variant_identifier" <*> pMaybe (pSort @DatatypeFieldsL "datatype_fields")
 
 pDatatypeFields :: TermParser DatatypeFieldsL
 pDatatypeFields =
@@ -1907,42 +1936,42 @@ pDatatypeFields =
   where
     pDatatypeFieldsPositionalFields :: TermParser DatatypeFieldsL
     pDatatypeFieldsPositionalFields =
-      DatatypeFieldsPositionalFields' <$> pPositionalFields
+      DatatypeFieldsPositionalFields' <$> pSort @PositionalFieldsL "positional_fields"
     pDatatypeFieldsNamedFields :: TermParser DatatypeFieldsL
     pDatatypeFieldsNamedFields =
-      DatatypeFieldsNamedFields' <$> pNamedFields
+      DatatypeFieldsNamedFields' <$> pSort @NamedFieldsL "named_fields"
 
 pNamedFields :: TermParser NamedFieldsL
 pNamedFields =
-  NamedFields' <$> pBetween pLeftCurlyBracketTok pRightCurlyBracketTok (pSepBy pFieldAnnotation pCommaTok)
+  NamedFields' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @FieldAnnotationL "field_annotation") (pSort @CommaTokL ",_tok"))
 
 pFieldAnnotation :: TermParser FieldAnnotationL
 pFieldAnnotation =
-  FieldAnnotation' <$> pHidFieldIdentifier <*> pColonTok <*> pHidType
+  FieldAnnotation' <$> pSort @HidFieldIdentifierL "hid_field_identifier" <*> pSort @ColonTokL ":_tok" <*> pSort @HidTypeL "hid_type"
 
 pPositionalFields :: TermParser PositionalFieldsL
 pPositionalFields =
-  PositionalFields' <$> pBetween pLeftParenthesisTok pRightParenthesisTok (pSepBy pHidType pCommaTok)
+  PositionalFields' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pSort @HidTypeL "hid_type") (pSort @CommaTokL ",_tok"))
 
 pHidVariantIdentifier :: TermParser HidVariantIdentifierL
 pHidVariantIdentifier =
-  HidVariantIdentifier' <$> pIdentifier
+  HidVariantIdentifier' <$> pSort @IdentifierL "identifier"
 
 pHidEnumSignature :: TermParser HidEnumSignatureL
 pHidEnumSignature =
-  HidEnumSignature' <$> pEnumTok <*> pHidEnumIdentifier <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
+  HidEnumSignature' <$> pSort @EnumTokL "enum_tok" <*> pSort @HidEnumIdentifierL "hid_enum_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pMaybe (pSort @AbilityDeclsL "ability_decls")
 
 pAbilityDecls :: TermParser AbilityDeclsL
 pAbilityDecls =
-  AbilityDecls' <$> pHasTok <*> pSepBy pAbility pCommaTok
+  AbilityDecls' <$> pSort @HasTokL "has_tok" <*> pSepBy (pSort @AbilityL "ability") (pSort @CommaTokL ",_tok")
 
 pHidEnumIdentifier :: TermParser HidEnumIdentifierL
 pHidEnumIdentifier =
-  HidEnumIdentifier' <$> pIdentifier
+  HidEnumIdentifier' <$> pSort @IdentifierL "identifier"
 
 pPostfixAbilityDecls :: TermParser PostfixAbilityDeclsL
 pPostfixAbilityDecls =
-  PostfixAbilityDecls' <$> pBetween pHasTok pSemicolonTok (pSepBy pAbility pCommaTok)
+  PostfixAbilityDecls' <$> pBetween (pSort @HasTokL "has_tok") (pSort @SemicolonTokL ";_tok") (pSepBy (pSort @AbilityL "ability") (pSort @CommaTokL ",_tok"))
 
 pHidFunctionItem :: TermParser HidFunctionItemL
 pHidFunctionItem =
@@ -1953,21 +1982,21 @@ pHidFunctionItem =
   where
     pHidFunctionItemNativeFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemNativeFunctionDefinition =
-      HidFunctionItemNativeFunctionDefinition' <$> pNativeFunctionDefinition
+      HidFunctionItemNativeFunctionDefinition' <$> pSort @NativeFunctionDefinitionL "native_function_definition"
     pHidFunctionItemMacroFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemMacroFunctionDefinition =
-      HidFunctionItemMacroFunctionDefinition' <$> pMacroFunctionDefinition
+      HidFunctionItemMacroFunctionDefinition' <$> pSort @MacroFunctionDefinitionL "macro_function_definition"
     pHidFunctionItemFunctionDefinition :: TermParser HidFunctionItemL
     pHidFunctionItemFunctionDefinition =
-      HidFunctionItemFunctionDefinition' <$> pFunctionDefinition
+      HidFunctionItemFunctionDefinition' <$> pSort @FunctionDefinitionL "function_definition"
 
 pFunctionDefinition :: TermParser FunctionDefinitionL
 pFunctionDefinition =
-  FunctionDefinition' <$> pHidFunctionSignature <*> pBlock
+  FunctionDefinition' <$> pSort @HidFunctionSignatureL "hid_function_signature" <*> pSort @BlockL "block"
 
 pHidFunctionSignature :: TermParser HidFunctionSignatureL
 pHidFunctionSignature =
-  HidFunctionSignature' <$> pMaybe pModifier <*> pMaybe pModifier <*> pMaybe pModifier <*> pFunTok <*> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
+  HidFunctionSignature' <$> pMaybe (pSort @ModifierL "modifier") <*> pMaybe (pSort @ModifierL "modifier") <*> pMaybe (pSort @ModifierL "modifier") <*> pSort @FunTokL "fun_tok" <*> pSort @HidFunctionIdentifierL "hid_function_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pMaybe (pSort @RetTypeL "ret_type")
 
 pModifier :: TermParser ModifierL
 pModifier =
@@ -1978,13 +2007,13 @@ pModifier =
   where
     pModifier1 :: TermParser ModifierL
     pModifier1 =
-      Modifier1' <$> pPublicTok <*> pMaybe (pBetween pLeftParenthesisTok pRightParenthesisTok (pModifierInternal0))
+      Modifier1' <$> pSort @PublicTokL "public_tok" <*> pMaybe (pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSort @ModifierInternal0L "modifier_internal0"))
     pModifierEntry :: TermParser ModifierL
     pModifierEntry =
-      ModifierEntry' <$> pEntryTok
+      ModifierEntry' <$> pSort @EntryTokL "entry_tok"
     pModifierNative :: TermParser ModifierL
     pModifierNative =
-      ModifierNative' <$> pNativeTok
+      ModifierNative' <$> pSort @NativeTokL "native_tok"
 
 pModifierInternal0 :: TermParser ModifierInternal0L
 pModifierInternal0 =
@@ -1994,22 +2023,22 @@ pModifierInternal0 =
   where
     pModifierInternal0Package :: TermParser ModifierInternal0L
     pModifierInternal0Package =
-      ModifierInternal0Package' <$> pPackageTok
+      ModifierInternal0Package' <$> pSort @PackageTokL "package_tok"
     pModifierInternal0Friend :: TermParser ModifierInternal0L
     pModifierInternal0Friend =
-      ModifierInternal0Friend' <$> pFriendTok
+      ModifierInternal0Friend' <$> pSort @FriendTokL "friend_tok"
 
 pMacroFunctionDefinition :: TermParser MacroFunctionDefinitionL
 pMacroFunctionDefinition =
-  MacroFunctionDefinition' <$> pMaybe pModifier <*> pMacroTok <*> pHidMacroSignature <*> pBlock
+  MacroFunctionDefinition' <$> pMaybe (pSort @ModifierL "modifier") <*> pSort @MacroTokL "macro_tok" <*> pSort @HidMacroSignatureL "hid_macro_signature" <*> pSort @BlockL "block"
 
 pHidMacroSignature :: TermParser HidMacroSignatureL
 pHidMacroSignature =
-  HidMacroSignature' <$> pMaybe pModifier <*> pFunTok <*> pHidFunctionIdentifier <*> pMaybe pTypeParameters <*> pFunctionParameters <*> pMaybe pRetType
+  HidMacroSignature' <$> pMaybe (pSort @ModifierL "modifier") <*> pSort @FunTokL "fun_tok" <*> pSort @HidFunctionIdentifierL "hid_function_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pMaybe (pSort @RetTypeL "ret_type")
 
 pNativeFunctionDefinition :: TermParser NativeFunctionDefinitionL
 pNativeFunctionDefinition =
-  NativeFunctionDefinition' <$> pHidFunctionSignature <*> pSemicolonTok
+  NativeFunctionDefinition' <$> pSort @HidFunctionSignatureL "hid_function_signature" <*> pSort @SemicolonTokL ";_tok"
 
 pHidStructItem :: TermParser HidStructItemL
 pHidStructItem =
@@ -2019,22 +2048,22 @@ pHidStructItem =
   where
     pHidStructItemNativeStructDefinition :: TermParser HidStructItemL
     pHidStructItemNativeStructDefinition =
-      HidStructItemNativeStructDefinition' <$> pNativeStructDefinition
+      HidStructItemNativeStructDefinition' <$> pSort @NativeStructDefinitionL "native_struct_definition"
     pHidStructItemStructDefinition :: TermParser HidStructItemL
     pHidStructItemStructDefinition =
-      HidStructItemStructDefinition' <$> pStructDefinition
+      HidStructItemStructDefinition' <$> pSort @StructDefinitionL "struct_definition"
 
 pNativeStructDefinition :: TermParser NativeStructDefinitionL
 pNativeStructDefinition =
-  NativeStructDefinition' <$> pMaybe pPublicTok <*> pBetween pNativeTok pSemicolonTok pHidStructSignature
+  NativeStructDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pBetween (pSort @NativeTokL "native_tok") (pSort @SemicolonTokL ";_tok") (pSort @HidStructSignatureL "hid_struct_signature")
 
 pHidStructSignature :: TermParser HidStructSignatureL
 pHidStructSignature =
-  HidStructSignature' <$> pStructTok <*> pHidStructIdentifier <*> pMaybe pTypeParameters <*> pMaybe pAbilityDecls
+  HidStructSignature' <$> pSort @StructTokL "struct_tok" <*> pSort @HidStructIdentifierL "hid_struct_identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pMaybe (pSort @AbilityDeclsL "ability_decls")
 
 pStructDefinition :: TermParser StructDefinitionL
 pStructDefinition =
-  StructDefinition' <$> pMaybe pPublicTok <*> pHidStructSignature <*> pDatatypeFields <*> pMaybe pPostfixAbilityDecls
+  StructDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pSort @HidStructSignatureL "hid_struct_signature" <*> pSort @DatatypeFieldsL "datatype_fields" <*> pMaybe (pSort @PostfixAbilityDeclsL "postfix_ability_decls")
 
 --------------------------------------------------------------------------------
 -- Parse Table
