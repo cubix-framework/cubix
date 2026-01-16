@@ -1,32 +1,32 @@
 import: cabal.project.release
-debug-info: 3
+debug-info: 0
 profiling: False
 executable-profiling: False
 library-profiling: False
 
 optimization: False
 
-package cubix-sui-move
-  ghc-options:
-    -g -debug
-    -finfo-table-map
-    -fdistinct-constructor-tables
-    -fprof-auto
+-- package cubix-sui-move
+--   ghc-options:
+--     -g -debug
+--     -finfo-table-map
+--     -fdistinct-constructor-tables
+--     -fprof-auto
 
-package hs-tree-sitter
-  ghc-options:
-    -g -debug
-    -finfo-table-map
-    -fdistinct-constructor-tables
+-- package hs-tree-sitter
+--   ghc-options:
+--     -g -debug
+--     -finfo-table-map
+--     -fdistinct-constructor-tables
 
-package hs-tree-sitter-capi
-  ghc-options:
-    -g -debug
-    -finfo-table-map
-    -fdistinct-constructor-tables
+-- package hs-tree-sitter-capi
+--   ghc-options:
+--     -g -debug
+--     -finfo-table-map
+--     -fdistinct-constructor-tables
 
-package tree-sitter-sui-move
-  ghc-options:
-    -g -debug
-    -finfo-table-map
-    -fdistinct-constructor-tables
+-- package tree-sitter-sui-move
+--   ghc-options:
+--     -g -debug
+--     -finfo-table-map
+--     -fdistinct-constructor-tables
