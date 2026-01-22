@@ -73,13 +73,6 @@ import Cubix.Language.Parametric.Semantics.SemanticProperties
 
 import Cubix.Sin.Compdata.Annotation ( getAnn, propAnnSigFun )
 
---------------------------------------------------------------------------------------
-
-instance KShow f => Show (E f) where
-  show (E x) = unK $ kshow x
-
---------------------------------------------------------------------------------------
-
 newtype CfgNodeType = CfgNodeType NodeEvaluationPoint
   deriving ( Eq, Ord, Show, Generic, NFData )
 
