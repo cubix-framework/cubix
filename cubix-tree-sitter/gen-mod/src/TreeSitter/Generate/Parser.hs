@@ -1,6 +1,9 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-module TreeSitter.Generate.Parser where
+module TreeSitter.Generate.Parser
+  ( Parser (..)
+  , mkParser
+  ) where
 
 import Data.Functor.Foldable
 import Data.List.NonEmpty (NonEmpty (..))

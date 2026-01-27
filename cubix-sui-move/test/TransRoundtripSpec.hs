@@ -5,14 +5,14 @@ import System.Directory (listDirectory, doesFileExist)
 import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM, forM_, unless)
 
-import TreeSitter.SuiMove (getTestDir)
+import TreeSitter.SuiMove (tree_sitter_sui_move, getTestDir)
 import Cubix.Language.SuiMove.ParsePretty (parse)
 import Cubix.Language.SuiMove.IPS (translate, untranslate)
 
 -- | Parse a Move file, translate to IPS, untranslate back, and verify equality
 roundtripTest :: FilePath -> IO ()
 roundtripTest filepath = do
-  parsed <- parse filepath
+  parsed <- parse filepath tree_sitter_sui_move
   case parsed of
     Nothing -> expectationFailure $ "Failed to parse file: " ++ filepath
     Just orig -> do

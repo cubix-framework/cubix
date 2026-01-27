@@ -4,9 +4,10 @@ module Main where
 import Options.Applicative (Parser, ParserInfo, execParser, fullDesc, help, helper, info, metavar, progDesc, strArgument, (<**>))
 import Text.Pretty.Simple
 -- import GHC.Debug.Stub (withGhcDebug)
-
-import Cubix.Language.SuiMove.Parse qualified as SuiMove
--- import Cubix.Language.SuiMove.IPS (translate, untranslate)
+import Data.Comp.Multi
+import Cubix.Language.SuiMove.ParsePretty qualified as SuiMove
+import Cubix.Language.SuiMove.IPS (translate, untranslate)
+import TreeSitter.SuiMove (tree_sitter_sui_move)
 
 data Options = Options
   { inputFile :: FilePath }
@@ -30,19 +31,19 @@ main :: IO ()
 main = -- withGhcDebug $
   do
     Options{..} <- execParser optionsInfo
-    ast <-
-      SuiMove.parse inputFile
-    -- case mast of
-    --   Just ast -> do
+    mast <- SuiMove.parse inputFile tree_sitter_sui_move
+    ast <- case mast of
+      Nothing -> error "Couldn't parse top level sort"
+      Just a -> pure a
     putStrLn "Original:"
     pPrintLightBg ast
-    -- let ips = translate ast
+    let ips = translate ast
 
-    -- putStrLn "Incremental Parametric:"
-    -- pPrintLightBg ips
+    putStrLn "Incremental Parametric:"
+    pPrintLightBg ips
 
-    -- putStrLn "Un-translated:"
-    -- pPrintLightBg (untranslate ips)
+    putStrLn "Un-translated:"
+    pPrintLightBg (untranslate ips)
     -- Nothing -> putStrLn "something went wrong"
 
     pure ()

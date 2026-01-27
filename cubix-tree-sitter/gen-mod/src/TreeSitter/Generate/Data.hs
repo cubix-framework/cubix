@@ -1,23 +1,21 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module TreeSitter.Generate.Data where
 
-import Control.Applicative ((<|>))
 import Control.Exception (throw, Exception)
-import Data.Char (isAlphaNum, toLower, toUpper)
 import Data.Functor.Foldable
 import Data.Graph.Inductive (Gr)
 import Data.Graph.Inductive qualified as Gr
 import Data.Set (Set)
+import Data.Set qualified as Set
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe (fromMaybe)
-import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
 import TreeSitter.Grammar
@@ -25,24 +23,12 @@ import TreeSitter.Grammar
 import TreeSitter.Generate.Types
 import TreeSitter.Generate.Parser
 
-import Debug.Trace
-import Data.Set qualified as Set
-
 isHidden :: RuleName -> Bool
 isHidden n = Text.head n == '_'
 
 isInternal :: RuleName -> Bool
 isInternal n = let segments = Text.split (== '_') n
   in any (Text.isPrefixOf "internal") segments
-
-shouldInline :: Map RuleName Rule -> RuleName -> Maybe Rule
-shouldInline rules name
-  | isHidden name = Nothing
-      -- case getRule rules name of
-      --   ChoiceRule {} -> Nothing
-      --   AliasRule {..} -> Just content
-      --   r -> Just r
-  | otherwise = Nothing
   
 data Type
   = Ref Name
@@ -157,7 +143,7 @@ ruleToField rules = para alg
     alg r = Unnamed (toType . embed $ fst <$> r)
 
 ruleToType :: Map RuleName Rule -> Rule -> Type
-ruleToType rules = go
+ruleToType _rules = go
   where
     go = cata alg
     alg :: RuleF Type -> Type
@@ -171,20 +157,8 @@ ruleToType rules = go
     -- they'll be in our syntax
     alg (StringRuleF {..}) = Token valueF
     alg (PatternRuleF {}) = Content
-    alg (SymbolRuleF n@(Name -> s)) =
-      -- case shouldInline rules n of
-      --   Just r -> go r
-      --   Nothing ->
-      Ref s
-      -- if isHidden (getName s)
-      --    then ruleToType rules (getRule rules n)
-      -- -- $ ruleToType (rule $ unName s) -- Node (Name s)
-      --    else Ref s
-    alg (RefRuleF s@(Name -> n)) =
-      -- case shouldInline rules s of
-      --   Just r -> go r
-      --   Nothing ->
-      Ref n
+    alg (SymbolRuleF s) = Ref (Name s)
+    alg (RefRuleF n) = Ref (Name n)
     alg (SeqRuleF (Vector.uncons -> Nothing)) = error "Empty sequence rule"
     alg (SeqRuleF (Vector.uncons -> Just (h, t))) =
       Vector.foldl mkTuple h t

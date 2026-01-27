@@ -10,27 +10,25 @@ import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
 import Data.Comp.Multi (E (..))
-import Data.Comp.Multi.Strategy.Classification (DynCase)
+import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
 import Data.Foldable (foldrM)
+import Data.Functor ((<&>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (catMaybes, fromJust)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Typeable (Typeable)
+import Foreign.C.ConstPtr.Compat (ConstPtr (..))
 
 import TreeSitter qualified as TS
-import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
--- import Text.Megaparsec.Cubix
---   ( pMaybe, pPair, pSome, pMany
---   , pSepBy, pSepBy1, pBetween
---   , pSort, pContent
---   )
 
+import Cubix.ParsePretty (type RootSort)
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
 
@@ -44,53 +42,54 @@ parse' = do
   rootNode <- liftIO . TS.treeRootNode =<< getTree
   syntax filepath source pTable rootNode
 
-parse :: FilePath -> IO SomeTerm
-parse path =
-  runReaderT parse' =<<
-    newTreeSitterEnv path tree_sitter_sui_move
+{-+}
+parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
+parse path getLang =
+  newTreeSitterEnv path getLang
+  >>= runReaderT parse'
+  <&> caseE @_ @(RootSort ${grammarName}Sig)
+{+-}
 
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
-syntax path source pTable = go
+syntax path source pTable = fmap fromJust . go
   where
     pContent = Megaparsec.Cubix.getContent source
     getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
-    go :: TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
+    go :: TS.Node -> ReaderT TreeSitterEnv IO (Maybe SomeTerm)
     go root = do
       extra <- liftIO $ TS.nodeIsExtra root
       if extra
-        then pure $ error ""
+        then pure Nothing
         else do
           range    <- liftIO $ nodeRange root
           span     <- liftIO $ nodeSpan path root
           symbolNo <- liftIO $ TS.nodeSymbol root
-          -- liftIO $ traceIO =<< TS.nodeTypeAsString root
           case getParser symbolNo of
             Nothing -> do
-              pPrintLightBg $ "Unrecognized symbol: " <> Prelude.show symbolNo
-              pPrintLightBg $ "  at: " <> Prelude.show span
               liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
-              error "no parse"
+              error $ "Unrecognized symbol: "
+                   <> Prelude.show symbolNo
+                   <> " at: "
+                   <> Prelude.show span
 
             Just p -> do
               childNo <- liftIO $ TS.nodeChildCount root
-              -- pPrintLightBg $ "parsed sym: " <> show sym
-              -- pPrintLightBg $ "child count: " <> show childNo
-
               let childNums = [0..childNo - 1]
                   content = pContent range
 
               children <- if childNo == 0
-                then do
-                  -- pPrintLightBg $ "parsed sym: " <> show sym
+                then
                   pure []
                 else
-                  mapM (go <=< (liftIO . TS.nodeChild root)) childNums
+                  catMaybes <$> mapM (go <=< (liftIO . TS.nodeChild root)) childNums
               case Megaparsec.runParser p path (Megaparsec.Cubix.Input content children) of
                 Left err -> do
+                  liftIO . putStrLn $ Megaparsec.errorBundlePretty err
+                  pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
+                  pPrintDarkBg children
                   error "no parse"
-                Right item -> do
-                  pPrintLightBg item
-                  pure item
+                Right item ->
+                  pure (Just item)
 
 -- --------------------------------------------------------------------------------
 -- -- Parser 

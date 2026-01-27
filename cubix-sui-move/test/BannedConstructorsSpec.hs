@@ -12,7 +12,7 @@ import Test.Hspec
 import Data.Comp.Multi
 import Data.Comp.Multi.Strategic
 
-import TreeSitter.SuiMove (getTestDir)
+import TreeSitter.SuiMove (tree_sitter_sui_move, getTestDir)
 import Cubix.Language.SuiMove.ParsePretty (parse)
 import Cubix.Language.SuiMove.IPS (translate, MSuiMoveTerm)
 
@@ -33,7 +33,7 @@ getMoveTestFiles = do
 
 bannedConstructorsTest :: FilePath -> IO ()
 bannedConstructorsTest filepath = do
-  parsed <- parse filepath
+  parsed <- parse filepath tree_sitter_sui_move
   case parsed of
     Nothing -> expectationFailure $ "Failed to parse file: " ++ filepath
     Just orig -> do

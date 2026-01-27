@@ -209,7 +209,7 @@ instance ToContext Text Parser where
       Optional a -> par p ("pMaybe " <> p2t True a)
       Many ps -> par p ("pMany " <> p2t True ps)
       Some ps -> par p ("pSome " <> p2t True ps)
-      Skip -> Builder.fromText "pure ()"
+      Skip -> Builder.fromText "Megaparsec.eof"
       Extract -> "pContent"
       SepBy sep content -> par p ("pSepBy " <> p2t True content <> " " <> p2t True sep)
       SepBy1 sep content -> par p ("pSepBy1 " <> p2t True content <> " " <> p2t True sep)
@@ -220,12 +220,14 @@ instance ToContext Text Parser where
     -- inspect _ (Tok _) = Builder.fromText " <* "
     inspect _ _ = Builder.fromText " <*> "
 
-    name2psort name =
-      "pSort @" <>
-      Builder.fromText (sortName name) <>
-      " \"" <>
-      Builder.fromText (getName name) <>
-      "\""
+    name2psort name
+      | hasSymbol name =
+          "pSort @" <>
+          Builder.fromText (sortName name) <>
+          " \"" <>
+          Builder.fromText (getName name) <>
+          "\""
+      | otherwise = "p" <> Builder.fromText (snakeToCase Upper $ hiddenName name)
 
     intersperseBy :: Monoid b => (a -> b) -> (a -> a -> b) -> [a] -> [b]
     intersperseBy _ _ []     = mempty

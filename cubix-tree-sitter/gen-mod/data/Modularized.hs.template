@@ -68,7 +68,7 @@ ${endfor}
 {+-}
 
 {-+}
-deriveAllButDynCase
+deriveAll
 ${for(data/first)}
   [ ''${it.name.camelCase/first}
 ${endfor}

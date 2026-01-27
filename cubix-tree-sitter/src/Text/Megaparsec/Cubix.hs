@@ -1,15 +1,18 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE RecordWildCards #-}
 module Text.Megaparsec.Cubix where
 
 import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (between, eitherP, many, optional, sepEndBy, sepEndBy1, some)
 import Data.ByteString as ByteString
+import Data.ByteString.Char8 qualified as ByteString.Char8
 -- TODO: CUBIX_NON_EMPTY
 -- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
-import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, NoHole, OrdHF, Sum, KShow, (:<:), runE, kshow, unK)
+import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, KShow, NoHole, OrdHF, ShowHF, Sum, (:<:))
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
 import Data.List qualified as List
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Proxy (Proxy (..))
 import Data.Set qualified as Set
 import Data.String (IsString (..))
@@ -100,9 +103,6 @@ pBetween
 pBetween = between
 {-# INLINABLE pBetween #-}
 
--- instance KShow f => Show (E f) where
---   show = runE (show . unK . kshow)
-
 data Input h fs a = Input
   { content :: ByteString
   , tokens  :: [E (Cxt h fs a)]
@@ -128,6 +128,50 @@ instance (HFunctor fs, OrdHF fs, KOrd a) => Text.Megaparsec.Stream (Input h fs a
   takeWhile_ f (Input src s) =
     let (x, s') = List.span f s
      in (x, Input src s')
+
+instance
+  ( HFunctor fs, OrdHF fs, KOrd a, ShowHF fs, KShow a
+  ) => Text.Megaparsec.VisualStream (Input h fs a)
+  where
+    showTokens Proxy = unwords
+      . NonEmpty.toList
+      . fmap show
+
+    tokensLength Proxy = sum . fmap (const 1)
+
+instance
+  ( HFunctor fs, OrdHF fs, KOrd a, ShowHF fs, KShow a
+  ) => Text.Megaparsec.TraversableStream (Input h fs a)
+  where
+    reachOffsetNoLine offset Text.Megaparsec.PosState {..} =
+      Text.Megaparsec.PosState
+        { pstateInput =
+            Input
+              { content = content pstateInput
+              , tokens = post
+              }
+        , pstateOffset = max pstateOffset offset
+        , pstateSourcePos = newSourcePos
+        , pstateTabWidth = pstateTabWidth
+        , pstateLinePrefix = prefix
+        }
+      where
+        (pre, post) = List.splitAt (offset - pstateOffset) (tokens pstateInput)
+        tokensConsumed = case NonEmpty.nonEmpty pre of
+          Nothing -> 0
+          Just nePre -> Text.Megaparsec.tokensLength (Proxy @(Input h fs a)) nePre
+        -- those are wrong since tokensLength doesn't count proper, we would need to do the Annotated tokens
+        preBS = ByteString.take tokensConsumed (content pstateInput)
+        preStr = ByteString.Char8.unpack preBS
+        newSourcePos = pstateSourcePos
+        sameLine =
+          (==)
+            (Text.Megaparsec.sourceLine newSourcePos)
+            (Text.Megaparsec.sourceLine pstateSourcePos)
+        prefix =
+          if sameLine
+            then pstateLinePrefix ++ preStr
+            else preStr
 
 type Parser' h fs a t = Text.Megaparsec.Parsec Void (Input h fs a) t
 type Parser sig t = Parser' NoHole (Sum sig) (K ()) t
