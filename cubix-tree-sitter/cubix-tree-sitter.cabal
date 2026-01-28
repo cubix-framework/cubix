@@ -77,7 +77,6 @@ common dependencies
     , path ^>= 0.9
     , path-io ^>= 1.6
     , recursion-schemes ^>= 5.2
-    , streaming ^>= 0.2.4
     , template-haskell >= 2.21.0.0
     , text >= 2.1.2
     , transformers ^>= 0.6
@@ -97,7 +96,6 @@ library
     -O0
   exposed-modules:
     Cubix.TreeSitter
-    Text.Megaparsec.TreeSitter
     Text.Megaparsec.Cubix
   
 library gen-internal

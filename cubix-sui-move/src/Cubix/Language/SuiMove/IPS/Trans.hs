@@ -11,11 +11,11 @@ module Cubix.Language.SuiMove.IPS.Trans (
   ) where
 
 import Data.Either ( partitionEithers )
-import Data.List( (\\), unsnoc )
+import Data.List( (\\) )
 import Data.Text qualified as Text
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
-import Data.Comp.Multi ( project, project', inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
+import Data.Comp.Multi ( inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 
 import Cubix.Language.SuiMove.IPS.Types
 import Cubix.Language.SuiMove.Modularized qualified as Modularized

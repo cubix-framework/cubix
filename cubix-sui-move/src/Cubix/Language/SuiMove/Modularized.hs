@@ -4,22 +4,13 @@
 module Cubix.Language.SuiMove.Modularized
   where
 
-import Data.ByteString.Char8 qualified as BSC
 import Data.Comp.Multi.Strategy.Classification (DynCase (..))
-import Data.Foldable (foldrM)
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as IM
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.Text (Text)
-import Data.Type.Equality (type (:~:) (..), type (:~~:) (..))
+import Data.Type.Equality (type (:~:) (..))
 import Language.Haskell.TH qualified as TH
-import TreeSitter qualified as TS
 
 import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive
-import Cubix.Language.Parametric.InjF (projF)
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
 import Data.Comp.Multi (Term, project)
