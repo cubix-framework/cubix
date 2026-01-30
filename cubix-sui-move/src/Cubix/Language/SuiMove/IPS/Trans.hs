@@ -134,6 +134,7 @@ instance Trans Modularized.HiddenExpression where
   trans he@(Modularized.HiddenExpressionUnaryExpression (Modularized.HiddenUnaryExpression' uexp)) = case uexp of
     Modularized.HiddenUnaryExpressionInternal0UnaryExpression' ue -> injF $ transUnaryExpr ue
     _ -> transDefault he
+  trans (Modularized.HiddenExpressionIfExpression ie) = injF $ transIfExpression ie
   trans x = transDefault x
 
 -------- Block
@@ -204,6 +205,14 @@ transLetStatement (Modularized.LetStatement' _ bindList mtype minit) =
 
 instance Trans Modularized.LetStatement where
   trans ls@(Modularized.LetStatement {}) = injF $ transLetStatement $ inject ls
+
+-------- If Expression (Ternary operator)
+transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> MSuiMoveTerm ExpressionL
+transIfExpression (Modularized.IfExpression' (PairF' (PairF' (PairF' _ condExpr) thenExpr) elseClause)) =
+  let elseExpr = case elseClause of
+        Nothing' -> iUnitF
+        Just' (PairF' _ expr) -> translate' expr
+  in iTernary ITE' (translate' condExpr) (translate' thenExpr) elseExpr
 
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
@@ -289,6 +298,8 @@ instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
     Modularized.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
   untrans (ExpressionIsHiddenExpression (Unary' op expr)) =
     Modularized.iHiddenExpressionUnaryExpression $ untransUnaryOp op (fromProjF expr)
+  untrans (ExpressionIsHiddenExpression (Ternary' op cond thenExpr elseExpr)) =
+    Modularized.iHiddenExpressionIfExpression $ untransIfExpression op (fromProjF cond) (fromProjF thenExpr) (fromProjF elseExpr)
   untrans (ExpressionIsHiddenExpression e) = untranslate' e
 
 untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.BinaryExpressionL
@@ -322,6 +333,29 @@ untransUnaryOp Not' expr =
         (Modularized.iUnaryOp Modularized.iExclamationMarkTok)
         (untranslate expr)
 untransUnaryOp _ _ = error "untransUnaryOp: unsupported operator"
+
+-------- If Expression (Ternary operator)
+
+untransIfExpression :: MSuiMoveTerm TernaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.IfExpressionL
+untransIfExpression ITE' cond thenExpr elseExpr =
+  let condTerm = untranslate cond
+      thenTerm = untranslate thenExpr
+      elseTerm = untranslate elseExpr
+      -- Check if elseTerm is a unit expression by examining its structure
+      isUnit = case elseTerm of
+        Modularized.HiddenExpressionUnaryExpression'
+          (Modularized.HiddenUnaryExpression'
+            (Modularized.HiddenUnaryExpressionInternal0ExpressionTerm'
+              (Modularized.HiddenExpressionTermUnitExpression' _))) -> True
+        _ -> False
+      maybeElse = if isUnit
+                    then Nothing'
+                    else Just' $ riPairF Modularized.iElseTok elseTerm
+      ifTokCond = riPairF Modularized.iIfTok condTerm
+      ifCondThen = riPairF ifTokCond thenTerm
+      fullTuple = riPairF ifCondThen maybeElse
+  in Modularized.iIfExpression fullTuple
+untransIfExpression _ _ _ _ = error "untransIfExpression: unsupported ternary operator"
 
 -------- Block
 

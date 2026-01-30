@@ -135,6 +135,7 @@ do let suiSortInjections =
          , ''Parametric.ArithShrOp
          , ''Parametric.RelationalBinOp
          , ''Parametric.LogicalNegationOp
+         , ''Parametric.CondTernaryOp
          , ''Parametric.Block
          , ''Parametric.EmptyBlockEnd
          , ''Parametric.UnitF
@@ -179,4 +180,21 @@ instance {-# OVERLAPPING #-} InjF MSuiMoveSig Modularized.UnaryExpressionL Param
     , Just (HiddenUnaryExpression ue') <- project' ue
     , Just (HiddenUnaryExpressionInternal0UnaryExpression uexp) <- project' ue'
     = projF' uexp
+  projF' _ = Nothing
+
+instance {-# OVERLAPPING #-} InjF MSuiMoveSig () Parametric.ExpressionL where
+  injF = iHiddenExpressionUnaryExpression
+       . iHiddenUnaryExpression
+       . iHiddenUnaryExpressionInternal0ExpressionTerm
+       . iHiddenExpressionTermUnitExpression
+       . iUnitIsUnitExpression
+
+  projF' e
+    | Just (HiddenExpressionIsExpression e') <- project' e
+    , Just (HiddenExpressionUnaryExpression a) <- project' e'
+    , Just (HiddenUnaryExpression b) <- project' a
+    , Just (HiddenUnaryExpressionInternal0ExpressionTerm c) <- project' b
+    , Just (HiddenExpressionTermUnitExpression d) <- project' c
+    , Just (UnitIsUnitExpression u) <- project' d
+    = projF' u
   projF' _ = Nothing
