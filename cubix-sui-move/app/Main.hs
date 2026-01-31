@@ -4,7 +4,6 @@ module Main where
 import Options.Applicative (Parser, ParserInfo, execParser, fullDesc, help, helper, info, metavar, progDesc, strArgument, (<**>))
 import Text.Pretty.Simple
 -- import GHC.Debug.Stub (withGhcDebug)
-import Data.Comp.Multi
 import Cubix.Language.SuiMove.ParsePretty qualified as SuiMove
 import Cubix.Language.SuiMove.IPS (translate, untranslate)
 import TreeSitter.SuiMove (tree_sitter_sui_move)

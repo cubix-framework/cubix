@@ -206,13 +206,89 @@ transLetStatement (Modularized.LetStatement' _ bindList mtype minit) =
 instance Trans Modularized.LetStatement where
   trans ls@(Modularized.LetStatement {}) = injF $ transLetStatement $ inject ls
 
--------- If Expression (Ternary operator)
 transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> MSuiMoveTerm ExpressionL
 transIfExpression (Modularized.IfExpression' (PairF' (PairF' (PairF' _ condExpr) thenExpr) elseClause)) =
   let elseExpr = case elseClause of
         Nothing' -> iUnitF
         Just' (PairF' _ expr) -> translate' expr
   in iTernary ITE' (translate' condExpr) (translate' thenExpr) elseExpr
+
+transFunctionParametersInternal :: Modularized.MoveTerm Modularized.FunctionParametersInternal0L -> MSuiMoveTerm FunctionParameterL
+transFunctionParametersInternal (Modularized.FunctionParametersInternal0FunctionParameter' fp) =
+  let (ty, ident, hasDollar) = transFunctionParameter fp
+  in iPositionalParameter (iImmutable hasDollar ty) ident
+transFunctionParametersInternal (Modularized.FunctionParametersInternal0MutFunctionParameter' (Modularized.MutFunctionParameter' _ fp)) =
+  let (ty, ident, _) = transFunctionParameter fp  -- Mutable params don't support $ prefix
+  in iPositionalParameter (iMutable ty) ident
+
+transFunctionParameter :: Modularized.MoveTerm Modularized.FunctionParameterL -> (MSuiMoveTerm Modularized.HiddenTypeL, MSuiMoveTerm IdentL, Bool)
+transFunctionParameter (Modularized.FunctionParameter' paramInternal _ hiddenType) =
+  case paramInternal of
+    Modularized.FunctionParameterInternal0Name' (Modularized.HiddenVariableIdentifier' ident) ->
+      (translate' hiddenType, transIdent ident, False)  -- No $ prefix
+    Modularized.FunctionParameterInternal02' _ (Modularized.HiddenVariableIdentifier' ident) ->
+      (translate' hiddenType, transIdent ident, True)  -- Has $ prefix
+
+instance Trans Modularized.FunctionParametersInternal0 where
+  trans (Modularized.FunctionParametersInternal0FunctionParameter fp) =
+    let (ty, ident, hasDollar) = transFunctionParameter fp
+    in iPositionalParameter (iImmutable hasDollar ty) ident
+  trans (Modularized.FunctionParametersInternal0MutFunctionParameter (Modularized.MutFunctionParameter' _ fp)) =
+    let (ty, ident, _hasDollar) = transFunctionParameter fp
+    in iPositionalParameter (iMutable ty) ident
+
+-------- Function Definitions
+transFunctionDefinition :: Modularized.MoveTerm Modularized.FunctionDefinitionL -> MSuiMoveTerm FunctionDefL
+transFunctionDefinition (Modularized.FunctionDefinition' hiddenFunctionSig block) =
+  let (Modularized.HiddenFunctionSignature' mod1 mod2 mod3 _ hiddenFuncIdent typeParams funcParams retType) = hiddenFunctionSig
+      -- Extract function name
+      (Modularized.HiddenFunctionIdentifier' funcNameIdent) = hiddenFuncIdent
+      funcName = transIdent funcNameIdent
+
+      -- Extract and translate parameters
+      (Modularized.FunctionParameters' paramsInternalList) = funcParams
+      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+
+      -- Store only minimal data in FunctionDefAttrs (not the entire signature)
+      funcAttrs = iNormalFunctionDefAttrs
+        (translate' mod1)
+        (translate' mod2)
+        (translate' mod3)
+        (translate' typeParams)
+        (translate' retType)
+
+      -- Translate body
+      funcBody = iBlockIsFunctionBody $ translate' block
+  in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
+
+instance Trans Modularized.FunctionDefinition where
+  trans (Modularized.FunctionDefinition hiddenFunctionSig block) = injF $ transFunctionDefinition $ inject $ Modularized.FunctionDefinition hiddenFunctionSig block
+
+-------- Macro Function Definitions
+transMacroFunctionDefinition :: Modularized.MoveTerm Modularized.MacroFunctionDefinitionL -> MSuiMoveTerm FunctionDefL
+transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier _ hiddenMacroSig block) =
+  let (Modularized.HiddenMacroSignature' _ _ hiddenFuncIdent typeParams funcParams retType) = hiddenMacroSig
+      -- Extract function name
+      (Modularized.HiddenFunctionIdentifier' funcNameIdent) = hiddenFuncIdent
+      funcName = transIdent funcNameIdent
+
+      -- Extract and translate parameters (note: macro params will have $ prefix)
+      (Modularized.FunctionParameters' paramsInternalList) = funcParams
+      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+
+      -- Store only minimal data in FunctionDefAttrs
+      -- Use the modifier from maybeModifier (outer level) as it's typically the visibility modifier
+      funcAttrs = iMacroFunctionDefAttrs
+        (translate' maybeModifier)
+        (translate' typeParams)
+        (translate' retType)
+
+      -- Translate body
+      funcBody = iBlockIsFunctionBody $ translate' block
+  in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
+
+instance Trans Modularized.MacroFunctionDefinition where
+  trans (Modularized.MacroFunctionDefinition maybeModifier _ hiddenMacroSig block) = iFunctionDefIsMacroFunctionDefinition $ transMacroFunctionDefinition $ inject $ Modularized.MacroFunctionDefinition maybeModifier Modularized.iMacroTok hiddenMacroSig block
 
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
@@ -256,6 +332,12 @@ do ipsNames <- sumToNames ''MSuiMoveSig
          , ''HiddenExpressionIsLocalVarInit
          , ''BinderIsVarDeclBinder
          , ''HiddenTypeIsLocalVarDeclAttrs
+         , ''SuiMoveFunctionDefAttrs
+         , ''SuiMoveParameterAttrs
+         , ''FunctionParameterIsFunctionParametersInternal0
+         , ''FunctionDefIsFunctionDefinition
+         , ''FunctionDefIsMacroFunctionDefinition
+         , ''BlockIsFunctionBody
          ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
@@ -456,4 +538,106 @@ instance {-# OVERLAPPING #-} Untrans HiddenExpressionIsLocalVarInit where
 -- BinderIsVarDeclBinder is never untranslated directly, only as part of SingleLocalVarDecl
 -- But we need an instance to prevent the default instance from being generated
 instance {-# OVERLAPPING #-} Untrans BinderIsVarDeclBinder where
+  untrans = untransError
+
+-------- Function Parameters
+
+-- Untranslate parameter, using the hasDollar flag to determine whether to add $ prefix
+untransParameter :: MSuiMoveTerm FunctionParameterL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
+untransParameter (PositionalParameter' paramAttrs ident) =
+  case paramAttrs of
+    Immutable' True hiddenType ->
+      -- Has $ prefix
+      let varIdent = Modularized.iHiddenVariableIdentifier (untransIdent ident)
+          paramInternal = Modularized.iFunctionParameterInternal02 Modularized.iDollarSignTok varIdent
+          fp = Modularized.iFunctionParameter paramInternal Modularized.iColonTok (untranslate hiddenType)
+      in Modularized.iFunctionParametersInternal0FunctionParameter fp
+    Immutable' False hiddenType ->
+      -- No $ prefix
+      let varIdent = Modularized.iHiddenVariableIdentifier (untransIdent ident)
+          paramInternal = Modularized.iFunctionParameterInternal0Name varIdent
+          fp = Modularized.iFunctionParameter paramInternal Modularized.iColonTok (untranslate hiddenType)
+      in Modularized.iFunctionParametersInternal0FunctionParameter fp
+    Mutable' hiddenType ->
+      -- Mutable parameters never have $ prefix
+      let varIdent = Modularized.iHiddenVariableIdentifier (untransIdent ident)
+          paramInternal = Modularized.iFunctionParameterInternal0Name varIdent
+          fp = Modularized.iFunctionParameter paramInternal Modularized.iColonTok (untranslate hiddenType)
+      in Modularized.iFunctionParametersInternal0MutFunctionParameter $ Modularized.iMutFunctionParameter Modularized.iMutTok fp
+    EmptyParameterAttrs' -> error "untransParameter: expected type annotation"
+    _ -> error "untransParameter: unexpected ParameterAttrs"
+untransParameter _ = error "untransParameter: expected PositionalParameter"
+
+instance {-# OVERLAPPING #-} Untrans FunctionParameterIsFunctionParametersInternal0 where
+  untrans (FunctionParameterIsFunctionParametersInternal0 fp) = untransParameter fp
+
+-------- Function Definitions
+
+untransFunctionDefinition :: MSuiMoveTerm FunctionDefL -> Either (Modularized.MoveTerm Modularized.FunctionDefinitionL) (Modularized.MoveTerm Modularized.MacroFunctionDefinitionL)
+untransFunctionDefinition (FunctionDef' funcAttrs funcName paramsListTerm funcBody) =
+  let block = case funcBody of
+                BlockIsFunctionBody' b -> untranslate' b
+                _ -> error "untransFunctionDefinition: unexpected FunctionBody"
+      params = extractF paramsListTerm
+  in case funcAttrs of
+    NormalFunctionDefAttrs' mod1 mod2 mod3 typeParams retType ->
+      -- Reconstruct HiddenFunctionSignature from minimal data
+      let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
+          -- Reconstruct FunctionParameters from parameter list
+          funcParams = Modularized.iFunctionParameters $
+            insertF $ map untransParameter params
+          -- Reconstruct complete signature
+          hiddenFunctionSig = Modularized.iHiddenFunctionSignature
+            (untranslate mod1)
+            (untranslate mod2)
+            (untranslate mod3)
+            Modularized.iFunTok
+            hiddenFuncIdent
+            (untranslate typeParams)
+            funcParams
+            (untranslate retType)
+      in Left $ Modularized.iFunctionDefinition hiddenFunctionSig block
+    MacroFunctionDefAttrs' maybeModifier typeParams retType ->
+      -- Reconstruct HiddenMacroSignature from minimal data
+      let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
+          -- Reconstruct FunctionParameters from parameter list (preserving $ prefix)
+          funcParams = Modularized.iFunctionParameters $
+            insertF $ map untransParameter params
+          -- Reconstruct complete macro signature
+          -- Note: The modifier goes in the outer MacroFunctionDefinition, not in HiddenMacroSignature
+          hiddenMacroSig = Modularized.iHiddenMacroSignature
+            Nothing'  -- No modifier in the signature itself
+            Modularized.iFunTok
+            hiddenFuncIdent
+            (untranslate typeParams)
+            funcParams
+            (untranslate retType)
+      in Right $ Modularized.iMacroFunctionDefinition (untranslate maybeModifier) Modularized.iMacroTok hiddenMacroSig block
+    _ -> error "untransFunctionDefinition: unexpected FunctionDefAttrs"
+
+instance {-# OVERLAPPING #-} Untrans FunctionDefIsFunctionDefinition where
+  untrans (FunctionDefIsFunctionDefinition fd) =
+    case untransFunctionDefinition fd of
+      Left normalFunc -> normalFunc
+      Right _ -> error "untrans FunctionDefIsFunctionDefinition: expected normal function but got macro function"
+
+instance {-# OVERLAPPING #-} Untrans FunctionDefIsMacroFunctionDefinition where
+  untrans (FunctionDefIsMacroFunctionDefinition fd) =
+    case untransFunctionDefinition fd of
+      Left _ -> error "untrans FunctionDefIsMacroFunctionDefinition: expected macro function but got normal function"
+      Right macroFunc -> macroFunc
+
+-- SuiMoveFunctionDefAttrs is never untranslated directly, only as part of FunctionDef
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans SuiMoveFunctionDefAttrs where
+  untrans = untransError
+
+-- SuiMoveParameterAttrs is never untranslated directly, only as part of PositionalParameter
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans SuiMoveParameterAttrs where
+  untrans = untransError
+
+-- BlockIsFunctionBody is never untranslated directly, only as part of FunctionDef
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans BlockIsFunctionBody where
   untrans = untransError

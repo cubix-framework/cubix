@@ -41,6 +41,11 @@ bannedCons =
   , 'M.AssignExpression
   , 'M.LetStatement
   , 'M.IfExpression
+  , 'M.FunctionParametersInternal0MutFunctionParameter
+  , 'M.FunctionParametersInternal0FunctionParameter
+  , 'M.FunctionParameter
+  , 'M.FunctionDefinition
+  , 'M.MacroFunctionDefinition
   ]
 
 -- | Generate a function that checks if a term contains any banned constructors.

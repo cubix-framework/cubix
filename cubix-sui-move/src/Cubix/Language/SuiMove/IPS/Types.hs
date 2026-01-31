@@ -94,6 +94,53 @@ createSortInclusionInfers
   [''UnitExpressionL, ''Parametric.LhsL, ''Parametric.RhsL, ''HiddenExpressionL, ''HiddenExpressionL, ''Parametric.ExpressionL]
 
 -----------------------------------------------------------------------------------
+-------------------         Functions and Parameters           --------------------
+-----------------------------------------------------------------------------------
+
+data SuiMoveFunctionDefAttrs e l where
+  NormalFunctionDefAttrs
+    :: e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e (Maybe TypeParametersL)
+    -> e (Maybe RetTypeL)
+    -> SuiMoveFunctionDefAttrs e Parametric.FunctionDefAttrsL
+  MacroFunctionDefAttrs
+    :: e (Maybe ModifierL)
+    -> e (Maybe TypeParametersL)
+    -> e (Maybe RetTypeL)
+    -> SuiMoveFunctionDefAttrs e Parametric.FunctionDefAttrsL
+
+deriveAllButSortInjection [''SuiMoveFunctionDefAttrs]
+
+data SuiMoveParameterAttrs e l where
+  -- Bool indicates if it has $ prefix
+  Immutable :: Bool -> e HiddenTypeL -> SuiMoveParameterAttrs e Parametric.ParameterAttrsL
+  Mutable :: e HiddenTypeL -> SuiMoveParameterAttrs e Parametric.ParameterAttrsL
+
+deriveAllButSortInjection [''SuiMoveParameterAttrs]
+
+instance
+  ( All HFunctor fs
+  , SuiMoveParameterAttrs :-<: fs
+  , Parametric.BoolF :-<: fs
+  ) => InjF fs HiddenTypeL Parametric.ParameterAttrsL where
+  injF ty = iImmutable False ty -- Default to no $ prefix
+
+  projF' (project' -> Just (Immutable _ ty)) = Just ty
+  projF' (project' -> Just (Mutable ty)) = Just ty
+  projF' _ = Nothing
+
+createSortInclusionTypes
+  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL]
+  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL]
+deriveAllButSortInjection
+  [''FunctionParameterIsFunctionParametersInternal0, ''FunctionDefIsFunctionDefinition, ''FunctionDefIsMacroFunctionDefinition, ''BlockIsFunctionBody]
+createSortInclusionInfers
+  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL]
+  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL]
+
+-----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
 -----------------------------------------------------------------------------------
 
@@ -113,6 +160,12 @@ do let suiSortInjections =
          , ''HiddenUnaryExpressionIsLhs
          , ''HiddenExpressionIsRhs
          , ''AssignIsHiddenExpression
+         , ''SuiMoveFunctionDefAttrs
+         , ''SuiMoveParameterAttrs
+         , ''FunctionParameterIsFunctionParametersInternal0
+         , ''FunctionDefIsFunctionDefinition
+         , ''FunctionDefIsMacroFunctionDefinition
+         , ''BlockIsFunctionBody
          ]
        suiNewNodes =
          [ ''SuiMoveBlockEnd
@@ -121,6 +174,7 @@ do let suiSortInjections =
          (moveSigNames \\
           [ mkName "BinaryExpression", mkName "UnaryExpression", mkName "UnitExpression", mkName "AssignExpression"
           , mkName "Identifier", mkName "Block", mkName "LetStatement"
+          , mkName "FunctionParametersInternal0", mkName "FunctionDefinition", mkName "MacroFunctionDefinition"
           ]) ++
          suiSortInjections ++
          suiNewNodes ++
@@ -146,6 +200,9 @@ do let suiSortInjections =
          , ''Parametric.IdentIsVarDeclBinder
          , ''Parametric.EmptyLocalVarDeclAttrs
          , ''Parametric.SingleLocalVarDecl
+         , ''Parametric.PositionalParameter
+         , ''Parametric.EmptyParameterAttrs
+         , ''Parametric.FunctionDef
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 
