@@ -120,6 +120,17 @@ data SuiMoveParameterAttrs e l where
 
 deriveAllButSortInjection [''SuiMoveParameterAttrs]
 
+data SuiMoveFunctionDeclAttrs e l where
+  NativeFunctionDeclAttrs
+    :: e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e (Maybe ModifierL)
+    -> e (Maybe TypeParametersL)
+    -> e (Maybe RetTypeL)
+    -> SuiMoveFunctionDeclAttrs e Parametric.FunctionDeclAttrsL
+
+deriveAllButSortInjection [''SuiMoveFunctionDeclAttrs]
+
 instance
   ( All HFunctor fs
   , SuiMoveParameterAttrs :-<: fs
@@ -132,13 +143,13 @@ instance
   projF' _ = Nothing
 
 createSortInclusionTypes
-  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL]
-  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL]
+  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL, ''Parametric.FunctionParameterL, ''Parametric.FunctionDeclL]
+  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL, ''Parametric.FunctionParameterDeclL, ''NativeFunctionDefinitionL]
 deriveAllButSortInjection
-  [''FunctionParameterIsFunctionParametersInternal0, ''FunctionDefIsFunctionDefinition, ''FunctionDefIsMacroFunctionDefinition, ''BlockIsFunctionBody]
+  [''FunctionParameterIsFunctionParametersInternal0, ''FunctionDefIsFunctionDefinition, ''FunctionDefIsMacroFunctionDefinition, ''BlockIsFunctionBody, ''FunctionParameterIsFunctionParameterDecl, ''FunctionDeclIsNativeFunctionDefinition]
 createSortInclusionInfers
-  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL]
-  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL]
+  [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL, ''Parametric.FunctionParameterL, ''Parametric.FunctionDeclL]
+  [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL, ''Parametric.FunctionParameterDeclL, ''NativeFunctionDefinitionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
@@ -166,6 +177,9 @@ do let suiSortInjections =
          , ''FunctionDefIsFunctionDefinition
          , ''FunctionDefIsMacroFunctionDefinition
          , ''BlockIsFunctionBody
+         , ''SuiMoveFunctionDeclAttrs
+         , ''FunctionParameterIsFunctionParameterDecl
+         , ''FunctionDeclIsNativeFunctionDefinition
          ]
        suiNewNodes =
          [ ''SuiMoveBlockEnd
@@ -175,6 +189,7 @@ do let suiSortInjections =
           [ mkName "BinaryExpression", mkName "UnaryExpression", mkName "UnitExpression", mkName "AssignExpression"
           , mkName "Identifier", mkName "Block", mkName "LetStatement"
           , mkName "FunctionParametersInternal0", mkName "FunctionDefinition", mkName "MacroFunctionDefinition"
+          , mkName "NativeFunctionDefinition"
           ]) ++
          suiSortInjections ++
          suiNewNodes ++
@@ -203,6 +218,7 @@ do let suiSortInjections =
          , ''Parametric.PositionalParameter
          , ''Parametric.EmptyParameterAttrs
          , ''Parametric.FunctionDef
+         , ''Parametric.FunctionDecl
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 

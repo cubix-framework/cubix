@@ -154,7 +154,7 @@ transUnitExpression :: Modularized.MoveTerm Modularized.UnitExpressionL -> MSuiM
 transUnitExpression (Modularized.UnitExpression' _ _) = UnitF'
 
 instance Trans Modularized.UnitExpression where
-  trans (Modularized.UnitExpression leftParen rightParen) = iUnitIsUnitExpression (transUnitExpression $ inject $ Modularized.UnitExpression leftParen rightParen)
+  trans (Modularized.UnitExpression leftParen rightParen) = iUnitIsUnitExpression (transUnitExpression $ Modularized.iUnitExpression leftParen rightParen)
 
 -------- Assign Expression
 
@@ -262,7 +262,7 @@ transFunctionDefinition (Modularized.FunctionDefinition' hiddenFunctionSig block
   in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
 
 instance Trans Modularized.FunctionDefinition where
-  trans (Modularized.FunctionDefinition hiddenFunctionSig block) = injF $ transFunctionDefinition $ inject $ Modularized.FunctionDefinition hiddenFunctionSig block
+  trans (Modularized.FunctionDefinition hiddenFunctionSig block) = injF $ transFunctionDefinition $ Modularized.iFunctionDefinition hiddenFunctionSig block
 
 -------- Macro Function Definitions
 transMacroFunctionDefinition :: Modularized.MoveTerm Modularized.MacroFunctionDefinitionL -> MSuiMoveTerm FunctionDefL
@@ -288,7 +288,33 @@ transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier
   in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
 
 instance Trans Modularized.MacroFunctionDefinition where
-  trans (Modularized.MacroFunctionDefinition maybeModifier _ hiddenMacroSig block) = iFunctionDefIsMacroFunctionDefinition $ transMacroFunctionDefinition $ inject $ Modularized.MacroFunctionDefinition maybeModifier Modularized.iMacroTok hiddenMacroSig block
+  trans (Modularized.MacroFunctionDefinition maybeModifier _ hiddenMacroSig block) = iFunctionDefIsMacroFunctionDefinition $ transMacroFunctionDefinition $ Modularized.iMacroFunctionDefinition maybeModifier Modularized.iMacroTok hiddenMacroSig block
+
+-------- Native Function Definitions (Declarations)
+transNativeFunctionDefinition :: Modularized.MoveTerm Modularized.NativeFunctionDefinitionL -> MSuiMoveTerm FunctionDeclL
+transNativeFunctionDefinition (Modularized.NativeFunctionDefinition' hiddenFunctionSig _) =
+  let (Modularized.HiddenFunctionSignature' mod1 mod2 mod3 _ hiddenFuncIdent typeParams funcParams retType) = hiddenFunctionSig
+      -- Extract function name
+      (Modularized.HiddenFunctionIdentifier' funcNameIdent) = hiddenFuncIdent
+      funcName = transIdent funcNameIdent
+
+      -- Extract and translate parameters
+      (Modularized.FunctionParameters' paramsInternalList) = funcParams
+      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+      -- Convert FunctionParameter to FunctionParameterDecl
+      translatedParamDecls = map iFunctionParameterIsFunctionParameterDecl translatedParams
+
+      -- Store only minimal data in FunctionDeclAttrs (same as NormalFunctionDefAttrs)
+      funcDeclAttrs = iNativeFunctionDeclAttrs
+        (translate' mod1)
+        (translate' mod2)
+        (translate' mod3)
+        (translate' typeParams)
+        (translate' retType)
+  in iFunctionDecl funcDeclAttrs funcName (insertF translatedParamDecls)
+
+instance Trans Modularized.NativeFunctionDefinition where
+  trans (Modularized.NativeFunctionDefinition hiddenFunctionSig semicolonTok) = iFunctionDeclIsNativeFunctionDefinition $ transNativeFunctionDefinition $ Modularized.iNativeFunctionDefinition hiddenFunctionSig semicolonTok
 
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
@@ -338,6 +364,9 @@ do ipsNames <- sumToNames ''MSuiMoveSig
          , ''FunctionDefIsFunctionDefinition
          , ''FunctionDefIsMacroFunctionDefinition
          , ''BlockIsFunctionBody
+         , ''SuiMoveFunctionDeclAttrs
+         , ''FunctionParameterIsFunctionParameterDecl
+         , ''FunctionDeclIsNativeFunctionDefinition
          ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
@@ -640,4 +669,47 @@ instance {-# OVERLAPPING #-} Untrans SuiMoveParameterAttrs where
 -- BlockIsFunctionBody is never untranslated directly, only as part of FunctionDef
 -- But we need an instance to prevent the default instance from being generated
 instance {-# OVERLAPPING #-} Untrans BlockIsFunctionBody where
+  untrans = untransError
+
+-------- Native Function Definitions (Declarations)
+
+-- Untranslate FunctionParameterDecl back to FunctionParametersInternal0
+untransParameterDecl :: MSuiMoveTerm FunctionParameterDeclL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
+untransParameterDecl (FunctionParameterIsFunctionParameterDecl' fp) = untransParameter fp
+untransParameterDecl _ = error "untransParameterDecl: expected FunctionParameterIsFunctionParameterDecl"
+
+untransNativeFunctionDefinition :: MSuiMoveTerm FunctionDeclL -> Modularized.MoveTerm Modularized.NativeFunctionDefinitionL
+untransNativeFunctionDefinition (FunctionDecl' funcDeclAttrs funcName paramsListTerm) =
+  let params = extractF paramsListTerm
+  in case funcDeclAttrs of
+    NativeFunctionDeclAttrs' mod1 mod2 mod3 typeParams retType ->
+      -- Reconstruct HiddenFunctionSignature from minimal data
+      let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
+          -- Reconstruct FunctionParameters from parameter list
+          funcParams = Modularized.iFunctionParameters $
+            insertF $ map untransParameterDecl params
+          -- Reconstruct complete signature
+          hiddenFunctionSig = Modularized.iHiddenFunctionSignature
+            (untranslate mod1)
+            (untranslate mod2)
+            (untranslate mod3)
+            Modularized.iFunTok
+            hiddenFuncIdent
+            (untranslate typeParams)
+            funcParams
+            (untranslate retType)
+      in Modularized.iNativeFunctionDefinition hiddenFunctionSig Modularized.iSemicolonTok
+    _ -> error "untransNativeFunctionDefinition: expected NativeFunctionDeclAttrs"
+
+instance {-# OVERLAPPING #-} Untrans FunctionDeclIsNativeFunctionDefinition where
+  untrans (FunctionDeclIsNativeFunctionDefinition fd) = untransNativeFunctionDefinition fd
+
+-- SuiMoveFunctionDeclAttrs is never untranslated directly, only as part of FunctionDecl
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans SuiMoveFunctionDeclAttrs where
+  untrans = untransError
+
+-- FunctionParameterIsFunctionParameterDecl is never untranslated directly, only as part of FunctionDecl
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans FunctionParameterIsFunctionParameterDecl where
   untrans = untransError
