@@ -47,6 +47,9 @@ bannedCons =
   , 'M.FunctionDefinition
   , 'M.MacroFunctionDefinition
   , 'M.NativeFunctionDefinition
+  , 'M.CallExpression
+  , 'M.MacroCallExpression
+  , 'M.ArgList
   ]
 
 -- | Generate a function that checks if a term contains any banned constructors.

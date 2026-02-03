@@ -131,6 +131,18 @@ data SuiMoveFunctionDeclAttrs e l where
 
 deriveAllButSortInjection [''SuiMoveFunctionDeclAttrs]
 
+data SuiMoveFunctionCallAttrs e l where
+  NormalFunctionCallAttrs :: SuiMoveFunctionCallAttrs e Parametric.FunctionCallAttrsL
+  MacroFunctionCallAttrs :: e (Maybe TypeArgumentsL) -> SuiMoveFunctionCallAttrs e Parametric.FunctionCallAttrsL
+
+deriveAllButSortInjection [''SuiMoveFunctionCallAttrs]
+
+data SuiMoveFunctionExp e l where
+  SimpleFunctionExp :: Bool -> e ModuleAccessL -> SuiMoveFunctionExp e Parametric.FunctionExpL
+  MacroFunctionExp :: e ModuleAccessL -> SuiMoveFunctionExp e Parametric.FunctionExpL
+
+deriveAllButSortInjection [''SuiMoveFunctionExp]
+
 instance
   ( All HFunctor fs
   , SuiMoveParameterAttrs :-<: fs
@@ -150,6 +162,19 @@ deriveAllButSortInjection
 createSortInclusionInfers
   [''Parametric.FunctionParameterL, ''Parametric.FunctionDefL, ''Parametric.FunctionDefL, ''BlockL, ''Parametric.FunctionParameterL, ''Parametric.FunctionDeclL]
   [''FunctionParametersInternal0L, ''FunctionDefinitionL, ''MacroFunctionDefinitionL, ''Parametric.FunctionBodyL, ''Parametric.FunctionParameterDeclL, ''NativeFunctionDefinitionL]
+
+-----------------------------------------------------------------------------------
+-------------------         Function Calls                         ----------------
+-----------------------------------------------------------------------------------
+
+createSortInclusionTypes
+  [''HiddenExpressionL, ''Parametric.FunctionCallL, ''Parametric.FunctionCallL]
+  [''Parametric.PositionalArgExpL, ''CallExpressionL, ''MacroCallExpressionL]
+deriveAllButSortInjection
+  [''HiddenExpressionIsPositionalArgExp, ''FunctionCallIsCallExpression, ''FunctionCallIsMacroCallExpression]
+createSortInclusionInfers
+  [''HiddenExpressionL, ''Parametric.FunctionCallL, ''Parametric.FunctionCallL]
+  [''Parametric.PositionalArgExpL, ''CallExpressionL, ''MacroCallExpressionL]
 
 -----------------------------------------------------------------------------------
 ----------------------         Declaring the IPS           ------------------------
@@ -180,6 +205,11 @@ do let suiSortInjections =
          , ''SuiMoveFunctionDeclAttrs
          , ''FunctionParameterIsFunctionParameterDecl
          , ''FunctionDeclIsNativeFunctionDefinition
+         , ''SuiMoveFunctionCallAttrs
+         , ''SuiMoveFunctionExp
+         , ''HiddenExpressionIsPositionalArgExp
+         , ''FunctionCallIsCallExpression
+         , ''FunctionCallIsMacroCallExpression
          ]
        suiNewNodes =
          [ ''SuiMoveBlockEnd
@@ -190,6 +220,8 @@ do let suiSortInjections =
           , mkName "Identifier", mkName "Block", mkName "LetStatement"
           , mkName "FunctionParametersInternal0", mkName "FunctionDefinition", mkName "MacroFunctionDefinition"
           , mkName "NativeFunctionDefinition"
+          , mkName "CallExpression", mkName "MacroCallExpression", mkName "ArgList"
+          , mkName "NameExpression", mkName "MacroModuleAccess"
           ]) ++
          suiSortInjections ++
          suiNewNodes ++
@@ -219,6 +251,9 @@ do let suiSortInjections =
          , ''Parametric.EmptyParameterAttrs
          , ''Parametric.FunctionDef
          , ''Parametric.FunctionDecl
+         , ''Parametric.FunctionCall
+         , ''Parametric.PositionalArgument
+         , ''Parametric.FunctionArgumentList
          ]
    runCompTrans $ makeSumType "MSuiMoveSig" names
 

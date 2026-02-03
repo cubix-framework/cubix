@@ -316,6 +316,48 @@ transNativeFunctionDefinition (Modularized.NativeFunctionDefinition' hiddenFunct
 instance Trans Modularized.NativeFunctionDefinition where
   trans (Modularized.NativeFunctionDefinition hiddenFunctionSig semicolonTok) = iFunctionDeclIsNativeFunctionDefinition $ transNativeFunctionDefinition $ Modularized.iNativeFunctionDefinition hiddenFunctionSig semicolonTok
 
+-------- Function Calls
+
+-- Translate ArgList to FunctionArguments
+transArgList :: Modularized.MoveTerm Modularized.ArgListL -> MSuiMoveTerm FunctionArgumentsL
+transArgList (Modularized.ArgList' exprs) =
+  iFunctionArgumentList $ mapF (iPositionalArgument . translate') exprs
+
+-- Helper to translate NameExpression to FunctionExp
+transNameExpressionToFunctionExp :: Modularized.MoveTerm Modularized.NameExpressionL -> MSuiMoveTerm FunctionExpL
+transNameExpressionToFunctionExp (Modularized.NameExpression' colonColon moduleAccess) =
+  let hasColon = case colonColon of
+        Just' _ -> True
+        Nothing' -> False
+  in iSimpleFunctionExp hasColon (translate' moduleAccess)
+
+-- Helper to translate MacroModuleAccess to FunctionExp
+transMacroModuleAccessToFunctionExp :: Modularized.MoveTerm Modularized.MacroModuleAccessL -> MSuiMoveTerm FunctionExpL
+transMacroModuleAccessToFunctionExp (Modularized.MacroModuleAccess' moduleAccess _) =
+  iMacroFunctionExp (translate' moduleAccess)
+
+-- Translate CallExpression
+transCallExpression :: Modularized.MoveTerm Modularized.CallExpressionL -> MSuiMoveTerm FunctionCallL
+transCallExpression (Modularized.CallExpression' tuple) =
+  let (nameExpr, argList) = extractF2 tuple
+      funcExp = transNameExpressionToFunctionExp nameExpr
+      funcArgs = transArgList argList
+  in iFunctionCall iNormalFunctionCallAttrs funcExp funcArgs
+
+instance Trans Modularized.CallExpression where
+  trans (Modularized.CallExpression tuple) = iFunctionCallIsCallExpression $ transCallExpression $ Modularized.iCallExpression tuple
+
+-- Translate MacroCallExpression
+transMacroCallExpression :: Modularized.MoveTerm Modularized.MacroCallExpressionL -> MSuiMoveTerm FunctionCallL
+transMacroCallExpression (Modularized.MacroCallExpression' macroModuleAccess typeArgs argList) =
+  let funcExp = transMacroModuleAccessToFunctionExp macroModuleAccess
+      funcArgs = transArgList argList
+      funcAttrs = iMacroFunctionCallAttrs (mapF translate typeArgs)
+  in iFunctionCall funcAttrs funcExp funcArgs
+
+instance Trans Modularized.MacroCallExpression where
+  trans (Modularized.MacroCallExpression macroModuleAccess typeArgs argList) = iFunctionCallIsMacroCallExpression $ transMacroCallExpression $ Modularized.iMacroCallExpression macroModuleAccess typeArgs argList
+
 ------------------------------------------------------------------------------------
 ---------------- Reverse translation: IPS to modularized syntax  -------------------
 ------------------------------------------------------------------------------------
@@ -367,6 +409,10 @@ do ipsNames <- sumToNames ''MSuiMoveSig
          , ''SuiMoveFunctionDeclAttrs
          , ''FunctionParameterIsFunctionParameterDecl
          , ''FunctionDeclIsNativeFunctionDefinition
+         , ''SuiMoveFunctionCallAttrs
+         , ''HiddenExpressionIsPositionalArgExp
+         , ''FunctionCallIsCallExpression
+         , ''FunctionCallIsMacroCallExpression
          ]
    return $ makeDefaultInstances targTs ''Untrans 'untrans (VarE 'untransError)
 
@@ -712,4 +758,58 @@ instance {-# OVERLAPPING #-} Untrans SuiMoveFunctionDeclAttrs where
 -- FunctionParameterIsFunctionParameterDecl is never untranslated directly, only as part of FunctionDecl
 -- But we need an instance to prevent the default instance from being generated
 instance {-# OVERLAPPING #-} Untrans FunctionParameterIsFunctionParameterDecl where
+  untrans = untransError
+
+-------- Function Calls
+
+-- Untranslate FunctionArguments to ArgList
+untransArgList :: MSuiMoveTerm FunctionArgumentsL -> Modularized.MoveTerm Modularized.ArgListL
+untransArgList (FunctionArgumentList' args) =
+  Modularized.iArgList $ mapF extractExprFromArg args
+  where
+    extractExprFromArg :: MSuiMoveTerm FunctionArgumentL -> Modularized.MoveTerm Modularized.HiddenExpressionL
+    extractExprFromArg (PositionalArgument' expr) = untranslate' expr
+    extractExprFromArg _ = error "untransArgList: expected PositionalArgument"
+
+-- Untranslate FunctionExp to NameExpression
+untransNameExpression :: MSuiMoveTerm FunctionExpL -> Modularized.MoveTerm Modularized.NameExpressionL
+untransNameExpression (SimpleFunctionExp' hasColon moduleAccess) =
+  let colonColon = if hasColon then Just' Modularized.iColonColonTok else Nothing'
+  in Modularized.iNameExpression colonColon (untranslate moduleAccess)
+untransNameExpression _ = error "untransNameExpression: expected SimpleFunctionExp"
+
+-- Untranslate FunctionExp to MacroModuleAccess
+untransMacroModuleAccess :: MSuiMoveTerm FunctionExpL -> Modularized.MoveTerm Modularized.MacroModuleAccessL
+untransMacroModuleAccess (MacroFunctionExp' moduleAccess) =
+  Modularized.iMacroModuleAccess (untranslate moduleAccess) Modularized.iExclamationMarkTok
+untransMacroModuleAccess _ = error "untransMacroModuleAccess: expected MacroFunctionExp"
+
+-- Untranslate CallExpression
+untransCallExpression :: MSuiMoveTerm FunctionCallL -> Modularized.MoveTerm Modularized.CallExpressionL
+untransCallExpression (FunctionCall' _attrs funcExp funcArgs) =
+  let nameExpr = untransNameExpression funcExp
+      argList = untransArgList funcArgs
+  in Modularized.iCallExpression $ riPairF nameExpr argList
+
+instance {-# OVERLAPPING #-} Untrans FunctionCallIsCallExpression where
+  untrans (FunctionCallIsCallExpression fc) = untransCallExpression fc
+
+-- Untranslate MacroCallExpression
+untransMacroCallExpression :: MSuiMoveTerm FunctionCallL -> Modularized.MoveTerm Modularized.MacroCallExpressionL
+untransMacroCallExpression (FunctionCall' _attrs funcExp funcArgs) =
+  let macroModuleAccess = untransMacroModuleAccess funcExp
+      argList = untransArgList funcArgs
+  in Modularized.iMacroCallExpression macroModuleAccess Nothing' argList
+
+instance {-# OVERLAPPING #-} Untrans FunctionCallIsMacroCallExpression where
+  untrans (FunctionCallIsMacroCallExpression fc) = untransMacroCallExpression fc
+
+-- SuiMoveFunctionCallAttrs is never untranslated directly, only as part of FunctionCall
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans SuiMoveFunctionCallAttrs where
+  untrans = untransError
+
+-- HiddenExpressionIsPositionalArgExp is never untranslated directly, only as part of FunctionArguments
+-- But we need an instance to prevent the default instance from being generated
+instance {-# OVERLAPPING #-} Untrans HiddenExpressionIsPositionalArgExp where
   untrans = untransError
