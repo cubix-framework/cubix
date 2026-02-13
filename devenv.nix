@@ -9,6 +9,7 @@ let
 in {
   packages = with pkgs; [
     ghcid
+    git
     unstable.claude-code
   ];
 
