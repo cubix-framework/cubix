@@ -11,6 +11,7 @@ in {
     fourmolu
     gdb
     ghcid
+    git
     tree-sitter
     unstable.claude-code
     valgrind
