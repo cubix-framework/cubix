@@ -96,19 +96,23 @@ The codebase extensively uses Template Haskell for deriving instances:
 
 ### Adding new language support (based on tree-sitter)
 
-1. Tree-sitter syntax generation cannot handle tree-sitter alias rule properly, therefore one needs to preprecess language `grammar.json` file with this jq filter, in the tree-sitter grammar definition project root directory:
+1. In the tree-sitter grammar definition project root dir, you need to initialize project, with appropriate config file `tree-sitter.json` by running:
+```bash
+tree-sitter init
+```
+You can find example config for Sui Move grammar in the `tree-sitter-sui-move/vendor/tree-sitter.json`. The important part is to enable bindings generation for the `C` language.
+
+2. Tree-sitter syntax generation cannot handle tree-sitter alias rule properly, therefore one needs to preprecess language `grammar.json` file with this jq filter, in the tree-sitter grammar definition project root directory:
 ```bash
 cat <<< $(jq 'walk(if type != "object" then . else if .type == "ALIAS" then .content else . end end)' src/grammar.json) > src/grammar.json
 ```
 
-2. Once processed you need to regenerate tree-sitter artefacts from processed grammar file:
+3. Once processed you need to regenerate tree-sitter artefacts from processed grammar file:
 ```bash
 tree-sitter generate --abi 14 src/grammar.json
 ```
 
-3. Make a new cubix package that adds language support.
-
-4. Investigate and make a `preserved_tokens.json` file, for tokens that tree-sitter would normally omit, but you want to preserve in the syntax tree.
+4. Make a new cubix package that adds language support.
 
 5. Run `gen-mod` from `cubix-tree-sitter` to generate Modularized syntax tree
 ```bash
