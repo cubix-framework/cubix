@@ -5,18 +5,19 @@ module TreeSitter.Grammar.Transform.HoistDefinitions (
   hoistDefinitions
 ) where
 
-import Control.Exception (Exception, throw)
+import Control.Exception (Exception)
 import Control.Monad ((<=<))
-import Control.Monad.Reader (MonadReader, Reader, runReader, asks)
-import Control.Monad.State (MonadState, StateT, runStateT, modify', gets)
+import Control.Monad.Reader (MonadReader, Reader, asks, runReader)
+import Control.Monad.State (MonadState, StateT, gets, modify', runStateT)
 import Data.Bifunctor (second)
-import Data.Functor.Foldable hiding (hoist)
 import Data.Map (Map)
-import Data.Map qualified as Map
-import Data.Maybe (fromMaybe)
+import Data.Map qualified as Map (filter, insert, keys, mapAccumWithKey)
 import Data.Text (Text)
-import Data.Text qualified as Text
-import Data.Vector qualified as Vector
+import Data.Text qualified as Text (show)
+import Data.Vector qualified as Vector (cons, empty, foldr')
+
+import Data.Functor.Foldable (Base, Corecursive (..), Recursive (..))
+
 import TreeSitter.Grammar
 
 newtype HoistError

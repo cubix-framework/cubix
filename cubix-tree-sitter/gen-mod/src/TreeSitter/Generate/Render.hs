@@ -15,26 +15,27 @@ import Data.Char (isAlphaNum, toLower, toUpper)
 import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (..))
 import Data.List (uncons)
-import Data.List.NonEmpty qualified as NonEmpty
-import Data.Map qualified as Map
+import Data.List.NonEmpty qualified as NonEmpty (toList)
+import Data.Map qualified as Map (elems, fromList, mapWithKey, singleton)
 import Data.Maybe (fromMaybe)
-import Data.Set qualified as Set
+import Data.Set qualified as Set (fromList, toList)
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Data.Text qualified as Text
-import Data.Text.Lazy qualified as Text.Lazy
+import Data.Text qualified as Text (head, length, lines, pack, unlines, unpack)
+import Data.Text.Lazy qualified as Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (Builder)
-import Data.Text.Lazy.Builder qualified as Builder
-import Unicode.Char.General qualified as Unicode
-import Unicode.Char.General.Names qualified as Unicode
+import Data.Text.Lazy.Builder qualified as Builder (fromText, toLazyText)
+
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
+import Unicode.Char.General qualified as Unicode (isWhiteSpace)
+import Unicode.Char.General.Names qualified as Unicode (name)
 
-import TreeSitter.Generate.Types
 import TreeSitter.Generate.Data
-import TreeSitter.Generate.Parser (Parser (..))
-import TreeSitter.Grammar (Grammar (..), RuleName)
+import TreeSitter.Generate.Parser
+import TreeSitter.Generate.Types
+import TreeSitter.Grammar
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -96,7 +97,7 @@ renderTemplate templateFile templateText context =
   line :: Text -> Builder
   line ln = Builder.fromText (ln <> "\n")
 
-  template :: [Text] -> Either String Builder.Builder
+  template :: [Text] -> Either String Builder
   template acc = do
     let tpl = Text.unlines . reverse $ acc
     (doc :: Doc Text) <- runIdentity (applyTemplate templateFile tpl context)

@@ -1,13 +1,15 @@
 module TransRoundtripSpec (spec) where
 
-import Test.Hspec
-import System.Directory (listDirectory, doesFileExist)
-import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM, forM_, unless)
+import System.Directory (doesFileExist, listDirectory)
+import System.FilePath ((</>), takeExtension)
 
-import TreeSitter.SuiMove (tree_sitter_sui_move, getTestDir)
-import Cubix.Language.SuiMove.ParsePretty (parse)
+import Test.Hspec (Spec, describe, expectationFailure, it, runIO, shouldSatisfy)
+
+import TreeSitter.SuiMove (getTestDir, tree_sitter_sui_move)
+
 import Cubix.Language.SuiMove.IPS (translate, untranslate)
+import Cubix.Language.SuiMove.ParsePretty (parse)
 
 -- | Parse a Move file, translate to IPS, untranslate back, and verify equality
 roundtripTest :: FilePath -> IO ()

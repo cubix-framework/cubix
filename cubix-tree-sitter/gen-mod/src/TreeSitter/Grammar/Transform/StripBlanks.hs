@@ -4,9 +4,11 @@ module TreeSitter.Grammar.Transform.StripBlanks (
   stripBlanks
 ) where
 
-import Data.Functor.Foldable
 import Data.Map (Map)
-import Data.Vector qualified as Vector
+import Data.Vector qualified as Vector (elem, filter, length, null, unsafeHead)
+
+import Data.Functor.Foldable (Corecursive (..), Recursive (..), fold)
+
 import TreeSitter.Grammar
 
 stripBlanks :: Grammar -> Grammar

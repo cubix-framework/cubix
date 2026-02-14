@@ -12,8 +12,8 @@ in {
     jq
     gdb
     ghcid
+    git
     tree-sitter
-    valgrind
   ];
 
   # This sets gcc version brought into env by languages.c option

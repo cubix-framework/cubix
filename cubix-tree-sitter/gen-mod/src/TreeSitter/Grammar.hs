@@ -12,13 +12,15 @@
 module TreeSitter.Grammar where
 
 import Control.Applicative (Alternative (..))
-import Data.Aeson.Types (FromJSON (..), Parser, Value (..), defaultOptions, genericParseJSON, typeMismatch, withObject, (.:), (.:?))
-import Data.Functor.Base.Extra ()
-import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Map (Map)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import GHC.Generics (Generic)
+
+import Data.Aeson.Types (FromJSON (..), Parser, Value (..), defaultOptions, genericParseJSON, typeMismatch, withObject, (.:), (.:?))
+import Data.Functor.Foldable.TH (makeBaseFunctor)
+
+import Data.Functor.Base.Extra ()
 
 type GrammarName = Text
 

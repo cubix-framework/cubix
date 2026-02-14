@@ -11,17 +11,18 @@ module Cubix.Language.SuiMove.IPS.Trans (
   ) where
 
 import Data.Either ( partitionEithers )
-import Data.List( (\\) )
+import Data.List ( (\\) )
 import Data.Text qualified as Text
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Data.Comp.Multi ( inject, unTerm, caseCxt, Sum, All, HFunctor(..), (:-<:) )
 
-import Cubix.Language.SuiMove.IPS.Types
-import Cubix.Language.SuiMove.Modularized qualified as Modularized
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax
+import Cubix.Language.Parametric.Syntax qualified as P
+
+import Cubix.Language.SuiMove.IPS.Types
+import Cubix.Language.SuiMove.Modularized qualified as Modularized
 
 ------------------------------------------------------------------------------------
 ---------------- Forward translation: Modularized syntax to IPS  -------------------
@@ -66,67 +67,67 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MSuiMoveSig, f :-<: Modularize
 ---------------------------------
 
 -------- Identifiers
-transIdent :: Modularized.MoveTerm Modularized.IdentifierL -> MSuiMoveTerm IdentL
-transIdent (Modularized.Identifier' t) = Ident' (Text.unpack t)
+transIdent :: Modularized.MoveTerm Modularized.IdentifierL -> MSuiMoveTerm P.IdentL
+transIdent (Modularized.Identifier' t) = P.Ident' (Text.unpack t)
 
 -- Clone of transIdent because type-safe pattern match
 instance Trans Modularized.Identifier where
-  trans (Modularized.Identifier n) = iIdent (Text.unpack n)
+  trans (Modularized.Identifier n) = P.iIdent (Text.unpack n)
 
 -------- Binary Expressions
 
-transBinaryExpr :: Modularized.MoveTerm Modularized.BinaryExpressionL -> MSuiMoveTerm ExpressionL
+transBinaryExpr :: Modularized.MoveTerm Modularized.BinaryExpressionL -> MSuiMoveTerm P.ExpressionL
 transBinaryExpr (Modularized.BinaryExpression1' lhs _ rhs) =
   -- Implies operator (..) - no direct equivalent in parametric syntax, keep as-is
   Modularized.iBinaryExpression1 (translate lhs) Modularized.iEqualsSignEqualsSignGreaterThanSignTok (translate rhs)
 transBinaryExpr (Modularized.BinaryExpression2' lhs _ rhs) =
-  Binary' LogicOr' (translate' lhs) (translate' rhs)
+  P.Binary' P.LogicOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression3' lhs _ rhs) =
-  Binary' LogicAnd' (translate' lhs) (translate' rhs)
+  P.Binary' P.LogicAnd' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression4' lhs _ rhs) =
-  Binary' Eq' (translate' lhs) (translate' rhs)
+  P.Binary' P.Eq' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression5' lhs _ rhs) =
-  Binary' Neq' (translate' lhs) (translate' rhs)
+  P.Binary' P.Neq' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression6' lhs _ rhs) =
-  Binary' Lt' (translate' lhs) (translate' rhs)
+  P.Binary' P.Lt' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression7' lhs _ rhs) =
-  Binary' Gt' (translate' lhs) (translate' rhs)
+  P.Binary' P.Gt' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression8' lhs _ rhs) =
-  Binary' Lte' (translate' lhs) (translate' rhs)
+  P.Binary' P.Lte' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression9' lhs _ rhs) =
-  Binary' Gte' (translate' lhs) (translate' rhs)
+  P.Binary' P.Gte' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression10' lhs _ rhs) =
   -- Range operator (..) - no direct equivalent in parametric syntax, keep as-is
   Modularized.iBinaryExpression10 (translate lhs) Modularized.iFullStopFullStopTok (translate rhs)
 transBinaryExpr (Modularized.BinaryExpression11' lhs _ rhs) =
-  Binary' BitOr' (translate' lhs) (translate' rhs)
+  P.Binary' P.BitOr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression12' lhs _ rhs) =
-  Binary' BitXor' (translate' lhs) (translate' rhs)
+  P.Binary' P.BitXor' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression13' lhs _ rhs) =
-  Binary' BitAnd' (translate' lhs) (translate' rhs)
+  P.Binary' P.BitAnd' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression14' lhs _ rhs) =
-  Binary' Shl' (translate' lhs) (translate' rhs)
+  P.Binary' P.Shl' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression15' lhs _ rhs) =
-  Binary' ArithShr' (translate' lhs) (translate' rhs)
+  P.Binary' P.ArithShr' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression16' lhs _ rhs) =
-  Binary' Add' (translate' lhs) (translate' rhs)
+  P.Binary' P.Add' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression17' lhs _ rhs) =
-  Binary' Sub' (translate' lhs) (translate' rhs)
+  P.Binary' P.Sub' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression18' lhs _ rhs) =
-  Binary' Mul' (translate' lhs) (translate' rhs)
+  P.Binary' P.Mul' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression19' lhs _ rhs) =
-  Binary' Div' (translate' lhs) (translate' rhs)
+  P.Binary' P.Div' (translate' lhs) (translate' rhs)
 transBinaryExpr (Modularized.BinaryExpression20' lhs _ rhs) =
-  Binary' Mod' (translate' lhs) (translate' rhs)
+  P.Binary' P.Mod' (translate' lhs) (translate' rhs)
 
 -------- Unary Expressions
 
-transUnop :: Modularized.MoveTerm Modularized.UnaryOpL -> MSuiMoveTerm UnaryOpL
-transUnop (Modularized.UnaryOp' Modularized.ExclamationMarkTok') = Not'
+transUnop :: Modularized.MoveTerm Modularized.UnaryOpL -> MSuiMoveTerm P.UnaryOpL
+transUnop (Modularized.UnaryOp' Modularized.ExclamationMarkTok') = P.Not'
 
-transUnaryExpr :: Modularized.MoveTerm Modularized.UnaryExpressionL -> MSuiMoveTerm ExpressionL
+transUnaryExpr :: Modularized.MoveTerm Modularized.UnaryExpressionL -> MSuiMoveTerm P.ExpressionL
 transUnaryExpr (Modularized.UnaryExpression' op expr) =
-  Unary' (transUnop op) (translate' expr)
+  P.Unary' (transUnop op) (translate' expr)
 
 instance Trans Modularized.HiddenExpression where
   trans (Modularized.HiddenExpressionAssignExpression ae) = injF $ transAssignExpr ae
@@ -139,52 +140,52 @@ instance Trans Modularized.HiddenExpression where
 
 -------- Block
 
-transBlock :: Modularized.MoveTerm Modularized.BlockL -> MSuiMoveTerm BlockL
+transBlock :: Modularized.MoveTerm Modularized.BlockL -> MSuiMoveTerm P.BlockL
 transBlock (Modularized.Block' _ useDecls blockItems maybeExpr _) =
-  let translatedUseDecls = map (iUseDeclarationIsBlockItem . translate') (extractF useDecls)
-      translatedBlockItems = map (iBlockItemIsBlockItem . translate') (extractF blockItems)
-      allItems = insertF $ translatedUseDecls ++ translatedBlockItems
-      blockEnd = iSuiMoveBlockEnd (mapF (injF . translate) maybeExpr)
-  in Block' allItems blockEnd
+  let translatedUseDecls = map (iUseDeclarationIsBlockItem . translate') (P.extractF useDecls)
+      translatedBlockItems = map (iBlockItemIsBlockItem . translate') (P.extractF blockItems)
+      allItems = P.insertF $ translatedUseDecls ++ translatedBlockItems
+      blockEnd = iSuiMoveBlockEnd (P.mapF (injF . translate) maybeExpr)
+  in P.Block' allItems blockEnd
 
 instance Trans Modularized.Block where
   trans b@(Modularized.Block {}) = iBlockIsBlock (transBlock $ inject b)
 
 transUnitExpression :: Modularized.MoveTerm Modularized.UnitExpressionL -> MSuiMoveTerm ()
-transUnitExpression (Modularized.UnitExpression' _ _) = UnitF'
+transUnitExpression (Modularized.UnitExpression' _ _) = P.UnitF'
 
 instance Trans Modularized.UnitExpression where
   trans (Modularized.UnitExpression leftParen rightParen) = iUnitIsUnitExpression (transUnitExpression $ Modularized.iUnitExpression leftParen rightParen)
 
 -------- Assign Expression
 
-transAssignExpr :: Modularized.MoveTerm Modularized.AssignExpressionL -> MSuiMoveTerm AssignL
+transAssignExpr :: Modularized.MoveTerm Modularized.AssignExpressionL -> MSuiMoveTerm P.AssignL
 transAssignExpr (Modularized.AssignExpression' tuple) =
-  let (lhsTok, rhs) = extractF2 tuple
-      (lhs, _assignTok) = extractF2 lhsTok
-  in Assign' (translate' lhs) AssignOpEquals' (translate' rhs)
+  let (lhsTok, rhs) = P.extractF2 tuple
+      (lhs, _assignTok) = P.extractF2 lhsTok
+  in P.Assign' (translate' lhs) P.AssignOpEquals' (translate' rhs)
 
 -------- Variable Declarations (LetStatement)
 
-transBindList :: Modularized.MoveTerm Modularized.BindListL -> MSuiMoveTerm VarDeclBinderL
+transBindList :: Modularized.MoveTerm Modularized.BindListL -> MSuiMoveTerm P.VarDeclBinderL
 transBindList (Modularized.BindListBind' (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0VariableIdentifier' (Modularized.HiddenVariableIdentifier' ident)))) =
   -- Single non-mutable identifier: translate to IdentIsVarDeclBinder
-  iIdentIsVarDeclBinder $ transIdent ident
+  P.iIdentIsVarDeclBinder $ transIdent ident
 transBindList (Modularized.BindListCommaBindList' commaList) =
   -- Tuple destructuring: extract identifiers and use TupleBinder
   let idents = extractBindListIdents commaList
-  in iTupleBinder $ insertF idents
+  in P.iTupleBinder $ P.insertF idents
 transBindList bindList =
   -- Other patterns (mutable variables, struct destructuring, @ patterns, or patterns)
   iBinderIsVarDeclBinder $ translate bindList
 
 -- Extract identifiers from CommaBindList for tuple destructuring
-extractBindListIdents :: Modularized.MoveTerm Modularized.CommaBindListL -> [MSuiMoveTerm IdentL]
+extractBindListIdents :: Modularized.MoveTerm Modularized.CommaBindListL -> [MSuiMoveTerm P.IdentL]
 extractBindListIdents (Modularized.CommaBindList' binds) =
-  map extractIdentFromBind $ extractF binds
+  map extractIdentFromBind $ P.extractF binds
 
 -- Extract single identifier from a bind
-extractIdentFromBind :: Modularized.MoveTerm Modularized.HiddenBindL -> MSuiMoveTerm IdentL
+extractIdentFromBind :: Modularized.MoveTerm Modularized.HiddenBindL -> MSuiMoveTerm P.IdentL
 extractIdentFromBind (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0VariableIdentifier' (Modularized.HiddenVariableIdentifier' ident))) =
   transIdent ident
 extractIdentFromBind (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0MutBindVar' (Modularized.MutBindVar' _ (Modularized.HiddenVariableIdentifier' ident)))) =
@@ -192,36 +193,36 @@ extractIdentFromBind (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBi
 extractIdentFromBind _ =
   error "extractIdentFromBind: unexpected bind pattern in tuple destructuring"
 
-transLetStatement :: Modularized.MoveTerm Modularized.LetStatementL -> MSuiMoveTerm SingleLocalVarDeclL
+transLetStatement :: Modularized.MoveTerm Modularized.LetStatementL -> MSuiMoveTerm P.SingleLocalVarDeclL
 transLetStatement (Modularized.LetStatement' _ bindList mtype minit) =
   let attrs = case mtype of
-        Nothing' -> iEmptyLocalVarDeclAttrs
-        Just' (PairF' _ hiddenType) -> iHiddenTypeIsLocalVarDeclAttrs (translate' hiddenType)
+        P.Nothing' -> P.iEmptyLocalVarDeclAttrs
+        P.Just' (P.PairF' _ hiddenType) -> iHiddenTypeIsLocalVarDeclAttrs (translate' hiddenType)
       binder = transBindList bindList
       init = case minit of
-        Nothing' -> iNoLocalVarInit
-        Just' (PairF' _ expr) -> iJustLocalVarInit (translate' expr)
-  in iSingleLocalVarDecl attrs binder init
+        P.Nothing' -> P.iNoLocalVarInit
+        P.Just' (P.PairF' _ expr) -> P.iJustLocalVarInit (translate' expr)
+  in P.iSingleLocalVarDecl attrs binder init
 
 instance Trans Modularized.LetStatement where
   trans ls@(Modularized.LetStatement {}) = injF $ transLetStatement $ inject ls
 
-transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> MSuiMoveTerm ExpressionL
-transIfExpression (Modularized.IfExpression' (PairF' (PairF' (PairF' _ condExpr) thenExpr) elseClause)) =
+transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> MSuiMoveTerm P.ExpressionL
+transIfExpression (Modularized.IfExpression' (P.PairF' (P.PairF' (P.PairF' _ condExpr) thenExpr) elseClause)) =
   let elseExpr = case elseClause of
-        Nothing' -> iUnitF
-        Just' (PairF' _ expr) -> translate' expr
-  in iTernary ITE' (translate' condExpr) (translate' thenExpr) elseExpr
+        P.Nothing' -> P.iUnitF
+        P.Just' (P.PairF' _ expr) -> translate' expr
+  in P.iTernary P.ITE' (translate' condExpr) (translate' thenExpr) elseExpr
 
-transFunctionParametersInternal :: Modularized.MoveTerm Modularized.FunctionParametersInternal0L -> MSuiMoveTerm FunctionParameterL
+transFunctionParametersInternal :: Modularized.MoveTerm Modularized.FunctionParametersInternal0L -> MSuiMoveTerm P.FunctionParameterL
 transFunctionParametersInternal (Modularized.FunctionParametersInternal0FunctionParameter' fp) =
   let (ty, ident, hasDollar) = transFunctionParameter fp
-  in iPositionalParameter (iImmutable hasDollar ty) ident
+  in P.iPositionalParameter (iImmutable hasDollar ty) ident
 transFunctionParametersInternal (Modularized.FunctionParametersInternal0MutFunctionParameter' (Modularized.MutFunctionParameter' _ fp)) =
   let (ty, ident, _) = transFunctionParameter fp  -- Mutable params don't support $ prefix
-  in iPositionalParameter (iMutable ty) ident
+  in P.iPositionalParameter (iMutable ty) ident
 
-transFunctionParameter :: Modularized.MoveTerm Modularized.FunctionParameterL -> (MSuiMoveTerm Modularized.HiddenTypeL, MSuiMoveTerm IdentL, Bool)
+transFunctionParameter :: Modularized.MoveTerm Modularized.FunctionParameterL -> (MSuiMoveTerm Modularized.HiddenTypeL, MSuiMoveTerm P.IdentL, Bool)
 transFunctionParameter (Modularized.FunctionParameter' paramInternal _ hiddenType) =
   case paramInternal of
     Modularized.FunctionParameterInternal0Name' (Modularized.HiddenVariableIdentifier' ident) ->
@@ -232,13 +233,13 @@ transFunctionParameter (Modularized.FunctionParameter' paramInternal _ hiddenTyp
 instance Trans Modularized.FunctionParametersInternal0 where
   trans (Modularized.FunctionParametersInternal0FunctionParameter fp) =
     let (ty, ident, hasDollar) = transFunctionParameter fp
-    in iPositionalParameter (iImmutable hasDollar ty) ident
+    in P.iPositionalParameter (iImmutable hasDollar ty) ident
   trans (Modularized.FunctionParametersInternal0MutFunctionParameter (Modularized.MutFunctionParameter' _ fp)) =
     let (ty, ident, _hasDollar) = transFunctionParameter fp
-    in iPositionalParameter (iMutable ty) ident
+    in P.iPositionalParameter (iMutable ty) ident
 
 -------- Function Definitions
-transFunctionDefinition :: Modularized.MoveTerm Modularized.FunctionDefinitionL -> MSuiMoveTerm FunctionDefL
+transFunctionDefinition :: Modularized.MoveTerm Modularized.FunctionDefinitionL -> MSuiMoveTerm P.FunctionDefL
 transFunctionDefinition (Modularized.FunctionDefinition' hiddenFunctionSig block) =
   let (Modularized.HiddenFunctionSignature' mod1 mod2 mod3 _ hiddenFuncIdent typeParams funcParams retType) = hiddenFunctionSig
       -- Extract function name
@@ -247,7 +248,7 @@ transFunctionDefinition (Modularized.FunctionDefinition' hiddenFunctionSig block
 
       -- Extract and translate parameters
       (Modularized.FunctionParameters' paramsInternalList) = funcParams
-      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+      translatedParams = map transFunctionParametersInternal (P.extractF paramsInternalList)
 
       -- Store only minimal data in FunctionDefAttrs (not the entire signature)
       funcAttrs = iNormalFunctionDefAttrs
@@ -259,13 +260,13 @@ transFunctionDefinition (Modularized.FunctionDefinition' hiddenFunctionSig block
 
       -- Translate body
       funcBody = iBlockIsFunctionBody $ translate' block
-  in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
+  in P.iFunctionDef funcAttrs funcName (P.insertF translatedParams) funcBody
 
 instance Trans Modularized.FunctionDefinition where
   trans (Modularized.FunctionDefinition hiddenFunctionSig block) = injF $ transFunctionDefinition $ Modularized.iFunctionDefinition hiddenFunctionSig block
 
 -------- Macro Function Definitions
-transMacroFunctionDefinition :: Modularized.MoveTerm Modularized.MacroFunctionDefinitionL -> MSuiMoveTerm FunctionDefL
+transMacroFunctionDefinition :: Modularized.MoveTerm Modularized.MacroFunctionDefinitionL -> MSuiMoveTerm P.FunctionDefL
 transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier _ hiddenMacroSig block) =
   let (Modularized.HiddenMacroSignature' _ _ hiddenFuncIdent typeParams funcParams retType) = hiddenMacroSig
       -- Extract function name
@@ -274,7 +275,7 @@ transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier
 
       -- Extract and translate parameters (note: macro params will have $ prefix)
       (Modularized.FunctionParameters' paramsInternalList) = funcParams
-      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+      translatedParams = map transFunctionParametersInternal (P.extractF paramsInternalList)
 
       -- Store only minimal data in FunctionDefAttrs
       -- Use the modifier from maybeModifier (outer level) as it's typically the visibility modifier
@@ -285,13 +286,13 @@ transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier
 
       -- Translate body
       funcBody = iBlockIsFunctionBody $ translate' block
-  in iFunctionDef funcAttrs funcName (insertF translatedParams) funcBody
+  in P.iFunctionDef funcAttrs funcName (P.insertF translatedParams) funcBody
 
 instance Trans Modularized.MacroFunctionDefinition where
   trans (Modularized.MacroFunctionDefinition maybeModifier _ hiddenMacroSig block) = iFunctionDefIsMacroFunctionDefinition $ transMacroFunctionDefinition $ Modularized.iMacroFunctionDefinition maybeModifier Modularized.iMacroTok hiddenMacroSig block
 
 -------- Native Function Definitions (Declarations)
-transNativeFunctionDefinition :: Modularized.MoveTerm Modularized.NativeFunctionDefinitionL -> MSuiMoveTerm FunctionDeclL
+transNativeFunctionDefinition :: Modularized.MoveTerm Modularized.NativeFunctionDefinitionL -> MSuiMoveTerm P.FunctionDeclL
 transNativeFunctionDefinition (Modularized.NativeFunctionDefinition' hiddenFunctionSig _) =
   let (Modularized.HiddenFunctionSignature' mod1 mod2 mod3 _ hiddenFuncIdent typeParams funcParams retType) = hiddenFunctionSig
       -- Extract function name
@@ -300,7 +301,7 @@ transNativeFunctionDefinition (Modularized.NativeFunctionDefinition' hiddenFunct
 
       -- Extract and translate parameters
       (Modularized.FunctionParameters' paramsInternalList) = funcParams
-      translatedParams = map transFunctionParametersInternal (extractF paramsInternalList)
+      translatedParams = map transFunctionParametersInternal (P.extractF paramsInternalList)
       -- Convert FunctionParameter to FunctionParameterDecl
       translatedParamDecls = map iFunctionParameterIsFunctionParameterDecl translatedParams
 
@@ -311,7 +312,7 @@ transNativeFunctionDefinition (Modularized.NativeFunctionDefinition' hiddenFunct
         (translate' mod3)
         (translate' typeParams)
         (translate' retType)
-  in iFunctionDecl funcDeclAttrs funcName (insertF translatedParamDecls)
+  in P.iFunctionDecl funcDeclAttrs funcName (P.insertF translatedParamDecls)
 
 instance Trans Modularized.NativeFunctionDefinition where
   trans (Modularized.NativeFunctionDefinition hiddenFunctionSig semicolonTok) = iFunctionDeclIsNativeFunctionDefinition $ transNativeFunctionDefinition $ Modularized.iNativeFunctionDefinition hiddenFunctionSig semicolonTok
@@ -319,41 +320,41 @@ instance Trans Modularized.NativeFunctionDefinition where
 -------- Function Calls
 
 -- Translate ArgList to FunctionArguments
-transArgList :: Modularized.MoveTerm Modularized.ArgListL -> MSuiMoveTerm FunctionArgumentsL
+transArgList :: Modularized.MoveTerm Modularized.ArgListL -> MSuiMoveTerm P.FunctionArgumentsL
 transArgList (Modularized.ArgList' exprs) =
-  iFunctionArgumentList $ mapF (iPositionalArgument . translate') exprs
+  P.iFunctionArgumentList $ P.mapF (P.iPositionalArgument . translate') exprs
 
 -- Helper to translate NameExpression to FunctionExp
-transNameExpressionToFunctionExp :: Modularized.MoveTerm Modularized.NameExpressionL -> MSuiMoveTerm FunctionExpL
+transNameExpressionToFunctionExp :: Modularized.MoveTerm Modularized.NameExpressionL -> MSuiMoveTerm P.FunctionExpL
 transNameExpressionToFunctionExp (Modularized.NameExpression' colonColon moduleAccess) =
   let hasColon = case colonColon of
-        Just' _ -> True
-        Nothing' -> False
+        P.Just' _ -> True
+        P.Nothing' -> False
   in iSimpleFunctionExp hasColon (translate' moduleAccess)
 
 -- Helper to translate MacroModuleAccess to FunctionExp
-transMacroModuleAccessToFunctionExp :: Modularized.MoveTerm Modularized.MacroModuleAccessL -> MSuiMoveTerm FunctionExpL
+transMacroModuleAccessToFunctionExp :: Modularized.MoveTerm Modularized.MacroModuleAccessL -> MSuiMoveTerm P.FunctionExpL
 transMacroModuleAccessToFunctionExp (Modularized.MacroModuleAccess' moduleAccess _) =
   iMacroFunctionExp (translate' moduleAccess)
 
 -- Translate CallExpression
-transCallExpression :: Modularized.MoveTerm Modularized.CallExpressionL -> MSuiMoveTerm FunctionCallL
+transCallExpression :: Modularized.MoveTerm Modularized.CallExpressionL -> MSuiMoveTerm P.FunctionCallL
 transCallExpression (Modularized.CallExpression' tuple) =
-  let (nameExpr, argList) = extractF2 tuple
+  let (nameExpr, argList) = P.extractF2 tuple
       funcExp = transNameExpressionToFunctionExp nameExpr
       funcArgs = transArgList argList
-  in iFunctionCall iNormalFunctionCallAttrs funcExp funcArgs
+  in P.iFunctionCall iNormalFunctionCallAttrs funcExp funcArgs
 
 instance Trans Modularized.CallExpression where
   trans (Modularized.CallExpression tuple) = iFunctionCallIsCallExpression $ transCallExpression $ Modularized.iCallExpression tuple
 
 -- Translate MacroCallExpression
-transMacroCallExpression :: Modularized.MoveTerm Modularized.MacroCallExpressionL -> MSuiMoveTerm FunctionCallL
+transMacroCallExpression :: Modularized.MoveTerm Modularized.MacroCallExpressionL -> MSuiMoveTerm P.FunctionCallL
 transMacroCallExpression (Modularized.MacroCallExpression' macroModuleAccess typeArgs argList) =
   let funcExp = transMacroModuleAccessToFunctionExp macroModuleAccess
       funcArgs = transArgList argList
-      funcAttrs = iMacroFunctionCallAttrs (mapF translate typeArgs)
-  in iFunctionCall funcAttrs funcExp funcArgs
+      funcAttrs = iMacroFunctionCallAttrs (P.mapF translate typeArgs)
+  in P.iFunctionCall funcAttrs funcExp funcArgs
 
 instance Trans Modularized.MacroCallExpression where
   trans (Modularized.MacroCallExpression macroModuleAccess typeArgs argList) = iFunctionCallIsMacroCallExpression $ transMacroCallExpression $ Modularized.iMacroCallExpression macroModuleAccess typeArgs argList
@@ -442,8 +443,8 @@ untranslate' = untranslate . fromProjF
 
 -------- Identifiers
 
-untransIdent :: MSuiMoveTerm IdentL -> Modularized.MoveTerm Modularized.IdentifierL
-untransIdent (Ident' s) = Modularized.iIdentifier (Text.pack s)
+untransIdent :: MSuiMoveTerm P.IdentL -> Modularized.MoveTerm Modularized.IdentifierL
+untransIdent (P.Ident' s) = Modularized.iIdentifier (Text.pack s)
 
 instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
   untrans (IdentIsIdentifier n) = untransIdent n
@@ -451,39 +452,39 @@ instance {-# OVERLAPPING #-} Untrans IdentIsIdentifier where
 -------- Binary Expressions
 
 instance {-# OVERLAPPING #-} Untrans ExpressionIsHiddenExpression where
-  untrans (ExpressionIsHiddenExpression (Binary' op lhs rhs)) =
+  untrans (ExpressionIsHiddenExpression (P.Binary' op lhs rhs)) =
     Modularized.iHiddenExpressionBinaryExpression $ untransBinaryOp op (fromProjF lhs) (fromProjF rhs)
-  untrans (ExpressionIsHiddenExpression (Unary' op expr)) =
+  untrans (ExpressionIsHiddenExpression (P.Unary' op expr)) =
     Modularized.iHiddenExpressionUnaryExpression $ untransUnaryOp op (fromProjF expr)
-  untrans (ExpressionIsHiddenExpression (Ternary' op cond thenExpr elseExpr)) =
+  untrans (ExpressionIsHiddenExpression (P.Ternary' op cond thenExpr elseExpr)) =
     Modularized.iHiddenExpressionIfExpression $ untransIfExpression op (fromProjF cond) (fromProjF thenExpr) (fromProjF elseExpr)
   untrans (ExpressionIsHiddenExpression e) = untranslate' e
 
-untransBinaryOp :: MSuiMoveTerm BinaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.BinaryExpressionL
-untransBinaryOp LogicOr' lhs rhs  = Modularized.iBinaryExpression2 (untranslate lhs) (inject Modularized.VerticalLineVerticalLineTok) (untranslate rhs)
-untransBinaryOp LogicAnd' lhs rhs = Modularized.iBinaryExpression3 (untranslate lhs) (inject Modularized.AmpersandAmpersandTok) (untranslate rhs)
-untransBinaryOp Eq' lhs rhs       = Modularized.iBinaryExpression4 (untranslate lhs) (inject Modularized.EqualsSignEqualsSignTok) (untranslate rhs)
-untransBinaryOp Neq' lhs rhs      = Modularized.iBinaryExpression5 (untranslate lhs) (inject Modularized.ExclamationMarkEqualsSignTok) (untranslate rhs)
-untransBinaryOp Lt' lhs rhs       = Modularized.iBinaryExpression6 (untranslate lhs) (inject Modularized.LessThanSignTok) (untranslate rhs)
-untransBinaryOp Gt' lhs rhs       = Modularized.iBinaryExpression7 (untranslate lhs) (inject Modularized.GreaterThanSignTok) (untranslate rhs)
-untransBinaryOp Lte' lhs rhs      = Modularized.iBinaryExpression8 (untranslate lhs) (inject Modularized.LessThanSignEqualsSignTok) (untranslate rhs)
-untransBinaryOp Gte' lhs rhs      = Modularized.iBinaryExpression9 (untranslate lhs) (inject Modularized.GreaterThanSignEqualsSignTok) (untranslate rhs)
-untransBinaryOp BitOr' lhs rhs    = Modularized.iBinaryExpression11 (untranslate lhs) (inject Modularized.VerticalLineTok) (untranslate rhs)
-untransBinaryOp BitXor' lhs rhs   = Modularized.iBinaryExpression12 (untranslate lhs) (inject Modularized.CircumflexAccentTok) (untranslate rhs)
-untransBinaryOp BitAnd' lhs rhs   = Modularized.iBinaryExpression13 (untranslate lhs) (inject Modularized.AmpersandTok) (untranslate rhs)
-untransBinaryOp Shl' lhs rhs      = Modularized.iBinaryExpression14 (untranslate lhs) (inject Modularized.LessThanSignLessThanSignTok) (untranslate rhs)
-untransBinaryOp ArithShr' lhs rhs = Modularized.iBinaryExpression15 (untranslate lhs) (inject Modularized.GreaterThanSignGreaterThanSignTok) (untranslate rhs)
-untransBinaryOp Add' lhs rhs      = Modularized.iBinaryExpression16 (untranslate lhs) (inject Modularized.PlusSignTok) (untranslate rhs)
-untransBinaryOp Sub' lhs rhs      = Modularized.iBinaryExpression17 (untranslate lhs) (inject Modularized.HyphenMinusTok) (untranslate rhs)
-untransBinaryOp Mul' lhs rhs      = Modularized.iBinaryExpression18 (untranslate lhs) (inject Modularized.AsteriskTok) (untranslate rhs)
-untransBinaryOp Div' lhs rhs      = Modularized.iBinaryExpression19 (untranslate lhs) (inject Modularized.SolidusTok) (untranslate rhs)
-untransBinaryOp Mod' lhs rhs      = Modularized.iBinaryExpression20 (untranslate lhs) (inject Modularized.PercentSignTok) (untranslate rhs)
+untransBinaryOp :: MSuiMoveTerm P.BinaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.BinaryExpressionL
+untransBinaryOp P.LogicOr' lhs rhs  = Modularized.iBinaryExpression2 (untranslate lhs) (inject Modularized.VerticalLineVerticalLineTok) (untranslate rhs)
+untransBinaryOp P.LogicAnd' lhs rhs = Modularized.iBinaryExpression3 (untranslate lhs) (inject Modularized.AmpersandAmpersandTok) (untranslate rhs)
+untransBinaryOp P.Eq' lhs rhs       = Modularized.iBinaryExpression4 (untranslate lhs) (inject Modularized.EqualsSignEqualsSignTok) (untranslate rhs)
+untransBinaryOp P.Neq' lhs rhs      = Modularized.iBinaryExpression5 (untranslate lhs) (inject Modularized.ExclamationMarkEqualsSignTok) (untranslate rhs)
+untransBinaryOp P.Lt' lhs rhs       = Modularized.iBinaryExpression6 (untranslate lhs) (inject Modularized.LessThanSignTok) (untranslate rhs)
+untransBinaryOp P.Gt' lhs rhs       = Modularized.iBinaryExpression7 (untranslate lhs) (inject Modularized.GreaterThanSignTok) (untranslate rhs)
+untransBinaryOp P.Lte' lhs rhs      = Modularized.iBinaryExpression8 (untranslate lhs) (inject Modularized.LessThanSignEqualsSignTok) (untranslate rhs)
+untransBinaryOp P.Gte' lhs rhs      = Modularized.iBinaryExpression9 (untranslate lhs) (inject Modularized.GreaterThanSignEqualsSignTok) (untranslate rhs)
+untransBinaryOp P.BitOr' lhs rhs    = Modularized.iBinaryExpression11 (untranslate lhs) (inject Modularized.VerticalLineTok) (untranslate rhs)
+untransBinaryOp P.BitXor' lhs rhs   = Modularized.iBinaryExpression12 (untranslate lhs) (inject Modularized.CircumflexAccentTok) (untranslate rhs)
+untransBinaryOp P.BitAnd' lhs rhs   = Modularized.iBinaryExpression13 (untranslate lhs) (inject Modularized.AmpersandTok) (untranslate rhs)
+untransBinaryOp P.Shl' lhs rhs      = Modularized.iBinaryExpression14 (untranslate lhs) (inject Modularized.LessThanSignLessThanSignTok) (untranslate rhs)
+untransBinaryOp P.ArithShr' lhs rhs = Modularized.iBinaryExpression15 (untranslate lhs) (inject Modularized.GreaterThanSignGreaterThanSignTok) (untranslate rhs)
+untransBinaryOp P.Add' lhs rhs      = Modularized.iBinaryExpression16 (untranslate lhs) (inject Modularized.PlusSignTok) (untranslate rhs)
+untransBinaryOp P.Sub' lhs rhs      = Modularized.iBinaryExpression17 (untranslate lhs) (inject Modularized.HyphenMinusTok) (untranslate rhs)
+untransBinaryOp P.Mul' lhs rhs      = Modularized.iBinaryExpression18 (untranslate lhs) (inject Modularized.AsteriskTok) (untranslate rhs)
+untransBinaryOp P.Div' lhs rhs      = Modularized.iBinaryExpression19 (untranslate lhs) (inject Modularized.SolidusTok) (untranslate rhs)
+untransBinaryOp P.Mod' lhs rhs      = Modularized.iBinaryExpression20 (untranslate lhs) (inject Modularized.PercentSignTok) (untranslate rhs)
 untransBinaryOp _ _ _             = error "untransBinaryOp: unsupported operator"
 
 -------- Unary Expressions
 
-untransUnaryOp :: MSuiMoveTerm UnaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.HiddenUnaryExpressionL
-untransUnaryOp Not' expr =
+untransUnaryOp :: MSuiMoveTerm P.UnaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.HiddenUnaryExpressionL
+untransUnaryOp P.Not' expr =
   Modularized.iHiddenUnaryExpression $
     Modularized.iHiddenUnaryExpressionInternal0UnaryExpression $
       Modularized.iUnaryExpression
@@ -493,8 +494,8 @@ untransUnaryOp _ _ = error "untransUnaryOp: unsupported operator"
 
 -------- If Expression (Ternary operator)
 
-untransIfExpression :: MSuiMoveTerm TernaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.IfExpressionL
-untransIfExpression ITE' cond thenExpr elseExpr =
+untransIfExpression :: MSuiMoveTerm P.TernaryOpL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> MSuiMoveTerm Modularized.HiddenExpressionL -> Modularized.MoveTerm Modularized.IfExpressionL
+untransIfExpression P.ITE' cond thenExpr elseExpr =
   let condTerm = untranslate cond
       thenTerm = untranslate thenExpr
       elseTerm = untranslate elseExpr
@@ -506,27 +507,27 @@ untransIfExpression ITE' cond thenExpr elseExpr =
               (Modularized.HiddenExpressionTermUnitExpression' _))) -> True
         _ -> False
       maybeElse = if isUnit
-                    then Nothing'
-                    else Just' $ riPairF Modularized.iElseTok elseTerm
-      ifTokCond = riPairF Modularized.iIfTok condTerm
-      ifCondThen = riPairF ifTokCond thenTerm
-      fullTuple = riPairF ifCondThen maybeElse
+                    then P.Nothing'
+                    else P.Just' $ P.riPairF Modularized.iElseTok elseTerm
+      ifTokCond = P.riPairF Modularized.iIfTok condTerm
+      ifCondThen = P.riPairF ifTokCond thenTerm
+      fullTuple = P.riPairF ifCondThen maybeElse
   in Modularized.iIfExpression fullTuple
 untransIfExpression _ _ _ _ = error "untransIfExpression: unsupported ternary operator"
 
 -------- Block
 
-untransBlock :: MSuiMoveTerm BlockL -> Modularized.MoveTerm Modularized.BlockL
-untransBlock (Block' items (SuiMoveBlockEnd' maybeExpr)) =
-  let (useDecls, blockItems) = partitionEithers $ map separateItem $ extractF items
+untransBlock :: MSuiMoveTerm P.BlockL -> Modularized.MoveTerm Modularized.BlockL
+untransBlock (P.Block' items (SuiMoveBlockEnd' maybeExpr)) =
+  let (useDecls, blockItems) = partitionEithers $ map separateItem $ P.extractF items
   in Modularized.iBlock
       Modularized.iLeftCurlyBracketTok
-      (insertF useDecls)
-      (insertF blockItems)
-      (mapF untranslate maybeExpr)
+      (P.insertF useDecls)
+      (P.insertF blockItems)
+      (P.mapF untranslate maybeExpr)
       Modularized.iRightCurlyBracketTok
   where
-    separateItem :: MSuiMoveTerm BlockItemL -> Either (Modularized.MoveTerm Modularized.UseDeclarationL) (Modularized.MoveTerm Modularized.BlockItemL)
+    separateItem :: MSuiMoveTerm P.BlockItemL -> Either (Modularized.MoveTerm Modularized.UseDeclarationL) (Modularized.MoveTerm Modularized.BlockItemL)
     separateItem (UseDeclarationIsBlockItem' ud) = Left (untranslate' ud)
     separateItem (BlockItemIsBlockItem' bi) = Right (untranslate' bi)
     separateItem (SingleLocalVarDeclIsBlockItem' svd) = Right $
@@ -539,19 +540,19 @@ instance {-# OVERLAPPING #-} Untrans BlockIsBlock where
   untrans (BlockIsBlock b) = untransBlock b
 
 untransUnitExpression :: MSuiMoveTerm () -> Modularized.MoveTerm Modularized.UnitExpressionL
-untransUnitExpression UnitF' = Modularized.UnitExpression' Modularized.LeftParenthesisTok' Modularized.RightParenthesisTok'
+untransUnitExpression P.UnitF' = Modularized.UnitExpression' Modularized.LeftParenthesisTok' Modularized.RightParenthesisTok'
 
 instance {-# OVERLAPPING #-} Untrans UnitIsUnitExpression where
   untrans (UnitIsUnitExpression u) = untransUnitExpression u
 
 -------- Assign Expression
 
-untransAssignExpr :: MSuiMoveTerm AssignL -> Modularized.MoveTerm Modularized.AssignExpressionL
-untransAssignExpr (Assign' lhs _op rhs) =
+untransAssignExpr :: MSuiMoveTerm P.AssignL -> Modularized.MoveTerm Modularized.AssignExpressionL
+untransAssignExpr (P.Assign' lhs _op rhs) =
   let lhsTerm = untranslate' lhs
       rhsTerm = untranslate' rhs
-      lhsTokPair = riPairF lhsTerm Modularized.iEqualsSignTok
-      fullTuple = riPairF lhsTokPair rhsTerm
+      lhsTokPair = P.riPairF lhsTerm Modularized.iEqualsSignTok
+      fullTuple = P.riPairF lhsTokPair rhsTerm
   in Modularized.iAssignExpression fullTuple
 
 instance {-# OVERLAPPING #-} Untrans AssignIsHiddenExpression where
@@ -559,17 +560,17 @@ instance {-# OVERLAPPING #-} Untrans AssignIsHiddenExpression where
 
 -------- Variable Declarations (LetStatement)
 
-untransBindList :: MSuiMoveTerm VarDeclBinderL -> Modularized.MoveTerm Modularized.BindListL
-untransBindList (IdentIsVarDeclBinder' ident) =
+untransBindList :: MSuiMoveTerm P.VarDeclBinderL -> Modularized.MoveTerm Modularized.BindListL
+untransBindList (P.IdentIsVarDeclBinder' ident) =
   Modularized.iBindListBind $
     Modularized.iHiddenBindBindInternal0 $
       Modularized.iHiddenBindInternal0VariableIdentifier $
         Modularized.iHiddenVariableIdentifier $
           untransIdent ident
-untransBindList (TupleBinder' idents) =
-  let binds = map (wrapIdentToBind . untransIdent) $ extractF idents
+untransBindList (P.TupleBinder' idents) =
+  let binds = map (wrapIdentToBind . untransIdent) $ P.extractF idents
   in Modularized.iBindListCommaBindList $
-    Modularized.iCommaBindList (insertF binds)
+    Modularized.iCommaBindList (P.insertF binds)
   where
     wrapIdentToBind :: Modularized.MoveTerm Modularized.IdentifierL -> Modularized.MoveTerm Modularized.HiddenBindL
     wrapIdentToBind ident =
@@ -582,18 +583,18 @@ untransBindList binder =
   error $ "untransBindList: unexpected binder type: " ++ show binder
 
 -- Main untranslation for SingleLocalVarDecl to LetStatement
-untransLetStatement :: MSuiMoveTerm SingleLocalVarDeclL -> Modularized.MoveTerm Modularized.LetStatementL
-untransLetStatement (SingleLocalVarDecl' attrs binder varInit) =
+untransLetStatement :: MSuiMoveTerm P.SingleLocalVarDeclL -> Modularized.MoveTerm Modularized.LetStatementL
+untransLetStatement (P.SingleLocalVarDecl' attrs binder varInit) =
   let maybeType = case attrs of
-                    (HiddenTypeIsLocalVarDeclAttrs' hiddenType) -> Just' $
-                      riPairF Modularized.iColonTok (untranslate hiddenType)
-                    EmptyLocalVarDeclAttrs' -> Nothing'
+                    (HiddenTypeIsLocalVarDeclAttrs' hiddenType) -> P.Just' $
+                      P.riPairF Modularized.iColonTok (untranslate hiddenType)
+                    P.EmptyLocalVarDeclAttrs' -> P.Nothing'
                     _ -> error "untransLetStatement: unexpected LocalVarDeclAttrs"
       bindList = untransBindList binder
       maybeInit = case varInit of
-                    NoLocalVarInit' -> Nothing'
-                    (JustLocalVarInit' expr) -> Just' $
-                      riPairF Modularized.iEqualsSignTok (untranslate' expr)
+                    P.NoLocalVarInit' -> P.Nothing'
+                    (P.JustLocalVarInit' expr) -> P.Just' $
+                      P.riPairF Modularized.iEqualsSignTok (untranslate' expr)
                     _ -> error "untransLetStatement: unexpected OptLocalVarInit"
   in Modularized.iLetStatement Modularized.iLetTok bindList maybeType maybeInit
 
@@ -618,8 +619,8 @@ instance {-# OVERLAPPING #-} Untrans BinderIsVarDeclBinder where
 -------- Function Parameters
 
 -- Untranslate parameter, using the hasDollar flag to determine whether to add $ prefix
-untransParameter :: MSuiMoveTerm FunctionParameterL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
-untransParameter (PositionalParameter' paramAttrs ident) =
+untransParameter :: MSuiMoveTerm P.FunctionParameterL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
+untransParameter (P.PositionalParameter' paramAttrs ident) =
   case paramAttrs of
     Immutable' True hiddenType ->
       -- Has $ prefix
@@ -639,7 +640,7 @@ untransParameter (PositionalParameter' paramAttrs ident) =
           paramInternal = Modularized.iFunctionParameterInternal0Name varIdent
           fp = Modularized.iFunctionParameter paramInternal Modularized.iColonTok (untranslate hiddenType)
       in Modularized.iFunctionParametersInternal0MutFunctionParameter $ Modularized.iMutFunctionParameter Modularized.iMutTok fp
-    EmptyParameterAttrs' -> error "untransParameter: expected type annotation"
+    P.EmptyParameterAttrs' -> error "untransParameter: expected type annotation"
     _ -> error "untransParameter: unexpected ParameterAttrs"
 untransParameter _ = error "untransParameter: expected PositionalParameter"
 
@@ -648,19 +649,19 @@ instance {-# OVERLAPPING #-} Untrans FunctionParameterIsFunctionParametersIntern
 
 -------- Function Definitions
 
-untransFunctionDefinition :: MSuiMoveTerm FunctionDefL -> Either (Modularized.MoveTerm Modularized.FunctionDefinitionL) (Modularized.MoveTerm Modularized.MacroFunctionDefinitionL)
-untransFunctionDefinition (FunctionDef' funcAttrs funcName paramsListTerm funcBody) =
+untransFunctionDefinition :: MSuiMoveTerm P.FunctionDefL -> Either (Modularized.MoveTerm Modularized.FunctionDefinitionL) (Modularized.MoveTerm Modularized.MacroFunctionDefinitionL)
+untransFunctionDefinition (P.FunctionDef' funcAttrs funcName paramsListTerm funcBody) =
   let block = case funcBody of
                 BlockIsFunctionBody' b -> untranslate' b
                 _ -> error "untransFunctionDefinition: unexpected FunctionBody"
-      params = extractF paramsListTerm
+      params = P.extractF paramsListTerm
   in case funcAttrs of
     NormalFunctionDefAttrs' mod1 mod2 mod3 typeParams retType ->
       -- Reconstruct HiddenFunctionSignature from minimal data
       let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
           -- Reconstruct FunctionParameters from parameter list
           funcParams = Modularized.iFunctionParameters $
-            insertF $ map untransParameter params
+            P.insertF $ map untransParameter params
           -- Reconstruct complete signature
           hiddenFunctionSig = Modularized.iHiddenFunctionSignature
             (untranslate mod1)
@@ -677,11 +678,11 @@ untransFunctionDefinition (FunctionDef' funcAttrs funcName paramsListTerm funcBo
       let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
           -- Reconstruct FunctionParameters from parameter list (preserving $ prefix)
           funcParams = Modularized.iFunctionParameters $
-            insertF $ map untransParameter params
+            P.insertF $ map untransParameter params
           -- Reconstruct complete macro signature
           -- Note: The modifier goes in the outer MacroFunctionDefinition, not in HiddenMacroSignature
           hiddenMacroSig = Modularized.iHiddenMacroSignature
-            Nothing'  -- No modifier in the signature itself
+            P.Nothing'  -- No modifier in the signature itself
             Modularized.iFunTok
             hiddenFuncIdent
             (untranslate typeParams)
@@ -720,20 +721,20 @@ instance {-# OVERLAPPING #-} Untrans BlockIsFunctionBody where
 -------- Native Function Definitions (Declarations)
 
 -- Untranslate FunctionParameterDecl back to FunctionParametersInternal0
-untransParameterDecl :: MSuiMoveTerm FunctionParameterDeclL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
+untransParameterDecl :: MSuiMoveTerm P.FunctionParameterDeclL -> Modularized.MoveTerm Modularized.FunctionParametersInternal0L
 untransParameterDecl (FunctionParameterIsFunctionParameterDecl' fp) = untransParameter fp
 untransParameterDecl _ = error "untransParameterDecl: expected FunctionParameterIsFunctionParameterDecl"
 
-untransNativeFunctionDefinition :: MSuiMoveTerm FunctionDeclL -> Modularized.MoveTerm Modularized.NativeFunctionDefinitionL
-untransNativeFunctionDefinition (FunctionDecl' funcDeclAttrs funcName paramsListTerm) =
-  let params = extractF paramsListTerm
+untransNativeFunctionDefinition :: MSuiMoveTerm P.FunctionDeclL -> Modularized.MoveTerm Modularized.NativeFunctionDefinitionL
+untransNativeFunctionDefinition (P.FunctionDecl' funcDeclAttrs funcName paramsListTerm) =
+  let params = P.extractF paramsListTerm
   in case funcDeclAttrs of
     NativeFunctionDeclAttrs' mod1 mod2 mod3 typeParams retType ->
       -- Reconstruct HiddenFunctionSignature from minimal data
       let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
           -- Reconstruct FunctionParameters from parameter list
           funcParams = Modularized.iFunctionParameters $
-            insertF $ map untransParameterDecl params
+            P.insertF $ map untransParameterDecl params
           -- Reconstruct complete signature
           hiddenFunctionSig = Modularized.iHiddenFunctionSignature
             (untranslate mod1)
@@ -763,43 +764,43 @@ instance {-# OVERLAPPING #-} Untrans FunctionParameterIsFunctionParameterDecl wh
 -------- Function Calls
 
 -- Untranslate FunctionArguments to ArgList
-untransArgList :: MSuiMoveTerm FunctionArgumentsL -> Modularized.MoveTerm Modularized.ArgListL
-untransArgList (FunctionArgumentList' args) =
-  Modularized.iArgList $ mapF extractExprFromArg args
+untransArgList :: MSuiMoveTerm P.FunctionArgumentsL -> Modularized.MoveTerm Modularized.ArgListL
+untransArgList (P.FunctionArgumentList' args) =
+  Modularized.iArgList $ P.mapF extractExprFromArg args
   where
-    extractExprFromArg :: MSuiMoveTerm FunctionArgumentL -> Modularized.MoveTerm Modularized.HiddenExpressionL
-    extractExprFromArg (PositionalArgument' expr) = untranslate' expr
+    extractExprFromArg :: MSuiMoveTerm P.FunctionArgumentL -> Modularized.MoveTerm Modularized.HiddenExpressionL
+    extractExprFromArg (P.PositionalArgument' expr) = untranslate' expr
     extractExprFromArg _ = error "untransArgList: expected PositionalArgument"
 
 -- Untranslate FunctionExp to NameExpression
-untransNameExpression :: MSuiMoveTerm FunctionExpL -> Modularized.MoveTerm Modularized.NameExpressionL
+untransNameExpression :: MSuiMoveTerm P.FunctionExpL -> Modularized.MoveTerm Modularized.NameExpressionL
 untransNameExpression (SimpleFunctionExp' hasColon moduleAccess) =
-  let colonColon = if hasColon then Just' Modularized.iColonColonTok else Nothing'
+  let colonColon = if hasColon then P.Just' Modularized.iColonColonTok else P.Nothing'
   in Modularized.iNameExpression colonColon (untranslate moduleAccess)
 untransNameExpression _ = error "untransNameExpression: expected SimpleFunctionExp"
 
 -- Untranslate FunctionExp to MacroModuleAccess
-untransMacroModuleAccess :: MSuiMoveTerm FunctionExpL -> Modularized.MoveTerm Modularized.MacroModuleAccessL
+untransMacroModuleAccess :: MSuiMoveTerm P.FunctionExpL -> Modularized.MoveTerm Modularized.MacroModuleAccessL
 untransMacroModuleAccess (MacroFunctionExp' moduleAccess) =
   Modularized.iMacroModuleAccess (untranslate moduleAccess) Modularized.iExclamationMarkTok
 untransMacroModuleAccess _ = error "untransMacroModuleAccess: expected MacroFunctionExp"
 
 -- Untranslate CallExpression
-untransCallExpression :: MSuiMoveTerm FunctionCallL -> Modularized.MoveTerm Modularized.CallExpressionL
-untransCallExpression (FunctionCall' _attrs funcExp funcArgs) =
+untransCallExpression :: MSuiMoveTerm P.FunctionCallL -> Modularized.MoveTerm Modularized.CallExpressionL
+untransCallExpression (P.FunctionCall' _attrs funcExp funcArgs) =
   let nameExpr = untransNameExpression funcExp
       argList = untransArgList funcArgs
-  in Modularized.iCallExpression $ riPairF nameExpr argList
+  in Modularized.iCallExpression $ P.riPairF nameExpr argList
 
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsCallExpression where
   untrans (FunctionCallIsCallExpression fc) = untransCallExpression fc
 
 -- Untranslate MacroCallExpression
-untransMacroCallExpression :: MSuiMoveTerm FunctionCallL -> Modularized.MoveTerm Modularized.MacroCallExpressionL
-untransMacroCallExpression (FunctionCall' _attrs funcExp funcArgs) =
+untransMacroCallExpression :: MSuiMoveTerm P.FunctionCallL -> Modularized.MoveTerm Modularized.MacroCallExpressionL
+untransMacroCallExpression (P.FunctionCall' _attrs funcExp funcArgs) =
   let macroModuleAccess = untransMacroModuleAccess funcExp
       argList = untransArgList funcArgs
-  in Modularized.iMacroCallExpression macroModuleAccess Nothing' argList
+  in Modularized.iMacroCallExpression macroModuleAccess P.Nothing' argList
 
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsMacroCallExpression where
   untrans (FunctionCallIsMacroCallExpression fc) = untransMacroCallExpression fc

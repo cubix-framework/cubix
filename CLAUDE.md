@@ -161,6 +161,31 @@ In `Trans` module:
 
 3. Define `Untrans` instance for getting back the Modularized syntax from parametric one. Similarly it might be easier to define helper function first, that also changes the sort type.
 
+## Import Style
+
+Imports should be organized into four groups, separated by blank lines, each group alphabetized:
+
+1. **Standard libraries** - base and very common libraries (containers, transformers, mtl, hashable, etc.) - must use explicit imports
+2. **Non-standard 3rd-party libraries** - must use explicit imports
+3. **Other local packages** (e.g., compdata, comptrans when in cubix-sui-move) - must use explicit imports
+4. **Local imports** (same package) - may import the whole module
+
+Example:
+```haskell
+import Control.Monad (when, unless)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+
+import Text.Megaparsec (ParseError, runParser)
+import Text.Pretty.Simple (pPrintLightBg)
+
+import Data.Comp.Multi (Term, unTerm)
+import Cubix.Language.Parametric.Syntax (FunctionDef)
+
+import Cubix.Language.SuiMove.Modularized
+import Cubix.Language.SuiMove.IPS.Types
+```
+
 ## Dealing with type errors
 While compiling Cubix one can encounter scary looking, huge compilation errors. While intimidating at first are actually pretty easy once you learn how to read them. Whenever you gat a huge type error about missing instance for `KnownNat` with a lot of `1 +...` it means that some node that you are trying to access isn't in your signature. Look at the end of the message to learn which node is missing.
 

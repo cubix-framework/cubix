@@ -3,37 +3,30 @@
 module Text.Megaparsec.Cubix where
 
 import Control.Applicative (Alternative)
-import Control.Applicative.Combinators (between, eitherP, many, optional, sepEndBy, sepEndBy1, some)
-import Data.ByteString as ByteString
-import Data.ByteString.Char8 qualified as ByteString.Char8
--- TODO: CUBIX_NON_EMPTY
--- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
-import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, KShow, NoHole, OrdHF, ShowHF, Sum, (:<:))
-import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
-import Data.List qualified as List
+import Data.ByteString as ByteString (ByteString, drop, take)
+import Data.ByteString.Char8 qualified as ByteString.Char8 (unpack)
+import Data.List qualified as List (length, null, span, splitAt)
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.List.NonEmpty qualified as NonEmpty
+import Data.List.NonEmpty qualified as NonEmpty (nonEmpty, toList)
 import Data.Proxy (Proxy (..))
-import Data.Set qualified as Set
+import Data.Set qualified as Set (singleton)
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Data.Text.Encoding qualified as Text.Encoding
-import Data.Text.Encoding.Error qualified as Text.Encoding
+import Data.Text.Encoding qualified as Text.Encoding (decodeUtf8With)
+import Data.Text.Encoding.Error qualified as Text.Encoding (lenientDecode)
 import Data.Typeable (Typeable)
 import Data.Void (Void)
-import Text.Megaparsec qualified
 
-import Cubix.Language.Info ( SourceRange (..), rangeLength )
-import Cubix.Language.Parametric.Syntax
-       ( EitherF
-       , InsertF (..)
-       , ListF
-       , MaybeF
-       , PairF
-       , riLeftF
-       , riPairF
-       , riRightF
-       )
+import Control.Applicative.Combinators (between, eitherP, many, optional, sepEndBy, sepEndBy1, some)
+-- TODO: CUBIX_NON_EMPTY
+-- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
+import Text.Megaparsec qualified (ErrorItem (Label), Parsec, PosState (..), Stream (..), Token, Tokens, TraversableStream (..), VisualStream (..), getParserState, sourceLine, stateInput, token, tokensLength)
+
+import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, KShow, NoHole, OrdHF, ShowHF, Sum, (:<:))
+import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+
+import Cubix.Language.Info (SourceRange (..), rangeLength)
+import Cubix.Language.Parametric.Syntax (EitherF, InsertF (..), ListF, MaybeF, PairF, riLeftF, riPairF, riRightF)
 
 pInsert
  :: (Functor m, Typeable l, InsertF f e)

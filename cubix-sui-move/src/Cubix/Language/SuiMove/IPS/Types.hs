@@ -6,18 +6,18 @@
 
 module Cubix.Language.SuiMove.IPS.Types where
 
-import Data.List ( (\\) )
+import Data.List ((\\))
+import Language.Haskell.TH (mkName)
 
-import Language.Haskell.TH ( mkName )
+import Data.Comp.Multi (All, AnnCxtS, CxtS, HFunctor, Term, (:-<:), project')
+import Data.Comp.Trans (makeSumType, runCompTrans)
 
-import Data.Comp.Multi ( All, HFunctor, Term, project', CxtS, AnnCxtS, (:-<:) )
-import Data.Comp.Trans ( runCompTrans, makeSumType )
+import Cubix.Language.Info (TermLab)
+import Cubix.Language.Parametric.Derive (createSortInclusionInfers, createSortInclusionTypes, deriveAll, deriveAllButSortInjection)
+import Cubix.Language.Parametric.InjF (InjF(..), InjectableSorts)
+import Cubix.Language.Parametric.Syntax qualified as Parametric
 
 import Cubix.Language.SuiMove.Modularized as Modularized
-import Cubix.Language.Info
-import Cubix.Language.Parametric.Derive
-import Cubix.Language.Parametric.InjF
-import Cubix.Language.Parametric.Syntax qualified as Parametric
 
 -----------------------------------------------------------------------------------
 ---------------------     Identifiers                      ------------------------
@@ -306,3 +306,24 @@ instance {-# OVERLAPPING #-} InjF MSuiMoveSig () Parametric.ExpressionL where
     , Just (UnitIsUnitExpression u) <- project' d
     = projF' u
   projF' _ = Nothing
+
+-- | Inject Assign into parametric BlockItemL (for hoist transformation)
+-- Path: AssignL -> HiddenExpressionL -> BlockItemInternal0L -> Modularized.BlockItemL -> Parametric.BlockItemL
+instance {-# OVERLAPPING #-} InjF MSuiMoveSig Parametric.AssignL Parametric.BlockItemL where
+  injF assign =
+    iBlockItemIsBlockItem $
+      Modularized.iBlockItem
+        (Modularized.iBlockItemInternal0Expression (iAssignIsHiddenExpression assign))
+        Modularized.iSemicolonTok
+
+  projF' e
+    | Just (BlockItemIsBlockItem bi) <- project' e
+    , Just (Modularized.BlockItem bi' _) <- project' bi
+    , Just (Modularized.BlockItemInternal0Expression expr) <- project' bi'
+    , Just (AssignIsHiddenExpression assign) <- project' expr
+    = Just assign
+  projF' _ = Nothing
+
+-- InjectableSorts for hoist transformation support
+type instance InjectableSorts MSuiMoveSig Parametric.SingleLocalVarDeclL = '[Parametric.BlockItemL]
+type instance InjectableSorts MSuiMoveSig Parametric.AssignL = '[Parametric.BlockItemL]

@@ -5,13 +5,15 @@ module TreeSitter.Generate.Parser
   , mkParser
   ) where
 
-import Data.Functor.Foldable
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
-import Data.Vector qualified as Vector
+import Data.Vector qualified as Vector (null, toList, uncons)
 import GHC.Generics (Generic)
-import TreeSitter.Grammar
+
+import Data.Functor.Foldable (Recursive (..), cata)
+
 import TreeSitter.Generate.Types
+import TreeSitter.Grammar
 
 data Parser
   = Symbol Name

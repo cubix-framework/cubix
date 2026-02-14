@@ -5,23 +5,24 @@
 
 module TreeSitter.Generate.Data where
 
-import Control.Exception (throw, Exception)
-import Data.Functor.Foldable
-import Data.Graph.Inductive (Gr)
-import Data.Graph.Inductive qualified as Gr
-import Data.Set (Set)
-import Data.Set qualified as Set
+import Control.Exception (Exception, throw)
 import Data.Map (Map)
-import Data.Map qualified as Map
+import Data.Map qualified as Map (elems, filter, fromList, keys, lookup)
 import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import Data.Set qualified as Set (empty, fromList, singleton)
 import Data.Text (Text)
-import Data.Text qualified as Text
-import Data.Vector qualified as Vector
+import Data.Text qualified as Text (head, isPrefixOf, show, split)
+import Data.Vector qualified as Vector (foldl, foldr, head, toList, uncons)
 import GHC.Generics (Generic)
-import TreeSitter.Grammar
 
-import TreeSitter.Generate.Types
+import Data.Functor.Foldable (Corecursive (..), Recursive (..), cata, para)
+import Data.Graph.Inductive (Gr)
+import Data.Graph.Inductive qualified as Gr (Node, lab, mkGraph, reachable)
+
 import TreeSitter.Generate.Parser
+import TreeSitter.Generate.Types
+import TreeSitter.Grammar
 
 isHidden :: RuleName -> Bool
 isHidden n = Text.head n == '_'

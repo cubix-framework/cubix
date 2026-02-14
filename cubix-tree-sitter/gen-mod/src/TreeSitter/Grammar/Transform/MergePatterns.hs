@@ -4,9 +4,11 @@ module TreeSitter.Grammar.Transform.MergePatterns (
   mergePatterns
 ) where
 
-import Data.Functor.Foldable
 import Data.Map (Map)
-import Data.Vector qualified as Vector
+import Data.Vector qualified as Vector (head)
+
+import Data.Functor.Foldable (Corecursive (..), Recursive (..), fold)
+
 import TreeSitter.Grammar
 
 mergePatterns :: Grammar -> Grammar

@@ -2,12 +2,11 @@
 module Data.Functor.Base.Extra where
 
 import Data.Vector (Vector)
-import Data.Vector qualified as Vector
+import Data.Vector qualified as Vector (cons, empty, foldr, null, unfoldr, unsafeHead, unsafeTail)
+import Prelude hiding (head, tail)
 
 import Data.Functor.Base (ListF (..))
-import Data.Functor.Foldable (Recursive(..), Corecursive(..), Base)
-
-import Prelude hiding (head, tail)
+import Data.Functor.Foldable (Base, Corecursive (..), Recursive (..))
 
 type instance Base (Vector a) = ListF a
 

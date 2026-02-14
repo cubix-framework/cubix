@@ -2,21 +2,23 @@
 
 module BannedConstructorsSpec (spec) where
 
-import Control.Monad (filterM, forM_, when )
-import Control.Monad.Identity ( Identity(..) )
-import Data.Monoid ( Any(..) )
-import System.Directory (listDirectory, doesFileExist)
+import Control.Monad (filterM, forM_, when)
+import Control.Monad.Identity (Identity(..))
+import Data.Monoid (Any(..))
+import System.Directory (doesFileExist, listDirectory)
 import System.FilePath ((</>), takeExtension)
-import Test.Hspec
 
-import Data.Comp.Multi
-import Data.Comp.Multi.Strategic
+import Test.Hspec (Spec, describe, expectationFailure, it, runIO, shouldSatisfy)
 
-import TreeSitter.SuiMove (tree_sitter_sui_move, getTestDir)
+import Data.Comp.Multi (project)
+import Data.Comp.Multi.Strategic (foldtdT)
+
+import TreeSitter.SuiMove (getTestDir, tree_sitter_sui_move)
+
+import Cubix.Language.SuiMove.IPS (MSuiMoveTerm, translate)
 import Cubix.Language.SuiMove.ParsePretty (parse)
-import Cubix.Language.SuiMove.IPS (translate, MSuiMoveTerm)
 
-import BannedConstructorTH (mkHasBanned, bannedCons)
+import BannedConstructorTH (bannedCons, mkHasBanned)
 
 $(mkHasBanned bannedCons)
 

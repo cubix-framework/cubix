@@ -1,21 +1,18 @@
 {-# LANGUAGE RecordWildCards #-}
 module Cubix.TreeSitter where
 
-import Data.ByteString qualified as BS
 import Control.Monad (unless)
-import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Reader (ReaderT, ask, asks)
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS (readFile)
 import Data.IORef (IORef, newIORef, readIORef)
-import Foreign.C.ConstPtr.Compat (ConstPtr (..))
-import TreeSitter qualified as TS
 
-import Cubix.Language.Info
-  ( SourcePos (..)
-  , SourceSpan (..)
-  , SourceRange (..)
-  , mkSourceSpan
-  )
+import Control.Monad.Catch (MonadMask, bracket)
+import Control.Monad.Trans.Reader (ReaderT, ask, asks)
+import Foreign.C.ConstPtr.Compat (ConstPtr (..))
+import TreeSitter qualified as TS (Language, Node, Parser, Point (..), Tree, nodeEndByte, nodeEndPoint, nodeStartByte, nodeStartPoint, parserLanguage, parserNew, parserParseByteString, parserSetLanguage, unsafeLanguageDelete, unsafeParserDelete, unsafeToLanguage)
+
+import Cubix.Language.Info (SourcePos (..), SourceRange (..), SourceSpan (..), mkSourceSpan)
 
 nodeRange :: TS.Node -> IO SourceRange
 nodeRange node = do
@@ -64,7 +61,7 @@ data TreeSitterEnv = TreeSitterEnv
   , tsLanguage :: IORef TS.Language
   , filepath :: FilePath
   , tsTree :: IORef TS.Tree
-  , source :: BS.ByteString
+  , source :: ByteString
   }
 
 newTreeSitterEnv
@@ -101,6 +98,6 @@ getFilePath :: ReaderT TreeSitterEnv IO FilePath
 getFilePath = asks filepath
 {-# INLINEABLE getFilePath #-}
 
-getSource :: ReaderT TreeSitterEnv IO BS.ByteString
+getSource :: ReaderT TreeSitterEnv IO ByteString
 getSource = asks source
 {-# INLINEABLE getSource #-}

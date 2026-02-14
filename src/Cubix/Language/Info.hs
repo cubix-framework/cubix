@@ -60,29 +60,26 @@ module Cubix.Language.Info
 
   ) where
 
-import Control.Concurrent.Supply ( Supply, newSupply, freshId, splitSupply )
+import Control.Concurrent.Supply ( Supply, freshId, newSupply, splitSupply )
 import Control.DeepSeq ( NFData(..) )
-import Control.DeepSeq.Generics ( genericRnf )
-import Control.Lens ( Lens', (&), (.~), (^.), use, (.=) )
-import Control.Lens.TH ( makeClassy, makeLenses )
-import Control.Monad ( liftM, forM_ )
+import Control.Monad ( forM_, liftM )
 import Control.Monad.IO.Class ( MonadIO(..) )
-import Control.Monad.State ( MonadState, StateT(..), state, runState, evalStateT )
+import Control.Monad.State ( MonadState, StateT(..), evalStateT, runState, state )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
-
 import Data.Data ( Data )
-import Data.Hashable ( Hashable )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Typeable ( Typeable )
-
 import GHC.Generics ( Generic )
-
 import System.IO.Unsafe ( unsafePerformIO )
 
-import Data.Aeson ( ToJSON, FromJSON )
+import Control.DeepSeq.Generics ( genericRnf )
+import Control.Lens ( Lens', (&), (.=), (.~), (^.), use )
+import Control.Lens.TH ( makeClassy, makeLenses )
+import Data.Aeson ( FromJSON, ToJSON )
+import Data.Hashable ( Hashable )
 
-import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
+import Data.Comp.Multi ( All, AnnHFix, AnnTerm, Context, Cxt(..), CxtFunM, E(..), HFix, HFoldable, HFunctor, HTraversable, Term, (:<:), (:&:)(..), appCxt, inj, rewriteEM )
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM, annotateOuter )
 

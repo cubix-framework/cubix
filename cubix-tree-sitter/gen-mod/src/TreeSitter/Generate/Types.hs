@@ -1,7 +1,7 @@
 module TreeSitter.Generate.Types where
 
 import Data.Map (Map)
-import Data.String (IsString)
+import Data.String (IsString (..))
 import Data.Text (Text)
 
 newtype Name = Name { getName :: Text }
