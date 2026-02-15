@@ -140,10 +140,30 @@ instance Trans Modularized.HiddenExpression where
 
 -------- Block
 
+-- | Translate a single BlockItem to a parametric BlockItemL
+--
+-- If the block item contains a LetStatement, we translate it to SingleLocalVarDecl
+-- and use SingleLocalVarDeclIsBlockItem injection so that the hoist transformation
+-- can find and extract it.
+--
+-- For other block items (expressions), we preserve the original structure wrapped
+-- in BlockItemIsBlockItem.
+transBlockItem :: Modularized.MoveTerm Modularized.BlockItemL -> MSuiMoveTerm P.BlockItemL
+transBlockItem (Modularized.BlockItem' internal _semi) =
+  case internal of
+    Modularized.BlockItemInternal0LetStatement' letStmt ->
+      -- Translate the let statement to SingleLocalVarDecl and inject directly
+      iSingleLocalVarDeclIsBlockItem $ transLetStatement letStmt
+    _ ->
+      -- For expressions, wrap the translated block item in BlockItemIsBlockItem
+      let blockItem :: Modularized.MoveTerm Modularized.BlockItemL
+          blockItem = Modularized.iBlockItem internal Modularized.iSemicolonTok
+      in iBlockItemIsBlockItem $ translate blockItem
+
 transBlock :: Modularized.MoveTerm Modularized.BlockL -> MSuiMoveTerm P.BlockL
 transBlock (Modularized.Block' _ useDecls blockItems maybeExpr _) =
   let translatedUseDecls = map (iUseDeclarationIsBlockItem . translate') (P.extractF useDecls)
-      translatedBlockItems = map (iBlockItemIsBlockItem . translate') (P.extractF blockItems)
+      translatedBlockItems = map transBlockItem (P.extractF blockItems)
       allItems = P.insertF $ translatedUseDecls ++ translatedBlockItems
       blockEnd = iSuiMoveBlockEnd (P.mapF (injF . translate) maybeExpr)
   in P.Block' allItems blockEnd

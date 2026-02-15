@@ -16,6 +16,7 @@ import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive (createSortInclusionInfers, createSortInclusionTypes, deriveAll, deriveAllButSortInjection)
 import Cubix.Language.Parametric.InjF (InjF(..), InjectableSorts)
 import Cubix.Language.Parametric.Syntax qualified as Parametric
+import Cubix.ParsePretty (RootSort)
 
 import Cubix.Language.SuiMove.Modularized as Modularized
 
@@ -327,3 +328,6 @@ instance {-# OVERLAPPING #-} InjF MSuiMoveSig Parametric.AssignL Parametric.Bloc
 -- InjectableSorts for hoist transformation support
 type instance InjectableSorts MSuiMoveSig Parametric.SingleLocalVarDeclL = '[Parametric.BlockItemL]
 type instance InjectableSorts MSuiMoveSig Parametric.AssignL = '[Parametric.BlockItemL]
+
+-- RootSort for ParseFile typeclass support
+type instance RootSort MSuiMoveSig = Modularized.SourceFileL
