@@ -13,7 +13,7 @@ bug-reports:   https://github.com/cubix-framework/cubix/issues
 extra-source-files:
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/grammar.js
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/package.json
-  vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c
+  cbits/parser.c
   cbits/tree_sitter/tree-sitter-move.h
   cbits/tree_sitter/alloc.h
   cbits/tree_sitter/array.h
@@ -65,5 +65,5 @@ library
   includes:
     tree_sitter/tree-sitter-move.h
   c-sources:
-    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c
+    cbits/parser.c
 
