@@ -30,7 +30,7 @@ import Language.Haskell.TH.Lib ( conP, conT, varE, varP )
 import Language.Haskell.TH.Syntax ( Bang(..), BndrVis(..), Body(..), Con(..), Dec(..), Exp, Info(..), Name, Overlap(..), Pat(..), Q, SourceStrictness(..), SourceUnpackedness(..), TyVarBndr(..), Type(..), mkName, nameBase, newName, reify )
 
 import Data.Comp.Multi ( All, HFunctor, (:-<:), project' )
-import Data.Comp.Multi.Derive ( derive, makeEqHF, makeHFoldable, makeHFunctor, makeHTraversable, makeOrdHF, makeShowHF, patternSynonyms, smartConstructors )
+import Data.Comp.Multi.Derive ( derive, makeConstrNameHF, makeEqHF, makeHFoldable, makeHFunctor, makeHTraversable, makeOrdHF, makeShowHF, patternSynonyms, smartConstructors )
 import Data.Comp.Multi.Strategy.Derive ( makeDynCase )
 
 import Cubix.Language.Parametric.InjF
@@ -59,20 +59,20 @@ makeIsSortInjection tName =
 deriveAll :: [Name] -> Q [Dec]
 deriveAll = derive
   [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
-  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors
   , makeDynCase, makeIsNotSortInjection
   ]
 
 deriveAllButSortInjection :: [Name] -> Q [Dec]
 deriveAllButSortInjection = derive
   [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
-  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors
   , makeDynCase
   ]
 
 deriveAllButDynCase :: [Name] -> Q [Dec]
 deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors]
+                    makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors]
 
 -- TODO: distributeAnnotation
 -- -- | Distributes an annotation over a sum

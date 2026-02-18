@@ -1,5 +1,5 @@
 name: cubix
-version: '0.7.0.15'
+version: '0.7.1.0'
 synopsis: A framework for multi-language transformation
 description: Please see README.md
 category: language
@@ -68,6 +68,7 @@ library:
   source-dirs: src
   exposed-modules:
   - Cubix.Analysis.Call.Trivial
+  - Cubix.Analysis.NodePairs
   - Cubix.Essentials
   - Cubix.Language.Info
   - Cubix.Language.C.Parametric.Common
@@ -79,7 +80,9 @@ library:
   - Cubix.Language.JavaScript.Parametric.Common
   - Cubix.Language.JavaScript.Parametric.Full
   - Cubix.Language.Lua.Parametric.Common
+  - Cubix.Language.Lua.Parametric.Common.Types
   - Cubix.Language.Lua.Parametric.Full
+  - Cubix.Language.Lua.Parametric.Full.Types
   - Cubix.Language.Parametric.Derive
   - Cubix.Language.Parametric.InjF
   - Cubix.Language.Parametric.ProgInfo
@@ -108,7 +111,9 @@ library:
   - constraints
   - data-default
   - deepseq-generics
+  - directory
   - fgl
+  - filepath
   - hashable
   - language-c
   - language-dot
@@ -118,6 +123,7 @@ library:
   - language-python
   - lens
   - MonadRandom
+  - parallel
   - process
   - random
   - solidity
@@ -138,12 +144,26 @@ tests:
     dependencies:
      - base
      - compstrat
-     - containers     
+     - containers
      - cubix
      - cubix-compdata
      - deepseq
      - directory
      - filepath
-     - hedgehog
      - lens
      - mtl
+  unit-tests:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+     - base
+     - containers
+     - cubix
+     - hspec
+     - temporary
+    build-tools:
+     - hspec-discover

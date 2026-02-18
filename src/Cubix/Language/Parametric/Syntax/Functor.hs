@@ -64,7 +64,7 @@ module Cubix.Language.Parametric.Syntax.Functor
   ) where
 
 import Data.Comp.Multi ( HFunctor, (:<:), Sum, (:&:), Cxt(..), Context, K(..), unK, inject, project, project', RemA(..), NotSum, HFix, caseCxt, All, CxtS, (:-<:) )
-import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
+import Data.Comp.Multi.Derive ( derive, makeConstrNameHF, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF )
 
 import Data.Comp.Multi.Strategy.Classification
 
@@ -343,7 +343,7 @@ riRightF :: (EitherF :<: f, Typeable i, Typeable j) => Cxt h f a j -> Cxt h f a 
 riRightF = inject . RightF
 
 $(derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF ]
+                    makeOrdHF, makeConstrNameHF ]
        [''MaybeF, ''ListF, ''PairF, ''TripleF, ''EitherF])
 
 --------------------------------------------------------------------------------

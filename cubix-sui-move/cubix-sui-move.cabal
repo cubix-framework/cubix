@@ -67,7 +67,7 @@ common dependencies
     , vector >= 0.13.2.0
     , pretty-simple
 
-executable parse
+executable driver
   import: language
   import: ghc-options
   import: dependencies
@@ -97,6 +97,32 @@ library
     Cubix.Language.SuiMove.IPS.Trans
     Cubix.Language.SuiMove.IPS.Types
     Cubix.Language.SuiMove.Modularized
+
+executable sui-move-examples
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: examples
+  main-is: Main.hs
+  other-modules:
+    Examples.Shared
+    Examples.ListIdentifiers
+    Examples.SortFunctions
+    Examples.CountCalls
+    Examples.SortByMutAssigns
+    Examples.UnusedImports
+    Examples.FunctionSize
+    Examples.PublicNoReturn
+    Examples.RenameIdent
+    Examples.StructAbilities
+    Examples.ConstantSummary
+  ghc-options:
+    -O0
+  build-depends:
+    , cubix-sui-move
+    , optparse-applicative ^>= 0.18
+    , directory >= 1.3
+    , filepath >= 1.4
 
 test-suite unit-tests
   import: language

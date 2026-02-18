@@ -1,10 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Control.Monad.Identity ( runIdentity )
 
 import Data.Char ( toLower )
 import Data.List ( intercalate )
+import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
 
 import Options.Applicative
   ( Parser, ParserInfo, execParser, fullDesc, help, helper, info, metavar
@@ -16,11 +19,13 @@ import Text.Pretty.Simple ( pPrintLightBg )
 
 import TreeSitter.SuiMove ( tree_sitter_sui_move )
 
+import Cubix.Analysis.NodePairs ( NodePair(..), countNodePairsInFolder, possibleNodePairs )
 import Cubix.ParsePretty ( ParseFile(..) )
 import Cubix.Transformations.Hoist ( hoistDeclarations )
 
 import Cubix.Language.SuiMove.IPS ( untranslate, MSuiMoveSig )
 import Cubix.Language.SuiMove.IPS.Hoist ()
+import Cubix.Language.SuiMove.Modularized ( MoveSig )
 import Cubix.Language.SuiMove.ParsePretty ()  -- Import for ParseFile instance
 import Cubix.Language.SuiMove.Pretty qualified as Pretty
 import Cubix.Language.SuiMove.RawParse qualified as RawParse
@@ -49,18 +54,23 @@ optionsInfo =
     (fullDesc <> progDesc description)
 
 -- | Available actions
-aPrintAst, aPrintIps, aHoist, aPretty, aRoundTrip :: String
-aPrintAst  = "print-ast"
-aPrintIps  = "print-ips"
-aHoist     = "hoist"
-aPretty    = "pretty"
-aRoundTrip = "round-trip"
+aPrintAst, aPrintIps, aHoist, aPretty, aRoundTrip, aNodePairs, aPossiblePairs :: String
+aPrintAst      = "print-ast"
+aPrintIps      = "print-ips"
+aHoist         = "hoist"
+aPretty        = "pretty"
+aRoundTrip     = "round-trip"
+aNodePairs     = "node-pairs"
+aPossiblePairs = "possible-pairs"
 
 actionsList :: [String]
-actionsList = [aPrintAst, aPrintIps, aHoist, aPretty, aRoundTrip]
+actionsList = [aPrintAst, aPrintIps, aHoist, aPretty, aRoundTrip, aNodePairs, aPossiblePairs]
 
 description :: String
 description = "Sui Move parser and transformation tool for Cubix."
+
+suiMovePossiblePairs :: Set.Set NodePair
+suiMovePossiblePairs = $(possibleNodePairs ''MoveSig)
 
 downcase :: String -> String
 downcase = map toLower
@@ -132,6 +142,20 @@ main = do
                 putStrLn "Round-trip FAILED: ASTs differ"
                 putStrLn "Pretty-printed output:"
                 putStrLn prettyPrinted
+
+    _ | act == aNodePairs -> do
+      -- Count node pairs across all .move files in the given folder
+      let parseRaw path = RawParse.parse path tree_sitter_sui_move
+      counts <- countNodePairsInFolder @MoveSig suiMovePossiblePairs ".move" parseRaw inputFile
+      putStrLn "Node pair counts:"
+      let printPair (NodePair p c, count) =
+            putStrLn $ "  " ++ p ++ " -> " ++ c ++ ": " ++ show count
+      mapM_ printPair (Map.toList counts)
+
+    _ | act == aPossiblePairs -> do
+      putStrLn $ "Possible node pairs for Sui Move (" ++ show (Set.size suiMovePossiblePairs) ++ " pairs):"
+      let printPair (NodePair p c) = putStrLn $ "  " ++ p ++ " -> " ++ c
+      mapM_ printPair (Set.toList suiMovePossiblePairs)
 
     _ -> do
       putStrLn $ "Unknown action: " ++ action

@@ -692,16 +692,15 @@ pApplyType =
 
 pModuleAccess :: TermParser ModuleAccessL
 pModuleAccess =
-  -- Order matters: try longer/more specific patterns first
-  choice [ Megaparsec.try pModuleAccess1   -- $identifier
-         , Megaparsec.try pModuleAccess2   -- @identifier
-         , Megaparsec.try pModuleAccessMember  -- reserved identifier
-         , Megaparsec.try pModuleAccess9   -- module::id<types>::id (most specific)
-         , Megaparsec.try pModuleAccess6   -- module::id<types>
-         , Megaparsec.try pModuleAccess8   -- module<types>::id
-         , Megaparsec.try pModuleAccess5   -- hidden_mod<types>::id
-         , Megaparsec.try pModuleAccess7   -- module<types>
-         , Megaparsec.try pModuleAccess4   -- identifier<types> (least specific, try last)
+  choice [ Megaparsec.try pModuleAccess1
+         , Megaparsec.try pModuleAccess2
+         , Megaparsec.try pModuleAccessMember
+         , Megaparsec.try pModuleAccess4
+         , Megaparsec.try pModuleAccess5
+         , Megaparsec.try pModuleAccess6
+         , Megaparsec.try pModuleAccess7
+         , Megaparsec.try pModuleAccess8
+         , Megaparsec.try pModuleAccess9
          ]
   where
     pModuleAccess1 :: TermParser ModuleAccessL
@@ -1584,7 +1583,7 @@ pSpecApplyPatternInternal0 =
       SpecApplyPatternInternal0Public' <$> pSort @PublicTokL "public_tok"
     pSpecApplyPatternInternal0Internal :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Internal =
-      SpecApplyPatternInternal0Internal' <$> pInternalTok
+      SpecApplyPatternInternal0Internal' <$> pSort @InternalTokL "internal"
 
 pSpecCondition :: TermParser SpecConditionL
 pSpecCondition =
