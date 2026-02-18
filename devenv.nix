@@ -3,14 +3,17 @@
 let
   unstable = import inputs.unstable {
     config.allowUnfree = true;
-    system = pkgs.stdenv.system;
+    localSystem = pkgs.stdenv.system;
   };
 
 in {
   packages = with pkgs; [
+    fourmolu
+    jq
+    gdb
     ghcid
     git
-    unstable.claude-code
+    tree-sitter
   ];
 
   # This sets gcc version brought into env by languages.c option
@@ -28,7 +31,11 @@ in {
     #                  one are needed
     c.enable = true;
     java.enable = true;
-    javascript.enable = true;
+    # tree-sitter needs node in path
+    javascript = {
+      enable = true;
+      npm.enable = true;
+    };
     lua = {
       enable = true;
       package = pkgs.lua53Packages.lua;
@@ -37,6 +44,41 @@ in {
 
     # test running is in ruby
     ruby.enable = true;
+  };
+
+  scripts = {
+    gen-sui-ast.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-ast -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Language.SuiMove.Syntax \
+        -o cubix-sui-move/src/Language/SuiMove/Syntax.hs
+      popd
+    '';
+
+    gen-sui-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Cubix.Language.SuiMove.Modularized \
+        --token-map cubix-sui-move/preserved_tokens.json \
+        -o cubix-sui-move/src/Cubix/Language/SuiMove/Modularized.hs
+      popd
+    '';
+
+    gen-sui-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-sui-move/vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/grammar.json \
+        --start-rule-name source_file \
+        --module-name Cubix.Language.SuiMove.ParsePretty \
+        --token-map cubix-sui-move/preserved_tokens.json \
+        -o cubix-sui-move/src/Cubix/Language/SuiMove/ParsePretty.hs
+      popd
+    '';
+
   };
 
   env = {

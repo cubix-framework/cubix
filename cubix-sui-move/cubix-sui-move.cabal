@@ -1,0 +1,150 @@
+cabal-version: 3.4
+name:          cubix-sui-move
+version:       1.0.2
+synopsis:      Cubix support for Move smart contract language
+description:   Cubix support for Move smart contract language
+category:      Language
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Jakub Kopański
+maintainer:    jakub@up-to-speed.ai
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+
+tested-with:
+  GHC == 9.8.4
+
+common language
+  default-language: GHC2021
+  default-extensions:
+    ApplicativeDo
+    DataKinds
+    DefaultSignatures
+    DerivingStrategies
+    FunctionalDependencies
+    GADTs
+    LambdaCase
+    MultiWayIf
+    NamedFieldPuns
+    OverloadedStrings
+    PatternSynonyms
+    QuasiQuotes
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+    ViewPatterns
+
+common ghc-options
+  ghc-options:
+    -W
+    -fno-warn-unused-foralls
+    -freduction-depth=400
+
+common dependencies
+  build-depends:
+    , base >= 4.19.2.0
+    , base-compat-constptr
+    , constraints
+    , bytestring ^>= 0.12
+    , containers >= 0.6.8
+    , compstrat ^>= 0.1.0.3
+    , comptrans >= 0.1.0.7
+    , cubix >= 0.7.0.15
+    , cubix-compdata >= 1.0.2
+    , cubix-tree-sitter
+    , ghc-prim >= 0.11.0
+    , hs-tree-sitter ^>= 13
+    , megaparsec ^>= 9.6
+    , mtl ^>= 2.3
+    , parser-combinators ^>= 1.3
+    , prettyprinter ^>= 1.7
+    , streaming ^>= 0.2.4
+    , template-haskell >= 2.21.0.0
+    , text >= 2.1.2
+    , transformers ^>= 0.6
+    , tree-sitter-sui-move
+    , wl-pprint ^>= 1.2
+    , vector >= 0.13.2.0
+    , pretty-simple
+
+executable driver
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: app
+  main-is: Main.hs
+  ghc-options:
+    -O0
+  build-depends:
+    , cubix-sui-move
+    , optparse-applicative ^>= 0.18
+    , ghc-debug-stub
+    , temporary ^>= 1.3
+
+library
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: src
+  ghc-options:
+    -O0
+  exposed-modules:
+    Cubix.Language.SuiMove.RawParse
+    Cubix.Language.SuiMove.ParsePretty
+    Cubix.Language.SuiMove.Pretty
+    Cubix.Language.SuiMove.IPS
+    Cubix.Language.SuiMove.IPS.Hoist
+    Cubix.Language.SuiMove.IPS.Trans
+    Cubix.Language.SuiMove.IPS.Types
+    Cubix.Language.SuiMove.Modularized
+
+executable sui-move-examples
+  import: language
+  import: ghc-options
+  import: dependencies
+  hs-source-dirs: examples
+  main-is: Main.hs
+  other-modules:
+    Examples.Shared
+    Examples.ListIdentifiers
+    Examples.SortFunctions
+    Examples.CountCalls
+    Examples.SortByMutAssigns
+    Examples.UnusedImports
+    Examples.FunctionSize
+    Examples.PublicNoReturn
+    Examples.RenameIdent
+    Examples.StructAbilities
+    Examples.ConstantSummary
+  ghc-options:
+    -O0
+  build-depends:
+    , cubix-sui-move
+    , optparse-applicative ^>= 0.18
+    , directory >= 1.3
+    , filepath >= 1.4
+
+test-suite unit-tests
+  import: language
+  import: ghc-options
+  import: dependencies
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  other-modules:
+    BannedConstructorTH
+    BannedConstructorsSpec
+    TransRoundtripSpec
+  build-depends:
+    , compstrat
+    , cubix-sui-move
+    , hspec >= 2.11
+    , hspec-discover >= 2.11
+    , directory >= 1.3
+    , filepath >= 1.4
+  build-tool-depends:
+    hspec-discover:hspec-discover >= 2.11
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N

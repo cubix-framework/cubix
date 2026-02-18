@@ -6,16 +6,22 @@
 module Cubix.Language.Info
   (
     -- ** SourcePos
-    SourcePos
+    SourcePos (..)
   , sourceFile
   , sourceRow
   , sourceCol
 
     -- ** SourceSpan
-  , SourceSpan
+  , SourceSpan (..)
   , sourceStart
   , sourceEnd
   , mkSourceSpan
+
+    -- ** SourceRange
+  , SourceRange (..)
+  , rangeStart
+  , rangeEnd
+  , rangeLength
 
     -- ** Attrs
   , Attrs
@@ -54,29 +60,26 @@ module Cubix.Language.Info
 
   ) where
 
-import Control.Concurrent.Supply ( Supply, newSupply, freshId, splitSupply )
+import Control.Concurrent.Supply ( Supply, freshId, newSupply, splitSupply )
 import Control.DeepSeq ( NFData(..) )
-import Control.DeepSeq.Generics ( genericRnf )
-import Control.Lens ( Lens', (&), (.~), (^.), use, (.=) )
-import Control.Lens.TH ( makeClassy, makeLenses )
-import Control.Monad ( liftM, forM_ )
+import Control.Monad ( forM_, liftM )
 import Control.Monad.IO.Class ( MonadIO(..) )
-import Control.Monad.State ( MonadState, StateT(..), state, runState, evalStateT )
+import Control.Monad.State ( MonadState, StateT(..), evalStateT, runState, state )
 import Control.Monad.Trans.Maybe ( MaybeT(..) )
-
 import Data.Data ( Data )
-import Data.Hashable ( Hashable )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Typeable ( Typeable )
-
 import GHC.Generics ( Generic )
-
 import System.IO.Unsafe ( unsafePerformIO )
 
-import Data.Aeson ( ToJSON, FromJSON )
+import Control.DeepSeq.Generics ( genericRnf )
+import Control.Lens ( Lens', (&), (.=), (.~), (^.), use )
+import Control.Lens.TH ( makeClassy, makeLenses )
+import Data.Aeson ( FromJSON, ToJSON )
+import Data.Hashable ( Hashable )
 
-import Data.Comp.Multi ( AnnTerm, AnnHFix, All, Cxt(..), Context, appCxt, Term, (:&:)(..), (:<:), CxtFunM, inj, HTraversable, E(..), rewriteEM, HFix , HFunctor, HFoldable)
+import Data.Comp.Multi ( All, AnnHFix, AnnTerm, Context, Cxt(..), CxtFunM, E(..), HFix, HFoldable, HFunctor, HTraversable, Term, (:<:), (:&:)(..), appCxt, inj, rewriteEM )
 
 import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM, annotateOuter )
 
@@ -128,6 +131,38 @@ makeClassy ''SourceSpan
 mkSourceSpan :: String -> (Int, Int ) -> (Int, Int) -> SourceSpan
 mkSourceSpan fileName (sRow, sCol) (eRow, eCol) = SourceSpan (SourcePos fileName sRow sCol)
                                                              (SourcePos fileName eRow eCol)
+
+
+--------------------------------------------------------------------------------
+--------------------------------- SourceSpan -----------------------------------
+--------------------------------------------------------------------------------
+
+data SourceRange = SourceRange
+  { _rangeStart :: !Int
+  , _rangeEnd   :: !Int
+  }
+  deriving (Eq, Ord, Read, Show, Typeable, Data, Generic)
+
+instance NFData SourceRange where rnf = genericRnf
+instance Hashable SourceRange
+instance ToJSON SourceRange
+instance FromJSON SourceRange
+
+instance Semigroup SourceRange where
+  SourceRange start1 end1 <> SourceRange start2 end2 = SourceRange (min start1 start2) (max end1 end2)
+
+makeClassy ''SourceRange
+
+point :: Int -> SourceRange
+point i = SourceRange i i
+
+-- | Return the length of the range.
+rangeLength :: SourceRange -> Int
+rangeLength range = _rangeEnd range - _rangeStart range
+
+subtractRange :: SourceRange -> SourceRange -> SourceRange
+subtractRange (SourceRange start1 end1) (SourceRange start2 end2) =
+  SourceRange start1 (end1 - rangeLength (SourceRange start2 (max end1 end2)))
 
 
 --------------------------------------------------------------------------------
