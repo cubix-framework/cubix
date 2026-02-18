@@ -1,0 +1,29 @@
+{
+  "grammars": [
+    {
+      "name": "move",
+      "camelcase": "MOVE",
+      "scope": "source.move",
+      "path": ".",
+      "file-types": null,
+      "injection-regex": "^move$"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "license": "Apache-2.0",
+    "description": "Tree sitter parser for Move",
+    "links": {
+      "repository": "https://github.com/MystenLabs/sui"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": false,
+    "swift": false,
+    "haskell": true
+  }
+}

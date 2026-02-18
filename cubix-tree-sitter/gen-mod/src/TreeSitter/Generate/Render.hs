@@ -12,29 +12,30 @@
 module TreeSitter.Generate.Render where
 
 import Data.Char (isAlphaNum, toLower, toUpper)
+import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (..))
 import Data.List (uncons)
-import Data.Map qualified as Map
+import Data.List.NonEmpty qualified as NonEmpty (toList)
+import Data.Map qualified as Map (elems, fromList, mapWithKey, singleton)
 import Data.Maybe (fromMaybe)
-import Data.Set qualified as Set
+import Data.Set qualified as Set (fromList, toList)
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Data.Text qualified as Text
-import Data.Text.Lazy qualified as Text.Lazy
+import Data.Text qualified as Text (head, length, lines, pack, unlines, unpack)
+import Data.Text.Lazy qualified as Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (Builder)
-import Data.Text.Lazy.Builder qualified as Builder
-import Unicode.Char.General qualified as Unicode
-import Unicode.Char.General.Names qualified as Unicode
+import Data.Text.Lazy.Builder qualified as Builder (fromText, toLazyText)
+
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
+import Unicode.Char.General qualified as Unicode (isWhiteSpace)
+import Unicode.Char.General.Names qualified as Unicode (name)
 
 import TreeSitter.Generate.Data
-import TreeSitter.Generate.Parser (Parser (..), mkParser)
-import TreeSitter.Grammar (Grammar (..), RuleName)
-
--- import Text.Pretty.Simple
--- import System.IO.Unsafe (unsafePerformIO)
+import TreeSitter.Generate.Parser
+import TreeSitter.Generate.Types
+import TreeSitter.Grammar
 
 data Metadata = Metadata
   { startRuleName :: RuleName
@@ -44,8 +45,8 @@ data Metadata = Metadata
 
 data RenderState = InText | InTemplate [Text]
 
-renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> TokenMap -> Either String Text
-renderSyntax Metadata{..} grammar templateFile template tokenMap =
+renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> Either String Text
+renderSyntax Metadata{..} grammar templateFile template =
   {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
@@ -56,16 +57,16 @@ renderSyntax Metadata{..} grammar templateFile template tokenMap =
       , ("moduleName", textToVal $ fromMaybe defaultModuleName moduleName)
       , ("pretty", BoolVal pretty)
       ]
-  tokens = Map.mapWithKey
-    (\k v -> MapVal . Context . Map.fromList $
-      [ ("name", toVal . Name $ fromMaybe k v)
-      , ("symbol", textToVal k)])
-    tokenMap
-  tokensCtx = Context . Map.singleton "tokens" . toVal
-    $ Map.elems tokens
-  nodes = Map.elems $ Map.mapWithKey (topRuleToNode tokenMap grammar.rules) grammar.rules
-  nodes' = {- unsafePerformIO (pPrintLightBg nodes) `seq` -} nodes `reachable` Name startRuleName
-  reachable = reachableFrom tokenMap
+  nodes  = Map.elems $ Map.mapWithKey (topRuleToNode grammar.rules) grammar.rules
+  nodes' = nodes `reachableFrom` Name startRuleName
+
+  -- Collect all tokens from grammar rules by traversing them with catamorphism
+  tokens = mconcat $ tokensOfRule <$> Map.elems grammar.rules
+  tokensCtx = Context . Map.singleton "tokens" . toVal $ Set.toList tokens <&> (\k ->
+    MapVal . Context . Map.fromList $
+      [ ("name", toVal (Name (k <> "_tok")))
+      , ("symbol", textToVal k)
+      ])
 
   nodesCtx = Context . Map.fromList $
     [ ("data", toVal nodes')
@@ -96,7 +97,7 @@ renderTemplate templateFile templateText context =
   line :: Text -> Builder
   line ln = Builder.fromText (ln <> "\n")
 
-  template :: [Text] -> Either String Builder.Builder
+  template :: [Text] -> Either String Builder
   template acc = do
     let tpl = Text.unlines . reverse $ acc
     (doc :: Doc Text) <- runIdentity (applyTemplate templateFile tpl context)
@@ -135,13 +136,14 @@ instance ToContext Text (Name, Constructor) where
   toVal :: (Name, Constructor) -> Val Text
   toVal = MapVal . toContext
   toContext :: (Name, Constructor) -> Context Text
-  toContext (sort, Constructor name fields) =
+  toContext (sort, Constructor name fields cParser) =
     Context . Map.fromList $
       [ ("name", toVal $ Name name)
       , ("type", toVal sort)
       , ("fields", ListVal (toVal <$> zip [(0 :: Int) ..] fields))
       , ("hasChildren", toVal hasChildren)
-      ] 
+      , ("parser", toVal cParser)
+      ]
    where
     hasChildren :: Bool
     hasChildren = any (isNodeLike . fType) fields
@@ -154,7 +156,6 @@ instance ToContext Text (Int, Field) where
     Context . Map.fromList $
       [ ("name", maybe NullVal toVal (fieldName field))
       , ("type", toVal (fType field))
-      , ("parser", toVal (mkParser (fType field)))
       , ("index", SimpleVal . fromString . show $ index)
       ]
 
@@ -196,17 +197,43 @@ instance ToContext Text Parser where
   toVal = textToVal . Text.Lazy.toStrict . Builder.toLazyText . p2t False
    where
     par b t = if b then "(" <> t <> ")" else t
+    hasSymbol :: Name -> Bool
+    hasSymbol (getName -> n) = not $ isHidden n || isInternal n
     p2t p = \case
-      Symbol name -> Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
-      Inline name -> Builder.fromText ("p" <> snakeToCase Upper (hiddenName name))
-      Alt a b -> par p ("pEither " <> p2t True a <> " " <> p2t True b)
-      -- Choice ps -> "
+      Symbol name -> par p $ name2psort name
+      Inline name -> par p $ name2psort name
+      Tok t -> par p $ name2psort (Name $ t <> "_tok")
+      -- Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
+      Seq ps -> mconcat $ intersperseBy (p2t False) inspect (NonEmpty.toList ps)
+        -- mconcat (p2t False <$> NonEmpty.toList ps)
+      Pair a b -> par p ("pPair "<> p2t True a <> " " <> p2t True b)
       Optional a -> par p ("pMaybe " <> p2t True a)
       Many ps -> par p ("pMany " <> p2t True ps)
       Some ps -> par p ("pSome " <> p2t True ps)
-      Pair a b -> par p ("pPair " <> p2t True a <> " " <> p2t True b)
-      Skip -> Builder.fromText "pure ()"
-      Extract -> "pText"
+      Skip -> Builder.fromText "Megaparsec.eof"
+      Extract -> "pContent"
+      SepBy sep content -> par p ("pSepBy " <> p2t True content <> " " <> p2t True sep)
+      SepBy1 sep content -> par p ("pSepBy1 " <> p2t True content <> " " <> p2t True sep)
+      Between open close content -> par p ("pBetween " <> p2t True open <> " " <> p2t True close <> " " <> p2t True content)
+    inspect :: Parser -> Parser -> Builder
+    -- future
+    -- inspect (Tok _) _ = Builder.fromText " *> "
+    -- inspect _ (Tok _) = Builder.fromText " <* "
+    inspect _ _ = Builder.fromText " <*> "
+
+    name2psort name
+      | hasSymbol name =
+          "pSort @" <>
+          Builder.fromText (sortName name) <>
+          " \"" <>
+          Builder.fromText (getName name) <>
+          "\""
+      | otherwise = "p" <> Builder.fromText (snakeToCase Upper $ hiddenName name)
+
+    intersperseBy :: Monoid b => (a -> b) -> (a -> a -> b) -> [a] -> [b]
+    intersperseBy _ _ []     = mempty
+    intersperseBy g _ [x]    = [g x]
+    intersperseBy g f (x:y:xs) = g x : f x y : intersperseBy g f (y:xs)
 
 hiddenName :: Name -> Text
 hiddenName (getName -> n)
@@ -229,12 +256,17 @@ snakeToCase b = Text.pack . go b . Text.unpack
   go _ [] = []
   go a (c : cs) =
     if | c == '_' -> go Upper cs
-       | c == '-' -> go Upper cs
        | Unicode.isWhiteSpace c -> go Upper cs
        | isAlphaNum c -> c `to` a : go Keep cs
-       | Just n <- Unicode.name c -> go a ((toLower <$> n) ++ cs)
+       | Just n <- Unicode.name c -> go Upper $
+           -- Some unicode names use '-' as separator
+           (toLower <$> replaceChar '-' '_' n) ++ cs
        | otherwise -> go Upper cs
 
   to c Upper = toUpper c
   to c Lower = toLower c
   to c Keep = c
+
+replaceChar :: Char -> Char -> String -> String
+replaceChar needle new haystack = haystack <&> \c ->
+  if c == needle then new else c

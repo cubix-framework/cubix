@@ -65,11 +65,3 @@ constraints:
     language-dot == 0.1.2,
     wl-pprint == 1.2.1,
     alex-tools == 0.6.1
-
-package cubix-sui-move
-  ghc-options:
-    -threaded -rtsopts "-with-rtsopts=-N -qn1"
-    -g -debug
-    -finfo-table-map
-    -fdistinct-constructor-tables
-    -fprof-auto

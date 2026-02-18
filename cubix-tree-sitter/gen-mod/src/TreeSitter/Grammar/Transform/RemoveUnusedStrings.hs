@@ -4,10 +4,12 @@ module TreeSitter.Grammar.Transform.RemoveUnusedStrings (
   removeUnusedStrings
 ) where
 
-import Data.Functor.Foldable
 import Data.Map (Map)
-import Data.Map qualified as Map
-import TreeSitter.Generate.Data (TokenMap)
+import Data.Map qualified as Map (lookup)
+
+import Data.Functor.Foldable (Corecursive (..), Recursive (..), fold)
+
+import TreeSitter.Generate.Types
 import TreeSitter.Grammar
 
 removeUnusedStrings :: TokenMap -> Grammar -> Grammar

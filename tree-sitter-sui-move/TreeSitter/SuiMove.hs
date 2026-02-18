@@ -8,6 +8,7 @@ module TreeSitter.SuiMove
   ) where
 
 import Foreign.C.ConstPtr.Compat (ConstPtr (..))
+
 import Paths_tree_sitter_sui_move (getDataFileName)
 
 getNodeTypesPath :: IO FilePath

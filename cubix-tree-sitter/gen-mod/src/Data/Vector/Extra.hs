@@ -1,7 +1,7 @@
 module Data.Vector.Extra where
 
 import Data.Vector (Vector)
-import Data.Vector qualified as Vector
+import Data.Vector qualified as Vector (uncons)
 
 uncons2 :: Vector a -> Maybe (a, a, Vector a)
 uncons2 as

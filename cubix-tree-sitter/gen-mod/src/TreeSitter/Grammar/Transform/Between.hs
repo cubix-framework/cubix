@@ -4,11 +4,13 @@ module TreeSitter.Grammar.Transform.Between (
   between
 ) where
 
-import Data.Functor.Foldable
 import Data.Map (Map)
 import Data.Vector (Vector)
-import Data.Vector qualified as Vector
-import Data.Vector.Extra qualified as Vector
+import Data.Vector qualified as Vector (cons, length, tail, unsafeHead)
+
+import Data.Functor.Foldable (Corecursive (..), Recursive (..), fold)
+
+import Data.Vector.Extra
 import TreeSitter.Grammar
 
 between :: Grammar -> Grammar
@@ -26,9 +28,9 @@ betweenAlg (SeqRuleF members) =
  where
   go :: Vector Rule -> Vector Rule
   go rules
-    | Just (StringRule open, rule, StringRule close, rest) <- Vector.uncons3 rules =
+    | Just (StringRule open, rule, StringRule close, rest) <- uncons3 rules =
         Vector.cons (BetweenRule open rule close) $ go rest
-    | Just (a, b, c, rest) <- Vector.uncons3 rules =
+    | Just (a, b, c, rest) <- uncons3 rules =
         Vector.cons a $ go (Vector.tail rules)
     | otherwise = rules
 betweenAlg r = embed r

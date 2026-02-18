@@ -63,6 +63,7 @@ common dependencies
     , base-compat-constptr ^>=0.1
     , bytestring ^>= 0.12
     , containers >= 0.6.8
+    , compstrat ^>= 0.1.0.3
     , comptrans >= 0.1.0.7
     , cubix >= 0.7.0.15
     , cubix-compdata >= 1.0.2
@@ -76,7 +77,6 @@ common dependencies
     , path ^>= 0.9
     , path-io ^>= 1.6
     , recursion-schemes ^>= 5.2
-    , streaming ^>= 0.2.4
     , template-haskell >= 2.21.0.0
     , text >= 2.1.2
     , transformers ^>= 0.6
@@ -96,7 +96,6 @@ library
     -O0
   exposed-modules:
     Cubix.TreeSitter
-    Text.Megaparsec.TreeSitter
     Text.Megaparsec.Cubix
   
 library gen-internal
@@ -114,12 +113,14 @@ library gen-internal
     TreeSitter.Generate.Data
     TreeSitter.Generate.Parser
     TreeSitter.Generate.Render
+    TreeSitter.Generate.Types
     TreeSitter.Grammar
     TreeSitter.Grammar.Transform
     TreeSitter.Grammar.Transform.Between
     TreeSitter.Grammar.Transform.HoistDefinitions
-    TreeSitter.Grammar.Transform.SepBy
+    TreeSitter.Grammar.Transform.MergePatterns
     TreeSitter.Grammar.Transform.RemoveUnusedStrings
+    TreeSitter.Grammar.Transform.SepBy
     TreeSitter.Grammar.Transform.StripBlanks
 
 executable gen-mod

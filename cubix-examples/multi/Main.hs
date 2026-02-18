@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Main where
 
 import Control.Monad ( when, liftM, (<=<) )
@@ -6,7 +8,10 @@ import Control.Monad.Identity ( runIdentity )
 import Data.Char  ( toLower )
 import Data.List ( intercalate )
 import Data.Map ( Map )
+import Data.Map qualified as Map
 import Data.Maybe ( fromJust )
+import Data.Set ( Set )
+import Data.Set qualified as Set
 import System.Environment ( getArgs )
 import System.IO ( hClose )
 
@@ -32,6 +37,7 @@ import Cubix.Language.Python.Parametric.Common as PCommon
 import Cubix.Language.Solidity.IPS
 
 import Cubix.Analysis.Call.Trivial
+import Cubix.Analysis.NodePairs
 
 import Cubix.Transformations.Hoist
 import Cubix.Transformations.Plumbing.IPT
@@ -172,6 +178,25 @@ runTrivCallAnalysis (JSProj     p) = callAnalysis p
 --runTrivCallAnalysis (PythonProj p) = callAnalysis p
 runTrivCallAnalysis (LuaProj    p) = callAnalysis p
 
+runNodePairsAnalysis :: String -> FilePath -> IO (Map NodePair Int)
+runNodePairsAnalysis lang folder = case downcase lang of
+  "c"          -> countNodePairsInFolder (possiblePairsForLang "c")          ".c"    (parseFile @MCSig)      folder
+  "java"       -> countNodePairsInFolder (possiblePairsForLang "java")       ".java" (parseFile @MJavaSig)   folder
+  "javascript" -> countNodePairsInFolder (possiblePairsForLang "javascript") ".js"   (parseFile @MJSSig)     folder
+  "lua"        -> countNodePairsInFolder (possiblePairsForLang "lua")        ".lua"  (parseFile @MLuaSig)    folder
+  "python"     -> countNodePairsInFolder (possiblePairsForLang "python")     ".py"   (parseFile @MPythonSig) folder
+  _            -> error "Unrecognized language for node-pairs analysis"
+
+-- | Get the set of all possible node pairs for a language (statically computed)
+possiblePairsForLang :: String -> Set NodePair
+possiblePairsForLang lang = case downcase lang of
+  "c"          -> $(possibleNodePairs ''MCSig)
+  "java"       -> $(possibleNodePairs ''MJavaSig)
+  "javascript" -> $(possibleNodePairs ''MJSSig)
+  "lua"        -> $(possibleNodePairs ''MLuaSig)
+  "python"     -> $(possibleNodePairs ''MPythonSig)
+  _            -> error $ "Unrecognize language for possible node pairs: " <> lang
+
 runIpt :: LabelGen -> LangProj -> IO ()
 runIpt gen (CProj      p) = putProj =<< (CProj      <$> interproceduralPlumbingTransform gen p)
 runIpt gen (JavaProj   p) = putProj =<< (JavaProj   <$> interproceduralPlumbingTransform gen p)
@@ -198,11 +223,13 @@ transformsList = [tDebug, tId, tCfg, tElemHoist, tHoist, tTac, tTestcov, tPrintA
 isTransform :: String -> Bool
 isTransform a = elem a transformsList
 
-aTrivCall :: String
+aTrivCall, aNodePairs, aPossiblePairs :: String
 aTrivCall = "anal-triv-call"
+aNodePairs = "node-pairs"
+aPossiblePairs = "possible-pairs"
 
 analsList :: [String]
-analsList = [aTrivCall]
+analsList = [aTrivCall, aNodePairs, aPossiblePairs]
 
 isAnalysis :: String -> Bool
 isAnalysis a = elem a analsList
@@ -217,6 +244,23 @@ doAnal lang anal fils = do
   where
     go proj
          | anal == aTrivCall = print $ runTrivCallAnalysis proj
+         | anal == aNodePairs = error "node-pairs requires a folder, use doNodePairs"
+
+doNodePairs :: String -> FilePath -> IO ()
+doNodePairs lang folder = do
+  pairs <- runNodePairsAnalysis lang folder
+  putStrLn $ "Node pairs in " ++ folder ++ ":"
+  mapM_ printPair (Map.toList pairs)
+  where
+    printPair (NodePair p c, count) = putStrLn $ "  " ++ p ++ " -> " ++ c ++ ": " ++ show count
+
+doPossiblePairs :: String -> IO ()
+doPossiblePairs lang = do
+  let pairs = possiblePairsForLang lang
+  putStrLn $ "Possible node pairs for " ++ lang ++ " (" ++ show (Set.size pairs) ++ " pairs):"
+  mapM_ printPair (Set.toList pairs)
+  where
+    printPair (NodePair p c) = putStrLn $ "  " ++ p ++ " -> " ++ c
 
 doIpt :: String -> [FilePath] -> IO ()
 doIpt lang fils = do
@@ -248,13 +292,20 @@ doTransform language transform file = do
 
 main = do
   args <- getArgs
-  if length args < 3 then do
+  if length args < 2 then do
     when (length args == 0) $ putStrLn description
     putStrLn usage
    else
      let (language, cmd) = (downcase (args !! 0), downcase (args !! 1)) in
-     if isTransform cmd then
+     if cmd == aPossiblePairs then
+       -- possible-pairs only needs language, no file argument
+       doPossiblePairs language
+     else if length args < 3 then
+       putStrLn usage
+     else if isTransform cmd then
        doTransform language cmd (args !! 2)
+     else if cmd == aNodePairs then
+       doNodePairs language (args !! 2)
      else if isAnalysis cmd then
        doAnal language cmd (drop 2 args)
      else if cmd == "ipt" then

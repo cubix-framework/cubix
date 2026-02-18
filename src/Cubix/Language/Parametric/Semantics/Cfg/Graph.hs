@@ -53,32 +53,21 @@ module Cubix.Language.Parametric.Semantics.Cfg.Graph (
 
 import Control.DeepSeq ( NFData )
 import Control.Monad.State ( MonadState )
-
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Maybe ( fromJust, fromMaybe, isNothing, mapMaybe )
-
 import Data.Set ( Set )
 import qualified Data.Set as Set
-
 import GHC.Generics ( Generic )
 
-import Control.Lens ( (^.), (%~), (%=), (&), (?=), (&), (%~), at, ix, use, makeClassy, makeClassyFor )
+import Control.Lens ( (%=), (%~), (&), (?=), (^.), at, ix, makeClassy, makeClassyFor, use )
 
-import Data.Comp.Multi ( K(..), E(..), appSigFun, subterms, HFoldable, HFunctor(..), ShowHF, runE, Sum, EqHF, OrdHF, All )
+import Data.Comp.Multi ( All, E(..), EqHF, HFoldable, HFunctor(..), K(..), OrdHF, ShowHF, Sum, appSigFun, runE, subterms )
 import Data.Comp.Multi.Derive ( KShow(..) )
 
 import Cubix.Language.Info
 import Cubix.Language.Parametric.Semantics.SemanticProperties
-
 import Cubix.Sin.Compdata.Annotation ( getAnn, propAnnSigFun )
-
---------------------------------------------------------------------------------------
-
-instance KShow f => Show (E f) where
-  show (E x) = unK $ kshow x
-
---------------------------------------------------------------------------------------
 
 newtype CfgNodeType = CfgNodeType NodeEvaluationPoint
   deriving ( Eq, Ord, Show, Generic, NFData )

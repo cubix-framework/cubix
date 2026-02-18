@@ -5,19 +5,19 @@ module TreeSitter.Grammar.Transform.HoistDefinitions (
   hoistDefinitions
 ) where
 
-import Control.Exception (Exception, throw)
+import Control.Exception (Exception)
 import Control.Monad ((<=<))
-import Control.Monad.Reader (MonadReader, Reader, runReader, asks)
-import Control.Monad.State (MonadState, StateT, runStateT, modify', gets)
+import Control.Monad.Reader (MonadReader, Reader, asks, runReader)
+import Control.Monad.State (MonadState, StateT, gets, modify', runStateT)
 import Data.Bifunctor (second)
-import Data.Functor.Foldable hiding (hoist)
 import Data.Map (Map)
-import Data.Map qualified as Map
-import Data.Maybe (fromMaybe)
+import Data.Map qualified as Map (filter, insert, keys, mapAccumWithKey)
 import Data.Text (Text)
-import Data.Text qualified as Text
-import Data.Vector qualified as Vector
-import TreeSitter.Generate.Data (TokenMap)
+import Data.Text qualified as Text (show)
+import Data.Vector qualified as Vector (cons, empty, foldr')
+
+import Data.Functor.Foldable (Base, Corecursive (..), Recursive (..))
+
 import TreeSitter.Grammar
 
 newtype HoistError
@@ -32,8 +32,8 @@ cataM :: (Monad m, Traversable (Base t), Recursive t)
 cataM phi = h
   where h = phi <=< mapM h . project
 
-hoistDefinitions :: TokenMap -> Grammar -> Grammar
-hoistDefinitions preserved g@(Grammar {..}) = g { rules = hoistChoiceRules preserved rules }
+hoistDefinitions :: Grammar -> Grammar
+hoistDefinitions g@(Grammar {..}) = g { rules = hoistChoiceRules rules }
 
 data HoistState = HoistState
   { fresh :: Int
@@ -96,36 +96,24 @@ hoist name rule = do
   pure $ RefRule name
 
 extractDefs
-  :: TokenMap
-  -> Map RuleName Rule   -- ^ Already hoisted rules
+  :: Map RuleName Rule   -- ^ Already hoisted rules
   -> RuleName            -- ^ Rule or parent rule name
   -> Rule
   -> ( Rule              -- ^ Updated rule that references new name
      , Map RuleName Rule -- ^ All the choices to hoist
      )
-extractDefs preserved rules rulename =
+extractDefs rules rulename =
   let initial = HoistState 0 rules
       env = HoistEnv rulename rules
-   in runHoist initial env . cataM (extractDefsAlgM preserved)
+   in runHoist initial env . cataM extractDefsAlgM
 
-extractDefsAlgM :: TokenMap -> RuleF Rule -> HoistM Rule
-extractDefsAlgM preserved = \case
+extractDefsAlgM :: RuleF Rule -> HoistM Rule
+extractDefsAlgM = \case
   ChoiceRuleF {..} -> hoistDedup $ ChoiceRule membersF
-  -- rule@(AliasRuleF {..}) -> do
-  --   let name = case contentF of
-  --         SymbolRule sym -> valueF <> "_" <> sym
-  --         -- Unused strings should be removed by now
-  --         StringRule string ->
-  --           valueF <> "_" <> fromMaybe string
-  --             (fromMaybe (throw $ HoistErrorUnusedString string)
-  --              $ Map.lookup string preserved)
-  --         _ -> valueF
-  --   -- make new rule hidden so there is a chance it won't show up in the final AST
-  --   hoist (Text.cons '_' name) $ embed rule
   r -> pure $ embed r
 
-hoistChoiceRules :: TokenMap -> Map RuleName Rule -> Map RuleName Rule
-hoistChoiceRules preserved rules =
+hoistChoiceRules :: Map RuleName Rule -> Map RuleName Rule
+hoistChoiceRules rules =
   let (hoisted, updated) = Map.mapAccumWithKey go' rules rules
   in updated <> hoisted
   where
@@ -143,5 +131,5 @@ hoistChoiceRules preserved rules =
       _ -> go acc name rule
     go :: Map RuleName Rule -> RuleName -> Rule -> (Map RuleName Rule, Rule)
     go acc name rule =
-        let (rule', hoisted) = extractDefs preserved acc name rule
+        let (rule', hoisted) = extractDefs acc name rule
         in (acc <> hoisted, rule')

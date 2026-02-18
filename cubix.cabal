@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           cubix
-version:        0.7.0.15
+version:        0.7.1.0
 synopsis:       A framework for multi-language transformation
 description:    Please see README.md
 category:       language
@@ -23,6 +23,7 @@ flag only-one-language
 library
   exposed-modules:
       Cubix.Analysis.Call.Trivial
+      Cubix.Analysis.NodePairs
       Cubix.Essentials
       Cubix.Language.Info
       Cubix.Language.C.Parametric.Common
@@ -34,7 +35,9 @@ library
       Cubix.Language.JavaScript.Parametric.Common
       Cubix.Language.JavaScript.Parametric.Full
       Cubix.Language.Lua.Parametric.Common
+      Cubix.Language.Lua.Parametric.Common.Types
       Cubix.Language.Lua.Parametric.Full
+      Cubix.Language.Lua.Parametric.Full.Types
       Cubix.Language.Parametric.Derive
       Cubix.Language.Parametric.InjF
       Cubix.Language.Parametric.ProgInfo
@@ -79,11 +82,9 @@ library
       Cubix.Language.Lua.Parametric.Common.Cfg
       Cubix.Language.Lua.Parametric.Common.Semantics
       Cubix.Language.Lua.Parametric.Common.Trans
-      Cubix.Language.Lua.Parametric.Common.Types
       Cubix.Language.Lua.Parametric.Full.Exclusions
       Cubix.Language.Lua.Parametric.Full.Names
       Cubix.Language.Lua.Parametric.Full.Trans
-      Cubix.Language.Lua.Parametric.Full.Types
       Cubix.Language.Parametric.Path
       Cubix.Language.Parametric.Semantics.Cfg.CfgConstruction
       Cubix.Language.Parametric.Semantics.Cfg.CfgDot
@@ -105,6 +106,7 @@ library
       Cubix.Sin.Compdata.Instances
       Cubix.Transformations.Hoist.Custom
       Cubix.Transformations.Hoist.Elementary
+      Cubix.Transformations.Hoist.External
       Cubix.Transformations.Hoist.Hoisting
       Cubix.Transformations.TAC.Custom
       Cubix.Transformations.TAC.Gensym
@@ -167,7 +169,9 @@ library
     , data-default
     , deepseq
     , deepseq-generics
+    , directory
     , fgl
+    , filepath
     , hashable
     , language-c
     , language-dot
@@ -177,6 +181,7 @@ library
     , language-python
     , lens
     , mtl
+    , parallel
     , process
     , random
     , solidity
@@ -242,7 +247,7 @@ test-suite cfg-test
       TypeFamilyDependencies
       TypeOperators
       ViewPatterns
-  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=300
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -fcontext-stack=300
   build-depends:
       base
     , compstrat
@@ -261,13 +266,14 @@ test-suite cfg-test
   if flag(only-one-language)
     cpp-options: -D ONLY_ONE_LANGUAGE
 
-benchmark mainbench
+test-suite unit-tests
   type: exitcode-stdio-1.0
-  main-is: Benchmarks.hs
+  main-is: Spec.hs
   other-modules:
+      Cubix.Analysis.NodePairsSpec
       Paths_cubix
   hs-source-dirs:
-      benchmarks
+      test
   default-extensions:
       ApplicativeDo
       BangPatterns
@@ -307,24 +313,19 @@ benchmark mainbench
       TypeFamilyDependencies
       TypeOperators
       ViewPatterns
-  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N -freduction-depth=400
+  ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -threaded -rtsopts -with-rtsopts=-N
+  build-tool-depends:
+      hspec-discover:hspec-discover
   build-depends:
       base
     , compstrat
     , comptrans
     , containers
-    , criterion
     , cubix
-    , cubix-compdata
     , deepseq
-    , language-c
-    , language-java >=0.2.8.1
-    , language-javascript >=0.6.0.9
-    , language-lua
-    , language-python
-    , lens
+    , hspec
     , mtl
-    , text
+    , temporary
     , transformers
   default-language: Haskell2010
   if flag(only-one-language)
