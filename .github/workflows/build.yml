@@ -7,9 +7,13 @@ jobs:
     runs-on: ubuntu-24.04 # or macOS-latest, or windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Rewrite SSH git URLs to HTTPS for CI
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
       - uses: haskell-actions/setup@v2
         with:
           ghc-version: '9.8.4' # Exact version of ghc to use
           cabal-version: 'latest'
       - name: Build and test
-        run: "cabal test cubix:test:unit-tests cubix:test:cfg-test --project-file=cabal.project.ci --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
+        run: "cabal test cubix:test:unit-tests cubix:test:cfg-test --project-file=cabal.project --ghc-options='-O0 -j +RTS -A256m -n2m -RTS'"
