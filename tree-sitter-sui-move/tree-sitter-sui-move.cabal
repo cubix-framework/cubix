@@ -13,11 +13,8 @@ bug-reports:   https://github.com/cubix-framework/cubix/issues
 extra-source-files:
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/grammar.js
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/package.json
-  vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/bindings/c/tree_sitter/tree-sitter-move.h
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/parser.c
-  vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/tree_sitter/alloc.h
-  vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/tree_sitter/array.h
-  vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/tree_sitter/parser.h
+  cbits/tree_sitter/tree-sitter-move.h
 
 data-files:
   vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src/node-types.json
@@ -61,7 +58,7 @@ library
     , base-compat-constptr  >=0.1  && <0.2
   build-tool-depends: hsc2hs:hsc2hs
   include-dirs:
-    vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/bindings/c
+    cbits
     vendor/tree-sitter-move/external-crates/move/tooling/tree-sitter/src
   includes:
     tree_sitter/tree-sitter-move.h
