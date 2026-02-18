@@ -258,6 +258,7 @@ test-suite cfg-test
     , deepseq
     , directory
     , filepath
+    , hedgehog
     , lens
     , mtl
     , transformers

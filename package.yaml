@@ -144,12 +144,14 @@ tests:
     dependencies:
      - base
      - compstrat
+     - comptrans
      - containers
      - cubix
      - cubix-compdata
      - deepseq
      - directory
      - filepath
+     - hedgehog
      - lens
      - mtl
   unit-tests:
