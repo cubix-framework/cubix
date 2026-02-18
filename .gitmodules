@@ -1,3 +1,0 @@
-[submodule "tree-sitter-sui-move/vendor/tree-sitter-move"]
-	path = tree-sitter-sui-move/vendor/tree-sitter-move
-	url = https://github.com/MystenLabs/sui.git

@@ -58,7 +58,6 @@ library
     Data.Comp.Multi.HTraversable
     Data.Comp.Multi.Algebra
     Data.Comp.Multi.Annotation
-    Data.Comp.Multi.ConstrName
     Data.Comp.Multi.Show
     Data.Comp.Multi.Equality
     Data.Comp.Multi.Ordering
@@ -77,7 +76,6 @@ library
     Data.Comp.Multi.Derive.HTraversable
     Data.Comp.Multi.Derive.Equality
     Data.Comp.Multi.Derive.Ordering
-    Data.Comp.Multi.Derive.ConstrName
     Data.Comp.Multi.Derive.Show
     Data.Comp.Multi.Derive.SmartConstructors
     Data.Comp.Multi.Alt

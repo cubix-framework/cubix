@@ -26,7 +26,6 @@ module Data.Comp.Multi (
   , module Data.Comp.Multi.HTraversable
   , module Data.Comp.Multi.Kinds
   , module Data.Comp.Multi.Ops
-  , module Data.Comp.Multi.ConstrName
   , module Data.Comp.Multi.Ordering
   , module Data.Comp.Multi.Show
   , module Data.Comp.Multi.Sum
@@ -36,7 +35,6 @@ module Data.Comp.Multi (
 
 import Data.Comp.Multi.Algebra
 import Data.Comp.Multi.Annotation
-import Data.Comp.Multi.ConstrName
 import Data.Comp.Multi.Equality
 import Data.Comp.Multi.Generic
 import Data.Comp.Multi.HFoldable

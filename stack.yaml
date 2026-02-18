@@ -1,0 +1,63 @@
+# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
+
+# Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
+resolver: lts-23.19
+
+# Local packages, usually specified by relative directory name
+packages:
+- .
+- ./compdata
+- ./comptrans
+- ./compstrat
+- ./cubix-solidity
+- ./cubix-examples
+
+# Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
+extra-deps:
+- concurrent-supply-0.1.8
+- language-lua-0.11.0.2
+- git: https://github.com/jkoppel/language-javascript.git
+  commit: 516f52b13870fa7d99b0503a0730438f07891340
+- language-dot-0.1.2
+- git: https://github.com/jkoppel/language-c.git
+  commit: 9a496ea8da36742ab3c4ca7769f072f8f6091deb
+- git: https://github.com/jkoppel/language-java.git
+  commit: 31de71c063d8586d6d69f49fbc55030f7e865593
+- git: https://github.com/jkoppel/language-python.git
+  commit: 4ef1ba415badfb58e043bef543d9d9857ab0f2cc
+  subdirs:
+   - language-python
+- wl-pprint-1.2.1@sha256:aea676cff4a062d7d912149d270e33f5bb0c01b68a9db46ff13b438141ff4b7c,734
+- alex-tools-0.6.1
+- git: https://github.com/jkoppel/solidity-hs
+  commit: ed56714c994693e7458ad5f5b02d6bb1c53fe435
+
+
+# Override default flag values for local packages and extra-deps
+flags: {}
+
+# Extra package databases containing global packages
+extra-package-dbs: []
+
+# Control whether we use the GHC we find on the path
+system-ghc: true
+# Use stuff from devenv
+nix:
+  enable: false
+notify-if-nix-on-path: false
+
+# Require a specific version of stack, using version ranges
+# require-stack-version: -any # Default
+# require-stack-version: >= 1.0.0
+
+# Override the architecture used by stack, especially useful on Windows
+# arch: i386
+# arch: x86_64
+
+# Extra directories used by stack for building
+# extra-include-dirs: [/path/to/dir]
+# extra-lib-dirs: [/path/to/dir]
+
+# Allow a newer minor version of GHC than the snapshot specifies
+# compiler-check: newer-minor
+

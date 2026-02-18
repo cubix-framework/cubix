@@ -6,7 +6,6 @@
 module Cubix.Transformations.Hoist.Custom (
     HoistState
   , seenIdents
-  , SpecialHoistState
   , HoistStateConstraints(..)
   , VarInitToRhs(..)
   , VarDeclBinderToLhs(..)

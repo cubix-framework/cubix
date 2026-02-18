@@ -38,9 +38,6 @@ instance KShow (K String) where
 instance KShow (K ()) where
     kshow _ = K $ show ()
 
-instance KShow f => Show (E f) where
-  show (E x) = unK $ kshow x
-
 instance (ShowHF f, HFunctor f) => ShowHF (Cxt h f) where
     showHF (Hole s) = s
     showHF (Term t) = showHF $ hfmap showHF t

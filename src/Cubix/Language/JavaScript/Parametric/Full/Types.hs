@@ -13,7 +13,7 @@ import qualified Data.Set as Set
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
 import Data.Comp.Multi ( (:<:), inject, project, Cxt, Term )
-import Data.Comp.Multi.Derive ( derive, makeConstrNameHF, makeHFunctor, makeHTraversable, makeHFoldable,
+import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable,
                                     makeEqHF, makeShowHF, makeOrdHF )
 
 import qualified Language.Haskell.TH as TH
@@ -91,7 +91,7 @@ do let specialSigNames = [''JSCommaListF, ''JSCommaTrailingListF]
 
    decs1 <- deriveAll newASTTypes
    decs2 <- derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                                makeOrdHF, makeConstrNameHF]
+                                makeOrdHF]
                    specialSigNames
    decs3 <- runCompTrans $ makeSumType "JSSig" jsSigNames
 

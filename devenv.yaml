@@ -5,7 +5,6 @@ inputs:
   unstable:
     url: github:nixos/nixpkgs/nixpkgs-unstable
 
-nixpkgs.allowUnfree: true
 # If you're using non-OSS software, you can set allowUnfree to true.
 allowUnfree: true
 

@@ -26,11 +26,12 @@ module Cubix.Language.Parametric.Derive
   ) where
 
 import Control.Monad ( liftM )
-import Language.Haskell.TH.Lib ( conP, conT, varE, varP )
-import Language.Haskell.TH.Syntax ( Bang(..), BndrVis(..), Body(..), Con(..), Dec(..), Exp, Info(..), Name, Overlap(..), Pat(..), Q, SourceStrictness(..), SourceUnpackedness(..), TyVarBndr(..), Type(..), mkName, nameBase, newName, reify )
 
-import Data.Comp.Multi ( All, HFunctor, (:-<:), project' )
-import Data.Comp.Multi.Derive ( derive, makeConstrNameHF, makeEqHF, makeHFoldable, makeHFunctor, makeHTraversable, makeOrdHF, makeShowHF, patternSynonyms, smartConstructors )
+import Language.Haskell.TH.Lib
+import Language.Haskell.TH.Syntax hiding ( Cxt )
+
+import Data.Comp.Multi ( (:-<:), project', HFunctor, All )
+import Data.Comp.Multi.Derive ( derive, makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF, makeOrdHF, smartConstructors, patternSynonyms )
 import Data.Comp.Multi.Strategy.Derive ( makeDynCase )
 
 import Cubix.Language.Parametric.InjF
@@ -59,20 +60,20 @@ makeIsSortInjection tName =
 deriveAll :: [Name] -> Q [Dec]
 deriveAll = derive
   [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
-  , makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
   , makeDynCase, makeIsNotSortInjection
   ]
 
 deriveAllButSortInjection :: [Name] -> Q [Dec]
 deriveAllButSortInjection = derive
   [ makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF
-  , makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors
+  , makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors
   , makeDynCase
   ]
 
 deriveAllButDynCase :: [Name] -> Q [Dec]
 deriveAllButDynCase = derive [makeHFunctor, makeHTraversable, makeHFoldable, makeEqHF, makeShowHF,
-                    makeOrdHF, makeConstrNameHF, smartConstructors, patternSynonyms, smartFConstructors]
+                    makeOrdHF, smartConstructors, patternSynonyms, smartFConstructors]
 
 -- TODO: distributeAnnotation
 -- -- | Distributes an annotation over a sum
@@ -184,12 +185,8 @@ sumToNames nm = do
     extract :: Type -> [Name]
     extract (SigT t _) = extract t
     extract (AppT (AppT PromotedConsT (ConT n)) res) = n : extract res
-    extract (AppT (AppT PromotedConsT (SigT (ConT n) _)) res) = n : extract res
     extract PromotedNilT = []
-    extract t = error $
-      "sumToNames found invalid summand: " <>
-      show t <>
-      "; only recognizes Sum and names"
+    extract _ = error "sumToNames found invalid summand; only recognizes Sum and names"
 
 -- | Used for creating default cases for Untrans instances.
 --   There are two default untranslate cases (identity for shared functors, error for unshared),

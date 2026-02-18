@@ -58,7 +58,6 @@ import Data.Set ( Set, fromList )
 
 import Language.Haskell.TH.Syntax hiding ( lift )
 
-import Data.Array.Byte ( ByteArray )
 import Data.ByteString ( ByteString )
 import Data.Text ( Text )
 
@@ -172,7 +171,7 @@ withExcludedNames names = local (excludedNames .~ names)
 -- | Names that should be excluded from an AST hierarchy.
 --   Includes base types, basic containers (`Maybe`, `Either`), and `Text`/`ByteString`.
 standardExcludedNames :: Set Name
-standardExcludedNames = fromList [''Maybe, ''Either, ''Int, ''Integer, ''Bool, ''Char, ''Double, ''Text, ''ByteString, ''ByteArray]
+standardExcludedNames = fromList [''Maybe, ''Either, ''Int, ''Integer, ''Bool, ''Char, ''Double, ''Text, ''ByteString]
 
 
 {-
@@ -192,7 +191,6 @@ baseTypes = [ ConT ''Int
             , AppT ListT (ConT ''Char)
             , ConT ''Text
             , ConT ''ByteString
-            , ConT ''ByteArray
             ]
 
 

@@ -22,8 +22,6 @@ module Data.Comp.Multi.Derive
 
      -- ** HShowF
      module Data.Comp.Multi.Derive.Show,
-     -- ** ConstrNameHF
-     module Data.Comp.Multi.Derive.ConstrName,
      -- ** EqHF
      module Data.Comp.Multi.Derive.Equality,
      -- ** OrdHF
@@ -44,7 +42,6 @@ module Data.Comp.Multi.Derive
 
 import Data.Comp.Derive.Utils (derive, liftSumGen)
 import Data.Comp.Dict (All)
-import Data.Comp.Multi.Derive.ConstrName
 import Data.Comp.Multi.Derive.Equality
 import Data.Comp.Multi.Derive.Generic
 import Data.Comp.Multi.Derive.HFoldable
