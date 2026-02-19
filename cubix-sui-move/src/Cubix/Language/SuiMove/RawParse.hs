@@ -22,7 +22,7 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
-import Data.Comp.Multi (E (..))
+import Data.Comp.Multi (E (..), project)
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
 import Data.Foldable (foldrM)
 import Data.Functor ((<&>))
@@ -41,6 +41,7 @@ import TreeSitter qualified as TS
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
+import Cubix.Language.Parametric.Syntax (jJustF, riNothingF)
 import Cubix.ParsePretty (type RootSort)
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
@@ -518,8 +519,21 @@ pModuleDefinition =
   ModuleDefinition' <$> pSort @ModuleTokL "module_tok" <*> pSort @ModuleIdentityL "module_identity" <*> pSort @ModuleBodyL "module_body"
 
 pModuleBody :: TermParser ModuleBodyL
-pModuleBody =
-  ModuleBody' <$> pModuleBodyInternal0 <*> pMany (pModuleBodyInternal1) <*> pMaybe (pSort @RightCurlyBracketTokL "}_tok")
+pModuleBody = do
+  opener <- pModuleBodyInternal0
+  items <- pMany (pModuleBodyInternal1)
+  closer <- case project @ModuleBodyInternal0 opener of
+    Just (ModuleBodyInternal0LeftCurlyBracket _) -> do
+      -- When opener is '{', always produce JustF '}'
+      -- (consume it if present, synthesize if absent from malformed source)
+      mbTok <- optional (pSort @RightCurlyBracketTokL "}_tok")
+      case mbTok of
+        Just tok -> pure (jJustF tok)
+        Nothing  -> pure (jJustF RightCurlyBracketTok')
+    _ ->
+      -- When opener is ';', no closer expected
+      pure riNothingF
+  pure $ ModuleBody' opener items closer
 
 pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
 pModuleBodyInternal0 =
@@ -692,15 +706,16 @@ pApplyType =
 
 pModuleAccess :: TermParser ModuleAccessL
 pModuleAccess =
-  choice [ Megaparsec.try pModuleAccess1
-         , Megaparsec.try pModuleAccess2
-         , Megaparsec.try pModuleAccessMember
-         , Megaparsec.try pModuleAccess4
-         , Megaparsec.try pModuleAccess5
-         , Megaparsec.try pModuleAccess6
-         , Megaparsec.try pModuleAccess7
-         , Megaparsec.try pModuleAccess8
-         , Megaparsec.try pModuleAccess9
+  -- Order matters: try longer/more specific patterns first
+  choice [ Megaparsec.try pModuleAccess1   -- $identifier
+         , Megaparsec.try pModuleAccess2   -- @identifier
+         , Megaparsec.try pModuleAccessMember  -- reserved identifier
+         , Megaparsec.try pModuleAccess9   -- module::id<types>::id (most specific)
+         , Megaparsec.try pModuleAccess6   -- module::id<types>
+         , Megaparsec.try pModuleAccess8   -- module<types>::id
+         , Megaparsec.try pModuleAccess5   -- hidden_mod<types>::id
+         , Megaparsec.try pModuleAccess7   -- module<types>
+         , Megaparsec.try pModuleAccess4   -- identifier<types> (least specific, try last)
          ]
   where
     pModuleAccess1 :: TermParser ModuleAccessL
@@ -1963,9 +1978,10 @@ pLambdaBindings =
 
 pLambdaBinding :: TermParser LambdaBindingL
 pLambdaBinding =
+  -- Order matters: pLambdaBinding3 (bind + optional type) before pLambdaBindingBind (bind only)
   choice [ Megaparsec.try pLambdaBindingCommaBindList
-         , Megaparsec.try pLambdaBindingBind
          , Megaparsec.try pLambdaBinding3
+         , Megaparsec.try pLambdaBindingBind
          ]
   where
     pLambdaBindingCommaBindList :: TermParser LambdaBindingL

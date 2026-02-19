@@ -107,7 +107,8 @@ data SuiMoveFunctionDefAttrs e l where
     -> e (Maybe RetTypeL)
     -> SuiMoveFunctionDefAttrs e Parametric.FunctionDefAttrsL
   MacroFunctionDefAttrs
-    :: e (Maybe ModifierL)
+    :: e (Maybe ModifierL)  -- outer modifier (before macro keyword)
+    -> e (Maybe ModifierL)  -- inner modifier (between macro and fun keywords)
     -> e (Maybe TypeParametersL)
     -> e (Maybe RetTypeL)
     -> SuiMoveFunctionDefAttrs e Parametric.FunctionDefAttrsL

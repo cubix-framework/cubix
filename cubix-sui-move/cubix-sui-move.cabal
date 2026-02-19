@@ -143,6 +143,7 @@ test-suite unit-tests
     , hspec-discover >= 2.11
     , directory >= 1.3
     , filepath >= 1.4
+    , temporary >= 1.3
   build-tool-depends:
     hspec-discover:hspec-discover >= 2.11
   ghc-options:
