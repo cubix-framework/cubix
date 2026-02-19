@@ -513,15 +513,19 @@ instance Pretty HiddenStructItem where
 -- Struct definition
 instance Pretty StructDefinition where
   prettyF (StructDefinition maybePub sig fields maybePostfixAbilities) =
-    prettyTerm maybePub PP.<> spMaybe maybePub PP.<> prettyTerm sig PP.<> prettyFieldsWithSpace fields PP.<> prettyTerm maybePostfixAbilities PP.<> postfixSemicolon maybePostfixAbilities
+    prettyTerm maybePub PP.<> spMaybe maybePub PP.<> prettyTerm sig PP.<> prettyFieldsWithSpace fields PP.<> prettyTerm maybePostfixAbilities PP.<> trailingSemicolon
     where
+      isPositional = case project @DatatypeFields fields of
+        Just (DatatypeFieldsPositionalFields _) -> True
+        _ -> False
       prettyFieldsWithSpace :: MoveTerm DatatypeFieldsL -> Doc
-      prettyFieldsWithSpace f = case project @DatatypeFields f of
-        Just (DatatypeFieldsPositionalFields _) -> prettyTerm f
-        Just (DatatypeFieldsNamedFields _) -> PP.space PP.<> prettyTerm f
-        Nothing -> PP.space PP.<> prettyTerm f
-      postfixSemicolon :: MoveTerm (Maybe PostfixAbilityDeclsL) -> Doc
-      postfixSemicolon m = if isNothingTerm m then PP.empty else PP.text ";"
+      prettyFieldsWithSpace f
+        | isPositional = prettyTerm f
+        | otherwise    = PP.space PP.<> prettyTerm f
+      trailingSemicolon
+        | isPositional = PP.text ";"
+        | not (isNothingTerm maybePostfixAbilities) = PP.text ";"
+        | otherwise = PP.empty
 
 instance Pretty HiddenStructSignature where
   prettyF (HiddenStructSignature _ structId typeParams abilities) =
@@ -1007,11 +1011,18 @@ instance Pretty QuantifierExpression where
               Just (PairF quantKeywordBindings maybeTrigger) ->
                 case project @PairF quantKeywordBindings of
                   Just (PairF keyword bindings) ->
-                    prettyTerm keyword <+> prettyTerm bindings PP.<> prettyTerm maybeTrigger <+> PP.text ":" <+> prettyTerm expr
+                    prettyTerm keyword <+> prettyTerm bindings PP.<> wherePart maybeTrigger <+> PP.text ":" <+> prettyTerm expr
                   Nothing -> prettyTerm pair
               Nothing -> prettyTerm pair
           Nothing -> prettyTerm pair
       Nothing -> prettyTerm pair
+    where
+      wherePart mt = case project @MaybeF mt of
+        Just NothingF -> PP.empty
+        Just (JustF pair') -> case project @PairF pair' of
+          Just (PairF _ whereExpr) -> PP.space PP.<> PP.text "where" <+> prettyTerm whereExpr
+          Nothing -> PP.space PP.<> prettyTerm pair'
+        Nothing -> prettyTerm mt
 
 instance Pretty QuantifierExpressionInternal0 where
   prettyF (QuantifierExpressionInternal0Forall f) = prettyTerm f
@@ -1157,7 +1168,13 @@ instance Pretty SpecCondition where
 
 instance Pretty HiddenSpecAbortIf where
   prettyF (HiddenSpecAbortIf _ maybeProps expr maybeWith _) =
-    PP.text "aborts_if" PP.<> prettyTerm maybeProps <+> prettyTerm expr PP.<> prettyTerm maybeWith PP.<> PP.text ";"
+    PP.text "aborts_if" PP.<> prettyTerm maybeProps <+> prettyTerm expr PP.<> withPart PP.<> PP.text ";"
+    where
+      withPart = case project @MaybeF maybeWith of
+        Just (JustF pair) -> case project @PairF pair of
+          Just (PairF _ withExpr) -> PP.space PP.<> PP.text "with" <+> prettyTerm withExpr
+          Nothing -> prettyTerm maybeWith
+        _ -> PP.empty
 
 instance Pretty ConditionProperties where
   prettyF (ConditionProperties props) = PP.text " [" PP.<> prettyListSepH (PP.text ", ") props PP.<> PP.text "]"
@@ -1179,7 +1196,7 @@ instance Pretty HiddenSpecCondition where
 
 instance Pretty HiddenSpecConditionInternal0 where
   prettyF (HiddenSpecConditionInternal0Kind kind) = prettyTerm kind
-  prettyF (HiddenSpecConditionInternal02 _ maybeModule) = PP.text "requires" PP.<> prettyTerm maybeModule
+  prettyF (HiddenSpecConditionInternal02 _ maybeModule) = PP.text "requires" PP.<> spMaybe maybeModule PP.<> prettyTerm maybeModule
 
 instance Pretty HiddenSpecConditionKind where
   prettyF (HiddenSpecConditionKindAssert _) = PP.text "assert"
@@ -1203,7 +1220,7 @@ instance Pretty SpecInvariantInternal0 where
 
 instance Pretty SpecLet where
   prettyF (SpecLet _ maybePost ident expr) =
-    PP.text "let" PP.<> prettyTerm maybePost <+> prettyTerm ident <+> PP.text "=" <+> prettyTerm expr PP.<> PP.text ";"
+    PP.text "let" <+> prettyTerm maybePost PP.<> spMaybe maybePost PP.<> prettyTerm ident <+> PP.text "=" <+> prettyTerm expr PP.<> PP.text ";"
 
 instance Pretty SpecPragma where
   prettyF (SpecPragma props) = PP.text "pragma" <+> prettyListSepH (PP.text ", ") props PP.<> PP.text ";"
