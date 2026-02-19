@@ -6,19 +6,21 @@ import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
 import Control.Exception (SomeException, bracket_, try, evaluate)
 import Control.Monad (forM)
 import Data.Maybe (catMaybes)
-import System.Timeout (timeout)
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath ((</>), takeExtension)
+import System.IO (hClose)
+import System.IO.Temp (withSystemTempFile)
+import System.Timeout (timeout)
 
 import Test.Hspec (Spec, describe, expectationFailure, it, runIO)
 
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 
-import Cubix.Language.SuiMove.IPS (translate, untranslate)
+import Cubix.Language.SuiMove.Pretty qualified as Pretty
 import Cubix.Language.SuiMove.RawParse (parse)
 
--- | Parse a Move file, translate to IPS, untranslate back, and verify equality.
--- Returns Nothing on success or skip, Just filepath on roundtrip failure.
+-- | Test parse(prettyPrint(parse(x))) === parse(x).
+-- Returns Nothing on success or skip, Just filepath on failure.
 -- Skips files that fail to parse or take longer than 10 seconds.
 roundtripTest :: FilePath -> IO (Maybe String)
 roundtripTest filepath = do
@@ -27,9 +29,16 @@ roundtripTest filepath = do
     case parsed of
       Nothing -> return Nothing
       Just orig -> do
-        let roundtripped = untranslate . translate $ orig
-        eq <- evaluate (orig == roundtripped)
-        return $ if eq then Nothing else Just filepath
+        let prettyPrinted = Pretty.pretty orig
+        withSystemTempFile "roundtrip.move" $ \tmpPath tmpHandle -> do
+          hClose tmpHandle
+          writeFile tmpPath prettyPrinted
+          reparsed <- parse tmpPath tree_sitter_sui_move
+          case reparsed of
+            Nothing -> return $ Just filepath
+            Just ast2 -> do
+              eq <- evaluate (orig == ast2)
+              return $ if eq then Nothing else Just filepath
   case result of
     Nothing        -> return Nothing  -- timed out, skip
     Just (Left _)  -> return Nothing  -- exception, skip
@@ -66,7 +75,7 @@ findCorpusDir = go candidates
       if exists then return (Just p) else go ps
 
 spec :: Spec
-spec = describe "Trans/Untrans Roundtrip Tests" $ do
+spec = describe "Parse/PrettyPrint Roundtrip Tests" $ do
   mdir <- runIO findCorpusDir
   case mdir of
     Nothing -> it "finds test corpus" $

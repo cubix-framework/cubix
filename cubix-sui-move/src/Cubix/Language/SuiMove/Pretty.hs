@@ -311,15 +311,15 @@ instance Pretty ModuleExtensionDefinition where
 -- Module definition
 instance Pretty ModuleDefinition where
   prettyF (ModuleDefinition _ identity body) =
-    PP.text "module" <+> prettyTerm identity <+> prettyTerm body
+    PP.text "module" <+> prettyTerm identity PP.<> prettyTerm body
 
 instance Pretty ModuleBody where
   prettyF (ModuleBody opener items closer) =
     case opener of
       ModuleBodyInternal0LeftCurlyBracket' _ ->
-        PP.lbrace PP.<> PP.nest 4 (PP.line PP.<> prettyListSepVV items) PP.<> PP.line PP.<> PP.rbrace
+        PP.space PP.<> PP.lbrace PP.<> PP.nest 4 (PP.line PP.<> prettyListSepVV items) PP.<> PP.line PP.<> PP.rbrace
       _ ->
-        prettyTerm opener PP.<> PP.line PP.<> PP.nest 4 (prettyListSepVV items)
+        prettyTerm opener PP.<> PP.line PP.<> prettyListSepVV items
 
 instance Pretty ModuleBodyInternal0 where
   prettyF (ModuleBodyInternal0Semicolon _) = PP.text ";"
@@ -894,10 +894,10 @@ instance Pretty HiddenReservedIdentifier where
   prettyF (HiddenReservedIdentifierSpec _) = PP.text "spec"
 
 instance Pretty HiddenForall where
-  prettyF (HiddenForall _) = PP.text "forall "
+  prettyF (HiddenForall _) = PP.text "forall"
 
 instance Pretty HiddenExists where
-  prettyF (HiddenExists _) = PP.text "exists "
+  prettyF (HiddenExists _) = PP.text "exists"
 
 -- Call expression
 instance Pretty CallExpression where
@@ -1004,8 +1004,11 @@ instance Pretty QuantifierExpression where
         case project @PairF innerPair of
           Just (PairF bindingsTrigger _colonTok) ->
             case project @PairF bindingsTrigger of
-              Just (PairF quantBindings maybeTrigger) ->
-                prettyTerm quantBindings PP.<> prettyTerm maybeTrigger <+> PP.text ":" <+> prettyTerm expr
+              Just (PairF quantKeywordBindings maybeTrigger) ->
+                case project @PairF quantKeywordBindings of
+                  Just (PairF keyword bindings) ->
+                    prettyTerm keyword <+> prettyTerm bindings PP.<> prettyTerm maybeTrigger <+> PP.text ":" <+> prettyTerm expr
+                  Nothing -> prettyTerm pair
               Nothing -> prettyTerm pair
           Nothing -> prettyTerm pair
       Nothing -> prettyTerm pair
@@ -1015,7 +1018,7 @@ instance Pretty QuantifierExpressionInternal0 where
   prettyF (QuantifierExpressionInternal0Exists e) = prettyTerm e
 
 instance Pretty QuantifierBindings where
-  prettyF (QuantifierBindings binds) = prettyListSepH PP.space binds
+  prettyF (QuantifierBindings binds) = prettyListSepH (PP.text ", ") binds
 
 instance Pretty QuantifierBinding where
   prettyF (QuantifierBinding1 name _ ty) = prettyTerm name PP.<> PP.text ":" <+> prettyTerm ty
@@ -1129,7 +1132,15 @@ instance Pretty HiddenSpecBlockMemeber where
 
 instance Pretty SpecApply where
   prettyF (SpecApply expr patterns maybeExcept _) =
-    PP.text "apply" <+> prettyTerm expr <+> PP.text "to" <+> prettyListSepH (PP.text ", ") patterns PP.<> prettyTerm maybeExcept PP.<> PP.text ";"
+    PP.text "apply" <+> prettyTerm expr <+> PP.text "to" <+> prettyListSepH (PP.text ", ") patterns PP.<> exceptPart PP.<> PP.text ";"
+    where
+      exceptPart = case project @MaybeF maybeExcept of
+        Just NothingF -> PP.empty
+        Just (JustF pair) -> case project @PairF pair of
+          Just (PairF _ exceptPatterns) ->
+            PP.space PP.<> PP.text "except" <+> prettyListSepH (PP.text ", ") exceptPatterns
+          Nothing -> prettyTerm maybeExcept
+        Nothing -> prettyTerm maybeExcept
 
 instance Pretty SpecApplyPattern where
   prettyF (SpecApplyPattern maybeInternal pat typeParams) =
