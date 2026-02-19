@@ -1,15 +1,17 @@
 module TransRoundtripSpec (spec) where
 
-import Control.Monad (filterM, forM_, unless)
-import System.Directory (doesFileExist, listDirectory)
+import Control.Concurrent (getNumCapabilities)
+import Control.Concurrent.Async (forConcurrently_)
+import Control.Monad (forM)
+import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>), takeExtension)
 
-import Test.Hspec (Spec, describe, expectationFailure, it, runIO, shouldSatisfy)
+import Test.Hspec (Spec, describe, expectationFailure, it, runIO)
 
-import TreeSitter.SuiMove (getTestDir, tree_sitter_sui_move)
+import TreeSitter.SuiMove (tree_sitter_sui_move)
 
 import Cubix.Language.SuiMove.IPS (translate, untranslate)
-import Cubix.Language.SuiMove.ParsePretty (parse)
+import Cubix.Language.SuiMove.RawParse (parse)
 
 -- | Parse a Move file, translate to IPS, untranslate back, and verify equality
 roundtripTest :: FilePath -> IO ()
@@ -19,27 +21,32 @@ roundtripTest filepath = do
     Nothing -> expectationFailure $ "Failed to parse file: " ++ filepath
     Just orig -> do
       let roundtripped = untranslate . translate $ orig
-      unless (orig == roundtripped) $
-        expectationFailure $ "Roundtrip failed for: " ++ filepath
+      if orig == roundtripped
+        then return ()
+        else expectationFailure $ "Roundtrip failed for: " ++ filepath
 
--- | Get all .move files from the test directory
-getMoveTestFiles :: IO [FilePath]
-getMoveTestFiles = do
-  testDir <- getTestDir
-  files <- listDirectory testDir
-  let moveFiles = filter (\f -> takeExtension f == ".move") files
-  let fullPaths = map (testDir </>) moveFiles
-  filterM doesFileExist fullPaths
+-- | Recursively collect all .move files under a directory
+getMoveFiles :: FilePath -> IO [FilePath]
+getMoveFiles dir = do
+  entries <- listDirectory dir
+  fmap concat $ forM entries $ \entry -> do
+    let path = dir </> entry
+    isDir <- doesDirectoryExist path
+    if isDir
+      then getMoveFiles path
+      else if takeExtension path == ".move"
+           then return [path]
+           else return []
 
 spec :: Spec
 spec = describe "Trans/Untrans Roundtrip Tests" $ do
-  
-  it "should have test files available" $ do
-    files <- getMoveTestFiles
-    files `shouldSatisfy` (not . null)
-  
-  describe "translate . untranslate should preserve AST" $ do
-    runIO getMoveTestFiles >>= \files ->
-      forM_ files $ \file ->
-        it ("roundtrips correctly for " ++ file) $ do
-          roundtripTest file
+  files <- runIO $ getMoveFiles "../sui-move-test-corpus"
+  caps  <- runIO getNumCapabilities
+
+  it ("found " ++ show (length files) ++ " .move files; running on " ++ show caps ++ " capabilities") $
+    if null files
+      then expectationFailure "No .move files found in ../sui-move-test-corpus"
+      else return ()
+
+  it "all files roundtrip correctly (parallel)" $
+    forConcurrently_ files roundtripTest

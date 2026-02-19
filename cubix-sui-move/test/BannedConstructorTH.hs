@@ -6,7 +6,7 @@ module BannedConstructorTH (
   ) where
 
 import Data.Monoid (Any(..))
-import Language.Haskell.TH (Clause(..), Dec(..), Exp(..), Name, Pat(..), Q, lookupValueName, mkName)
+import Language.Haskell.TH (Body(..), Clause(..), Dec(..), Exp(..), Name, Pat(..), Q, lookupValueName, mkName)
 
 import Cubix.Language.SuiMove.Modularized qualified as M
 

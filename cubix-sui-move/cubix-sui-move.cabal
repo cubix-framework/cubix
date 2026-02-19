@@ -136,6 +136,7 @@ test-suite unit-tests
     BannedConstructorsSpec
     TransRoundtripSpec
   build-depends:
+    , async >= 2.2
     , compstrat
     , cubix-sui-move
     , hspec >= 2.11
