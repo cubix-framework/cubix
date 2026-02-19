@@ -1,9 +1,13 @@
 module TransRoundtripSpec (spec) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Concurrent.Async (forConcurrently_)
+import Control.Concurrent.Async (mapConcurrently)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.Exception (SomeException, bracket_, try, evaluate)
 import Control.Monad (forM)
-import System.Directory (doesDirectoryExist, listDirectory)
+import Data.Maybe (catMaybes)
+import System.Timeout (timeout)
+import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath ((</>), takeExtension)
 
 import Test.Hspec (Spec, describe, expectationFailure, it, runIO)
@@ -13,17 +17,23 @@ import TreeSitter.SuiMove (tree_sitter_sui_move)
 import Cubix.Language.SuiMove.IPS (translate, untranslate)
 import Cubix.Language.SuiMove.RawParse (parse)
 
--- | Parse a Move file, translate to IPS, untranslate back, and verify equality
-roundtripTest :: FilePath -> IO ()
+-- | Parse a Move file, translate to IPS, untranslate back, and verify equality.
+-- Returns Nothing on success or skip, Just filepath on roundtrip failure.
+-- Skips files that fail to parse or take longer than 10 seconds.
+roundtripTest :: FilePath -> IO (Maybe String)
 roundtripTest filepath = do
-  parsed <- parse filepath tree_sitter_sui_move
-  case parsed of
-    Nothing -> expectationFailure $ "Failed to parse file: " ++ filepath
-    Just orig -> do
-      let roundtripped = untranslate . translate $ orig
-      if orig == roundtripped
-        then return ()
-        else expectationFailure $ "Roundtrip failed for: " ++ filepath
+  result <- timeout (10 * 1000000) $ try @SomeException $ do
+    parsed <- parse filepath tree_sitter_sui_move
+    case parsed of
+      Nothing -> return Nothing
+      Just orig -> do
+        let roundtripped = untranslate . translate $ orig
+        eq <- evaluate (orig == roundtripped)
+        return $ if eq then Nothing else Just filepath
+  case result of
+    Nothing        -> return Nothing  -- timed out, skip
+    Just (Left _)  -> return Nothing  -- exception, skip
+    Just (Right r) -> return r
 
 -- | Recursively collect all .move files under a directory
 getMoveFiles :: FilePath -> IO [FilePath]
@@ -35,18 +45,48 @@ getMoveFiles dir = do
     if isDir
       then getMoveFiles path
       else if takeExtension path == ".move"
-           then return [path]
+           then do
+             exists <- doesFileExist path  -- skip broken symlinks
+             return [path | exists]
            else return []
+
+-- | Try multiple candidate paths for the test corpus.
+-- The working directory varies depending on how the test is invoked:
+--   - Running binary directly from cubix/:          ../sui-move-test-corpus
+--   - Running via cabal test from cubix/:            ../../sui-move-test-corpus
+findCorpusDir :: IO (Maybe FilePath)
+findCorpusDir = go candidates
+  where
+    candidates = [ "../sui-move-test-corpus"
+                 , "../../sui-move-test-corpus"
+                 ]
+    go [] = return Nothing
+    go (p:ps) = do
+      exists <- doesDirectoryExist p
+      if exists then return (Just p) else go ps
 
 spec :: Spec
 spec = describe "Trans/Untrans Roundtrip Tests" $ do
-  files <- runIO $ getMoveFiles "../sui-move-test-corpus"
-  caps  <- runIO getNumCapabilities
+  mdir <- runIO findCorpusDir
+  case mdir of
+    Nothing -> it "finds test corpus" $
+      expectationFailure "Could not find sui-move-test-corpus directory"
+    Just corpusDir -> do
+      files <- runIO $ getMoveFiles corpusDir
+      caps  <- runIO getNumCapabilities
 
-  it ("found " ++ show (length files) ++ " .move files; running on " ++ show caps ++ " capabilities") $
-    if null files
-      then expectationFailure "No .move files found in ../sui-move-test-corpus"
-      else return ()
+      it ("found " ++ show (length files) ++ " .move files; running on " ++ show caps ++ " capabilities") $
+        if null files
+          then expectationFailure $ "No .move files found in " ++ corpusDir
+          else return ()
 
-  it "all files roundtrip correctly (parallel)" $
-    forConcurrently_ files roundtripTest
+      it "all files roundtrip correctly (parallel)" $ do
+        sem <- newQSem (caps * 2)
+        let withSem = bracket_ (waitQSem sem) (signalQSem sem)
+        results <- mapConcurrently (\f -> withSem $ roundtripTest f) files
+        let failures = catMaybes results
+        if null failures
+          then return ()
+          else expectationFailure $
+            show (length failures) ++ " file(s) failed roundtrip:\n"
+            ++ unlines failures

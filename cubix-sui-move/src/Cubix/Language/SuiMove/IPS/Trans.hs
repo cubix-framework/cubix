@@ -135,7 +135,10 @@ instance Trans Modularized.HiddenExpression where
   trans he@(Modularized.HiddenExpressionUnaryExpression (Modularized.HiddenUnaryExpression' uexp)) = case uexp of
     Modularized.HiddenUnaryExpressionInternal0UnaryExpression' ue -> injF $ transUnaryExpr ue
     _ -> transDefault he
-  trans (Modularized.HiddenExpressionIfExpression ie) = injF $ transIfExpression ie
+  trans he@(Modularized.HiddenExpressionIfExpression ie) =
+    case transIfExpression ie of
+      Just expr -> injF expr
+      Nothing   -> transDefault he
   trans x = transDefault x
 
 -------- Block
@@ -191,27 +194,24 @@ transBindList :: Modularized.MoveTerm Modularized.BindListL -> MSuiMoveTerm P.Va
 transBindList (Modularized.BindListBind' (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0VariableIdentifier' (Modularized.HiddenVariableIdentifier' ident)))) =
   -- Single non-mutable identifier: translate to IdentIsVarDeclBinder
   P.iIdentIsVarDeclBinder $ transIdent ident
-transBindList (Modularized.BindListCommaBindList' commaList) =
-  -- Tuple destructuring: extract identifiers and use TupleBinder
-  let idents = extractBindListIdents commaList
-  in P.iTupleBinder $ P.insertF idents
+transBindList (Modularized.BindListCommaBindList' commaList)
+  | Just idents <- extractAllNonMutIdents commaList =
+    -- Tuple destructuring with all non-mutable bindings: use TupleBinder
+    P.iTupleBinder $ P.insertF idents
 transBindList bindList =
   -- Other patterns (mutable variables, struct destructuring, @ patterns, or patterns)
   iBinderIsVarDeclBinder $ translate bindList
 
--- Extract identifiers from CommaBindList for tuple destructuring
-extractBindListIdents :: Modularized.MoveTerm Modularized.CommaBindListL -> [MSuiMoveTerm P.IdentL]
-extractBindListIdents (Modularized.CommaBindList' binds) =
-  map extractIdentFromBind $ P.extractF binds
+-- Extract identifiers from CommaBindList, but only if all bindings are non-mutable.
+-- Returns Nothing if any binding is mutable.
+extractAllNonMutIdents :: Modularized.MoveTerm Modularized.CommaBindListL -> Maybe [MSuiMoveTerm P.IdentL]
+extractAllNonMutIdents (Modularized.CommaBindList' binds) =
+  mapM extractNonMutIdent $ P.extractF binds
 
--- Extract single identifier from a bind
-extractIdentFromBind :: Modularized.MoveTerm Modularized.HiddenBindL -> MSuiMoveTerm P.IdentL
-extractIdentFromBind (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0VariableIdentifier' (Modularized.HiddenVariableIdentifier' ident))) =
-  transIdent ident
-extractIdentFromBind (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0MutBindVar' (Modularized.MutBindVar' _ (Modularized.HiddenVariableIdentifier' ident)))) =
-  transIdent ident
-extractIdentFromBind _ =
-  error "extractIdentFromBind: unexpected bind pattern in tuple destructuring"
+extractNonMutIdent :: Modularized.MoveTerm Modularized.HiddenBindL -> Maybe (MSuiMoveTerm P.IdentL)
+extractNonMutIdent (Modularized.HiddenBindBindInternal0' (Modularized.HiddenBindInternal0VariableIdentifier' (Modularized.HiddenVariableIdentifier' ident))) =
+  Just $ transIdent ident
+extractNonMutIdent _ = Nothing
 
 transLetStatement :: Modularized.MoveTerm Modularized.LetStatementL -> MSuiMoveTerm P.SingleLocalVarDeclL
 transLetStatement (Modularized.LetStatement' _ bindList mtype minit) =
@@ -227,12 +227,12 @@ transLetStatement (Modularized.LetStatement' _ bindList mtype minit) =
 instance Trans Modularized.LetStatement where
   trans ls@(Modularized.LetStatement {}) = injF $ transLetStatement $ inject ls
 
-transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> MSuiMoveTerm P.ExpressionL
+transIfExpression :: Modularized.MoveTerm Modularized.IfExpressionL -> Maybe (MSuiMoveTerm P.ExpressionL)
 transIfExpression (Modularized.IfExpression' (P.PairF' (P.PairF' (P.PairF' _ condExpr) thenExpr) elseClause)) =
-  let elseExpr = case elseClause of
-        P.Nothing' -> P.iUnitF
-        P.Just' (P.PairF' _ expr) -> translate' expr
-  in P.iTernary P.ITE' (translate' condExpr) (translate' thenExpr) elseExpr
+  case elseClause of
+    P.Nothing' -> Nothing  -- No else clause: fall through to default translation
+    P.Just' (P.PairF' _ expr) ->
+      Just $ P.iTernary P.ITE' (translate' condExpr) (translate' thenExpr) (translate' expr)
 
 transFunctionParametersInternal :: Modularized.MoveTerm Modularized.FunctionParametersInternal0L -> MSuiMoveTerm P.FunctionParameterL
 transFunctionParametersInternal (Modularized.FunctionParametersInternal0FunctionParameter' fp) =
@@ -288,7 +288,7 @@ instance Trans Modularized.FunctionDefinition where
 -------- Macro Function Definitions
 transMacroFunctionDefinition :: Modularized.MoveTerm Modularized.MacroFunctionDefinitionL -> MSuiMoveTerm P.FunctionDefL
 transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier _ hiddenMacroSig block) =
-  let (Modularized.HiddenMacroSignature' _ _ hiddenFuncIdent typeParams funcParams retType) = hiddenMacroSig
+  let (Modularized.HiddenMacroSignature' innerModifier _ hiddenFuncIdent typeParams funcParams retType) = hiddenMacroSig
       -- Extract function name
       (Modularized.HiddenFunctionIdentifier' funcNameIdent) = hiddenFuncIdent
       funcName = transIdent funcNameIdent
@@ -297,10 +297,10 @@ transMacroFunctionDefinition (Modularized.MacroFunctionDefinition' maybeModifier
       (Modularized.FunctionParameters' paramsInternalList) = funcParams
       translatedParams = map transFunctionParametersInternal (P.extractF paramsInternalList)
 
-      -- Store only minimal data in FunctionDefAttrs
-      -- Use the modifier from maybeModifier (outer level) as it's typically the visibility modifier
+      -- Store both outer and inner modifiers in FunctionDefAttrs
       funcAttrs = iMacroFunctionDefAttrs
         (translate' maybeModifier)
+        (translate' innerModifier)
         (translate' typeParams)
         (translate' retType)
 
@@ -519,19 +519,9 @@ untransIfExpression P.ITE' cond thenExpr elseExpr =
   let condTerm = untranslate cond
       thenTerm = untranslate thenExpr
       elseTerm = untranslate elseExpr
-      -- Check if elseTerm is a unit expression by examining its structure
-      isUnit = case elseTerm of
-        Modularized.HiddenExpressionUnaryExpression'
-          (Modularized.HiddenUnaryExpression'
-            (Modularized.HiddenUnaryExpressionInternal0ExpressionTerm'
-              (Modularized.HiddenExpressionTermUnitExpression' _))) -> True
-        _ -> False
-      maybeElse = if isUnit
-                    then P.Nothing'
-                    else P.Just' $ P.riPairF Modularized.iElseTok elseTerm
       ifTokCond = P.riPairF Modularized.iIfTok condTerm
       ifCondThen = P.riPairF ifTokCond thenTerm
-      fullTuple = P.riPairF ifCondThen maybeElse
+      fullTuple = P.riPairF ifCondThen (P.Just' $ P.riPairF Modularized.iElseTok elseTerm)
   in Modularized.iIfExpression fullTuple
 untransIfExpression _ _ _ _ = error "untransIfExpression: unsupported ternary operator"
 
@@ -693,22 +683,18 @@ untransFunctionDefinition (P.FunctionDef' funcAttrs funcName paramsListTerm func
             funcParams
             (untranslate retType)
       in Left $ Modularized.iFunctionDefinition hiddenFunctionSig block
-    MacroFunctionDefAttrs' maybeModifier typeParams retType ->
-      -- Reconstruct HiddenMacroSignature from minimal data
+    MacroFunctionDefAttrs' outerModifier innerModifier typeParams retType ->
       let hiddenFuncIdent = Modularized.iHiddenFunctionIdentifier (untransIdent funcName)
-          -- Reconstruct FunctionParameters from parameter list (preserving $ prefix)
           funcParams = Modularized.iFunctionParameters $
             P.insertF $ map untransParameter params
-          -- Reconstruct complete macro signature
-          -- Note: The modifier goes in the outer MacroFunctionDefinition, not in HiddenMacroSignature
           hiddenMacroSig = Modularized.iHiddenMacroSignature
-            P.Nothing'  -- No modifier in the signature itself
+            (untranslate innerModifier)
             Modularized.iFunTok
             hiddenFuncIdent
             (untranslate typeParams)
             funcParams
             (untranslate retType)
-      in Right $ Modularized.iMacroFunctionDefinition (untranslate maybeModifier) Modularized.iMacroTok hiddenMacroSig block
+      in Right $ Modularized.iMacroFunctionDefinition (untranslate outerModifier) Modularized.iMacroTok hiddenMacroSig block
     _ -> error "untransFunctionDefinition: unexpected FunctionDefAttrs"
 
 instance {-# OVERLAPPING #-} Untrans FunctionDefIsFunctionDefinition where
@@ -817,10 +803,13 @@ instance {-# OVERLAPPING #-} Untrans FunctionCallIsCallExpression where
 
 -- Untranslate MacroCallExpression
 untransMacroCallExpression :: MSuiMoveTerm P.FunctionCallL -> Modularized.MoveTerm Modularized.MacroCallExpressionL
-untransMacroCallExpression (P.FunctionCall' _attrs funcExp funcArgs) =
+untransMacroCallExpression (P.FunctionCall' attrs funcExp funcArgs) =
   let macroModuleAccess = untransMacroModuleAccess funcExp
       argList = untransArgList funcArgs
-  in Modularized.iMacroCallExpression macroModuleAccess P.Nothing' argList
+      typeArgs = case attrs of
+        MacroFunctionCallAttrs' mta -> P.mapF untranslate mta
+        _ -> P.Nothing'
+  in Modularized.iMacroCallExpression macroModuleAccess typeArgs argList
 
 instance {-# OVERLAPPING #-} Untrans FunctionCallIsMacroCallExpression where
   untrans (FunctionCallIsMacroCallExpression fc) = untransMacroCallExpression fc
