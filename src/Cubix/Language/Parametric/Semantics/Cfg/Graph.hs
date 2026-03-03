@@ -129,7 +129,7 @@ emptyCfg :: Cfg fs
 emptyCfg = Cfg Map.empty Map.empty
 
 cfgNodes :: Cfg fs -> [CfgNode fs]
-cfgNodes cfg = map snd $ Map.toList (cfg ^. cfg_nodes)
+cfgNodes cfg = Map.elems (cfg ^. cfg_nodes)
 
 addCfgNodeWithLabel :: (HasCurCfg s fs, MonadState s m) => TermLab fs l -> Label -> CfgNodeType -> m (CfgNode fs)
 addCfgNodeWithLabel t l typ = do
@@ -228,7 +228,7 @@ satisfyingBoundary seen succ pred cfg node =
     Just [ node ]
   else
     let labs = Set.toList $ succ node in
-    if labs == [] then
+    if null labs then
       Nothing
     else  Just $ concat $ mapMaybe getNext labs  where -- In this case, we convert [ Maybe [ CfgNode fs ] ] always into Just [ CfgNode fs ].
       -- getNext :: CfgNode fs -> Maybe [ CfgNode fs ]
@@ -261,7 +261,7 @@ enterNodeSuccs cfg n = satisfyingStrictSuccBoundary (isEnterNode . (^. cfg_node_
 prettyCfg :: Cfg fs -> String
 prettyCfg cfg = concatMap nodeEdges nodes
   where
-    nodes = map snd $ Map.toList (cfg ^. cfg_nodes)
+    nodes = Map.elems (cfg ^. cfg_nodes)
 
     nodeEdges :: CfgNode f -> String
     nodeEdges n = concatMap (pEdge (n ^. cfg_node_lab)) (n ^. cfg_node_succs)
@@ -280,14 +280,14 @@ prettyCfg cfg = concatMap nodeEdges nodes
 getCfgLab :: forall fs l. Cfg fs -> TermLab fs l -> [Label]
 getCfgLab cfg t = case Map.lookup astLab (cfg ^. cfg_ast_nodes) of
                     Nothing -> []
-                    Just m -> map snd $ Map.toList m
+                    Just m -> Map.elems m
   where
     astLab = getAnn t
 
 putSubtree :: (All ShowHF fs, All HFoldable fs, All HFunctor fs) => TermLab fs l -> Cfg fs ->  IO ()
 putSubtree t cfg = do
  let cfgLab = getCfgLab cfg t
- if length cfgLab > 0 then do
+ if not (null cfgLab) then do
    putStrLn ""
    putStrLn $ (show $ getAnn t) ++ "(cfg: " ++ show cfgLab ++ ")"
    putStrLn $ show t
