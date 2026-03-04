@@ -47,7 +47,7 @@ findPublicNoReturn = runIdentity . crushtdT (promoteTF $ addFail check)
     isPublic t
       | Just (NormalFunctionDefAttrs vis _ _ _ _) <- project t
       = hasPublicModifier vis
-      | Just (MacroFunctionDefAttrs vis _ _) <- project t
+      | Just (MacroFunctionDefAttrs vis _ _ _) <- project t
       = hasPublicModifier vis
       | otherwise = False
 
@@ -62,7 +62,7 @@ findPublicNoReturn = runIdentity . crushtdT (promoteTF $ addFail check)
     hasNoReturnType t
       | Just (NormalFunctionDefAttrs _ _ _ _ retT) <- project t
       = isNothingF retT
-      | Just (MacroFunctionDefAttrs _ _ retT) <- project t
+      | Just (MacroFunctionDefAttrs _ _ _ retT) <- project t
       = isNothingF retT
       | otherwise = True
 
