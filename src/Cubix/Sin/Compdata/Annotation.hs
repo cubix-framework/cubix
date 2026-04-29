@@ -1,8 +1,13 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Cubix.Sin.Compdata.Annotation (
     Annotated(..)
   , getAnn
+  , AnnotationInfo(..)
   , MonadAnnotater(..)
   , AnnotateDefault
   , pattern AnnotateDefault
@@ -46,6 +51,18 @@ instance ( Annotated a f
 
 getAnn :: (Annotated a f) => HFix f :=> a
 getAnn (Term x) = getAnn' x
+
+-- | Annotations can opt in to being copied onto wrapper nodes introduced by
+-- annotated sort injections. Source locations should propagate; generated
+-- labels and ordinary default annotations should not.
+class AnnotationInfo a where
+  propagateAnn :: Bool
+
+instance {-# OVERLAPPABLE #-} AnnotationInfo a where
+  propagateAnn = False
+
+instance {-# OVERLAPPING #-} (AnnotationInfo a) => AnnotationInfo (Maybe a) where
+  propagateAnn = propagateAnn @a
 
 -------------------------------------------------------------------
 ------------------------- Adding annotations ---------------------

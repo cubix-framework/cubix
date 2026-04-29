@@ -1,6 +1,8 @@
 {-# OPTIONS_HADDOCK hide #-}
 
+{-# LANGUAGE InstanceSigs             #-}
 {-# LANGUAGE PartialTypeSignatures    #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE UndecidableInstances     #-}
 
@@ -9,13 +11,16 @@ module Cubix.Language.Lua.Parametric.Common.Trans (
   , untranslate
   ) where
 
+import Data.Default ( Default(..) )
 import Data.List( (\\) )
 import Data.Maybe ( fromJust )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 import Data.Text ( pack, unpack )
 
-import Data.Comp.Multi ( project, inject, unTerm, (:-<:), Sum, All, caseCxt
-                       , HFunctor(..) )
+import Data.Comp.Multi ( project, pattern (::&::), inject, unTerm, (:-<:), Sum, All, caseCxt, caseCxt'
+                       , HFunctor(..), (:&:)(..) )
+
+import Cubix.Sin.Compdata.Annotation ( AnnotationInfo, getAnn )
 
 import Cubix.Language.Lua.Parametric.Common.Types
 import qualified Cubix.Language.Lua.Parametric.Full as F
@@ -23,42 +28,47 @@ import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
 
-translate :: F.LuaTerm l -> MLuaTerm l
+------------------------------------------------------------------------------------
+---------------- Forward translation: Modularized syntax to IPS  -------------------
+------------------------------------------------------------------------------------
+
+translate :: (Default a, AnnotationInfo a) => F.LuaTermAnn a l -> MLuaTermAnn a l
 translate = trans . unTerm
 
 class Trans f where
-  trans :: f F.LuaTerm l -> MLuaTerm l
+  trans :: (Default a, AnnotationInfo a) => (f :&: a) (F.LuaTermAnn a) l -> MLuaTermAnn a l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt @Trans trans
+  trans = caseCxt' @Trans trans
 
-transDefault :: (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => f F.LuaTerm l -> MLuaTerm l
+transDefault :: (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig, Default a, AnnotationInfo a)
+             => (f :&: a) (F.LuaTermAnn a) l -> MLuaTermAnn a l
 transDefault = inject . hfmap translate
 
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MLuaSig, f :-<: F.LuaSig) => Trans f where
   trans = transDefault
 
-transIdent :: F.LuaTerm F.NameL -> MLuaTerm IdentL
-transIdent (project -> Just (F.Name n)) = Ident' $ unpack n
+transIdent :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.NameL -> MLuaTermAnn a IdentL
+transIdent (F.Name n ::&:: a) = Ident (unpack n) ::&:: a
 
 
-transBlock :: F.LuaTerm F.BlockL -> MLuaTerm BlockL
-transBlock (project -> Just (F.Block s e)) = Block' (mapF (injF.translate) s) (injF $ translate e)
+transBlock :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.BlockL -> MLuaTermAnn a BlockL
+transBlock (F.Block s e ::&:: a) = Block (mapF (injFAnnDef . translate) s) (injFAnnDef $ translate e) ::&:: a
 
 instance Trans F.Block where
-  trans b@(F.Block _ _) = injF $ transBlock $ inject b
+  trans (F.Block s e :&: a) = injFAnnDef $ Block (mapF (injFAnnDef . translate) s) (injFAnnDef $ translate e) ::&:: a
 
 instance Trans F.Name where
-  trans (F.Name n) = iIdent $ unpack n
+  trans (F.Name n :&: a) = injectFAnnDef (Ident (unpack n) :&: a)
 
-transParams :: F.LuaTerm [F.NameL] -> Bool -> MLuaTerm [FunctionParameterL]
-transParams nms varArg = insertF $ (map makeParam $ extractF nms) ++ (if varArg then [iLuaVarArgsParam] else [])
+transParams :: (Default a, AnnotationInfo a) => F.LuaTermAnn a [F.NameL] -> Bool -> MLuaTermAnn a [FunctionParameterL]
+transParams nms varArg = insertF $ (map makeParam $ extractF nms) ++ (if varArg then [jLuaVarArgsParam] else [])
   where
-    makeParam :: F.LuaTerm F.NameL -> MLuaTerm FunctionParameterL
+    makeParam :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.NameL -> MLuaTermAnn a FunctionParameterL
     makeParam n = PositionalParameter' EmptyParameterAttrs' (transIdent n)
 
-splitLuaFunName :: F.LuaTerm F.FunNameL -> (MLuaTerm [IdentL], MLuaTerm IdentL, Bool)
-splitLuaFunName (project -> Just (F.FunName n1 n2s n3opt)) =
+splitLuaFunName :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.FunNameL -> (MLuaTermAnn a [IdentL], MLuaTermAnn a IdentL, Bool)
+splitLuaFunName (F.FunName n1 n2s n3opt ::&:: _) =
     case n3opt of
       Just' n3 -> (insertF $ n1' ++ n2s', transIdent n3, True)
       Nothing' -> (insertF $ init (n1' ++ n2s'), last (n1' ++ n2s'), False)
@@ -67,95 +77,108 @@ splitLuaFunName (project -> Just (F.FunName n1 n2s n3opt)) =
     n2s' = map transIdent $ extractF n2s
 
 instance Trans F.Stat where
-  trans (F.Assign vs es) = iAssign (injF $ translate vs) AssignOpEquals' (injF $ translate es)
-  trans (F.LocalAssign vs init) = injF $ SingleLocalVarDecl' EmptyLocalVarDeclAttrs' (injF $ mapF transIdent vs) tInit
+  trans (F.Assign vs es :&: a) = injFAnnDef $ Assign (injFAnnDef $ translate vs) AssignOpEquals' (injFAnnDef $ translate es) ::&:: a
+  trans (F.LocalAssign vs init :&: a) = injFAnnDef $ SingleLocalVarDecl EmptyLocalVarDeclAttrs' (injFAnnDef $ mapF transIdent vs) tInit ::&:: a
     where
       tInit = case init of
-        Just' x  -> JustLocalVarInit' $ injF $ translate x
+        Just' x  -> JustLocalVarInit' $ injFAnnDef $ translate x
         Nothing' -> NoLocalVarInit'
-  trans (F.FunAssign fn (project -> Just (F.FunBody pars varArg body))) = iFunctionDef (iLuaFunctionAttrs $ iLuaFunctionDefinedObj fnDefObjNms)
-                                                                                       funNm
-                                                                                       (addReceiverParam $ transParams pars varArg)
-                                                                                       (injF $ transBlock body)
+  trans (F.FunAssign fn (F.FunBody pars varArg body ::&:: _) :&: a) =
+      injFAnnDef $ FunctionDef (jLuaFunctionAttrs $ jLuaFunctionDefinedObj fnDefObjNms)
+                               funNm
+                               (addReceiverParam $ transParams pars varArg)
+                               (injFAnnDef $ transBlock body)
+                ::&:: a
     where
       (fnDefObjNms, funNm, isMethod) = splitLuaFunName fn
 
-      addReceiverParam :: MLuaTerm [FunctionParameterL] -> MLuaTerm [FunctionParameterL]
+      addReceiverParam :: (Default a, AnnotationInfo a) => MLuaTermAnn a [FunctionParameterL] -> MLuaTermAnn a [FunctionParameterL]
       addReceiverParam x = if isMethod then ConsF' SelfParameter' x else x
 
-  trans (F.LocalFunAssign n (project -> Just (F.FunBody pars varArg body))) = iFunctionDef EmptyFunctionDefAttrs' (transIdent n) (transParams pars varArg) (injF $ transBlock body)
+  trans (F.LocalFunAssign n (F.FunBody pars varArg body ::&:: _) :&: a) =
+      injFAnnDef $ FunctionDef EmptyFunctionDefAttrs' (transIdent n) (transParams pars varArg) (injFAnnDef $ transBlock body) ::&:: a
   trans x = transDefault x
 
 
-translateFunArg :: F.LuaTerm F.FunArgL -> MLuaTerm FunctionArgumentsL
-translateFunArg (project -> Just (F.Args args))   = FunctionArgumentList' (mapF (PositionalArgument' . injF . translate) args)
-translateFunArg (project -> Just (F.TableArg t))  = iLuaTableArg $ translate t
-translateFunArg (project -> Just (F.StringArg s)) = iLuaStringArg $ unpack s
+translateFunArg :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.FunArgL -> MLuaTermAnn a FunctionArgumentsL
+translateFunArg (F.Args args   ::&:: a) = FunctionArgumentList (mapF (\e -> PositionalArgument' (injFAnnDef $ translate e)) args) ::&:: a
+translateFunArg (F.TableArg t  ::&:: a) = injFAnnDef $ LuaTableArg (translate t) ::&:: a
+translateFunArg (F.StringArg s ::&:: a) = injFAnnDef $ LuaStringArg (unpack s) ::&:: a
 
 instance Trans F.FunCall where
-  trans (F.NormalFunCall  f arg) = iFunctionCall EmptyFunctionCallAttrs' (injF $ translate f) (translateFunArg arg)
-  trans (F.MethodCall rec f arg) = iFunctionCall EmptyFunctionCallAttrs' (injF $ transIdent f) receiverArg
+  trans :: forall a l. (Default a, AnnotationInfo a) => (F.FunCall :&: a) (F.LuaTermAnn a) l -> MLuaTermAnn a l
+  trans (F.NormalFunCall  f arg :&: a) = injFAnnDef $ FunctionCall EmptyFunctionCallAttrs' (injFAnnDef $ translate f) (translateFunArg arg) ::&:: a
+  trans (F.MethodCall rec f arg :&: a) = injFAnnDef $ FunctionCall EmptyFunctionCallAttrs' (injFAnnDef $ transIdent f) receiverArg ::&:: a
     where
-      receiverArg :: MLuaTerm FunctionArgumentsL
+      aArg = getAnn arg
+
+      receiverArg :: MLuaTermAnn a FunctionArgumentsL
       receiverArg = case arg of
-                      (project -> Just (F.Args as)) -> FunctionArgumentList' (ConsF' (ReceiverArg' $ injF $ translate rec)
-                                                                                      (mapF (PositionalArgument' . injF . translate) as))
-                      (project -> Just (F.TableArg  t)) -> iLuaReceiverAndTableArg  (translate rec) (translate t)
-                      (project -> Just (F.StringArg s)) -> iLuaReceiverAndStringArg (translate rec) (unpack s)
+                      (project -> Just (F.Args as)) ->
+                        FunctionArgumentList (ConsF' (ReceiverArg' $ injFAnnDef $ translate rec)
+                                                     (mapF (\e -> PositionalArgument' (injFAnnDef $ translate e)) as))
+                          ::&:: aArg
+                      (project -> Just (F.TableArg t)) ->
+                        injFAnnDef $ LuaReceiverAndTableArg  (translate rec) (translate t) ::&:: aArg
+                      (project -> Just (F.StringArg s)) ->
+                        injFAnnDef $ LuaReceiverAndStringArg (translate rec) (unpack s)    ::&:: aArg
 
 instance Trans F.FunArg where
   trans _ = error "Lua FunArg found not with FunCall"
 
-transUnOp :: F.LuaTerm F.UnopL -> Maybe (MLuaTerm UnaryOpL)
-transUnOp F.Neg' = Just UnaryMinus'
-transUnOp F.Not' = Just Not'
-transUnOp F.Complement' = Just Complement'
+transUnOp :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.UnopL -> Maybe (MLuaTermAnn a UnaryOpL)
+transUnOp (F.Neg        ::&:: a) = Just (UnaryMinus ::&:: a)
+transUnOp (F.Not        ::&:: a) = Just (Not        ::&:: a)
+transUnOp (F.Complement ::&:: a) = Just (Complement ::&:: a)
 -- transUnOp F.Len' = _
 transUnOp _ = Nothing
 
 translateUnary
-  :: F.LuaTerm F.UnopL
-  -> F.LuaTerm F.ExpL
-  -> MLuaTerm F.ExpL
-translateUnary (transUnOp -> Just op) exp = iUnary op (injF $ translate exp)
-translateUnary op exp = F.iUnop (injF $ translate op) (injF $ translate exp)
+  :: (Default a, AnnotationInfo a)
+  => F.LuaTermAnn a F.UnopL
+  -> F.LuaTermAnn a F.ExpL
+  -> a
+  -> MLuaTermAnn a F.ExpL
+translateUnary (transUnOp -> Just op) exp a = injFAnnDef $ Unary op (injFAnnDef $ translate exp) ::&:: a
+translateUnary op exp a = F.Unop (injFAnnDef $ translate op) (injFAnnDef $ translate exp) ::&:: a
 
-transBinOp :: F.LuaTerm F.BinopL -> Maybe (MLuaTerm BinaryOpL)
-transBinOp F.Add' = Just Add'
-transBinOp F.Sub' = Just Sub'
-transBinOp F.Mul' = Just Mul'
-transBinOp F.Div' = Just Div'
-transBinOp F.Mod' = Just Mod'
-transBinOp F.And' = Just LogicAnd'
-transBinOp F.Or' = Just LogicOr'
-transBinOp F.ShiftL' = Just Shl'
-transBinOp F.ShiftR' = Just LogicShr'
-transBinOp F.BAnd' = Just BitAnd'
-transBinOp F.BOr' = Just BitOr'
-transBinOp F.BXor' = Just BitXor'
-transBinOp F.LT' = Just Lt'
-transBinOp F.LTE' = Just Lte'
-transBinOp F.GT' = Just Gt'
-transBinOp F.GTE' = Just Gte'
-transBinOp F.EQ' = Just Eq'
-transBinOp F.NEQ' = Just Neq'
-transBinOp F.IDiv' = Just IDiv'
-transBinOp F.Exp' = Just Pow'
+transBinOp :: (Default a, AnnotationInfo a) => F.LuaTermAnn a F.BinopL -> Maybe (MLuaTermAnn a BinaryOpL)
+transBinOp (F.Add    ::&:: a) = Just (Add      ::&:: a)
+transBinOp (F.Sub    ::&:: a) = Just (Sub      ::&:: a)
+transBinOp (F.Mul    ::&:: a) = Just (Mul      ::&:: a)
+transBinOp (F.Div    ::&:: a) = Just (Div      ::&:: a)
+transBinOp (F.Mod    ::&:: a) = Just (Mod      ::&:: a)
+transBinOp (F.And    ::&:: a) = Just (LogicAnd ::&:: a)
+transBinOp (F.Or     ::&:: a) = Just (LogicOr  ::&:: a)
+transBinOp (F.ShiftL ::&:: a) = Just (Shl      ::&:: a)
+transBinOp (F.ShiftR ::&:: a) = Just (LogicShr ::&:: a)
+transBinOp (F.BAnd   ::&:: a) = Just (BitAnd   ::&:: a)
+transBinOp (F.BOr    ::&:: a) = Just (BitOr    ::&:: a)
+transBinOp (F.BXor   ::&:: a) = Just (BitXor   ::&:: a)
+transBinOp (F.LT     ::&:: a) = Just (Lt       ::&:: a)
+transBinOp (F.LTE    ::&:: a) = Just (Lte      ::&:: a)
+transBinOp (F.GT     ::&:: a) = Just (Gt       ::&:: a)
+transBinOp (F.GTE    ::&:: a) = Just (Gte      ::&:: a)
+transBinOp (F.EQ     ::&:: a) = Just (Eq       ::&:: a)
+transBinOp (F.NEQ    ::&:: a) = Just (Neq      ::&:: a)
+transBinOp (F.IDiv   ::&:: a) = Just (IDiv     ::&:: a)
+transBinOp (F.Exp    ::&:: a) = Just (Pow      ::&:: a)
 -- transBinOp F.Concat' = _
 transBinOp _ = Nothing
 
 translateBinary
-  :: F.LuaTerm F.BinopL
-  -> F.LuaTerm F.ExpL
-  -> F.LuaTerm F.ExpL
-  -> MLuaTerm F.ExpL
-translateBinary (transBinOp -> Just op) a b = iBinary op (injF $ translate a) (injF $ translate b)
-translateBinary op a b = F.iBinop (injF $ translate op) (injF $ translate a) (injF $ translate b)
+  :: (Default a, AnnotationInfo a)
+  => F.LuaTermAnn a F.BinopL
+  -> F.LuaTermAnn a F.ExpL
+  -> F.LuaTermAnn a F.ExpL
+  -> a
+  -> MLuaTermAnn a F.ExpL
+translateBinary (transBinOp -> Just op) a b ann = injFAnnDef $ Binary op (injFAnnDef $ translate a) (injFAnnDef $ translate b) ::&:: ann
+translateBinary op a b ann = F.Binop (injFAnnDef $ translate op) (injFAnnDef $ translate a) (injFAnnDef $ translate b) ::&:: ann
 
 instance Trans F.Exp where
-  trans :: F.Exp F.LuaTerm l -> MLuaTerm l
-  trans (F.Unop op exp) = translateUnary op exp
-  trans (F.Binop op a b) = translateBinary op a b
+  trans (F.Unop  op exp  :&: a) = translateUnary  op exp   a
+  trans (F.Binop op a' b :&: a) = translateBinary op a' b  a
   trans exp = transDefault exp
   -- there is something called PEFunCall here, probably should translate it as well?
   -- trans (F.PrefixExp exp) = _

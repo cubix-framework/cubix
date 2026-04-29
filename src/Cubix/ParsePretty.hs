@@ -101,13 +101,12 @@ class Pretty fs where
 ------------------------------ Lua --------------------------------
 -------------------------------------------------------------------
 
--- | NOTE: This reflects the half-finished transition of Lua to annotated terms
-parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
-parseLua path = do
+parseLuaTrackSources :: FilePath -> IO (Maybe (MLuaTermAnn (Maybe SourceSpan) LBlockL))
+parseLuaTrackSources path = do
     res <- Lua.parseFile path
     case res of
      Left errors -> print errors >> return Nothing
-     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
+     Right tree  -> return $ Just $ LCommon.translate $ LFull.translate $ fmap toSourceSpan tree
   where
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
     toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))
@@ -117,11 +116,15 @@ parseLua path = do
         from = Lua.sourceFrom x
         to   = Lua.sourceTo   x
 
+parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
+parseLua = fmap (fmap stripA) . parseLuaTrackSources
+
 prettyLua :: MLuaTerm LBlockL -> String
 prettyLua = show . Lua.pprint . Lua.sBlock . LFull.untranslate . ann Nothing . LCommon.untranslate
 
 type instance RootSort MLuaSig = LBlockL
 instance ParseFile MLuaSig where parseFile = parseLua
+instance ParseFileTrackSources MLuaSig where parseFileTrackSources = parseLuaTrackSources
 instance Pretty MLuaSig where pretty = prettyLua
 
 #ifndef ONLY_ONE_LANGUAGE

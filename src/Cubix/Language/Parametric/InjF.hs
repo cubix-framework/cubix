@@ -1,5 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- 
 -- This module enables the creation of "sort injections," stating that
@@ -28,14 +32,33 @@ import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
 import Data.Type.Equality ( (:~:), gcastWith )
 
-import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:),  (:&:), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable, Fragment )
+import Data.Comp.Multi ( Signature, Sort, Cxt(..), (:-<:), (:&:)(..), Cxt, inject, ann, stripA, HFunctor(..), HTraversable, AnnTerm, Sum, All, CxtS, HFoldable, Fragment )
 import Data.Comp.Multi.Strategic ( RewriteM, GRewriteM )
 import Data.Comp.Multi.Strategy.Classification ( DynCase(..), KDynCase(..) )
 
 import Cubix.Language.Info
 
-import Cubix.Sin.Compdata.Annotation ( MonadAnnotater, AnnotateDefault, runAnnotateDefault, annotateOuter )
-import Data.Kind (Type)
+import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), AnnotationInfo(..), runAnnotateDefault, annotateOuter, getAnn )
+
+--------------------------------------------------------------------------------
+
+newtype AnnotateWith a x = AnnotateWith { runAnnotateWith' :: a -> x }
+
+runAnnotateWith :: a -> AnnotateWith a x -> x
+runAnnotateWith a m = runAnnotateWith' m a
+
+instance Functor (AnnotateWith a) where
+  fmap f (AnnotateWith g) = AnnotateWith (f . g)
+
+instance Applicative (AnnotateWith a) where
+  pure x = AnnotateWith $ \_ -> x
+  AnnotateWith f <*> AnnotateWith x = AnnotateWith $ \a -> f a (x a)
+
+instance Monad (AnnotateWith a) where
+  AnnotateWith x >>= f = AnnotateWith $ \a -> runAnnotateWith' (f $ x a) a
+
+instance MonadAnnotater a (AnnotateWith a) where
+  annM x = AnnotateWith $ \a -> x :&: a
 
 --------------------------------------------------------------------------------
 
@@ -84,18 +107,23 @@ labeledInjF :: ( MonadAnnotater Label m
 labeledInjF t = annotateLabelOuter $ injF $ Hole t
 
 
-injFAnnDef :: ( InjF fs l l'
+injFAnnDef :: forall fs l l' a.
+               ( InjF fs l l'
              , All HTraversable fs
              , Default a
+             , AnnotationInfo a
              , All HFoldable fs
              ) => AnnTerm a fs l -> AnnTerm a fs l'
-injFAnnDef t = runAnnotateDefault $ annotateOuter $ injF $ Hole t
+injFAnnDef t
+  | propagateAnn @a = runAnnotateWith (getAnn t) $ annotateOuter $ injF $ Hole t
+  | otherwise       = runAnnotateDefault         $ annotateOuter $ injF $ Hole t
 
 injectFAnnDef :: ( InjF fs l l'
                  , f :-<: fs
                  , All HTraversable fs
                  , All HFoldable fs
                  , Default a
+                 , AnnotationInfo a
                 ) => (f :&: a) (AnnTerm a fs) l -> AnnTerm a fs l'
 injectFAnnDef =  injFAnnDef . inject
 

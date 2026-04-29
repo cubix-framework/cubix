@@ -205,4 +205,3 @@ makeDefaultInstances typs className methName exp =
   flip map typs $ \t -> let instSig = AppT (ConT className) t in
                         let dec = ValD (VarP methName) (NormalB exp) [] in
                         InstanceD (Just Overlapping) [] instSig [dec]
-
