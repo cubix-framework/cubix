@@ -93,9 +93,7 @@ instance AssertCfgWellFormed MLuaSig ShlOp
 instance AssertCfgWellFormed MLuaSig RelationalBinOp
 instance AssertCfgWellFormed MLuaSig Operator
 instance AssertCfgWellFormed MLuaSig ExpIsExpression
-instance AssertCfgWellFormed MLuaSig ExpressionIsExp where
-  assertCfgWellFormed t@(remA -> ExpressionIsExp e) =
-    assertCfgIsGenericAuto (inject' t) [E e]
+instance AssertCfgWellFormed MLuaSig ExpressionIsExp
 
 instance AssertCfgWellFormed MLuaSig Assign where
   assertCfgWellFormed t@(remA -> Assign (project' -> Just (LuaLhs lhs :&: _)) _ (project' -> Just (LuaRhs rhs :&: _))) = do
