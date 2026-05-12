@@ -115,7 +115,7 @@ injFAnnDef :: forall fs l l' a.
              , All HFoldable fs
              ) => AnnTerm a fs l -> AnnTerm a fs l'
 injFAnnDef t
-  | propagateAnn @a = runAnnotateWith (getAnn t) $ annotateOuter $ injF $ Hole t
+  | shouldPropagateAnn @a = runAnnotateWith (getAnn t) $ annotateOuter $ injF $ Hole t
   | otherwise       = runAnnotateDefault         $ annotateOuter $ injF $ Hole t
 
 injectFAnnDef :: ( InjF fs l l'

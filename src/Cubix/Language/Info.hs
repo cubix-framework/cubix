@@ -125,7 +125,7 @@ instance NFData SourceSpan where rnf = genericRnf
 instance Hashable SourceSpan
 instance ToJSON SourceSpan
 instance FromJSON SourceSpan
-instance AnnotationInfo SourceSpan where propagateAnn = True
+instance AnnotationInfo SourceSpan where shouldPropagateAnn = True
 
 makeClassy ''SourceSpan
 

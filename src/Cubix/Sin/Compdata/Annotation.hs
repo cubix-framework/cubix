@@ -56,13 +56,13 @@ getAnn (Term x) = getAnn' x
 -- annotated sort injections. Source locations should propagate; generated
 -- labels and ordinary default annotations should not.
 class AnnotationInfo a where
-  propagateAnn :: Bool
+  shouldPropagateAnn :: Bool
 
 instance {-# OVERLAPPABLE #-} AnnotationInfo a where
-  propagateAnn = False
+  shouldPropagateAnn = False
 
 instance {-# OVERLAPPING #-} (AnnotationInfo a) => AnnotationInfo (Maybe a) where
-  propagateAnn = propagateAnn @a
+  shouldPropagateAnn = shouldPropagateAnn @a
 
 -------------------------------------------------------------------
 ------------------------- Adding annotations ---------------------

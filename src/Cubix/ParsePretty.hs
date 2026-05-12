@@ -108,7 +108,7 @@ parseLuaTrackSources path = do
      Left errors -> print errors >> return Nothing
      Right tree  -> return $ Just $ LCommon.translate $ LFull.translate $ fmap toSourceSpan tree
   where
-    -- language-lua's @at@ helper falls back to a sentinel "fake" range
+    -- In language-lua, when constructing source spans, it falls back to a sentinel "fake" range
     -- (file "(nowehere)", position (1,1)) when one side of a production
     -- has no tokens (e.g. an empty @function() end@ body). Filter those
     -- out instead of propagating a structurally-broken span downstream.
