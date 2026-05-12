@@ -9,6 +9,8 @@
 
 module Cubix.Language.Lua.Parametric.Full.Trans (
     translate
+  , translateStat
+  , translateExp
   , untranslate
   , Targ
   ) where
@@ -44,6 +46,12 @@ do substs <- makeSubsts
 
 translate :: Lua.Block (Maybe SourceSpan) -> LuaTermOptAnn SourceSpan BlockL
 translate = trans
+
+translateStat :: Lua.Stat (Maybe SourceSpan) -> LuaTermOptAnn SourceSpan StatL
+translateStat = trans
+
+translateExp :: Lua.Exp (Maybe SourceSpan) -> LuaTermOptAnn SourceSpan ExpL
+translateExp = trans
 
 instance Trans (Lua.FunBody (Maybe SourceSpan)) FunBodyL where
   trans (Lua.FunBody a args varArg blk) = inject' $ (FunBody (trans args) (isJust varArg) (trans blk)) :&: a

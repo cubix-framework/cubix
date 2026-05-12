@@ -110,18 +110,16 @@ instance Trans F.FunCall where
   trans (F.NormalFunCall  f arg :&: a) = injFAnnDef $ FunctionCall EmptyFunctionCallAttrs' (injFAnnDef $ translate f) (translateFunArg arg) ::&:: a
   trans (F.MethodCall rec f arg :&: a) = injFAnnDef $ FunctionCall EmptyFunctionCallAttrs' (injFAnnDef $ transIdent f) receiverArg ::&:: a
     where
-      aArg = getAnn arg
-
       receiverArg :: MLuaTermAnn a FunctionArgumentsL
       receiverArg = case arg of
                       (project -> Just (F.Args as)) ->
                         FunctionArgumentList (ConsF' (ReceiverArg' $ injFAnnDef $ translate rec)
                                                      (mapF (\e -> PositionalArgument' (injFAnnDef $ translate e)) as))
-                          ::&:: aArg
+                          ::&:: a
                       (project -> Just (F.TableArg t)) ->
-                        injFAnnDef $ LuaReceiverAndTableArg  (translate rec) (translate t) ::&:: aArg
+                        injFAnnDef $ LuaReceiverAndTableArg  (translate rec) (translate t) ::&:: a
                       (project -> Just (F.StringArg s)) ->
-                        injFAnnDef $ LuaReceiverAndStringArg (translate rec) (unpack s)    ::&:: aArg
+                        injFAnnDef $ LuaReceiverAndStringArg (translate rec) (unpack s)    ::&:: a
 
 instance Trans F.FunArg where
   trans _ = error "Lua FunArg found not with FunCall"

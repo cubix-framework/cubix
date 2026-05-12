@@ -271,6 +271,7 @@ test-suite unit-tests
   main-is: Spec.hs
   other-modules:
       Cubix.Analysis.NodePairsSpec
+      Cubix.Language.Lua.SourcePosSpec
       Paths_cubix
   hs-source-dirs:
       test
@@ -322,10 +323,13 @@ test-suite unit-tests
     , comptrans
     , containers
     , cubix
+    , cubix-compdata
     , deepseq
     , hspec
+    , language-lua
     , mtl
     , temporary
+    , text
     , transformers
   default-language: Haskell2010
   if flag(only-one-language)
