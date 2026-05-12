@@ -1,5 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -27,6 +29,7 @@ module Cubix.Language.Parametric.InjF
   ) where
 
 import Control.Monad ( MonadPlus(..), liftM )
+import Control.Monad.Reader ( Reader, asks, runReader )
 
 import Data.Default ( Default )
 import Data.Proxy ( Proxy(..) )
@@ -42,23 +45,17 @@ import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), AnnotationInfo(..), r
 
 --------------------------------------------------------------------------------
 
-newtype AnnotateWith a x = AnnotateWith { runAnnotateWith' :: a -> x }
+-- | A 'Reader' over the annotation to copy onto each newly-built node.
+-- Used by 'injFAnnDef' when the annotation type opts into propagation
+-- via 'shouldPropagateAnn'.
+newtype AnnotateWith a x = AnnotateWith (Reader a x)
+  deriving newtype (Functor, Applicative, Monad)
 
 runAnnotateWith :: a -> AnnotateWith a x -> x
-runAnnotateWith a m = runAnnotateWith' m a
-
-instance Functor (AnnotateWith a) where
-  fmap f (AnnotateWith g) = AnnotateWith (f . g)
-
-instance Applicative (AnnotateWith a) where
-  pure x = AnnotateWith $ \_ -> x
-  AnnotateWith f <*> AnnotateWith x = AnnotateWith $ \a -> f a (x a)
-
-instance Monad (AnnotateWith a) where
-  AnnotateWith x >>= f = AnnotateWith $ \a -> runAnnotateWith' (f $ x a) a
+runAnnotateWith a (AnnotateWith r) = runReader r a
 
 instance MonadAnnotater a (AnnotateWith a) where
-  annM x = AnnotateWith $ \a -> x :&: a
+  annM x = AnnotateWith (asks (x :&:))
 
 --------------------------------------------------------------------------------
 
