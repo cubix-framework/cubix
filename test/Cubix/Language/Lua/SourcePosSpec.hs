@@ -8,6 +8,7 @@
 
 module Cubix.Language.Lua.SourcePosSpec (spec) where
 
+import Control.Monad                         (unless, when)
 import Data.List                             (sort)
 import Data.Maybe                            (mapMaybe)
 import Data.Text                             (Text)
@@ -46,18 +47,21 @@ luaKit testFiles = SourcePosKit
   , kitReParseTargets = luaReParseTargets
   }
 
--- | The Lua 5.3 reference test suite ships with the repo. We discover
--- the @.lua@ files at spec-construction time so an empty/missing
--- directory degrades to the inline snippets instead of failing.
+-- | Discover the @.lua@ files in the Lua 5.3 reference test suite that
+-- ships with the repo. Fails loudly if the directory is missing or
+-- empty: that suite is a known, expected resource, and silently
+-- skipping it would hide a real problem.
 discoverLua53TestSuite :: IO [FilePath]
 discoverLua53TestSuite = do
   let dir = "test/lua/lua-5.3.3-tests"
   exists <- doesDirectoryExist dir
-  if not exists
-    then pure []
-    else do
-      entries <- listDirectory dir
-      pure $ sort [ dir </> e | e <- entries, takeExtension e == ".lua" ]
+  unless exists $
+    error $ "Lua 5.3 test suite missing — expected to find " ++ dir
+  entries <- listDirectory dir
+  let files = sort [ dir </> e | e <- entries, takeExtension e == ".lua" ]
+  when (null files) $
+    error $ "Lua 5.3 test suite is empty — no .lua files in " ++ dir
+  pure files
 
 luaSnippets :: [(String, String)]
 luaSnippets =
