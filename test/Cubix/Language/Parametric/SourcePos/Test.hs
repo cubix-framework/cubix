@@ -37,21 +37,25 @@ module Cubix.Language.Parametric.SourcePos.Test
   , showSpan
   , sliceSpan
   , contains
+  , isDegenerateSpan
   ) where
 
 import Control.Monad             (forM_)
 import Data.Text                 (Text)
 import Data.Text qualified       as T
 import Data.Text.IO qualified    as TIO
+import System.FilePath           (takeFileName)
 import System.IO.Temp            (writeSystemTempFile)
 import Test.Hspec
 
 import Data.Comp.Multi           (AnnTerm, E (..), HFoldable, stripA)
 import Data.Comp.Multi.Equality  (EqHF)
 import Data.Comp.Multi.Generic   qualified as Generic
-import Data.Comp.Multi.Show      (ShowHF)
+import Data.Comp.Multi.HFoldable (hfoldMap)
 import Data.Comp.Multi.HFunctor  (HFunctor)
 import Data.Comp.Multi.Ops       (RemA, Sum, (:&:))
+import Data.Comp.Multi.Show      (ShowHF)
+import Data.Comp.Multi.Term      (Cxt (..))
 
 import Cubix.Language.Info             (SourcePos (..), SourceSpan (..))
 import Cubix.Sin.Compdata.Annotation   (getAnn)
@@ -72,8 +76,14 @@ data SourcePosKit fs root = SourcePosKit
     kitLanguageName :: String
 
     -- | Inline (name, source) snippets to exercise. Each will be
-    -- written to a temp file and parsed.
+    -- written to a temp file and parsed. Use these for focused,
+    -- self-contained cases.
   , kitSnippets :: [(String, String)]
+
+    -- | Absolute paths to real source files to exercise. Use these
+    -- to ground the properties in a real-world corpus (e.g. the
+    -- language's own test suite).
+  , kitTestFiles :: [FilePath]
 
     -- | Parse a file preserving source spans.
   , kitParseFile
@@ -107,36 +117,57 @@ type SourcePosCxt fs =
   , RemA (Sum fs :&: Maybe SourceSpan) (Sum fs)
   )
 
--- | Run both source-position properties over every snippet in a kit.
+-- | Run both source-position properties over every snippet and test
+-- file in a kit.
 sourcePosSpec :: forall fs root. SourcePosCxt fs => SourcePosKit fs root -> Spec
 sourcePosSpec kit =
-  describe (kitLanguageName kit ++ " source-position tracking") $
-    forM_ (kitSnippets kit) $ \(name, src) ->
-      describe ("on snippet: " ++ name) $ do
-        it "every parent span contains its children's spans" $ do
-          (_, t) <- parseSnippet kit name src
-          case containmentViolations t of
-            []  -> pure ()
-            vs  -> expectationFailure $
-                     "containment violations:\n" ++ unlines (map showViolation vs)
+  describe (kitLanguageName kit ++ " source-position tracking") $ do
+    forM_ (kitSnippets kit)  $ \(name, src) ->
+      describe ("on snippet: " ++ name) $ runProperties (snippetSource kit name src)
+    forM_ (kitTestFiles kit) $ \path ->
+      describe ("on file: " ++ takeFileName path) $ runProperties (fileSource kit path)
+  where
+    runProperties :: IO (Text, AnnTerm (Maybe SourceSpan) fs root) -> Spec
+    runProperties load = do
+      it "every parent span contains its children's spans" $ do
+        (_, t) <- load
+        case containmentViolations t of
+          []  -> pure ()
+          vs  -> expectationFailure $
+                   "containment violations:\n" ++ unlines (map showViolation vs)
 
-        it "every kit target reparses from its slice" $ do
-          (text, t) <- parseSnippet kit name src
-          forM_ (kitReParseTargets kit t) $ \target ->
-            case checkReparse text target of
-              Right () -> pure ()
-              Left err -> expectationFailure err
+      it "every kit target reparses from its slice" $ do
+        (text, t) <- load
+        forM_ (kitReParseTargets kit t) $ \target ->
+          case checkReparse text target of
+            Right () -> pure ()
+            Left err -> expectationFailure err
 
-parseSnippet
+-- | Materialise an inline snippet into a temp file and parse it.
+snippetSource
   :: SourcePosKit fs root
   -> String
   -> String
   -> IO (Text, AnnTerm (Maybe SourceSpan) fs root)
-parseSnippet kit name src = do
-  path <- writeSystemTempFile (name ++ ".lua") src
-  mt   <- kitParseFile kit path
+snippetSource kit name src = do
+  path <- writeSystemTempFile (name ++ ".src") src
+  loadParsed kit path
+
+-- | Read a real file in place and parse it.
+fileSource
+  :: SourcePosKit fs root
+  -> FilePath
+  -> IO (Text, AnnTerm (Maybe SourceSpan) fs root)
+fileSource = loadParsed
+
+loadParsed
+  :: SourcePosKit fs root
+  -> FilePath
+  -> IO (Text, AnnTerm (Maybe SourceSpan) fs root)
+loadParsed kit path = do
+  mt <- kitParseFile kit path
   case mt of
-    Nothing -> error $ kitLanguageName kit ++ " parse failed for snippet " ++ name
+    Nothing -> error $ kitLanguageName kit ++ " parse failed for " ++ path
     Just t  -> do
       text <- TIO.readFile path
       pure (text, t)
@@ -158,11 +189,11 @@ showSpan :: SourceSpan -> String
 showSpan (SourceSpan (SourcePos _ r1 c1) (SourcePos _ r2 c2)) =
   show (r1, c1) ++ "-" ++ show (r2, c2)
 
--- | Every (ancestor, descendant) pair where both have a SourceSpan and
--- the ancestor's range fails to enclose the descendant's. Equivalent
--- to strict step-wise containment (since enclosure is transitive) but
--- doesn't require us to single out "direct children" against an
--- existential set.
+-- | Every (parent, direct-child) pair where both have a SourceSpan and
+-- the parent's range fails to enclose the child's. Stepwise containment
+-- is transitive, so this is equivalent to the cross-product check on
+-- (ancestor, descendant) pairs but runs in O(n) instead of O(n²) —
+-- which matters when the kit hands us a 1000-line file.
 containmentViolations
   :: forall fs l.
      ( HFunctor (Sum fs)
@@ -171,13 +202,23 @@ containmentViolations
   => AnnTerm (Maybe SourceSpan) fs l
   -> [Violation]
 containmentViolations root =
-  [ Violation aSp dSp
-  | E ancestor      <- Generic.subterms root
-  , Just aSp        <- [getAnn ancestor]
-  , E descendant    <- Generic.subterms ancestor
-  , Just dSp        <- [getAnn descendant]
-  , not (aSp `contains` dSp)
+  [ Violation pSp cSp
+  | E parent <- Generic.subterms root
+  , Just pSp <- [getAnn parent]
+  , not (isDegenerateSpan pSp)
+  , E child  <- directChildren parent
+  , Just cSp <- [getAnn child]
+  , not (isDegenerateSpan cSp)
+  , not (pSp `contains` cSp)
   ]
+
+-- | The immediate (one-level-deep) children of a term.
+directChildren
+  :: HFoldable f
+  => Cxt h f a l
+  -> [E (Cxt h f a)]
+directChildren (Term t) = hfoldMap (\c -> [E c]) t
+directChildren (Hole _) = []
 
 -- | Whether the first span encloses the second (inclusive on both ends).
 contains :: SourceSpan -> SourceSpan -> Bool
@@ -185,6 +226,18 @@ contains (SourceSpan ps pe) (SourceSpan cs ce) =
   posLE ps cs && posLE ce pe
   where
     posLE (SourcePos _ r1 c1) (SourcePos _ r2 c2) = (r1, c1) <= (r2, c2)
+
+-- | A span whose end precedes its start. Some upstream parsers
+-- (currently @language-lua@) emit these for productions where one
+-- side is empty and the parser falls back to a sentinel "fake"
+-- 'SourcePos' at @(1,1)@; the result is a span like @(44,41)-(1,1)@
+-- that's structurally broken. Kits can use this to skip degenerate
+-- targets; the generic 'containmentViolations' already ignores
+-- pairs where either side is degenerate.
+isDegenerateSpan :: SourceSpan -> Bool
+isDegenerateSpan (SourceSpan s e) = posLT e s
+  where
+    posLT (SourcePos _ r1 c1) (SourcePos _ r2 c2) = (r1, c1) < (r2, c2)
 
 ------------------------------------------------------------------------
 -- Property 2: slice + reparse
@@ -197,15 +250,20 @@ checkReparse
   -> Either String ()
 checkReparse source (RPT sp reparse original) = do
   let slice = sliceSpan source sp
-  reparsed <- reparse slice
-  if stripA original == stripA reparsed
-    then Right ()
-    else Left $ unlines
-      [ "structural mismatch at " ++ showSpan sp
-      , "slice was: " ++ show (T.unpack slice)
-      , "original: " ++ show (stripA original)
-      , "reparsed: " ++ show (stripA reparsed)
-      ]
+  case reparse slice of
+    Left err -> Left $
+      "reparse failed at " ++ showSpan sp ++
+      "\n  slice: " ++ show (T.unpack slice) ++
+      "\n  error: " ++ err
+    Right reparsed ->
+      if stripA original == stripA reparsed
+        then Right ()
+        else Left $ unlines
+          [ "structural mismatch at " ++ showSpan sp
+          , "slice was: " ++ show (T.unpack slice)
+          , "original: " ++ show (stripA original)
+          , "reparsed: " ++ show (stripA reparsed)
+          ]
 
 ------------------------------------------------------------------------
 -- Source-byte slicing
@@ -217,13 +275,36 @@ checkReparse source (RPT sp reparse original) = do
 -- when they report @sourceTo@ as the position of the /last/ token
 -- consumed by a production. The slice covers the byte range from
 -- @start@ through @end@ inclusive.
+--
+-- Columns are interpreted with tab stops every 8 characters, matching
+-- @alex@\'s default lexer behaviour. A bare character-count would
+-- diverge from the parser's positions inside any tab-indented file.
 sliceSpan :: Text -> SourceSpan -> Text
 sliceSpan src (SourceSpan (SourcePos _ r1 c1) (SourcePos _ r2 c2)) =
-  let s = lineColToOffset r1 c1
-      e = lineColToOffset r2 c2 + 1
+  let s = rowColToOffset r1 c1
+      e = rowColToOffset r2 c2 + 1
   in T.take (e - s) (T.drop s src)
   where
-    lineLengths :: [Int]
-    lineLengths = map ((+ 1) . T.length) (T.lines src)
-    -- 1-based row, 1-based col → 0-based byte offset
-    lineColToOffset r c = sum (take (r - 1) lineLengths) + (c - 1)
+    -- 1-based row, 1-based (tab-aware) col → 0-based byte offset
+    rowColToOffset :: Int -> Int -> Int
+    rowColToOffset r c =
+      let ls = T.lines src
+          (before, line) = case splitAt (r - 1) ls of
+            (xs, y : _) -> (xs, y)
+            (xs, [])    -> (xs, T.empty)
+          lineStart = sum (map ((+ 1) . T.length) before)
+      in lineStart + colToCharOffset c line
+
+    -- Walk a single line accumulating tab-aware columns until @target@
+    -- is reached; return the 0-based char offset within the line.
+    colToCharOffset :: Int -> Text -> Int
+    colToCharOffset target = go 1 0 . T.unpack
+      where
+        tabWidth = 8
+        go !col !off cs
+          | col >= target = off
+          | otherwise = case cs of
+              []        -> off
+              ('\t':xs) -> let !col' = ((col - 1) `div` tabWidth + 1) * tabWidth + 1
+                           in go col' (off + 1) xs
+              (_   :xs) -> go (col + 1) (off + 1) xs

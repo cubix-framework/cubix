@@ -8,9 +8,12 @@
 
 module Cubix.Language.Lua.SourcePosSpec (spec) where
 
+import Data.List                             (sort)
 import Data.Maybe                            (mapMaybe)
 import Data.Text                             (Text)
 import Data.Text qualified                   as T
+import System.Directory                      (doesDirectoryExist, listDirectory)
+import System.FilePath                       ((</>), takeExtension)
 import Test.Hspec
 
 import Language.Lua.Annotated.Parser qualified as LP
@@ -30,15 +33,31 @@ import Cubix.Sin.Compdata.Annotation         (getAnn)
 import Cubix.Language.Parametric.SourcePos.Test
 
 spec :: Spec
-spec = sourcePosSpec luaKit
+spec = do
+  testFiles <- runIO discoverLua53TestSuite
+  sourcePosSpec (luaKit testFiles)
 
-luaKit :: SourcePosKit MLuaSig LFull.BlockL
-luaKit = SourcePosKit
+luaKit :: [FilePath] -> SourcePosKit MLuaSig LFull.BlockL
+luaKit testFiles = SourcePosKit
   { kitLanguageName   = "Lua"
   , kitSnippets       = luaSnippets
+  , kitTestFiles      = testFiles
   , kitParseFile      = parseFileTrackSources @MLuaSig
   , kitReParseTargets = luaReParseTargets
   }
+
+-- | The Lua 5.3 reference test suite ships with the repo. We discover
+-- the @.lua@ files at spec-construction time so an empty/missing
+-- directory degrades to the inline snippets instead of failing.
+discoverLua53TestSuite :: IO [FilePath]
+discoverLua53TestSuite = do
+  let dir = "test/lua/lua-5.3.3-tests"
+  exists <- doesDirectoryExist dir
+  if not exists
+    then pure []
+    else do
+      entries <- listDirectory dir
+      pure $ sort [ dir </> e | e <- entries, takeExtension e == ".lua" ]
 
 luaSnippets :: [(String, String)]
 luaSnippets =
@@ -61,6 +80,7 @@ luaReParseTargets root = mapMaybe targetOf (Generic.subterms root)
     targetOf
       :: E (MLuaTermAnn (Maybe SourceSpan)) -> Maybe (ReParseTarget MLuaSig)
     targetOf (E sub)
+      | Just sp <- getAnn sub, isDegenerateSpan sp = Nothing
       | Just sp <- getAnn sub
       , isSort @LFull.BlockL sub
       , Just sub' <- dynProj @_ @LFull.BlockL sub = Just (RPT sp reparseBlock sub')
@@ -84,8 +104,16 @@ reparseExp :: Text -> Either String (MLuaTermAnn (Maybe SourceSpan) LFull.ExpL)
 reparseExp   = fmap (LCommon.translate . LFull.translateExp  . fmap toSourceSpan)
              . runParser LP.exp
 
+-- | 'language-lua' applies a shebang-stripping pass to /any/ input that
+-- starts with @#@, including standalone reparse of an expression like
+-- @#x@ (length-of-x), which collapses the whole input to nothing and
+-- yields \"unexpected end of file\". Prepending a space sidesteps the
+-- check — the parse tree is identical modulo source positions, and we
+-- compare with 'stripA' anyway.
+--
+-- See LexerUtils.hs:dropSpecialComment in language-lua.
 runParser :: LP.Parser a -> Text -> Either String a
-runParser p t = case LP.parseText p t of
+runParser p t = case LP.parseText p (T.cons ' ' t) of
   Left  (_, msg) -> Left $ "parser error: " ++ msg
   Right v        -> Right v
 

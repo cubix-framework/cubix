@@ -326,6 +326,8 @@ test-suite unit-tests
     , cubix
     , cubix-compdata
     , deepseq
+    , directory
+    , filepath
     , hspec
     , language-lua
     , mtl
