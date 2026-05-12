@@ -272,6 +272,7 @@ test-suite unit-tests
   other-modules:
       Cubix.Analysis.NodePairsSpec
       Cubix.Language.Lua.SourcePosSpec
+      Cubix.Language.Parametric.SourcePos.Test
       Paths_cubix
   hs-source-dirs:
       test
