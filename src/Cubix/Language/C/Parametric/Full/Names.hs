@@ -13,6 +13,12 @@ module Cubix.Language.C.Parametric.Full.Names (
   , newASTTypes
   , cSigNames
   , makeSubsts
+
+  , isAnn
+  , propAnn
+
+  , annType
+  , annotatedSourceType
   ) where
 
 import           Data.Map ( Map )
@@ -22,7 +28,9 @@ import           Language.Haskell.TH hiding ( Name )
 import qualified Language.Haskell.TH as TH
 import           Language.C
 
-import           Data.Comp.Trans ( runCompTrans, generateNameLists, getTypeParamVars )
+import           Data.Comp.Trans ( runCompTrans, generateNameLists, getTypeParamVars, defaultPropAnn )
+
+import           Cubix.Language.Info
 
 import           Cubix.Language.Parametric.Syntax.Base
 import           Cubix.Language.Parametric.Syntax.Functor
@@ -35,8 +43,20 @@ cSigNames = newASTTypes ++ [''PairF, ''TripleF, ''ListF, ''MaybeF, ''EitherF, ''
 makeSubsts :: Q (Map TH.Name Type)
 makeSubsts = do
   vars <- runCompTrans $ getTypeParamVars origASTTypes
-  let substs = Map.fromList (zip vars (repeat $ TupleT 0))
+  let substs = Map.fromList (zip vars (repeat annType))
   inf <- reify ''Flags
   TyConI (NewtypeD _ _ [KindedTV f BndrReq StarT] _ _ _) <- reify ''Flags
   return $ Map.insert f (ConT ''CIntFlag) substs
+
+isAnn :: TH.Type -> Bool
+isAnn = (== (TH.AppT (TH.ConT ''Maybe) (TH.ConT ''SourceSpan)))
+
+propAnn :: [(TH.Exp, TH.Type)] -> TH.Exp
+propAnn = defaultPropAnn (TH.ConE 'Nothing)
+
+annType :: TH.Type
+annType = (TH.AppT (TH.ConT ''Maybe) (TH.ConT ''SourceSpan))
+
+annotatedSourceType :: TH.Type
+annotatedSourceType = TH.AppT (TH.ConT ''CTranslationUnit) annType
 #endif

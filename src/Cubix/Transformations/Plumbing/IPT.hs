@@ -138,7 +138,7 @@ instance PromptParamAttrs MPythonSig where
   promptParamAttrs = return $ PyParamAttrs' Nothing' Nothing'
 
 instance PromptParamAttrs MCSig where
-  promptParamAttrs = return $ iCFunParamAttrs (SingletonF' $ iCTypeSpec $ iCIntType iUnitF) NilF' Nothing' NilF'
+  promptParamAttrs = return $ iCFunParamAttrs (SingletonF' $ iCTypeSpec iCIntType) NilF' Nothing' NilF'
 
 instance PromptParamAttrs MJavaSig where
   promptParamAttrs = do liftIO $ putStrLn "Provide a Java type (e.g.: \"(PrimType IntT)\"): "

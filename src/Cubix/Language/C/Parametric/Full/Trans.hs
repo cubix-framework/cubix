@@ -12,6 +12,9 @@ module Cubix.Language.C.Parametric.Full.Trans () where
 #else
 module Cubix.Language.C.Parametric.Full.Trans (
     translate
+  , translateExtDecl
+  , translateStatement
+  , translateExpression
   , translateNodeInfo
   , untranslate
   ) where
@@ -21,9 +24,10 @@ import Data.Typeable ( Typeable )
 import qualified Language.C as C
 import qualified Language.Haskell.TH as TH
 
-import Data.Comp.Multi ( caseCxt, Sum, All )
-import Data.Comp.Trans ( runCompTrans, withSubstitutions, deriveTrans, deriveUntrans )
+import Data.Comp.Multi ( inject, caseCxt'', Sum, All, (:&:)(..), DistAnn )
+import Data.Comp.Trans ( runCompTrans, withSubstitutions, withAnnotationProp, defaultUnpropAnn, deriveTrans, deriveUntrans )
 
+import Cubix.Language.Info
 import Cubix.Language.C.Parametric.Full.Names
 import Cubix.Language.C.Parametric.Full.Types
 import Cubix.Language.Parametric.Syntax.Base
@@ -31,89 +35,102 @@ import Cubix.Language.Parametric.Syntax.Functor
 
 
 do substs <- makeSubsts
-   runCompTrans $ withSubstitutions substs $ deriveTrans origASTTypes (TH.ConT ''CTerm)
+   runCompTrans $ withAnnotationProp annType isAnn propAnn defaultUnpropAnn
+                $ withSubstitutions substs
+                $ deriveTrans origASTTypes annotatedTargType
 
-translate :: C.CTranslationUnit () -> CTerm CTranslationUnitL
+translate :: C.CTranslationUnit (Maybe SourceSpan) -> CTermOptAnn SourceSpan CTranslationUnitL
 translate = trans
 
-translateNodeInfo :: C.NodeInfo -> CTerm NodeInfoL
+translateExtDecl :: C.CExternalDeclaration (Maybe SourceSpan) -> CTermOptAnn SourceSpan CExternalDeclarationL
+translateExtDecl = trans
+
+translateStatement :: C.CStatement (Maybe SourceSpan) -> CTermOptAnn SourceSpan CStatementL
+translateStatement = trans
+
+translateExpression :: C.CExpression (Maybe SourceSpan) -> CTermOptAnn SourceSpan CExpressionL
+translateExpression = trans
+
+translateNodeInfo :: C.NodeInfo -> CTermOptAnn SourceSpan NodeInfoL
 translateNodeInfo = trans
 
 instance (Trans c l, Typeable l) => Trans [c] [l] where
-  trans [] = riNilF
-  trans (x:xs) = (trans x :: CTerm l) `iConsF` (trans xs)
+  trans [] = inject NilF
+  trans (x:xs) = inject $ ConsF (trans x) (trans xs)
 
 instance (Trans c l, Typeable l) => Trans (Maybe c) (Maybe l) where
-  trans Nothing  = riNothingF
-  trans (Just x) = iJustF $ (trans x :: CTerm l)
+  trans Nothing  = inject NothingF
+  trans (Just x) = inject $ JustF $ trans x
 
 instance (Trans c l, Trans d l', Typeable l, Typeable l') => Trans (c, d) (l, l')  where
-  trans (x, y) = riPairF (trans x) (trans y)
+  trans (x, y) = inject $ PairF (trans x) (trans y)
 
 instance (Trans c l, Trans d l', Trans e l'', Typeable l, Typeable l', Typeable l'') => Trans (c, d, e) (l, l', l'') where
-  trans (x, y, z) = riTripleF (trans x) (trans y) (trans z)
+  trans (x, y, z) = inject $ TripleF (trans x) (trans y) (trans z)
 
 instance (Trans c l, Trans d l', Typeable l, Typeable l') => Trans (Either c d) (Either l l') where
-  trans (Left x)  = riLeftF (trans x)
-  trans (Right x) = riRightF (trans x)
+  trans (Left x)  = inject $ LeftF (trans x)
+  trans (Right x) = inject $ RightF (trans x)
 
 instance Trans Bool BoolL where
-  trans x = iBoolF x
+  trans x = inject $ BoolF x
 
 instance Trans Int IntL where
-  trans x = iIntF x
+  trans x = inject $ IntF x
 
 instance Trans Integer IntegerL where
-  trans x = iIntegerF x
+  trans x = inject $ IntegerF x
 
 instance Trans () () where
-  trans _ = iUnitF
+  trans _ = inject UnitF
 
 
 do substs <- makeSubsts
-   runCompTrans $ withSubstitutions substs $ deriveUntrans origASTTypes (TH.ConT ''CTerm)
+   runCompTrans $ withAnnotationProp annType isAnn propAnn defaultUnpropAnn
+                $ withSubstitutions substs
+                $ deriveUntrans origASTTypes annotatedTargType
 
 type instance Targ [l] = [Targ l]
-instance Untrans ListF where
-  untrans NilF = T []
-  untrans (ConsF a b) = T ((t a) : (t b))
+instance Untrans (ListF :&: a) where
+  untrans (NilF :&: _) = T []
+  untrans (ConsF a b :&: _) = T ((t a) : (t b))
 
 type instance Targ (Maybe l) = Maybe (Targ l)
-instance Untrans MaybeF where
-  untrans NothingF = T Nothing
-  untrans (JustF x) = T (Just (t x))
+instance Untrans (MaybeF :&: a) where
+  untrans (NothingF :&: _) = T Nothing
+  untrans (JustF x  :&: _) = T (Just (t x))
 
 type instance Targ (l, l') = (Targ l, Targ l')
-instance Untrans PairF where
-  untrans (PairF x y) = T (t x, t y)
+instance Untrans (PairF :&: a) where
+  untrans (PairF x y :&: _) = T (t x, t y)
 
 type instance Targ (l, l', l'') = (Targ l, Targ l', Targ l'')
-instance Untrans TripleF where
-  untrans (TripleF x y z) = T (t x, t y, t z)
-  
+instance Untrans (TripleF :&: a) where
+  untrans (TripleF x y z :&: _) = T (t x, t y, t z)
+
 type instance Targ (Either l l') = Either (Targ l) (Targ l')
-instance Untrans EitherF where
-  untrans (LeftF x)  = T (Left (t x))
-  untrans (RightF x) = T (Right (t x))
+instance Untrans (EitherF :&: a) where
+  untrans (LeftF x  :&: _) = T (Left (t x))
+  untrans (RightF x :&: _) = T (Right (t x))
 
 type instance Targ BoolL = Bool
-instance Untrans BoolF where
-  untrans (BoolF x) = T x
+instance Untrans (BoolF :&: a) where
+  untrans (BoolF x :&: _) = T x
 
 type instance Targ IntL = Int
-instance Untrans IntF where
-  untrans (IntF x) = T x
+instance Untrans (IntF :&: a) where
+  untrans (IntF x :&: _) = T x
 
 type instance Targ IntegerL = Integer
-instance Untrans IntegerF where
-  untrans (IntegerF x) = T x
+instance Untrans (IntegerF :&: a) where
+  untrans (IntegerF x :&: _) = T x
 
 type instance Targ () = ()
-instance Untrans UnitF where
-  untrans UnitF = T ()
+instance Untrans (UnitF :&: a) where
+  untrans (UnitF :&: _) = T ()
 
-instance (All Untrans fs) => Untrans (Sum fs) where
-  untrans = caseCxt @Untrans untrans
+instance (All Untrans (DistAnn fs a)) => Untrans (Sum fs :&: a) where
+  untrans = caseCxt'' @Untrans untrans
 
 type instance Targ IntL = Int
 type instance Targ BoolL = Bool

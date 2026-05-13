@@ -34,6 +34,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 import qualified Data.Text.IO as Text
 
 import qualified Language.C as C
+import qualified Language.C.Data.Node as C ( lengthOfNode )
 import qualified Language.Java.Pretty as Java
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.JavaScript.Pretty.Printer.Extended as JS
@@ -141,12 +142,66 @@ instance Pretty MLuaSig where pretty = prettyLua
 ------------------------------- C ---------------------------------
 -------------------------------------------------------------------
 
+-- | Parse a C file preserving source positions on every node. Unlike
+-- 'parseC' / 'Cubix.Language.C.Parse.parse', this skips @gcc@
+-- preprocessing — positions are relative to the original file and the
+-- file's bytes are usable as a slicing source. The trade-off is that
+-- preprocessor directives, system @#include@s, and the macOS
+-- @__BLOCKS__@ workaround aren't applied; this path is intended for
+-- self-contained C source.
+parseCTrackSources :: FilePath -> IO (Maybe (MCTermAnn (Maybe SourceSpan) CTranslationUnitL))
+parseCTrackSources path = do
+  contents <- readFile path
+  case C.parseC (C.inputStreamFromString contents) (C.initPos path) of
+    Left  err  -> print err >> return Nothing
+    Right tree -> return $ Just $ CCommon.translate
+                                $ CFull.translate
+                                $ fmap (nodeInfoToSpan contents) tree
+
+-- | Convert a 'C.NodeInfo' to a 'SourceSpan'. The /start/ position
+-- comes from @posOfNode@; the /end/ is computed by walking
+-- @lengthOfNode@ characters forward from the start through the
+-- source. When @lengthOfNode@ isn't available we collapse to a
+-- point at the start.
+nodeInfoToSpan :: String -> C.NodeInfo -> Maybe SourceSpan
+nodeInfoToSpan source ni
+  | not (C.isSourcePos start) = Nothing
+  | otherwise =
+      let startRow = C.posRow start
+          startCol = C.posColumn start
+          (endRow, endCol) = case C.lengthOfNode ni of
+            Just len | len > 0 -> advancePos source startRow startCol (len - 1)
+            _                  -> (startRow, startCol)
+      in Just $ mkSourceSpan (C.posFile start)
+                             (startRow, startCol)
+                             (endRow, endCol)
+  where
+    start = C.posOfNode ni
+
+-- | Step @n@ characters forward through @source@ from @(row, col)@
+-- (1-based), returning the resulting @(row, col)@. Newlines bump the
+-- row and reset col to 1; all other characters advance col by 1.
+-- Caller is responsible for not stepping off the end of the source.
+advancePos :: String -> Int -> Int -> Int -> (Int, Int)
+advancePos source row col n =
+  let startOffset = lineColToOffset source row col
+  in offsetToLineCol source (startOffset + n)
+
+lineColToOffset :: String -> Int -> Int -> Int
+lineColToOffset source row col =
+  let (before, _rest) = splitAt (row - 1) (lines source)
+      lineStart = sum (map ((+ 1) . length) before)
+  in lineStart + (col - 1)
+
+offsetToLineCol :: String -> Int -> (Int, Int)
+offsetToLineCol source off =
+  let prefix = take off source
+      newlines = length (filter (== '\n') prefix)
+      lastLine = reverse (takeWhile (/= '\n') (reverse prefix))
+  in (newlines + 1, length lastLine + 1)
+
 parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
-parseC path = do
-  res <- CParse.parse path
-  case res of
-    Left errors -> print errors >> return Nothing
-    Right tree -> return $ Just $ CCommon.translate $ CFull.translate $ fmap (const ()) tree
+parseC = fmap (fmap stripA) . parseCTrackSources
 
 
 dummyNodeInfo :: C.NodeInfo
@@ -154,10 +209,11 @@ dummyNodeInfo = C.mkNodeInfoOnlyPos C.nopos
 
 
 prettyC :: MCTerm CTranslationUnitL -> String
-prettyC = show . C.pretty . fmap (const dummyNodeInfo) . CFull.untranslate . CCommon.untranslate
+prettyC = show . C.pretty . fmap (maybe dummyNodeInfo (const dummyNodeInfo)) . CFull.untranslate . ann Nothing . CCommon.untranslate
 
 type instance RootSort MCSig = CTranslationUnitL
 instance ParseFile MCSig where parseFile = parseC
+instance ParseFileTrackSources MCSig where parseFileTrackSources = parseCTrackSources
 instance Pretty MCSig where pretty = prettyC
 
 

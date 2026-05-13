@@ -271,6 +271,7 @@ test-suite unit-tests
   main-is: Spec.hs
   other-modules:
       Cubix.Analysis.NodePairsSpec
+      Cubix.Language.C.SourcePosSpec
       Cubix.Language.Lua.SourcePosSpec
       Cubix.Language.Parametric.SourcePos.Test
       Paths_cubix
@@ -329,6 +330,7 @@ test-suite unit-tests
     , directory
     , filepath
     , hspec
+    , language-c
     , language-lua
     , mtl
     , temporary

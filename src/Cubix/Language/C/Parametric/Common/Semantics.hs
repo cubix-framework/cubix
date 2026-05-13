@@ -30,9 +30,9 @@ import Unsafe.Coerce ( unsafeCoerce )
 ----------------------------------------------------------------
 
 instance {-# OVERLAPPING #-} (CBinaryOp :-<: gs) => GetStrictness' gs CExpression where
-  getStrictness'   (CCond _ _ _ _)     = [Strict, GuardedBy (Place 0), GuardedBy (NegPlace 0), NoEval]
-  getStrictness'   (CSizeofExpr _ _)   = [NoEval, NoEval]
-  getStrictness' t@(CBinary op _ _ _)  = case op of
+  getStrictness'   (CCond _ _ _)       = [Strict, GuardedBy (Place 0), GuardedBy (NegPlace 0), NoEval]
+  getStrictness'   (CSizeofExpr _)     = [NoEval, NoEval]
+  getStrictness' t@(CBinary op _ _)    = case op of
     CLndOp' -> [NoEval, Strict, GuardedBy (Place 1), NoEval]
     CLorOp' -> [NoEval, Strict, GuardedBy (NegPlace 1), NoEval]
     _       -> defaultGetStrictness t

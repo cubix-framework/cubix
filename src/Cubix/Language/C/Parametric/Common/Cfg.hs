@@ -155,23 +155,23 @@ extractForInit m = do
 
 -- TODO: test this for Duff's device (once we have switches working)
 instance ConstructCfg MCSig CCfgState CStatement where
-  constructCfg t@(remA -> CLabel (nam :*: _) (_ :*: mStatEE) _ _) = HState $ do
+  constructCfg t@(remA -> CLabel (nam :*: _) (_ :*: mStatEE) _) = HState $ do
     -- It's easiest to model it as if the label and the ensuing statement are separate
    labEE <- constructCfgLabel (ffst $ collapseFProd' t) (nameString nam)
    statEE <- unHState mStatEE
    combineEnterExit labEE statEE
 
-  constructCfg (collapseFProd' -> (t :*: (CIf e thn optElse _))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState e) (unHState thn)) (extractEEPMaybe $ unHState optElse)
-  constructCfg (collapseFProd' -> (t :*: (CWhile e b False _))) = HState $ constructCfgWhile   t (unHState e) (unHState b)
-  constructCfg (collapseFProd' -> (t :*: (CWhile e b True _)))  = HState $ constructCfgDoWhile t (unHState e) (unHState b)
+  constructCfg (collapseFProd' -> (t :*: (CIf e thn optElse))) = HState $ constructCfgIfElseIfElse t (liftM singleton $ liftM2 (,) (unHState e) (unHState thn)) (extractEEPMaybe $ unHState optElse)
+  constructCfg (collapseFProd' -> (t :*: (CWhile e b False))) = HState $ constructCfgWhile   t (unHState e) (unHState b)
+  constructCfg (collapseFProd' -> (t :*: (CWhile e b True)))  = HState $ constructCfgDoWhile t (unHState e) (unHState b)
 
-  constructCfg t@(remA -> CGoto (nam :*: _) _) = HState $ constructCfgGoto (ffst $ collapseFProd' t) (nameString nam)
-  constructCfg (collapseFProd' -> (t :*: (CGotoPtr e _))) = HState $ constructCfgReturn t (liftM Just $ unHState e)
-  constructCfg (collapseFProd' -> (t :*: (CCont _))) = HState $ constructCfgContinue t
-  constructCfg (collapseFProd' -> (t :*: (CBreak _))) = HState $ constructCfgBreak t
-  constructCfg (collapseFProd' -> (t :*: (CReturn e _))) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
+  constructCfg t@(remA -> CGoto (nam :*: _)) = HState $ constructCfgGoto (ffst $ collapseFProd' t) (nameString nam)
+  constructCfg (collapseFProd' -> (t :*: (CGotoPtr e))) = HState $ constructCfgReturn t (liftM Just $ unHState e)
+  constructCfg (collapseFProd' -> (t :*: CCont)) = HState $ constructCfgContinue t
+  constructCfg (collapseFProd' -> (t :*: CBreak)) = HState $ constructCfgBreak t
+  constructCfg (collapseFProd' -> (t :*: (CReturn e))) = HState $ constructCfgReturn t (extractEEPMaybe $ unHState e)
 
-  constructCfg (collapseFProd' -> (t :*: (CSwitch exp body _))) = HState $ do
+  constructCfg (collapseFProd' -> (t :*: (CSwitch exp body))) = HState $ do
     enterNode <- addCfgNode t EnterNode
     exitNode  <- addCfgNode t ExitNode
 
@@ -193,7 +193,7 @@ instance ConstructCfg MCSig CCfgState CStatement where
     return $ EnterExitPair enterNode exitNode
 
       where cases = case project0 t of
-              Just (remA -> CSwitch _ b0 _) -> extractCases b0
+              Just (remA -> CSwitch _ b0) -> extractCases b0
 
             extractCases t0 =
               let subs = subterms t0
@@ -221,8 +221,8 @@ instance ConstructCfg MCSig CCfgState CFor where
 
 
 instance ConstructCfg MCSig CCfgState CExpression where
-  constructCfg t'@(remA -> (CBinary (op :*: _) _ _ _)) = do
-    let (t :*: (CBinary _ el er _)) = collapseFProd' t'
+  constructCfg t'@(remA -> (CBinary (op :*: _) _ _)) = do
+    let (t :*: (CBinary _ el er)) = collapseFProd' t'
     case extractOp op of
       CLndOp -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
       CLorOp  -> HState $ constructCfgShortCircuitingBinOp t (unHState el) (unHState er)
@@ -232,7 +232,7 @@ instance ConstructCfg MCSig CCfgState CExpression where
           extractOp (stripA -> project -> Just bp) = bp
 
   constructCfg t'@(remA -> CCond {}) = HState $ do
-    let (t :*: (CCond test succ fail _)) = collapseFProd' t'
+    let (t :*: (CCond test succ fail)) = collapseFProd' t'
     constructCfgCCondOp t (unHState test) (extractEEPMaybe (unHState succ)) (unHState fail)
 
   constructCfg t = constructCfgDefault t

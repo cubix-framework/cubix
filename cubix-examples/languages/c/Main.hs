@@ -20,14 +20,14 @@ parse path = do
   contents <- readInputStream path
   case parseC contents (initPos path) of
     Left errors -> print errors >> return Nothing
-    Right tree -> return $ Just $ translate $ fmap (const ()) tree
+    Right tree -> return $ Just $ stripA $ translate $ fmap (const Nothing) tree
 
 
 dummyNodeInfo :: Node.NodeInfo
 dummyNodeInfo = Node.mkNodeInfoOnlyPos nopos
 
 prettyC :: CTerm CTranslationUnitL -> String
-prettyC tree = show $ pretty $ fmap (const dummyNodeInfo) $ untranslate tree
+prettyC tree = show $ pretty $ fmap (maybe dummyNodeInfo (const dummyNodeInfo)) $ untranslate $ ann Nothing tree
 
 
 pattern PIdent s x y <- (project -> (Just (Ident s x y)))
@@ -40,6 +40,6 @@ vandalize = allbuR $ promoteR $ addFail vandalize'
 
 main = do
   Just tree <- parse "Foo.c"
-  let tree' = Common.translate tree
+  let tree' = stripA $ Common.translate (ann (Nothing :: Maybe ()) tree)
   print tree'
   putStrLn $ prettyC $ runIdentity $ vandalize tree
