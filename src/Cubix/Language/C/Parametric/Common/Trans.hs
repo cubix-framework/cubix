@@ -95,7 +95,7 @@ transSingleDec (extractF3 -> (declaratorOpt, initOpt, bitFieldOpt)) = checkBitFi
       Nothing' -> ()
 
     (id, localOpts) = case declaratorOpt of
-      Just' (project -> Just (F.CDeclr (Just' vid) decls asmName attrs)) -> (injFAnnDef $ transIdent vid, jCLocalVarAttrs (translate decls) (translate asmName) (translate attrs))
+      Just' (project -> Just (F.CDeclr (Just' vid) decls asmName attrs)) -> (injFAnnDef $ transIdent vid, CLocalVarAttrs' (translate decls) (translate asmName) (translate attrs))
       _ -> error "Attempting to translate nameless bitfield var declaration as if it were a local decl"
 
     init = case initOpt of
@@ -143,9 +143,9 @@ instance {-# OVERLAPPING #-} Trans F.CExpression where
 -------- For-loops
 
 transForInit :: (Default a, AnnotationInfo a) => F.CTermAnn a (Either (Maybe F.CExpressionL) F.CDeclarationL) -> MCTermAnn a CForInitL
-transForInit (Left' Nothing')  = jCForInitEmpty
-transForInit (Left' (Just' e)) = jCForInitExp $ translate e
-transForInit (Right' dec)      = jCForInitDecl $ transMultiDec dec
+transForInit (Left' Nothing')  = CForInitEmpty'
+transForInit (Left' (Just' e)) = CForInitExp' $ translate e
+transForInit (Right' dec)      = CForInitDecl' $ transMultiDec dec
 
 instance {-# OVERLAPPING #-} Trans F.CStatement where
   trans (F.CCompound ids items        :&: a) = injFAnnDef $ CLabeledBlock (mapF transIdent ids) (Block (mapF (injFAnnDef.translate) items) EmptyBlockEnd' ::&:: a) ::&:: a
@@ -155,24 +155,24 @@ instance {-# OVERLAPPING #-} Trans F.CStatement where
 -------- Function calls, declarations, and definitions
 
 paramDeclFromId :: (Default a, AnnotationInfo a) => F.CTermAnn a F.IdentL -> MCTermAnn a FunctionParameterDeclL
-paramDeclFromId n = PositionalParameterDeclOptionalIdent' (injFAnnDef $ jCFunParamAttrs NilF' NilF' Nothing' NilF') (Just' $ transIdent n)
+paramDeclFromId n = PositionalParameterDeclOptionalIdent' (injFAnnDef $ CFunParamAttrs' NilF' NilF' Nothing' NilF') (Just' $ transIdent n)
 
 paramDeclFromDecl :: (Default a, AnnotationInfo a) => F.CTermAnn a F.CDeclarationL -> MCTermAnn a FunctionParameterDeclL
-paramDeclFromDecl (project -> Just (F.CDecl (SingletonF' (project -> Just (F.CTypeSpec (project -> Just F.CVoidType)))) NilF')) = injFAnnDef jCVoidArg
+paramDeclFromDecl (project -> Just (F.CDecl (SingletonF' (project -> Just (F.CTypeSpec (project -> Just F.CVoidType)))) NilF')) = injFAnnDef CVoidArg'
 
 paramDeclFromDecl (project -> Just (F.CDecl dss inf)) =
   case inf of
-    NilF' -> PositionalParameterDeclOptionalIdent' (injFAnnDef $ jCFunParamAttrs (translate dss) NilF' Nothing' NilF') Nothing'
+    NilF' -> PositionalParameterDeclOptionalIdent' (injFAnnDef $ CFunParamAttrs' (translate dss) NilF' Nothing' NilF') Nothing'
     (SingletonF' (TripleF' (Just' (project -> Just (F.CDeclr nOpt dds asmNm attrs))) Nothing' Nothing')) ->
-                PositionalParameterDeclOptionalIdent' (injFAnnDef $ jCFunParamAttrs (translate dss) (translate dds) (translate asmNm) (translate attrs)) (mapF transIdent nOpt)
+                PositionalParameterDeclOptionalIdent' (injFAnnDef $ CFunParamAttrs' (translate dss) (translate dds) (translate asmNm) (translate attrs)) (mapF transIdent nOpt)
 
 instance {-# OVERLAPPING #-} Trans F.CDeclarator where
   trans (F.CDeclr (Just' n) (ConsF' (project -> Just (F.CFunDeclr pars attrs1)) dds) asmNm attrs2 :&: a) =
-    injFAnnDef $ FunctionDecl (jCFunDeclAttrs (translate dds) (translate attrs1) (translate asmNm) (translate attrs2))
+    injFAnnDef $ FunctionDecl (CFunDeclAttrs' (translate dds) (translate attrs1) (translate asmNm) (translate attrs2))
                               (transIdent n)
                               (case pars of
                                 Left' ps                                -> mapF paramDeclFromId ps
-                                Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramDeclFromDecl $ extractF decls) ++ (if isVarArg then [injFAnnDef jCVarArgParam] else []))
+                                Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramDeclFromDecl $ extractF decls) ++ (if isVarArg then [injFAnnDef CVarArgParam'] else []))
               ::&:: a
   trans t = transDefault t
 
@@ -181,28 +181,28 @@ instance {-# OVERLAPPING #-} Trans F.CDeclarator where
 -- Problem here is that I don't really know how to abstract these overlapping trees.
 -- I think the solution is going to be some way to "partially merge" the param decl/param hierarchies
 paramFromDecl :: (Default a, AnnotationInfo a) => F.CTermAnn a F.CDeclarationL -> MCTermAnn a FunctionParameterL
-paramFromDecl (project -> Just (F.CDecl (SingletonF' (project -> Just (F.CTypeSpec (project -> Just F.CVoidType)))) NilF')) = injFAnnDef jCVoidArg
+paramFromDecl (project -> Just (F.CDecl (SingletonF' (project -> Just (F.CTypeSpec (project -> Just F.CVoidType)))) NilF')) = injFAnnDef CVoidArg'
 paramFromDecl (project -> Just (F.CDecl dss (SingletonF' (TripleF' declOpt Nothing' Nothing')))) =
   case declOpt of
     Nothing' -> error "Unnamed parameter in function definition"
     Just' (project -> Just (F.CDeclr (Just' n) dds asmNm attrs)) ->
-                PositionalParameter' (injFAnnDef $ jCFunParamAttrs (translate dss) (translate dds) (translate asmNm) (translate attrs)) (transIdent n)
+                PositionalParameter' (injFAnnDef $ CFunParamAttrs' (translate dss) (translate dds) (translate asmNm) (translate attrs)) (transIdent n)
 
 instance {-# OVERLAPPING #-} Trans F.CFunctionDef where
   trans (F.CFunDef dss (project -> Just (F.CDeclr (Just' n)
                                                   (ConsF' (project -> Just (F.CFunDeclr pars attrs1)) dds)
                                                   asmNm attrs2))
                    oldStyleDecls body :&: a) =
-      injFAnnDef $ FunctionDef (jCFunDefAttrs (translate dss)
-                                              (jCFunDeclAttrs (translate dds)
+      injFAnnDef $ FunctionDef (CFunDefAttrs' (translate dss)
+                                              (CFunDeclAttrs' (translate dds)
                                                               (translate attrs1)
                                                               (translate asmNm)
                                                               (translate attrs2))
                                               (translate oldStyleDecls))
                                (transIdent n)
                                (case pars of
-                                 Left' ps -> mapF (injFAnnDef . jCOldStyleParam . transIdent) ps
-                                 Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramFromDecl $ extractF decls) ++ (if isVarArg then [injFAnnDef jCVarArgParam] else []))
+                                 Left' ps -> mapF (injFAnnDef . COldStyleParam' . transIdent) ps
+                                 Right' (PairF' decls (BoolF' isVarArg)) -> insertF $ (map paramFromDecl $ extractF decls) ++ (if isVarArg then [injFAnnDef CVarArgParam'] else []))
                                (injFAnnDef $ translate body)
                 ::&:: a
 

@@ -333,6 +333,7 @@ test-suite unit-tests
     , language-c
     , language-lua
     , mtl
+    , process
     , temporary
     , text
     , transformers

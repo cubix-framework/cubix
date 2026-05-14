@@ -17,7 +17,7 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/jkoppel/language-c.git
-    tag: 9a496ea8da36742ab3c4ca7769f072f8f6091deb
+    tag: d48312de53527665584bcb0cb21a1d325e4fe4b6
 
 source-repository-package
     type: git

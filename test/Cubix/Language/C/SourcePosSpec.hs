@@ -9,9 +9,16 @@
 
 module Cubix.Language.C.SourcePosSpec (spec) where
 
+import Control.Monad                         (unless, when)
+import Data.List                             (sort)
 import Data.Maybe                            (mapMaybe)
 import Data.Text                             (Text)
 import Data.Text qualified                   as T
+import System.Directory                      (createDirectoryIfMissing, doesDirectoryExist, listDirectory)
+import System.Exit                           (ExitCode (..))
+import System.FilePath                       ((</>), takeBaseName, takeExtension)
+import System.IO.Temp                        (getCanonicalTemporaryDirectory)
+import System.Process                        (readProcessWithExitCode)
 import Test.Hspec
 
 import Language.C qualified                  as C
@@ -31,16 +38,63 @@ import Cubix.Sin.Compdata.Annotation         (getAnn)
 import Cubix.Language.Parametric.SourcePos.Test
 
 spec :: Spec
-spec = sourcePosSpec cKit
+spec = do
+  testFiles <- runIO discoverInputFiles
+  sourcePosSpec (cKit testFiles)
 
-cKit :: SourcePosKit MCSig CFull.CTranslationUnitL
-cKit = SourcePosKit
+cKit :: [FilePath] -> SourcePosKit MCSig CFull.CTranslationUnitL
+cKit testFiles = SourcePosKit
   { kitLanguageName   = "C"
   , kitSnippets       = cSnippets
-  , kitTestFiles      = []  -- TODO: a real corpus, once preprocessor-free files are in place
+  , kitTestFiles      = testFiles
   , kitParseFile      = parseFileTrackSources @MCSig
   , kitReParseTargets = cReParseTargets
+    -- C parsing is context-sensitive (typedefs), so slicing a subterm
+    -- without its surrounding declarations can legitimately produce a
+    -- different AST when reparsed. Treat corpus-file reparse failures
+    -- as pending rather than hard errors.
+  , kitFileReparseIsBestEffort = True
   }
+
+-- | Discover @.c@ files under @input-files/c/@ (including the
+-- @ipt/@ subdirectory) and run each through @gcc -E -P@ so that
+-- comments and preprocessor directives are gone before
+-- 'parseCTrackSources' sees them. Returns the paths to the
+-- preprocessed copies. Positions in the resulting AST refer to those
+-- copies, and the kit's slicing reads from them; the originals are
+-- only used as input to @gcc@.
+discoverInputFiles :: IO [FilePath]
+discoverInputFiles = do
+  originals <- (++) <$> listCFiles "input-files/c"
+                    <*> listCFiles "input-files/c/ipt"
+  outDir <- (</> "cubix-c-source-pos") <$> getCanonicalTemporaryDirectory
+  createDirectoryIfMissing True outDir
+  mapM (preprocess outDir) originals
+
+listCFiles :: FilePath -> IO [FilePath]
+listCFiles dir = do
+  exists <- doesDirectoryExist dir
+  unless exists $
+    error $ "C test corpus directory missing — expected to find " ++ dir
+  entries <- listDirectory dir
+  let files = sort [ dir </> e | e <- entries, takeExtension e == ".c" ]
+  when (null files) $
+    error $ "C test corpus directory is empty — no .c files in " ++ dir
+  pure files
+
+-- | Preprocess @src@ with @gcc -E -P@ and write the result to
+-- @outDir/<basename>.c@. The @-P@ flag suppresses @# line@ markers
+-- so positions stay relative to the preprocessed file. Errors out if
+-- gcc can't be invoked or fails; that's a test-environment problem
+-- worth surfacing.
+preprocess :: FilePath -> FilePath -> IO FilePath
+preprocess outDir src = do
+  let dst = outDir </> takeBaseName src ++ ".c"
+  (code, stdout, stderr) <- readProcessWithExitCode "gcc" ["-E", "-P", src] ""
+  case code of
+    ExitSuccess   -> writeFile dst stdout >> pure dst
+    ExitFailure n -> error $
+      "gcc -E -P " ++ src ++ " failed (exit " ++ show n ++ "):\n" ++ stderr
 
 cSnippets :: [(String, String)]
 cSnippets =

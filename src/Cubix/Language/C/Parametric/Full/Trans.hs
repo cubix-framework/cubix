@@ -55,22 +55,22 @@ translateNodeInfo :: C.NodeInfo -> CTermOptAnn SourceSpan NodeInfoL
 translateNodeInfo = trans
 
 instance (Trans c l, Typeable l) => Trans [c] [l] where
-  trans [] = inject NilF
-  trans (x:xs) = inject $ ConsF (trans x) (trans xs)
+  trans [] = riNilF
+  trans (x:xs) = jConsF (trans x) (trans xs)
 
 instance (Trans c l, Typeable l) => Trans (Maybe c) (Maybe l) where
-  trans Nothing  = inject NothingF
-  trans (Just x) = inject $ JustF $ trans x
+  trans Nothing  = riNothingF
+  trans (Just x) = jJustF $ trans x
 
 instance (Trans c l, Trans d l', Typeable l, Typeable l') => Trans (c, d) (l, l')  where
-  trans (x, y) = inject $ PairF (trans x) (trans y)
+  trans (x, y) = riPairF (trans x) (trans y)
 
 instance (Trans c l, Trans d l', Trans e l'', Typeable l, Typeable l', Typeable l'') => Trans (c, d, e) (l, l', l'') where
-  trans (x, y, z) = inject $ TripleF (trans x) (trans y) (trans z)
+  trans (x, y, z) = riTripleF (trans x) (trans y) (trans z)
 
 instance (Trans c l, Trans d l', Typeable l, Typeable l') => Trans (Either c d) (Either l l') where
-  trans (Left x)  = inject $ LeftF (trans x)
-  trans (Right x) = inject $ RightF (trans x)
+  trans (Left x)  = riLeftF (trans x)
+  trans (Right x) = riRightF (trans x)
 
 instance Trans Bool BoolL where
   trans x = inject $ BoolF x

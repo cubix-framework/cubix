@@ -34,7 +34,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 import qualified Data.Text.IO as Text
 
 import qualified Language.C as C
-import qualified Language.C.Data.Node as C ( lengthOfNode )
+import qualified Language.C.Data.Node as C ( getLastTokenPos )
 import qualified Language.Java.Pretty as Java
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.JavaScript.Pretty.Printer.Extended as JS
@@ -151,54 +151,35 @@ instance Pretty MLuaSig where pretty = prettyLua
 -- self-contained C source.
 parseCTrackSources :: FilePath -> IO (Maybe (MCTermAnn (Maybe SourceSpan) CTranslationUnitL))
 parseCTrackSources path = do
-  contents <- readFile path
-  case C.parseC (C.inputStreamFromString contents) (C.initPos path) of
-    Left  err  -> print err >> return Nothing
+  res <- CParse.parse path
+  case res of
+    Left  err  -> putStrLn err >> return Nothing
     Right tree -> return $ Just $ CCommon.translate
                                 $ CFull.translate
-                                $ fmap (nodeInfoToSpan contents) tree
+                                $ fmap nodeInfoToSpan tree
 
--- | Convert a 'C.NodeInfo' to a 'SourceSpan'. The /start/ position
--- comes from @posOfNode@; the /end/ is computed by walking
--- @lengthOfNode@ characters forward from the start through the
--- source. When @lengthOfNode@ isn't available we collapse to a
--- point at the start.
-nodeInfoToSpan :: String -> C.NodeInfo -> Maybe SourceSpan
-nodeInfoToSpan source ni
-  | not (C.isSourcePos start) = Nothing
-  | otherwise =
-      let startRow = C.posRow start
-          startCol = C.posColumn start
-          (endRow, endCol) = case C.lengthOfNode ni of
-            Just len | len > 0 -> advancePos source startRow startCol (len - 1)
-            _                  -> (startRow, startCol)
-      in Just $ mkSourceSpan (C.posFile start)
-                             (startRow, startCol)
-                             (endRow, endCol)
+-- | Convert a 'C.NodeInfo' to a 'SourceSpan'. Unlike @language-lua@
+-- and @language-python@, @language-c@ exposes node extents as
+-- @(startPos, totalLength)@ rather than @(startPos, endPos)@. We
+-- recover the end via @getLastTokenPos@, which gives the position
+-- and length of the /last/ token belonging to the node; end column
+-- is then @col + len - 1@. This is approximate if the last token
+-- itself spans newlines (multi-line string literals etc.)
+--
+-- The 'C.Position' type is a sum with 'BuiltinPosition' / 'NoPosition'
+-- / 'InternalPosition' constructors, on which 'C.posRow' / 'C.posColumn'
+-- throw. Both endpoints must be real source positions; otherwise we
+-- drop the span.
+nodeInfoToSpan :: C.NodeInfo -> Maybe SourceSpan
+nodeInfoToSpan ni
+  | not (C.isSourcePos start)   = Nothing
+  | not (C.isSourcePos lastTok) = Nothing
+  | otherwise = Just $ mkSourceSpan (C.posFile start)
+                                    (C.posRow start, C.posColumn start)
+                                    (C.posRow lastTok, C.posColumn lastTok + max 0 (lastLen - 1))
   where
-    start = C.posOfNode ni
-
--- | Step @n@ characters forward through @source@ from @(row, col)@
--- (1-based), returning the resulting @(row, col)@. Newlines bump the
--- row and reset col to 1; all other characters advance col by 1.
--- Caller is responsible for not stepping off the end of the source.
-advancePos :: String -> Int -> Int -> Int -> (Int, Int)
-advancePos source row col n =
-  let startOffset = lineColToOffset source row col
-  in offsetToLineCol source (startOffset + n)
-
-lineColToOffset :: String -> Int -> Int -> Int
-lineColToOffset source row col =
-  let (before, _rest) = splitAt (row - 1) (lines source)
-      lineStart = sum (map ((+ 1) . length) before)
-  in lineStart + (col - 1)
-
-offsetToLineCol :: String -> Int -> (Int, Int)
-offsetToLineCol source off =
-  let prefix = take off source
-      newlines = length (filter (== '\n') prefix)
-      lastLine = reverse (takeWhile (/= '\n') (reverse prefix))
-  in (newlines + 1, length lastLine + 1)
+    start             = C.posOfNode ni
+    (lastTok, lastLen) = C.getLastTokenPos ni
 
 parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
 parseC = fmap (fmap stripA) . parseCTrackSources

@@ -35,7 +35,7 @@ import Cubix.Language.Parametric.SourcePos.Test
 
 spec :: Spec
 spec = do
-  testFiles <- runIO discoverLua53TestSuite
+  testFiles <- runIO $ (++) <$> discoverLua53TestSuite <*> discoverInputFiles
   sourcePosSpec (luaKit testFiles)
 
 luaKit :: [FilePath] -> SourcePosKit MLuaSig LFull.BlockL
@@ -45,6 +45,9 @@ luaKit testFiles = SourcePosKit
   , kitTestFiles      = testFiles
   , kitParseFile      = parseFileTrackSources @MLuaSig
   , kitReParseTargets = luaReParseTargets
+    -- Lua parsing is context-free; reparse mismatches indicate real
+    -- problems and should fail loudly.
+  , kitFileReparseIsBestEffort = False
   }
 
 -- | Discover the @.lua@ files in the Lua 5.3 reference test suite that
@@ -52,15 +55,23 @@ luaKit testFiles = SourcePosKit
 -- empty: that suite is a known, expected resource, and silently
 -- skipping it would hide a real problem.
 discoverLua53TestSuite :: IO [FilePath]
-discoverLua53TestSuite = do
-  let dir = "test/lua/lua-5.3.3-tests"
+discoverLua53TestSuite = listLuaFiles "test/lua/lua-5.3.3-tests"
+
+-- | Discover the smaller @.lua@ corpus under @input-files/lua/@,
+-- including its @ipt/@ subdirectory.
+discoverInputFiles :: IO [FilePath]
+discoverInputFiles = (++) <$> listLuaFiles "input-files/lua"
+                          <*> listLuaFiles "input-files/lua/ipt"
+
+listLuaFiles :: FilePath -> IO [FilePath]
+listLuaFiles dir = do
   exists <- doesDirectoryExist dir
   unless exists $
-    error $ "Lua 5.3 test suite missing — expected to find " ++ dir
+    error $ "Lua test corpus directory missing — expected to find " ++ dir
   entries <- listDirectory dir
   let files = sort [ dir </> e | e <- entries, takeExtension e == ".lua" ]
   when (null files) $
-    error $ "Lua 5.3 test suite is empty — no .lua files in " ++ dir
+    error $ "Lua test corpus directory is empty — no .lua files in " ++ dir
   pure files
 
 luaSnippets :: [(String, String)]
