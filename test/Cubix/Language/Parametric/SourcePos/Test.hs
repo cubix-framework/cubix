@@ -182,12 +182,15 @@ sourcePosSpec kit =
                     ++ "\nfirst mismatch:\n" ++ m
                 | otherwise  -> expectationFailure m
               ([], pf : _)
-                | bestEffort -> pendingWith (summary (length parseFails) 0)
+                | bestEffort -> pendingWith $
+                    summary (length parseFails) 0
+                    ++ "\nfirst parse-failure:\n" ++ pf
                 | isCorpusFile ->
                     pendingWith $
                       show (length parseFails) ++ " of " ++ show (length results)
                       ++ " targets failed to reparse (likely context-sensitive parsing); "
                       ++ show passes ++ " passed"
+                      ++ "\nfirst parse-failure:\n" ++ pf
                 | otherwise  ->
                     -- Inline snippets shouldn't have reparse failures.
                     expectationFailure pf
@@ -339,6 +342,11 @@ checkReparse source (RPT sp reparse original) =
 -- Columns are interpreted with tab stops every 8 characters, matching
 -- @alex@\'s default lexer behaviour. A bare character-count would
 -- diverge from the parser's positions inside any tab-indented file.
+--
+-- Note: the slice's first line begins at column 1 (its leading bytes
+-- before @c1@ are dropped), but subsequent lines retain their absolute
+-- column positions. For indentation-sensitive languages a kit may need
+-- to dedent before reparsing — see 'Cubix.Language.Python.SourcePosSpec'.
 sliceSpan :: Text -> SourceSpan -> Text
 sliceSpan src (SourceSpan (SourcePos _ r1 c1) (SourcePos _ r2 c2)) =
   let s = rowColToOffset r1 c1

@@ -274,6 +274,7 @@ test-suite unit-tests
       Cubix.Language.C.SourcePosSpec
       Cubix.Language.Lua.SourcePosSpec
       Cubix.Language.Parametric.SourcePos.Test
+      Cubix.Language.Python.SourcePosSpec
       Paths_cubix
   hs-source-dirs:
       test
@@ -332,6 +333,7 @@ test-suite unit-tests
     , hspec
     , language-c
     , language-lua
+    , language-python
     , mtl
     , process
     , temporary

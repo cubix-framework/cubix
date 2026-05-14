@@ -307,9 +307,14 @@ printAstAnn "c" file = do
   case mt of
     Nothing -> error "Parse failed"
     Just t  -> pPrintLightBg t
+printAstAnn "python" file = do
+  mt <- parseFileTrackSources @MPythonSig file
+  case mt of
+    Nothing -> error "Parse failed"
+    Just t  -> pPrintLightBg t
 printAstAnn lang _ = error $
   "print-ast-ann is not yet wired up for language: " ++ lang
-  ++ " (currently supported: c, lua)"
+  ++ " (currently supported: c, lua, python)"
 
 --FIXME: I got lazy and just made a separate branch for IPT. Should be merged
 -- with other transformations
