@@ -96,10 +96,10 @@ class VarInitToRhs f where
 #ifndef ONLY_ONE_LANGUAGE
 instance VarInitToRhs MCTerm where
   varInitToRhs cAttrs (projF -> Just (Ident' nam)) lAttrs (projF -> Just (x :: MCTerm CInitializerL)) = case x of
-    CInitExpr' e _   -> injF e
-    CInitList' l ann -> iCCompoundLit decl l ann
+    CInitExpr' e -> injF e
+    CInitList' l -> iCCompoundLit decl l
       where
-        decl = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam) iUnitF) iUnitF))) riNilF iUnitF
+        decl = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam))))) riNilF
 
 instance VarInitToRhs MJavaTerm where
   varInitToRhs cAttrs _ lAttrs (projF -> Just (x :: MJavaTerm VarInitL)) = case x of
@@ -169,7 +169,7 @@ isArray t = not $ null (subterms t :: [MCTerm CArraySizeL])
 -- See 20000801-4.c from the GCC torture tests.
 getCharArraySize :: MCTerm LocalVarDeclAttrsL -> Maybe Int
 getCharArraySize t = case head (subterms t :: [MCTerm CArraySizeL]) of
-  (project -> Just (CArrSize _ (project -> Just (CConst (project -> Just (CIntConst (CInteger' n) _)))))) -> Just (fromInteger n)
+  (project -> Just (CArrSize _ (project -> Just (CConst (project -> Just (CIntConst (CInteger' n))))))) -> Just (fromInteger n)
   _ -> Nothing
 
 
@@ -178,7 +178,7 @@ updateSize :: MCTerm l -> Int -> MCTerm l
 updateSize t n = runIdentity $ (alltdR $ promoteR $ addFail $ updateSize' n) t
 
 updateSize' :: Int -> Rewrite MCTerm CArraySizeL
-updateSize' n (project -> Just (CNoArrSize _)) = return $ iCArrSize False (iCConst $ iCIntConst (CInteger' (toInteger n)) iUnitF)
+updateSize' n (project -> Just (CNoArrSize _)) = return $ iCArrSize False (iCConst $ iCIntConst (CInteger' (toInteger n)))
 updateSize' _ t                                = return t
 
 makeDeclUpdateSize attrs lattrs nam len = updateSize decl len
@@ -188,30 +188,29 @@ makeDeclUpdateSize attrs lattrs nam len = updateSize decl len
 
 makeMemcpy nam val = memcpy
   where
-    var = iCVar (iIdent nam) iUnitF
-    argList = map PositionalArgument' [ iCUnary iCAdrOp var iUnitF
-                                      , iCUnary iCAdrOp val iUnitF
-                                      , iCSizeofExpr var iUnitF
+    var = iCVar (iIdent nam)
+    argList = map PositionalArgument' [ iCUnary iCAdrOp var
+                                      , iCUnary iCAdrOp val
+                                      , iCSizeofExpr var
                                       ]
 
     memcpy = iCBlockStmt (iCExpr (Just' $ iFunctionCall EmptyFunctionCallAttrs'
-                                                        (iCVar (iIdent "memcpy") iUnitF)
-                                                        (FunctionArgumentList' $ insertF argList))
-                                 iUnitF)
+                                                        (iCVar (iIdent "memcpy"))
+                                                        (FunctionArgumentList' $ insertF argList)))
 
 hoistArrayInitString :: MCTerm MultiLocalVarDeclCommonAttrsL
                      -> MCTerm LocalVarDeclAttrsL
                      -> String
                      -> MCTerm CExpressionL
                      -> Maybe ([MCTerm BlockItemL], [MCTerm BlockItemL])
-hoistArrayInitString attrs lattrs nam (project -> Just (CConst (project -> Just (CStrConst (CString' str) _)))) =
+hoistArrayInitString attrs lattrs nam (project -> Just (CConst (project -> Just (CStrConst (CString' str))))) =
     Just ([decl], [memcpy])
   where
     decl = makeDeclUpdateSize attrs lattrs nam (length str + 1)
 
     arrSize = maybe 0 id (getCharArraySize lattrs)
     paddedStr = str ++ (take (arrSize - length str) $ repeat '\0')
-    memcpy = makeMemcpy nam (iCConst $ iCStrConst (CString' paddedStr) iUnitF)
+    memcpy = makeMemcpy nam (iCConst $ iCStrConst (CString' paddedStr))
 
 
 hoistArrayInitString _ _ _ _ = Nothing
@@ -226,14 +225,14 @@ instance {-# OVERLAPPABLE #-} SpecialHoist MCSig where
   specialHoistMulti _ attrs lattrs (projF -> Just (Ident' nam)) init
     | JustLocalVarInit' linit <- init
     , Just (x :: MCTerm CInitializerL) <- projF linit = case x of
-             CInitExpr' e _ -> if isArray lattrs then
+             CInitExpr' e -> if isArray lattrs then
                                  hoistArrayInitString attrs lattrs nam e
                                else
                                  Nothing
-             CInitList' l _ -> Just ([decl], [memcpy])
+             CInitList' l -> Just ([decl], [memcpy])
                where
-                 litType = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam) iUnitF) iUnitF))) riNilF iUnitF
-                 compoundLit = iCCompoundLit litType l iUnitF :: MCTerm CExpressionL
+                 litType = iCDecl (SingletonF' (iCTypeSpec (iCTypeOfExpr (iCVar (iIdent nam))))) riNilF
+                 compoundLit = iCCompoundLit litType l :: MCTerm CExpressionL
                  memcpy = makeMemcpy nam compoundLit
 
                  decl = makeDeclUpdateSize attrs lattrs nam (length $ extractF l)
@@ -282,7 +281,7 @@ containsConstAttr :: MCTerm l -> Bool
 containsConstAttr a = any isConstQual (subterms a :: [MCTerm CTypeQualifierL])
   where
     isConstQual :: MCTerm CTypeQualifierL -> Bool
-    isConstQual (project -> Just (CConstQual _)) = True
+    isConstQual (project -> Just CConstQual) = True
     isConstQual _                                = False
 
 instance {-# OVERLAPPING #-} BlockHoisting MCSig where

@@ -17,7 +17,7 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/jkoppel/language-c.git
-    tag: 9a496ea8da36742ab3c4ca7769f072f8f6091deb
+    tag: d48312de53527665584bcb0cb21a1d325e4fe4b6
 
 source-repository-package
     type: git
@@ -29,6 +29,11 @@ source-repository-package
     location: https://github.com/jkoppel/language-python.git
     tag: 4ef1ba415badfb58e043bef543d9d9857ab0f2cc
     subdir: language-python
+
+source-repository-package
+    type: git
+    location: https://github.com/jkoppel/language-lua.git
+    tag: 85e8dd720cc21ce79d5e3d8ef3f979381c5b6dc0
 
 source-repository-package
     type: git

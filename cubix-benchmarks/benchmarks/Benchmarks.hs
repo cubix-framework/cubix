@@ -134,14 +134,14 @@ getPython path = do
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 #endif
 
-getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTerm LBlockL
+getLua :: FilePath -> IO ( LuaLib.Block LuaLib.SourceRange, LFull.LuaTermOptAnn SourceSpan LBlockL
                          , MLuaTerm LBlockL, MLuaTermLab LBlockL
                          , Cfg MLuaSig)
 getLua path = do
   raw <- fromRight <$> LuaLib.parseFile path
   gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
-  let fullTree = stripA $ LFull.translate (fmap toSourceSpan raw)
-  let commTree = LCommon.translate fullTree
+  let fullTree = LFull.translate (fmap toSourceSpan raw)
+  let commTree = stripA $ LCommon.translate fullTree
   let labTree  = labelProg gen commTree
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
@@ -261,6 +261,6 @@ main = do
                     , bench "tac"             $ nfIO $ toTAC lab
                     , bench "testCov"         $ nfIO $ instrumentTestCoverage lab
                     , bench "untransIps"      $ nf LCommon.untranslate ips
-                    , bench "untransMod"      $ nf LFull.untranslate (ann Nothing full)
+                    , bench "untransMod"      $ nf LFull.untranslate full
                     ]
                 ]

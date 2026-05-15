@@ -14,7 +14,7 @@ import Data.List ( (\\) )
 
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Node, HFunctor, Term, project', project, (:-<:), CxtS, All, AnnCxtS )
+import Data.Comp.Multi ( Node, HFunctor, Term, AnnTerm, project', project, (:-<:), CxtS, All, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.C.Parametric.Full.Names
@@ -257,6 +257,9 @@ type instance InjectableSorts MCSig MultiLocalVarDeclL = '[CCompoundBlockItemL]
 type MCTerm = Term MCSig
 type MCTermLab = TermLab MCSig
 
+type MCTermAnn    a = AnnTerm        a  MCSig
+type MCTermOptAnn a = AnnTerm (Maybe a) MCSig
+
 type MCCxt h a = CxtS h MCSig a
 type MCCxtA h a p = AnnCxtS p h MCSig a
 
@@ -267,11 +270,11 @@ type MCCxtA h a p = AnnCxtS p h MCSig a
 
 -- Some extra work needed to make this work on Context's
 instance InjF MCSig AssignL BlockItemL where
-  injF = C.iCBlockStmt . (flip C.iCExpr iUnitF) . iJustF . (iAssignIsCExpression :: (MCCxt _ _) AssignL -> (MCCxt _ _) CExpressionL)
+  injF = C.iCBlockStmt . C.iCExpr . iJustF . (iAssignIsCExpression :: (MCCxt _ _) AssignL -> (MCCxt _ _) CExpressionL)
   projF' t = do
     (b :: MCCxtA _ _ _ CCompoundBlockItemL) <- projF' t
     CBlockStmt s <- project' b
-    CExpr me _ <- project' s
+    CExpr me <- project' s
     let JustA' e = me
     projF' e
 
@@ -282,16 +285,16 @@ instance InjF MCSig MultiLocalVarDeclL BlockItemL where
     projF' s
 
 instance InjF MCSig P.IdentL LhsL where
-  injF n = iCVar (injF n) iUnitF
+  injF n = iCVar (injF n)
   projF' n = do
     (x :: (MCCxtA _ _ _) CExpressionL) <- projF' n
-    CVar y _ <- project' x
+    CVar y <- project' x
     projF' y
 
 instance InjF MCSig P.IdentL CExpressionL where
-  injF n = iCVar (injF n) iUnitF
+  injF n = iCVar (injF n)
   projF' e = do
-    CVar x _ <- project' e
+    CVar x <- project' e
     projF' x
 
 instance InjF MCSig CStatementL BlockItemL where
@@ -302,28 +305,28 @@ instance InjF MCSig CStatementL BlockItemL where
     return y
 
 instance InjF MCSig CExpressionL LocalVarInitL where
-  injF x = iCInitExpr x iUnitF
+  injF x = iCInitExpr x
   projF' i = do
     CInitializerIsLocalVarInit x <- project' i
-    CInitExpr e _ <- project' x
+    CInitExpr e <- project' x
     return e
 
 instance InjF MCSig P.IdentL FunctionExpL where
-  injF x = iCVar (injF x) iUnitF
+  injF x = iCVar (injF x)
 
   projF' f
    | Just (CExpressionIsFunctionExp e) <- project' f
-   , Just (CVar n _) <- project' e
+   , Just (CVar n) <- project' e
    , Just (IdentIsIdent i) <- project' n
    = Just i
   projF' _ = Nothing
 
 instance InjF MCSig P.IdentL PositionalArgExpL where
-  injF n = iCVar (injF n) iUnitF
+  injF n = iCVar (injF n)
 
   projF' a
    | Just (CExpressionIsPositionalArgExp e) <- project' a
-   , Just (CVar n _) <- project' e = projF' n
+   , Just (CVar n) <- project' e = projF' n
   projF' _ = Nothing
 
 instance InjF MCSig FunctionCallL RhsL where

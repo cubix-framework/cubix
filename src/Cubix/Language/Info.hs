@@ -81,7 +81,7 @@ import Data.Hashable ( Hashable )
 
 import Data.Comp.Multi ( All, AnnHFix, AnnTerm, Context, Cxt(..), CxtFunM, E(..), HFix, HFoldable, HFunctor, HTraversable, Term, (:<:), (:&:)(..), appCxt, inj, rewriteEM )
 
-import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), annotateM, annotateOuter )
+import Cubix.Sin.Compdata.Annotation ( MonadAnnotater(..), AnnotationInfo(..), annotateM, annotateOuter )
 
 --------------------------------------------------------------------------------
 ---------------------------------- Labels --------------------------------------
@@ -125,6 +125,7 @@ instance NFData SourceSpan where rnf = genericRnf
 instance Hashable SourceSpan
 instance ToJSON SourceSpan
 instance FromJSON SourceSpan
+instance AnnotationInfo SourceSpan where shouldPropagateAnn = True
 
 makeClassy ''SourceSpan
 

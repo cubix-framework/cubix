@@ -34,6 +34,7 @@ import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 import qualified Data.Text.IO as Text
 
 import qualified Language.C as C
+import qualified Language.C.Data.Node as C ( getLastTokenPos )
 import qualified Language.Java.Pretty as Java
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.JavaScript.Pretty.Printer.Extended as JS
@@ -101,27 +102,37 @@ class Pretty fs where
 ------------------------------ Lua --------------------------------
 -------------------------------------------------------------------
 
--- | NOTE: This reflects the half-finished transition of Lua to annotated terms
-parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
-parseLua path = do
+parseLuaTrackSources :: FilePath -> IO (Maybe (MLuaTermAnn (Maybe SourceSpan) LBlockL))
+parseLuaTrackSources path = do
     res <- Lua.parseFile path
     case res of
      Left errors -> print errors >> return Nothing
-     Right tree  -> return $ Just $ LCommon.translate $ stripA $ LFull.translate $ fmap toSourceSpan tree
+     Right tree  -> return $ Just $ LCommon.translate $ LFull.translate $ fmap toSourceSpan tree
   where
+    -- In language-lua, when constructing source spans, it falls back to a sentinel "fake" range
+    -- (file "(nowehere)", position (1,1)) when one side of a production
+    -- has no tokens (e.g. an empty @function() end@ body). Filter those
+    -- out instead of propagating a structurally-broken span downstream.
     toSourceSpan :: Lua.SourceRange -> Maybe SourceSpan
-    toSourceSpan x = Just $ mkSourceSpan (T.unpack (Lua.sourceFile from))
-                                         (Lua.sourceLine from, Lua.sourceColumn from)
-                                         (Lua.sourceLine to,   Lua.sourceColumn to)
+    toSourceSpan x
+      | T.unpack (Lua.sourceFile from) == "(nowehere)" = Nothing
+      | otherwise = Just $ mkSourceSpan
+          (T.unpack (Lua.sourceFile from))
+          (Lua.sourceLine from, Lua.sourceColumn from)
+          (Lua.sourceLine to,   Lua.sourceColumn to)
       where
         from = Lua.sourceFrom x
         to   = Lua.sourceTo   x
+
+parseLua :: FilePath -> IO (Maybe (MLuaTerm LBlockL))
+parseLua = fmap (fmap stripA) . parseLuaTrackSources
 
 prettyLua :: MLuaTerm LBlockL -> String
 prettyLua = show . Lua.pprint . Lua.sBlock . LFull.untranslate . ann Nothing . LCommon.untranslate
 
 type instance RootSort MLuaSig = LBlockL
 instance ParseFile MLuaSig where parseFile = parseLua
+instance ParseFileTrackSources MLuaSig where parseFileTrackSources = parseLuaTrackSources
 instance Pretty MLuaSig where pretty = prettyLua
 
 #ifndef ONLY_ONE_LANGUAGE
@@ -131,12 +142,47 @@ instance Pretty MLuaSig where pretty = prettyLua
 ------------------------------- C ---------------------------------
 -------------------------------------------------------------------
 
-parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
-parseC path = do
+-- | Parse a C file preserving source positions on every node. Unlike
+-- 'parseC' / 'Cubix.Language.C.Parse.parse', this skips @gcc@
+-- preprocessing — positions are relative to the original file and the
+-- file's bytes are usable as a slicing source. The trade-off is that
+-- preprocessor directives, system @#include@s, and the macOS
+-- @__BLOCKS__@ workaround aren't applied; this path is intended for
+-- self-contained C source.
+parseCTrackSources :: FilePath -> IO (Maybe (MCTermAnn (Maybe SourceSpan) CTranslationUnitL))
+parseCTrackSources path = do
   res <- CParse.parse path
   case res of
-    Left errors -> print errors >> return Nothing
-    Right tree -> return $ Just $ CCommon.translate $ CFull.translate $ fmap (const ()) tree
+    Left  err  -> putStrLn err >> return Nothing
+    Right tree -> return $ Just $ CCommon.translate
+                                $ CFull.translate
+                                $ fmap nodeInfoToSpan tree
+
+-- | Convert a 'C.NodeInfo' to a 'SourceSpan'. Unlike @language-lua@
+-- and @language-python@, @language-c@ exposes node extents as
+-- @(startPos, totalLength)@ rather than @(startPos, endPos)@. We
+-- recover the end via @getLastTokenPos@, which gives the position
+-- and length of the /last/ token belonging to the node; end column
+-- is then @col + len - 1@. This is approximate if the last token
+-- itself spans newlines (multi-line string literals etc.)
+--
+-- The 'C.Position' type is a sum with 'BuiltinPosition' / 'NoPosition'
+-- / 'InternalPosition' constructors, on which 'C.posRow' / 'C.posColumn'
+-- throw. Both endpoints must be real source positions; otherwise we
+-- drop the span.
+nodeInfoToSpan :: C.NodeInfo -> Maybe SourceSpan
+nodeInfoToSpan ni
+  | not (C.isSourcePos start)   = Nothing
+  | not (C.isSourcePos lastTok) = Nothing
+  | otherwise = Just $ mkSourceSpan (C.posFile start)
+                                    (C.posRow start, C.posColumn start)
+                                    (C.posRow lastTok, C.posColumn lastTok + max 0 (lastLen - 1))
+  where
+    start             = C.posOfNode ni
+    (lastTok, lastLen) = C.getLastTokenPos ni
+
+parseC :: FilePath -> IO (Maybe (MCTerm CTranslationUnitL))
+parseC = fmap (fmap stripA) . parseCTrackSources
 
 
 dummyNodeInfo :: C.NodeInfo
@@ -144,10 +190,11 @@ dummyNodeInfo = C.mkNodeInfoOnlyPos C.nopos
 
 
 prettyC :: MCTerm CTranslationUnitL -> String
-prettyC = show . C.pretty . fmap (const dummyNodeInfo) . CFull.untranslate . CCommon.untranslate
+prettyC = show . C.pretty . fmap (maybe dummyNodeInfo (const dummyNodeInfo)) . CFull.untranslate . ann Nothing . CCommon.untranslate
 
 type instance RootSort MCSig = CTranslationUnitL
 instance ParseFile MCSig where parseFile = parseC
+instance ParseFileTrackSources MCSig where parseFileTrackSources = parseCTrackSources
 instance Pretty MCSig where pretty = prettyC
 
 

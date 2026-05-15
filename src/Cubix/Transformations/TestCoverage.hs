@@ -73,19 +73,19 @@ class MarkBlockCovered fs where
 
 #ifndef ONLY_ONE_LANGUAGE
 cInt :: Int -> MCTerm CExpressionL
-cInt n = iCConst $ iCIntConst (CInteger' (toInteger n)) iUnitF
+cInt n = iCConst $ iCIntConst (CInteger' (toInteger n))
 
 instance MarkBlockCovered MCSig where
   markBlockCovered n = annotateLabel term
     where
       term :: MCTerm BlockItemL
-      term = P.iAssign (iCIndex covArr (cInt n) iUnitF) AssignOpEquals' rhs
+      term = P.iAssign (iCIndex covArr (cInt n)) AssignOpEquals' rhs
 
       covArr :: MCTerm CExpressionL
-      covArr = iCMember (iCVar (iIdent "TestCoverage") iUnitF) (iIdent "coverage") False iUnitF
+      covArr = iCMember (iCVar (iIdent "TestCoverage")) (iIdent "coverage") False
 
       rhs :: MCTerm RhsL
-      rhs = iCConst $ iCIntConst (iCInteger 1 iDecRepr (C.iFlags 0)) iUnitF
+      rhs = iCConst $ iCIntConst (iCInteger 1 iDecRepr (C.iFlags 0))
 
 
 instance MarkBlockCovered MJavaSig where
@@ -156,7 +156,7 @@ instance {-# OVERLAPPING #-} ExcludeBasicBlock MCSig where
       excludeExp _ = True
 
       excludeWhile :: MCTermLab CStatementL -> Bool
-      excludeWhile (project' -> Just (CWhile _ _ _ _)) = True
+      excludeWhile (project' -> Just (CWhile _ _ _)) = True
       excludeWhile _                                   = False
 
 instance {-# OVERLAPPING #-} ExcludeBasicBlock MJavaSig where

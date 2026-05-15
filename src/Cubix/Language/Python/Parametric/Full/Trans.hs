@@ -12,6 +12,8 @@ module Cubix.Language.Python.Parametric.Full.Trans () where
 #else
 module Cubix.Language.Python.Parametric.Full.Trans (
     translate
+  , translateStatement
+  , translateExpression
   , untranslate
   ) where
 
@@ -43,6 +45,12 @@ do substs <- makeSubsts
 
 translate :: P.Module (Maybe SourceSpan) -> PythonTermOptAnn SourceSpan ModuleL
 translate = trans
+
+translateStatement :: P.Statement (Maybe SourceSpan) -> PythonTermOptAnn SourceSpan StatementL
+translateStatement = trans
+
+translateExpression :: P.Expr (Maybe SourceSpan) -> PythonTermOptAnn SourceSpan ExprL
+translateExpression = trans
 
 instance (Trans c l, Typeable l) => Trans [c] [l] where
   trans [] = riNilF

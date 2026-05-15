@@ -46,6 +46,7 @@ luaSigNames = luaSigNamesBase ++ [''FunBody] -- Yes, this duplicates code. Templ
 type LuaTerm    = Term LuaSig
 type LuaTermLab l = TermLab LuaSig l
 
+type LuaTermAnn    a = AnnTerm        a  LuaSig
 type LuaTermOptAnn a = AnnTerm (Maybe a) LuaSig
 
 annotatedTargType :: TH.Type

@@ -145,6 +145,7 @@ type MLuaTermLab = TermLab MLuaSig
 type MLuaCxt h a = CxtS h MLuaSig a
 type MLuaCxtA h a p = AnnCxtS p h MLuaSig a
 
+type MLuaTermAnn    a = AnnTerm        a  MLuaSig
 type MLuaTermOptAnn a = AnnTerm (Maybe a) MLuaSig
 
 -----------------------------------------------------------------------------------

@@ -21,6 +21,8 @@ import Data.Comp.Multi.Strategy.Classification ( dynProj )
 import qualified Language.Dot.Pretty as Dot
 import qualified Language.Dot.Syntax as Dot
 
+import Text.Pretty.Simple ( pPrintLightBg )
+
 import System.IO.Temp ( withSystemTempFile )
 
 import Cubix.ParsePretty
@@ -207,18 +209,19 @@ runIpt gen (LuaProj    p) = putProj =<< (LuaProj    <$> interproceduralPlumbingT
 downcase :: String -> String
 downcase = map toLower
 
-tDebug, tId, tCfg, tElemHoist,tHoist, tTac, tTestcov :: String
-tDebug     = "debug"
-tId        = "id"
-tCfg       = "cfg"
-tElemHoist = "elementary-hoist"
-tHoist     = "hoist"
-tPrintAst  = "print-ast"
-tTac       = "tac"
-tTestcov   = "testcov"
+tDebug, tId, tCfg, tElemHoist,tHoist, tTac, tTestcov, tPrintAstAnn :: String
+tDebug       = "debug"
+tId          = "id"
+tCfg         = "cfg"
+tElemHoist   = "elementary-hoist"
+tHoist       = "hoist"
+tPrintAst    = "print-ast"
+tPrintAstAnn = "print-ast-ann"
+tTac         = "tac"
+tTestcov     = "testcov"
 
 transformsList :: [String]
-transformsList = [tDebug, tId, tCfg, tElemHoist, tHoist, tTac, tTestcov, tPrintAst]
+transformsList = [tDebug, tId, tCfg, tElemHoist, tHoist, tTac, tTestcov, tPrintAst, tPrintAstAnn]
 
 isTransform :: String -> Bool
 isTransform a = elem a transformsList
@@ -271,11 +274,13 @@ doIpt lang fils = do
       Just proj -> runIpt gen proj
 
 doTransform :: String -> String -> FilePath -> IO ()
-doTransform language transform file = do
-    progRes <- parseProg (downcase language) file
-    case progRes of
-      Nothing -> error "Parse failed"
-      Just prog -> putStrLn =<< (prettyProg <$> go (downcase transform) prog)
+doTransform language transform file
+  | downcase transform == tPrintAstAnn = printAstAnn (downcase language) file
+  | otherwise = do
+      progRes <- parseProg (downcase language) file
+      case progRes of
+        Nothing -> error "Parse failed"
+        Just prog -> putStrLn =<< (prettyProg <$> go (downcase transform) prog)
   where
     go t prog
       | t == tDebug     = (debugTree prog >> return prog)
@@ -286,6 +291,30 @@ doTransform language transform file = do
       | t == tHoist     = return $ runHoist prog
       | t == tTac       = runTAC prog
       | t == tTestcov   = runTestCov prog
+
+-- | Parse a file via 'parseFileTrackSources' and pretty-print the
+-- resulting annotated term (indented and colourised via
+-- @pretty-simple@). Only available for languages with a
+-- 'ParseFileTrackSources' instance.
+printAstAnn :: String -> FilePath -> IO ()
+printAstAnn "lua" file = do
+  mt <- parseFileTrackSources @MLuaSig file
+  case mt of
+    Nothing -> error "Parse failed"
+    Just t  -> pPrintLightBg t
+printAstAnn "c" file = do
+  mt <- parseFileTrackSources @MCSig file
+  case mt of
+    Nothing -> error "Parse failed"
+    Just t  -> pPrintLightBg t
+printAstAnn "python" file = do
+  mt <- parseFileTrackSources @MPythonSig file
+  case mt of
+    Nothing -> error "Parse failed"
+    Just t  -> pPrintLightBg t
+printAstAnn lang _ = error $
+  "print-ast-ann is not yet wired up for language: " ++ lang
+  ++ " (currently supported: c, lua, python)"
 
 --FIXME: I got lazy and just made a separate branch for IPT. Should be merged
 -- with other transformations

@@ -25,6 +25,7 @@ import qualified Cubix.Language.Python.Parametric.Full as F
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
+import Cubix.Sin.Compdata.Annotation ( AnnotationInfo )
 
 -------------------------------------------------------------------------------
 
@@ -39,23 +40,23 @@ import Cubix.Language.Parametric.Syntax
 
 ------ Top-level definition
 
-translate :: (Default a) => F.PythonTermAnn a l -> MPythonTermAnn a l
+translate :: (Default a, AnnotationInfo a) => F.PythonTermAnn a l -> MPythonTermAnn a l
 translate = trans . unTerm
 
-translate' :: (InjF MPythonSig l l', Default a) => F.PythonTermAnn a l -> MPythonTermAnn a l'
+translate' :: (InjF MPythonSig l l', Default a, AnnotationInfo a) => F.PythonTermAnn a l -> MPythonTermAnn a l'
 translate' = injFAnnDef . translate
 
 ------ Class
 
 class Trans f where
-  trans :: (Default a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
+  trans :: (Default a, AnnotationInfo a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
 
 ------ Default and standard cases
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
   trans = caseCxt' @Trans trans
 
-transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig, Default a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
+transDefault :: (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig, Default a, AnnotationInfo a) => (f :&: a) (F.PythonTermAnn a) l -> MPythonTermAnn a l
 transDefault = inject . hfmap translate
 
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig) => Trans f where
@@ -69,7 +70,7 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MPythonSig, f :-<: F.PythonSig
 
 -------- Identifiers
 
-transIdent :: (Default a) => F.PythonTermAnn a F.IdentL -> MPythonTermAnn a IdentL
+transIdent :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.IdentL -> MPythonTermAnn a IdentL
 transIdent (F.Ident s ::&:: a) = Ident s ::&:: a
 
 instance Trans F.Ident where
@@ -77,16 +78,16 @@ instance Trans F.Ident where
 
 -------- Functions
 
-transArgs :: (Default a) => F.PythonTermAnn a [F.ArgumentL] -> MPythonTermAnn a [FunctionArgumentL]
+transArgs :: (Default a, AnnotationInfo a) => F.PythonTermAnn a [F.ArgumentL] -> MPythonTermAnn a [FunctionArgumentL]
 transArgs = mapF transArg
   where
-    transArg :: (Default a) => F.PythonTermAnn a F.ArgumentL -> MPythonTermAnn a FunctionArgumentL
+    transArg :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ArgumentL -> MPythonTermAnn a FunctionArgumentL
     transArg (F.ArgExpr           e ::&:: a) = PositionalArgument (injFAnnDef $ translate e) ::&:: a
     transArg (F.ArgVarArgsPos     e ::&:: a) = PythonArgSplat (translate e) ::&:: a
     transArg (F.ArgVarArgsKeyword e ::&:: a) = PythonArgKWSplat (translate e) ::&:: a
     transArg (F.ArgKeyword      n e ::&:: a) = PythonArgKeyword (transIdent n) (translate e) ::&:: a
 
-isCompOp :: (Default a) => F.PythonTermAnn a F.OpL -> Bool
+isCompOp :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.OpL -> Bool
 isCompOp (F.LessThan          ::&:: _) = True
 isCompOp (F.LessThanEquals    ::&:: _) = True
 isCompOp (F.GreaterThan       ::&:: _) = True
@@ -104,7 +105,7 @@ isCompOp _                             = False
 -- flips the grouping to "a > (b > c)".
 -- NOTE 2023.11.13: I'm just going to let this translation drop the annotations on the comparisons rather than trying to figure this out.
 --                  Note that, in the present case where the annotations are actually source spans, the reassociation will mess with things.
-reassociateComp :: (Default a) => F.PythonTermAnn a F.OpL -> F.PythonTermAnn a F.ExprL -> F.PythonTermAnn a F.ExprL -> a -> MPythonTermAnn a F.ExprL
+reassociateComp :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.OpL -> F.PythonTermAnn a F.ExprL -> F.PythonTermAnn a F.ExprL -> a -> MPythonTermAnn a F.ExprL
 reassociateComp op l r _ = injFAnnDef $ reassociate (translate op) (translate l) (translate r)
   where
     reassociate outer_op (PyCompIsExpr (PyChainComp inner_op left inner_right ::&:: _) ::&:: _) outer_right =
@@ -132,11 +133,11 @@ instance Trans F.Expr where
   trans (F.SetComp comp   :&: a) = injFAnnDef $ PySetComprehension (transComprehension comp) ::&:: a
   trans x                        = transDefault x
 
-transComprehension :: (Default a) => F.PythonTermAnn a F.ComprehensionL -> MPythonTermAnn a PyComprehensionL
+transComprehension :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ComprehensionL -> MPythonTermAnn a PyComprehensionL
 transComprehension (F.Comprehension cexpr cfor ::&:: a) = transComprehensionFor cexpr cfor a
 
 -- NOTE 2023.11.13: Totally unsure I got the annotation threading correct. What is the comp_if_iter case in language-python anyhow?
-transComprehensionIf :: (Default a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompIfL -> a -> MPythonTermAnn a PyComprehensionL
+transComprehensionIf :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompIfL -> a -> MPythonTermAnn a PyComprehensionL
 transComprehensionIf cexp (F.CompIf e mi ::&:: _) a =
   let comp = case extractF mi of
         Just (F.IterFor i ::&:: a') -> transComprehensionFor cexp i a'
@@ -144,7 +145,7 @@ transComprehensionIf cexp (F.CompIf e mi ::&:: _) a =
         Nothing -> jPyComprehensionBody (translate cexp) -- Very unsure of annotations here
   in PyComprehensionIf (translate e) comp ::&:: a
 
-transComprehensionFor :: (Default a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompForL -> a -> MPythonTermAnn a PyComprehensionL
+transComprehensionFor :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ComprehensionExprL -> F.PythonTermAnn a F.CompForL -> a -> MPythonTermAnn a PyComprehensionL
 transComprehensionFor cexp (F.CompFor b es v mi ::&:: a) a' =
   let comp = case extractF mi of
         Just (F.IterFor i ::&:: a'') -> transComprehensionFor cexp i a''
@@ -152,7 +153,7 @@ transComprehensionFor cexp (F.CompFor b es v mi ::&:: a) a' =
         Nothing -> jPyComprehensionBody (translate cexp) -- Very unsure of annotations here
   in PyComprehensionFor b (mapF translate es) (translate v) comp ::&:: a
 
-translateLValue :: (Default a) => F.PythonTermAnn a F.ExprL -> MPythonTermAnn a PyLValueL
+translateLValue :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ExprL -> MPythonTermAnn a PyLValueL
 translateLValue (F.Tuple xs        ::&:: a) = TupleLValue (mapF translateLValue xs)       ::&:: a
 translateLValue (F.List xs         ::&:: a) = ListLValue  (mapF translateLValue xs)       ::&:: a
 translateLValue (F.Dot e i         ::&:: a) = DotLValue (translate e) (transIdent i)      ::&:: a
@@ -164,26 +165,26 @@ translateLValue (F.Var n           ::&:: a) = injFAnnDef (transIdent n)
 translateLValue x                           = error ("Invalid expression appeared in lvalue: " ++ show (stripA x))
 
 
-transBinder :: (Default a) => F.PythonTermAnn a (F.ExprL, Maybe F.ExprL) -> MPythonTermAnn a PyWithBinderL
+transBinder :: (Default a, AnnotationInfo a) => F.PythonTermAnn a (F.ExprL, Maybe F.ExprL) -> MPythonTermAnn a PyWithBinderL
 transBinder (PairF x y ::&:: a) = injFAnnDef $ PyWithBinder (translate x) (mapF translateLValue y) ::&:: a
 
-transParam :: (Default a) => F.PythonTermAnn a F.ParameterL -> MPythonTermAnn a FunctionParameterL
+transParam :: (Default a, AnnotationInfo a) => F.PythonTermAnn a F.ParameterL -> MPythonTermAnn a FunctionParameterL
 transParam (F.Param          n ann d ::&:: a) = injFAnnDef $ PositionalParameter (jPyParamAttrs (translate ann) (translate d)) (transIdent n) ::&:: a
 transParam (F.VarArgsPos     n ann   ::&:: a) = injFAnnDef $ PythonParamVarArgs     (transIdent n) (translate ann) ::&:: a
 transParam (F.VarArgsKeyword n ann   ::&:: a) = injFAnnDef $ PythonParamVarArgsKW   (transIdent n) (translate ann) ::&:: a
 transParam (F.EndPositional          ::&:: a) = injFAnnDef $ PythonEndPosParam                                     ::&:: a
 transParam (F.UnPackTuple t    ann   ::&:: a) = injFAnnDef $ PythonParamUnpackTuple (translate t) (translate ann)  ::&:: a
 
-extractString :: (Default a) => F.PythonTermAnn a [CharL] -> String
+extractString :: (Default a, AnnotationInfo a) => F.PythonTermAnn a [CharL] -> String
 extractString cs = map getChar $ extractF cs
   where
-    getChar :: (Default a) => F.PythonTermAnn a CharL -> Char
+    getChar :: (Default a, AnnotationInfo a) => F.PythonTermAnn a CharL -> Char
     getChar (CharF' c) = c
 
-extractStrings :: (Default a) => F.PythonTermAnn a [[CharL]] -> [String]
+extractStrings :: (Default a, AnnotationInfo a) => F.PythonTermAnn a [[CharL]] -> [String]
 extractStrings strs = map extractString $ extractF strs
 
-makePyBlock :: forall a. (Default a) => F.PythonTermAnn a [F.StatementL] -> MPythonTermAnn a PyBlockL
+makePyBlock :: forall a. (Default a, AnnotationInfo a) => F.PythonTermAnn a [F.StatementL] -> MPythonTermAnn a PyBlockL
 makePyBlock stmts = jPyBlock docstring (jBlock (insertF $ map (injFAnnDef.translate) body) jEmptyBlockEnd)
   where
     docstring :: MPythonTermAnn a (Maybe PyStringLitL)
