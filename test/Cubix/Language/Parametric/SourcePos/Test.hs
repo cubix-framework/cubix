@@ -348,7 +348,9 @@ checkReparse source (RPT sp reparse original) =
 -- column positions. For indentation-sensitive languages a kit may need
 -- to dedent before reparsing — see 'Cubix.Language.Python.SourcePosSpec'.
 sliceSpan :: Text -> SourceSpan -> Text
-sliceSpan src (SourceSpan (SourcePos _ r1 c1) (SourcePos _ r2 c2)) =
+sliceSpan src sp@(SourceSpan (SourcePos _ r1 c1) (SourcePos _ r2 c2))
+  | isDegenerateSpan sp = T.empty
+  | otherwise =
   let s = rowColToOffset r1 c1
       e = rowColToOffset r2 c2 + 1
   in T.take (e - s) (T.drop s src)

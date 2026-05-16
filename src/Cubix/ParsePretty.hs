@@ -14,6 +14,7 @@ module Cubix.ParsePretty (
   , parseC
   , parseJava
   , parseJavaScript
+  , parseJavaScriptTrackSources
   , parsePython
 
   , prettyC
@@ -27,11 +28,11 @@ module Cubix.ParsePretty (
 import Control.Monad ( liftM, (>=>) )
 import Control.Monad.Identity ( runIdentity )
 
-import Data.Comp.Multi ( Term, AnnTerm, stripA, ann )
+import Data.Comp.Multi ( Term, AnnTerm, Cxt(..), Sum, HFunctor, hfmap, stripA, ann, (:&:)(..) )
 import Data.Comp.Multi.Strategic ( RewriteM, allbuR, promoteR )
 import Data.Comp.Multi.Strategy.Classification ( DynCase, fromDynProj )
 
-import qualified Data.Text.IO as Text
+import qualified Data.Text as T
 
 import qualified Language.C as C
 import qualified Language.C.Data.Node as C ( getLastTokenPos )
@@ -59,9 +60,6 @@ import           Cubix.Language.Lua.Parametric.Common        as LCommon
 import qualified Cubix.Language.Lua.Parametric.Full          as LFull
 import           Cubix.Language.Python.Parametric.Common     as PCommon
 import qualified Cubix.Language.Python.Parametric.Full       as PFull
-
-import qualified Data.Text as T (unpack)
-import qualified Cubix.Language.Java.Parametric.Common as Python
 
 ---------------------------------------------------------------------------------------------
 
@@ -223,8 +221,18 @@ instance Pretty MJavaSig where pretty = prettyJava
 --------------------------- JavaScript ----------------------------
 -------------------------------------------------------------------
 
+parseJavaScriptTrackSources
+  :: FilePath -> IO (Maybe (MJSTermAnn (Maybe SourceSpan) JSASTL))
+parseJavaScriptTrackSources path = do
+  tree <- JS.parseFile path
+  return $ Just $ fillFilename path
+                $ JSCommon.translate
+                $ JSFull.annotateWithSpans
+                $ JSFull.translate tree
+
 parseJavaScript :: FilePath -> IO (Maybe (MJSTerm JSASTL))
-parseJavaScript path = liftM (Just . JSCommon.translate . normalizeJS . JSFull.translate) $ JS.parseFile path
+parseJavaScript path =
+  liftM (Just . stripA . JSCommon.translate . ann () . normalizeJS . JSFull.translate) $ JS.parseFile path
   where
     normalizeJS :: JSFull.JSTerm JSASTL -> JSFull.JSTerm JSASTL
     normalizeJS t = runIdentity $ allbuR (promoteR normalizeSemi >=> promoteR normalizeAnno) t
@@ -241,6 +249,7 @@ prettyJavaScript =  JS.prettyPrint . JSFull.untranslate . JSCommon.untranslate
 
 type instance RootSort MJSSig = JSASTL
 instance ParseFile MJSSig where parseFile = parseJavaScript
+instance ParseFileTrackSources MJSSig where parseFileTrackSources = parseJavaScriptTrackSources
 instance Pretty MJSSig where pretty = prettyJavaScript
 
 -------------------------------------------------------------------
@@ -269,5 +278,22 @@ type instance RootSort MPythonSig = PCommon.ModuleL
 instance ParseFile MPythonSig where parseFile = fmap (fmap stripA) . parsePython
 instance ParseFileTrackSources MPythonSig where parseFileTrackSources = parsePython
 instance Pretty MPythonSig where pretty = prettyPython
+
+-- | Stamp a filename onto every 'SourceSpan' annotation in the tree.
+-- 'language-javascript' carries token positions but not file names, so
+-- 'annotateWithSpans' emits spans with @_sourceFile = ""@; we fix that
+-- up here in one tree pass instead of re-scanning the source bytes.
+fillFilename
+  :: forall fs l. HFunctor (Sum fs)
+  => FilePath
+  -> AnnTerm (Maybe SourceSpan) fs l
+  -> AnnTerm (Maybe SourceSpan) fs l
+fillFilename path = go
+  where
+    go :: forall l'. AnnTerm (Maybe SourceSpan) fs l' -> AnnTerm (Maybe SourceSpan) fs l'
+    go (Term (node :&: a)) = Term (hfmap go node :&: fmap setFile a)
+
+    setFile (SourceSpan s e) =
+      SourceSpan (s { _sourceFile = path }) (e { _sourceFile = path })
 
 #endif

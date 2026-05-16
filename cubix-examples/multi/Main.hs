@@ -312,9 +312,14 @@ printAstAnn "python" file = do
   case mt of
     Nothing -> error "Parse failed"
     Just t  -> pPrintLightBg t
+printAstAnn "javascript" file = do
+  mt <- parseFileTrackSources @MJSSig file
+  case mt of
+    Nothing -> error "Parse failed"
+    Just t  -> pPrintLightBg t
 printAstAnn lang _ = error $
   "print-ast-ann is not yet wired up for language: " ++ lang
-  ++ " (currently supported: c, lua, python)"
+  ++ " (currently supported: c, javascript, lua, python)"
 
 --FIXME: I got lazy and just made a separate branch for IPT. Should be merged
 -- with other transformations

@@ -53,12 +53,6 @@ fromRight :: Either a b -> b
 fromRight (Right x) = x
 fromRight (Left x) = error "Benchmarks.fromRight passed a Left"
 
-instance NFData (CLib.CTranslationUnit ()) where
-  rnf = rnf . show
-
-instance NFData (CLib.CTranslationUnit CLib.NodeInfo) where
-  rnf = rnf . show
-
 instance NFData JLib.CompilationUnit where
   rnf = rnf . show
 
@@ -83,14 +77,14 @@ instance NFData (Cfg f) where
 
 
 #ifndef ONLY_ONE_LANGUAGE
-getC :: FilePath -> IO ( CLib.CTranslUnit, CFull.CTerm CTranslationUnitL
+getC :: FilePath -> IO ( CLib.CTranslUnit, CFull.CTermOptAnn SourceSpan CTranslationUnitL
                        , MCTerm CTranslationUnitL, MCTermLab CTranslationUnitL
                        , Cfg MCSig)
 getC path = do
   raw <- fromRight <$> CParse.parse path
   gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
-  let fullTree = CFull.translate $ fmap (const ()) raw
-  let commTree = CCommon.translate fullTree
+  let fullTree = CFull.translate $ fmap (const Nothing) raw
+  let commTree = stripA $ CCommon.translate fullTree
   let labTree  = labelProg gen commTree
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
@@ -115,7 +109,7 @@ getJS path = do
   raw <- JSLib.parseFile path
   gen <- mkConcurrentSupplyLabelGen -- OriginSynthetic
   let fullTree = JSFull.translate raw
-  let commTree = JSCommon.translate fullTree
+  let commTree = stripA $ JSCommon.translate $ JSFull.annotateWithSpans fullTree
   let labTree  = labelProg gen commTree
   return (raw, fullTree, commTree, labTree, makeCfg labTree)
 
@@ -180,7 +174,7 @@ main = do
                     , bench "removeAnnot"     $ nf (fmap (const ())) lib
                     , bench "pretty"          $ nf (show . CLib.pretty) lib
 
-                    , bench "transMod"        $ nf (CFull.translate . fmap (const ())) lib
+                    , bench "transMod"        $ nf (CFull.translate . fmap (const Nothing)) lib
                     , bench "transIps"        $ nf CCommon.translate full
                     , bench "label"           $ nf (labelProg gen) ips
                     , bench "cfg"             $ nf makeCfg lab
@@ -217,7 +211,7 @@ main = do
                     , bench "pretty"          $ nf (show . JSLib.prettyPrint) lib
 
                     , bench "transMod"        $ nf JSFull.translate lib
-                    , bench "transIps"        $ nf JSCommon.translate full
+                    , bench "transIps"        $ nf (JSCommon.translate . JSFull.annotateWithSpans) full
                     , bench "label"           $ nf (labelProg gen) ips
                     , bench "cfg"             $ nf makeCfg lab
                     , bench "hoist"           $ nf hoistDeclarations ips
