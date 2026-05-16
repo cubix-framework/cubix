@@ -33,7 +33,7 @@ import Cubix.Language.JavaScript.Parametric.Common.Semantics as Semantics
 import Cubix.Language.JavaScript.Parametric.Common.Types as Types
 import Cubix.Language.JavaScript.Parametric.Common.Trans as Trans
 import Cubix.Language.JavaScript.Parametric.Full as F
-        hiding ( translate, untranslate, JSIdent, iJSIdentName, jJSIdentName, iJSIdentNone, jJSIdentNone
+        hiding ( translate, translateStatement, translateExpression, untranslate, JSIdent, iJSIdentName, jJSIdentName, iJSIdentNone, jJSIdentNone
                , JSVarInitializer, iJSVarInit, jJSVarInit, iJSVarInitNone, jJSVarInitNone
                , JSFor, iJSFor, jJSFor, pattern JSFor', JSForIn, iJSForIn, jJSForIn, pattern JSForIn'
                , JSForVar, iJSForVar, jJSForVar, pattern JSForVar', JSForVarIn, iJSForVarIn, jJSForVarIn, pattern JSForVarIn'

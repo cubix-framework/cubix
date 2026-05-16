@@ -3,6 +3,7 @@ packages:
     compdata
     comptrans
     compstrat
+    cubix-benchmarks
     cubix-examples
     cubix-solidity
     cubix-sui-move

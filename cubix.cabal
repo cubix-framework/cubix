@@ -272,9 +272,11 @@ test-suite unit-tests
   other-modules:
       Cubix.Analysis.NodePairsSpec
       Cubix.Language.C.SourcePosSpec
+      Cubix.Language.JavaScript.SourcePosSpec
       Cubix.Language.Lua.SourcePosSpec
       Cubix.Language.Parametric.SourcePos.Test
       Cubix.Language.Python.SourcePosSpec
+      Cubix.ParsePrettySpec
       Paths_cubix
   hs-source-dirs:
       test
@@ -332,6 +334,7 @@ test-suite unit-tests
     , filepath
     , hspec
     , language-c
+    , language-javascript
     , language-lua
     , language-python
     , mtl

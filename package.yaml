@@ -166,6 +166,7 @@ tests:
      - containers
      - cubix
      - hspec
+     - language-javascript
      - temporary
     build-tools:
      - hspec-discover
