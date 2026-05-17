@@ -151,7 +151,7 @@ instance AssertCfgWellFormed MCSig CAssemblyOperand
 instance AssertCfgWellFormed MCSig CArraySize
 instance AssertCfgWellFormed MCSig CAlignmentSpecifier
 instance AssertCfgWellFormed MCSig Position
--- instance AssertCfgWellFormed MCSig FilePosition -- The type `FilePosition` does not exist anywhere in cubix or in language-c.
+instance AssertCfgWellFormed MCSig FilePosition
 instance AssertCfgWellFormed MCSig NodeInfo
 instance AssertCfgWellFormed MCSig Name
 
@@ -176,9 +176,9 @@ instance AssertCfgWellFormed MCSig SingleLocalVarDecl
 instance AssertCfgWellFormed MCSig OptLocalVarInit
 
 instance AssertCfgWellFormed MCSig CExpression where
-  assertCfgWellFormed t@(CCond test succ fail _ :&: _) = do
+  assertCfgWellFormed t@(CCond test succ fail :&: _) = do
     assertCfgCondOp (inject' t) test (S.extractF succ) fail
-  assertCfgWellFormed t@(CBinary op e1 e2 _ :&: _) = do
+  assertCfgWellFormed t@(CBinary op e1 e2 :&: _) = do
     case extractOp op of
       CLndOp -> assertCfgShortCircuit (inject' t) e1 e2
       CLorOp  -> assertCfgShortCircuit (inject' t) e1 e2
@@ -187,63 +187,63 @@ instance AssertCfgWellFormed MCSig CExpression where
     where extractOp :: MCTermLab CBinaryOpL -> CBinaryOp MCTerm CBinaryOpL
           extractOp (stripA -> project -> Just bp) = bp
 
-  assertCfgWellFormed t@(remA -> CComma es _) = assertCfgIsGeneric (inject' t) (map E $ extractF es)
+  assertCfgWellFormed t@(remA -> CComma es) = assertCfgIsGeneric (inject' t) (map E $ extractF es)
   -- Ignoring Assign
-  assertCfgWellFormed t@(remA -> CCast decs e _) = assertCfgIsGenericAuto (inject' t) [E decs, E e]
-  assertCfgWellFormed t@(remA -> CUnary _ e _) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CSizeofExpr e _) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CSizeofType dec _) = assertCfgIsGenericAuto (inject' t) [E dec]
-  assertCfgWellFormed t@(remA -> CAlignofExpr e _) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CAlignofType dec _) = assertCfgIsGenericAuto (inject' t) [E dec]  
-  assertCfgWellFormed t@(remA -> CComplexReal e _) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CComplexImag e _) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CIndex i e _) = assertCfgIsGeneric (inject' t) [E i, E e]
-  assertCfgWellFormed t@(remA -> CIndex i e _) = assertCfgIsGeneric (inject' t) [E i, E e]
+  assertCfgWellFormed t@(remA -> CCast decs e) = assertCfgIsGenericAuto (inject' t) [E decs, E e]
+  assertCfgWellFormed t@(remA -> CUnary _ e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CSizeofExpr e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CSizeofType dec) = assertCfgIsGenericAuto (inject' t) [E dec]
+  assertCfgWellFormed t@(remA -> CAlignofExpr e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CAlignofType dec) = assertCfgIsGenericAuto (inject' t) [E dec]  
+  assertCfgWellFormed t@(remA -> CComplexReal e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CComplexImag e) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CIndex i e) = assertCfgIsGeneric (inject' t) [E i, E e]
+  assertCfgWellFormed t@(remA -> CIndex i e) = assertCfgIsGeneric (inject' t) [E i, E e]
   -- Ignoring CCall
-  assertCfgWellFormed t@(remA -> CMember e _ _ _) = assertCfgIsGeneric (inject' t) [E e]
+  assertCfgWellFormed t@(remA -> CMember e _ _) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> CVar {}) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> CConst {}) = assertCfgIsGeneric (inject' t) [] 
-  assertCfgWellFormed t@(remA -> CCompoundLit dec init _) = assertCfgIsGenericAuto (inject' t) [E dec, E init]
-  assertCfgWellFormed t@(remA -> CGenericSelection e es _) = assertCfgIsGenericAuto (inject' t) [E e, E es]  
-  assertCfgWellFormed t@(remA -> CStatExpr s _) = assertCfgIsGeneric (inject' t) (extractBlock s)
+  assertCfgWellFormed t@(remA -> CCompoundLit dec init) = assertCfgIsGenericAuto (inject' t) [E dec, E init]
+  assertCfgWellFormed t@(remA -> CGenericSelection e es) = assertCfgIsGenericAuto (inject' t) [E e, E es]  
+  assertCfgWellFormed t@(remA -> CStatExpr s) = assertCfgIsGeneric (inject' t) (extractBlock s)
   assertCfgWellFormed t@(remA -> CLabAddrExpr {}) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> CBuiltinExpr e) = assertCfgIsGenericAuto (inject' t) [E e]
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
   
 instance AssertCfgWellFormed MCSig CStatement where
-  assertCfgWellFormed t@(remA -> CLabel _ stat _ _) =
+  assertCfgWellFormed t@(remA -> CLabel _ stat _) =
     assertCfgLabel (inject' t) (extractBlock' stat)
-  assertCfgWellFormed t@(remA -> CCase _ stat _) =
+  assertCfgWellFormed t@(remA -> CCase _ stat) =
     assertCfgSubtermsAuto (inject' t) (extractBlock stat)
-  assertCfgWellFormed t@(remA -> CCases _ _ stat _) =
+  assertCfgWellFormed t@(remA -> CCases _ _ stat) =
     assertCfgSubtermsAuto (inject' t) (extractBlock stat)
-  assertCfgWellFormed t@(remA -> CDefault stat _) =
+  assertCfgWellFormed t@(remA -> CDefault stat) =
     assertCfgSubtermsAuto (inject' t) (extractBlock stat)
-  assertCfgWellFormed t@(remA -> CExpr mexp _) =
+  assertCfgWellFormed t@(remA -> CExpr mexp) =
     case extractF mexp of
       Just e -> assertCfgIsGeneric (inject' t) [E e]
       Nothing -> assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(CIf cond thn mels _ :&: _) =
+  assertCfgWellFormed t@(CIf cond thn mels :&: _) =
     case S.extractF mels of
       Just els -> assertCfgIfElse (inject' t) cond (extractBlock thn) (extractBlock els)
       Nothing  -> assertCfgIf (inject' t) cond (extractBlock thn)
-  assertCfgWellFormed t@(remA -> CWhile e b False _) =
+  assertCfgWellFormed t@(remA -> CWhile e b False) =
     assertCfgWhile (inject' t) e (extractBlock b)
-  assertCfgWellFormed t@(remA -> CWhile e b True _) =
+  assertCfgWellFormed t@(remA -> CWhile e b True) =
     assertCfgDoWhile (inject' t) (extractBlock b) e
-  assertCfgWellFormed t@(remA -> CGoto n _) =    
+  assertCfgWellFormed t@(remA -> CGoto n) =    
     assertCfgGoto (inject' t) (nameString n)
-  assertCfgWellFormed t@(remA -> CGotoPtr e _) =    
+  assertCfgWellFormed t@(remA -> CGotoPtr e) =    
     assertCfgReturn (inject' t) (Just e)
-  assertCfgWellFormed t@(remA -> CCont _) =
+  assertCfgWellFormed t@(remA -> CCont) =
     assertCfgContinue (inject' t)
-  assertCfgWellFormed t@(remA -> CBreak _) =
+  assertCfgWellFormed t@(remA -> CBreak) =
     assertCfgBreak (inject' t)
-  assertCfgWellFormed t@(remA -> CReturn e _) =
+  assertCfgWellFormed t@(remA -> CReturn e) =
     assertCfgReturn (inject' t) (S.extractF e)
-  assertCfgWellFormed t@(remA -> CSwitch exp body _) =
+  assertCfgWellFormed t@(remA -> CSwitch exp body) =
     assertCfgSwitch (inject' t) exp (extractBlock body)
-  assertCfgWellFormed t@(remA -> CAsm stmt _) = assertCfgIsGenericAuto (inject' t) [E stmt]
+  assertCfgWellFormed t@(remA -> CAsm stmt) = assertCfgIsGenericAuto (inject' t) [E stmt]
   assertCfgWellFormed t = error $ "Impossible case: " ++ show (inject' t)
 
 instance AssertCfgWellFormed MCSig CForInit
@@ -594,7 +594,7 @@ assertCfgGoto t labName = do
 
   where
     checkLab ::  E (TermLab MCSig) -> Bool
-    checkLab (E (project' -> Just (CLabel (nameString -> n) _ _ _ :&: _)))
+    checkLab (E (project' -> Just (CLabel (nameString -> n) _ _ :&: _)))
           | labName == n = True
           | otherwise = False
     checkLab _ = False
@@ -613,7 +613,7 @@ extractBlock :: TermLab MCSig CStatementL -> [E (TermLab MCSig)]
 extractBlock (project' -> Just (CLabeledBlock _ blk :&: _)) =
   case project' blk of
     Just (S.Block items _ :&: _) -> [E items]
-extractBlock t@(project' -> Just (remA -> CLabel _ stat _ _)) =
+extractBlock t@(project' -> Just (remA -> CLabel _ stat _)) =
   E t : extractBlock stat
 extractBlock t = [E t]
 

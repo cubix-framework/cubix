@@ -205,9 +205,9 @@ instance Pretty MCSig where pretty = prettyC
 parseJava :: FilePath -> IO (Maybe (MJavaTerm CompilationUnitL))
 parseJava path = do
   res <- JParse.parse path
-  case res of
-    Left  x -> return Nothing
-    Right p -> return $ Just $ JCommon.translate $ JFull.translate p
+  pure $ case res of
+    Left _   -> Nothing
+    Right cu -> Just (JCommon.translate (JFull.translate cu))
 
 
 prettyJava :: MJavaTerm CompilationUnitL -> String

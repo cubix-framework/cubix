@@ -13,6 +13,11 @@ module Cubix.Language.Java.Parametric.Full.Trans () where
 module Cubix.Language.Java.Parametric.Full.Trans (
     translate
   , translateType
+  , translateBlock
+  , translateBlockStmt
+  , translateStmt
+  , translateExp
+  , translateName
   , untranslate
   ) where
 
@@ -35,6 +40,21 @@ translate = trans
 
 translateType :: J.Type -> JavaTerm TypeL
 translateType = trans
+
+translateBlock :: J.Block -> JavaTerm BlockL
+translateBlock = trans
+
+translateBlockStmt :: J.BlockStmt -> JavaTerm BlockStmtL
+translateBlockStmt = trans
+
+translateStmt :: J.Stmt -> JavaTerm StmtL
+translateStmt = trans
+
+translateExp :: J.Exp -> JavaTerm ExpL
+translateExp = trans
+
+translateName :: J.Name -> JavaTerm NameL
+translateName = trans
 
 instance (Trans c l, Typeable l) => Trans [c] [l] where
   trans [] = riNilF

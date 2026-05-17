@@ -3,9 +3,11 @@
 import           Hedgehog hiding (label)
 
 import           Control.Arrow
+import           Control.Monad (unless)
 import qualified Data.Map as Map
 import           Data.String ( IsString (..))
 import           System.Directory
+import           System.Exit (exitFailure)
 import           System.FilePath
 
 import           Cubix.Language.Info
@@ -17,8 +19,7 @@ import           Cubix.Language.Python.Cfg.Test
 
 tests :: IO Bool
 tests = do
-  
-  checkParallel $ Group "cfg-unit-tests" $ [
+  unitOk <- checkParallel $ Group "cfg-unit-tests" $ [
         ("unit_lua_cfg_foo", unit_lua_cfg "input-files/lua/Foo.lua")
       , ("unit_lua_cfg_bar", unit_lua_cfg "input-files/lua/Bar.lua")
       , ("unit_java_cfg_foo", unit_java_cfg "input-files/java/Foo.java")
@@ -28,10 +29,10 @@ tests = do
       , ("unit_js_cfg_foo", unit_js_cfg "input-files/javascript/Foo.js")
       , ("unit_js_cfg_bar", unit_js_cfg "input-files/javascript/Bar.js")
       , ("unit_py_cfg_foo", unit_python_cfg "input-files/python/Foo.py")
-      , ("unit_py_cfg_bar", unit_python_cfg "input-files/python/Bar.py")      
+      , ("unit_py_cfg_bar", unit_python_cfg "input-files/python/Bar.py")
       ]
 
-  checkParallel $ Group "cfg-integration-tests" $ [
+  integrationOk <- checkParallel $ Group "cfg-integration-tests" $ [
         ("integration_lua_cfg_goto", integration_lua_cfg "integration-test-input-files/lua/goto.lua")
       , ("integration_lua_cfg_lExpr", integration_lua_cfg "integration-test-input-files/lua/lExpr.lua")
       , ("integration_lua_cfg_lFunReturn", integration_lua_cfg "integration-test-input-files/lua/lFunReturn.lua")
@@ -99,9 +100,13 @@ tests = do
       , ("integration_python_cfg_pAttendYourClasses", integration_python_cfg "integration-test-input-files/python/pAttendYourClasses.py")
       , ("integration_python_cfg_pCatchMeIfYouCan", integration_python_cfg "integration-test-input-files/python/pCatchMeIfYouCan.py")
       ]
-    
-                                    
-main = tests
+
+  pure (unitOk && integrationOk)
+
+main :: IO ()
+main = do
+  ok <- tests
+  unless ok exitFailure
 
 listRecursive :: String -> FilePath -> IO [FilePath]
 listRecursive ext fp = go fp

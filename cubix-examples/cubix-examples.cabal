@@ -153,3 +153,61 @@ executable language-python
   build-depends:
     , cubix-examples
     , language-python >= 0.6.2
+
+executable java-ts-validate
+  import: language
+  import: ghc-options
+  import: rts-options
+  import: dependencies
+  hs-source-dirs:
+    java-ts-validate
+  main-is: Main.hs
+  build-depends:
+    , cubix-examples
+    , directory >= 1.3
+    , filepath  >= 1.4
+    , language-java >= 0.2.8.2
+    , process
+    , temporary >= 1.3
+
+executable dump-java-ast
+  import: language
+  import: ghc-options
+  import: rts-options
+  import: dependencies
+  hs-source-dirs:
+    dump-java-ast
+  main-is: Main.hs
+  build-depends:
+    , cubix-examples
+    , directory >= 1.3
+    , filepath  >= 1.4
+
+executable java-span-check
+  import: language
+  import: ghc-options
+  import: rts-options
+  import: dependencies
+  hs-source-dirs:
+    java-span-check
+  main-is: Main.hs
+  build-depends:
+    , cubix-compdata
+    , cubix-examples
+    , directory >= 1.3
+    , filepath  >= 1.4
+    , text
+
+executable java-pos-audit
+  import: language
+  import: ghc-options
+  import: rts-options
+  import: dependencies
+  hs-source-dirs:
+    java-pos-audit
+  main-is: Main.hs
+  build-depends:
+    , cubix-compdata
+    , cubix-examples
+    , random   >= 1.2
+    , text

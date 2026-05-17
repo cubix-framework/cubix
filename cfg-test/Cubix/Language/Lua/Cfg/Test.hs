@@ -93,7 +93,8 @@ instance AssertCfgWellFormed MLuaSig ShlOp
 instance AssertCfgWellFormed MLuaSig RelationalBinOp
 instance AssertCfgWellFormed MLuaSig Operator
 instance AssertCfgWellFormed MLuaSig ExpIsExpression
-instance AssertCfgWellFormed MLuaSig ExpressionIsExp
+instance AssertCfgWellFormed MLuaSig ExpressionIsExp where
+  assertCfgWellFormed t = assertCfgIsGenericFullyAuto (inject' t)
 
 instance AssertCfgWellFormed MLuaSig Assign where
   assertCfgWellFormed t@(remA -> Assign (project' -> Just (LuaLhs lhs :&: _)) _ (project' -> Just (LuaRhs rhs :&: _))) = do
@@ -580,12 +581,12 @@ instance AssertCfgWellFormed MLuaSig UnitF
 
 -- hardcoded integration tests
 integration_lua_cfg :: FilePath -> Property
-integration_lua_cfg path = 
+integration_lua_cfg path =
   withTests 1 $
   property $ do
     Just t <- liftIO $ parseFile path
     edges <- liftIO $ parseEdges path
-    
+
     (_, cfg) <- makeLuaEnv t
     integration_cfg edges cfg
 

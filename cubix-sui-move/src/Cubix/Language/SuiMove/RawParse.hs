@@ -57,10 +57,11 @@ parse' = do
   syntax filepath source pTable rootNode
 
 parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (MoveTerm (RootSort MoveSig)))
-parse path getLang =
-  newTreeSitterEnv path getLang
-  >>= runReaderT parse'
-  <&> caseE @_ @(RootSort MoveSig)
+parse path getLang = do
+  mEnv <- newTreeSitterEnv path getLang
+  case mEnv of
+    Nothing  -> pure Nothing
+    Just env -> runReaderT parse' env <&> caseE @_ @(RootSort MoveSig)
 
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = fmap fromJust . go
@@ -74,7 +75,7 @@ syntax path source pTable = fmap fromJust . go
         then pure Nothing
         else do
           range    <- liftIO $ nodeRange root
-          span     <- liftIO $ nodeSpan path root
+          span     <- liftIO $ nodeSpan path source root
           symbolNo <- liftIO $ TS.nodeSymbol root
           case getParser symbolNo of
             Nothing -> do

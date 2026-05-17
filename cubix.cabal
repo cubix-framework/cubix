@@ -15,6 +15,15 @@ copyright:      2016-2023 James Koppel
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+extra-source-files:
+    cbits/parser.c
+    cbits/tree_sitter/alloc.h
+    cbits/tree_sitter/array.h
+    cbits/tree_sitter/parser.h
+    cbits/tree_sitter/tree-sitter-java.h
+    cbits/grammar.json
+    cbits/node-types.json
+    cbits/README.md
 
 flag only-one-language
   manual: True
@@ -32,6 +41,7 @@ library
       Cubix.Language.Java.Parametric.Common
       Cubix.Language.Java.Parametric.Full
       Cubix.Language.Java.Parse
+      TreeSitter.Java
       Cubix.Language.JavaScript.Parametric.Common
       Cubix.Language.JavaScript.Parametric.Full
       Cubix.Language.Lua.Parametric.Common
@@ -156,10 +166,21 @@ library
       TypeOperators
       ViewPatterns
   ghc-options: -fno-warn-partial-type-signatures -fwarn-unused-imports -O0 -freduction-depth=400
+  include-dirs:
+      cbits
+  install-includes:
+      tree_sitter/parser.h
+      tree_sitter/alloc.h
+      tree_sitter/array.h
+      tree_sitter/tree-sitter-java.h
+  c-sources:
+      cbits/parser.c
   build-depends:
       MonadRandom
     , aeson
     , base
+    , base-compat-constptr
+    , bytestring
     , compstrat
     , comptrans
     , concurrent-supply >=0.1.7
@@ -173,6 +194,7 @@ library
     , fgl
     , filepath
     , hashable
+    , hs-tree-sitter
     , language-c
     , language-dot
     , language-java >=0.2.8.1
@@ -272,6 +294,8 @@ test-suite unit-tests
   other-modules:
       Cubix.Analysis.NodePairsSpec
       Cubix.Language.C.SourcePosSpec
+      Cubix.Language.Java.ParseSpec
+      Cubix.Language.Java.SourcePosSpec
       Cubix.Language.Lua.SourcePosSpec
       Cubix.Language.Parametric.SourcePos.Test
       Cubix.Language.Python.SourcePosSpec
@@ -332,9 +356,11 @@ test-suite unit-tests
     , filepath
     , hspec
     , language-c
+    , language-java
     , language-lua
     , language-python
     , mtl
+    , parsec
     , process
     , temporary
     , text

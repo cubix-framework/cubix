@@ -5,6 +5,9 @@ out
 a.out
 *.class
 
+# Validation corpora cloned at runtime
+corpora/
+
 # Devenv
 .devenv*
 devenv.local.nix
@@ -22,6 +25,11 @@ cabal.project.local*
 dist
 dist-newstyle
 dist-repl
+# Workspace-local CABAL_DIR / cabal store (used e.g. when CABAL_DIR is
+# pointed inside the worktree); anchored so a sibling project named
+# similarly elsewhere isn't shadowed.
+/.cabal-home/
+/.cabal-store/
 .ghc.environment.*
 .ghci_history
 .hie
