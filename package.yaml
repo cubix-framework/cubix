@@ -7,6 +7,15 @@ author: James Koppel
 maintainer: jkoppel@mit.edu
 copyright: 2016-2023 James Koppel
 license: BSD3
+# Vendored tree-sitter parser headers + grammar artefacts. @c-sources@
+# only lists @parser.c@, but the parser @#include@s these headers and
+# they need to ship in any @cabal sdist@/Hackage tarball.
+extra-source-files:
+  - cbits/parser.c
+  - cbits/tree_sitter/*.h
+  - cbits/grammar.json
+  - cbits/node-types.json
+  - cbits/README.md
 dependencies:
 - compstrat
 - comptrans
@@ -66,6 +75,17 @@ default-extensions:
 
 library:
   source-dirs: src
+  c-sources:
+  - cbits/parser.c
+  include-dirs:
+  - cbits
+  # 'install-includes' carries headers into the installed package so
+  # downstream consumers' @cc-options@/@include-dirs@ resolve them.
+  install-includes:
+  - tree_sitter/parser.h
+  - tree_sitter/alloc.h
+  - tree_sitter/array.h
+  - tree_sitter/tree-sitter-java.h
   exposed-modules:
   - Cubix.Analysis.Call.Trivial
   - Cubix.Analysis.NodePairs
@@ -77,6 +97,7 @@ library:
   - Cubix.Language.Java.Parametric.Common
   - Cubix.Language.Java.Parametric.Full
   - Cubix.Language.Java.Parse
+  - TreeSitter.Java
   - Cubix.Language.JavaScript.Parametric.Common
   - Cubix.Language.JavaScript.Parametric.Full
   - Cubix.Language.Lua.Parametric.Common
@@ -106,6 +127,8 @@ library:
   dependencies:
   - aeson
   - base
+  - base-compat-constptr
+  - bytestring
   - cubix-compdata
   - concurrent-supply >=0.1.7
   - constraints
@@ -115,6 +138,7 @@ library:
   - fgl
   - filepath
   - hashable
+  - hs-tree-sitter
   - language-c
   - language-dot
   - language-java >= 0.2.8.1
@@ -163,10 +187,25 @@ tests:
       - -with-rtsopts=-N
     dependencies:
      - base
+     - compstrat
+     - comptrans
      - containers
      - cubix
+     - cubix-compdata
+     - deepseq
+     - directory
+     - filepath
      - hspec
+     - language-c
+     - language-java
      - language-javascript
+     - language-lua
+     - language-python
+     - mtl
+     - parsec
+     - process
      - temporary
+     - text
+     - transformers
     build-tools:
      - hspec-discover

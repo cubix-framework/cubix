@@ -4,13 +4,16 @@ module Cubix.TreeSitter where
 import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
-import Data.ByteString qualified as BS (readFile)
+import Data.ByteString qualified as BS
 import Data.IORef (IORef, newIORef, readIORef)
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
+import Data.Text.Encoding.Error (lenientDecode)
 
 import Control.Monad.Catch (MonadMask, bracket)
 import Control.Monad.Trans.Reader (ReaderT, ask, asks)
 import Foreign.C.ConstPtr.Compat (ConstPtr (..))
-import TreeSitter qualified as TS (Language, Node, Parser, Point (..), Tree, nodeEndByte, nodeEndPoint, nodeStartByte, nodeStartPoint, parserLanguage, parserNew, parserParseByteString, parserSetLanguage, unsafeLanguageDelete, unsafeParserDelete, unsafeToLanguage)
+import TreeSitter qualified as TS (Language, Node, Parser, Point (..), Tree, nodeEndByte, nodeEndPoint, nodeHasError, nodeStartByte, nodeStartPoint, parserLanguage, parserNew, parserParseByteString, parserSetLanguage, treeRootNode, unsafeLanguageDelete, unsafeParserDelete, unsafeToLanguage)
 
 import Cubix.Language.Info (SourcePos (..), SourceRange (..), SourceSpan (..), mkSourceSpan)
 
@@ -26,11 +29,31 @@ pointToPos path (TS.Point line column) = SourcePos path (fromIntegral line) (fro
 pointToPos' :: TS.Point -> (Int, Int)
 pointToPos' (TS.Point line column) = (fromIntegral line, fromIntegral column)
 
-nodeSpan :: FilePath -> TS.Node -> IO SourceSpan
-nodeSpan path node = do
+nodeSpan :: FilePath -> ByteString -> TS.Node -> IO SourceSpan
+nodeSpan path source node = do
   start <- pointToPos' <$> TS.nodeStartPoint node
   end <- pointToPos' <$> TS.nodeEndPoint node
-  pure $ mkSourceSpan path start end
+  pure $ mkSourceSpan path
+    (toSourcePos source start True)
+    (toSourcePos source end False)
+  where
+    toSourcePos src (row, byteCol) isStart =
+      let displayCol = byteColumnToDisplayColumn src row byteCol
+      in (row + 1, displayCol + if isStart then 1 else 0)
+
+byteColumnToDisplayColumn :: ByteString -> Int -> Int -> Int
+byteColumnToDisplayColumn src row byteCol =
+  T.foldl' advance 1 (TE.decodeUtf8With lenientDecode prefix) - 1
+  where
+    line = case drop row (BS.split 0x0a src) of
+      l : _ -> l
+      []    -> BS.empty
+    prefix = BS.take byteCol line
+
+    advance col '\t' = ((col - 1) `div` tabWidth + 1) * tabWidth + 1
+    advance col _    = col + 1
+
+    tabWidth = 8
 
 withLanguage :: (MonadMask m, MonadIO m) => IO (ConstPtr lang) -> (TS.Language -> m a) -> m a
 withLanguage getLang = bracket
@@ -67,7 +90,7 @@ data TreeSitterEnv = TreeSitterEnv
 newTreeSitterEnv
   :: FilePath
   -> IO (ConstPtr lang)
-  -> IO TreeSitterEnv
+  -> IO (Maybe TreeSitterEnv)
 newTreeSitterEnv filepath getLang = do
   parser <- newParser getLang
   tsParser <- newIORef parser
@@ -77,10 +100,17 @@ newTreeSitterEnv filepath getLang = do
 
   source <- BS.readFile filepath
   mTree <- liftIO $ TS.parserParseByteString parser Nothing source
-  tree <- maybe (error "failed to parse the program") pure mTree
-  tsTree <- liftIO $ newIORef tree
+  case mTree of
+    Nothing -> pure Nothing
+    Just tree -> do
+      root <- TS.treeRootNode tree
+      hasError <- TS.nodeHasError root
+      if hasError
+        then pure Nothing
+        else do
+          tsTree <- liftIO $ newIORef tree
 
-  pure $ TreeSitterEnv {..}
+          pure $ Just TreeSitterEnv {..}
 
 getParser :: ReaderT TreeSitterEnv IO TS.Parser
 getParser = liftIO . readIORef . tsParser =<< ask
