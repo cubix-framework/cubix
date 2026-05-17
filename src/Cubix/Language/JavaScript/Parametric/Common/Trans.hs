@@ -14,12 +14,14 @@ module Cubix.Language.JavaScript.Parametric.Common.Trans
   , untranslate
   ) where
 
+import Data.Default ( Default(..) )
 import Data.List ( (\\) )
 import Language.Haskell.TH.Syntax ( Type(ConT), Exp(VarE) )
 
 import Control.Lens ( (&), (%~), _1 )
 
-import Data.Comp.Multi ( Term, project, inject, unTerm, caseCxt, HFunctor(..), (:-<:), All, Sum )
+import Data.Comp.Multi ( Term, project, pattern (::&::), inject, unTerm, caseCxt, caseCxt'
+                       , HFunctor(..), (:-<:), All, Sum, (:&:)(..), AnnTerm )
 import Data.Comp.Multi.Show ()
 
 import Cubix.Language.JavaScript.Parametric.Common.Types
@@ -27,16 +29,25 @@ import qualified Cubix.Language.JavaScript.Parametric.Full as F
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.InjF
 import Cubix.Language.Parametric.Syntax
+import Cubix.Sin.Compdata.Annotation ( AnnotationInfo, getAnn )
 
 -------------------------------------------------------------------------------
 
+-- Unannotated placeholders used by the (unannotated) untranslate path.
 noAnn :: (F.JSAnnot :-<: fs, All HFunctor fs) => Term fs F.JSAnnotL
 noAnn = F.iJSNoAnnot
 
 semi :: (F.JSSemi :-<: fs, F.JSAnnot :-<: fs, All HFunctor fs) => Term fs F.JSSemiL
 semi = F.iJSSemi F.iJSNoAnnot
 
-jsCommaListToList :: F.JSTerm (F.JSCommaList l) -> [F.JSTerm l]
+-- Annotated placeholders used by the forward translate path.
+noAnnA :: forall fs a. (F.JSAnnot :-<: fs, Default a) => AnnTerm a fs F.JSAnnotL
+noAnnA = F.JSNoAnnot ::&:: def
+
+semiA :: forall fs a. (F.JSSemi :-<: fs, F.JSAnnot :-<: fs, Default a) => AnnTerm a fs F.JSSemiL
+semiA = F.JSSemi noAnnA ::&:: def
+
+jsCommaListToList :: (Default a) => F.JSTermAnn a (F.JSCommaList l) -> [F.JSTermAnn a l]
 jsCommaListToList (project -> Just (F.JSLCons xs _ x)) = jsCommaListToList xs ++ [x]
 jsCommaListToList (project -> Just (F.JSLOne x))       = [x]
 jsCommaListToList (project -> Just F.JSLNil)           = []
@@ -51,19 +62,20 @@ listToCommaList x = listToCommaList' $ reverse x -- They have left-associative l
 
 -------------------------------------------------------------------------------
 
-translate :: F.JSTerm l -> MJSTerm l
+translate :: (Default a, AnnotationInfo a) => F.JSTermAnn a l -> MJSTermAnn a l
 translate = trans . unTerm
 
-translate' :: (InjF MJSSig l l') => F.JSTerm l -> MJSTerm l'
-translate' = injF . translate
+translate' :: (InjF MJSSig l l', Default a, AnnotationInfo a) => F.JSTermAnn a l -> MJSTermAnn a l'
+translate' = injFAnnDef . translate
 
 class Trans f where
-  trans :: f F.JSTerm l -> MJSTerm l
+  trans :: (Default a, AnnotationInfo a) => (f :&: a) (F.JSTermAnn a) l -> MJSTermAnn a l
 
 instance {-# OVERLAPPING #-} (All Trans fs) => Trans (Sum fs) where
-  trans = caseCxt @Trans trans
+  trans = caseCxt' @Trans trans
 
-transDefault :: (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => f F.JSTerm l -> MJSTerm l
+transDefault :: (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig, Default a, AnnotationInfo a)
+             => (f :&: a) (F.JSTermAnn a) l -> MJSTermAnn a l
 transDefault = inject . hfmap translate
 
 instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => Trans f where
@@ -73,93 +85,145 @@ instance {-# OVERLAPPABLE #-} (HFunctor f, f :-<: MJSSig, f :-<: F.JSSig) => Tra
 instance {-# OVERLAPPABLE #-} Trans F.JSVarInitializer where
   trans = error "JSVarInitializer found not within variable declaration"
 
-translateAssign :: F.JSTerm F.JSExpressionL -> F.JSTerm F.JSAssignOpL -> F.JSTerm F.JSExpressionL -> MJSTerm F.JSExpressionL
-translateAssign lhs op rhs = iAssign (injF $ translate lhs) op' (injF $ translate rhs)
+translateAssign :: (Default a, AnnotationInfo a)
+                => F.JSTermAnn a F.JSExpressionL
+                -> F.JSTermAnn a F.JSAssignOpL
+                -> F.JSTermAnn a F.JSExpressionL
+                -> a
+                -> MJSTermAnn a F.JSExpressionL
+translateAssign lhs op rhs a =
+    injFAnnDef $ Assign (injFAnnDef $ translate lhs) op' (injFAnnDef $ translate rhs) ::&:: a
   where
     op' = case op of
-      F.JSAssign' _ -> AssignOpEquals'
-      _             -> injF $ translate op
+      (F.JSAssign _ ::&:: opA) -> AssignOpEquals ::&:: opA
+      _                        -> injFAnnDef $ translate op
 
 -- This takes out things like "use strict";, which aren't really part of the computation,
 -- and have to be at the front
-splitDirectivePrelude :: [F.JSTerm F.JSStatementL] -> ([String], [F.JSTerm F.JSStatementL])
+splitDirectivePrelude
+  :: forall a. (Default a, AnnotationInfo a)
+  => [F.JSTermAnn a F.JSStatementL] -> ([String], [F.JSTermAnn a F.JSStatementL])
 splitDirectivePrelude []     = ([], [])
 splitDirectivePrelude (s:ss) = case toDirective s of
                                  Nothing  -> ([], s:ss)
                                  Just dir -> (splitDirectivePrelude ss) & _1 %~ (dir:)
   where
-    toDirective :: F.JSTerm F.JSStatementL -> Maybe String
+    toDirective :: F.JSTermAnn a F.JSStatementL -> Maybe String
     toDirective (project -> Just (F.JSExpressionStatement (project -> Just (F.JSStringLiteral _ str)) _)) = Just str
     toDirective _ = Nothing
 
-translateBlock :: F.JSTerm F.JSBlockL -> MJSTerm F.JSBlockL
-translateBlock (project -> Just (F.JSBlock _ ss _)) = iBlockWithPrelude dirPrelude block
+translateBlockStmts
+  :: forall a. (Default a, AnnotationInfo a)
+  => F.JSTermAnn a [F.JSStatementL] -> a -> MJSTermAnn a F.JSBlockL
+translateBlockStmts ss a = BlockWithPrelude dirPrelude block ::&:: a
   where
     (dirPrelude, blockStmts) = splitDirectivePrelude $ extractF ss
 
-    block = iBlock (insertF $ map (injF.translate) blockStmts) EmptyBlockEnd'
+    block :: MJSTermAnn a BlockL
+    block = Block (insertF $ map (injFAnnDef . translate) blockStmts) jEmptyBlockEnd ::&:: a
 
-translateFunCall :: F.JSTerm F.JSExpressionL -> F.JSTerm (F.JSCommaList F.JSExpressionL) -> MJSTerm FunctionCallL
-translateFunCall e args = FunctionCall' EmptyFunctionCallAttrs'
-                                        (injF $ translate e)
-                                        (FunctionArgumentList' $ insertF $ map (PositionalArgument' . injF . translate)
-                                                                               (jsCommaListToList args))
+translateBlock :: (Default a, AnnotationInfo a) => F.JSTermAnn a F.JSBlockL -> MJSTermAnn a F.JSBlockL
+translateBlock (F.JSBlock _ ss _ ::&:: a) = translateBlockStmts ss a
+
+translateFunCall
+  :: (Default a, AnnotationInfo a)
+  => F.JSTermAnn a F.JSExpressionL
+  -> F.JSTermAnn a (F.JSCommaList F.JSExpressionL)
+  -> a
+  -> MJSTermAnn a FunctionCallL
+-- The outer 'FunctionCall' carries the parent's whole-call annotation 'a',
+-- but the 'FunctionArgumentList' sub-node must NOT inherit it — that would
+-- make the args list claim a span covering the function expression too.
+-- We propagate the JSCommaList's own annotation instead, which spans only
+-- the arguments (empty arg lists fall back to 'def').
+translateFunCall e args a =
+  FunctionCall jEmptyFunctionCallAttrs
+               (injFAnnDef $ translate e)
+               (FunctionArgumentList (insertF $ map (\x -> PositionalArgument (injFAnnDef $ translate x) ::&:: def)
+                                                    (jsCommaListToList args))
+                  ::&:: getAnn args)
+    ::&:: a
 
 instance Trans F.JSExpression where
-  trans (F.JSIdentifier _ n)                     = iIdent n
-  trans (F.JSAssignExpression lhs op rhs)        = translateAssign lhs op rhs
-  trans (F.JSFunctionExpression _ a _ b _ block) = F.iJSFunctionExpression noAnn (translate a) noAnn (translate b) noAnn (translateBlock block)
-  trans (F.JSMemberExpression f _ args _)        = injF $ translateFunCall f args
-  trans (F.JSCallExpression   f _ args _)        = injF $ translateFunCall f args
-  trans x                                        = transDefault x
+  trans (F.JSIdentifier _ n :&: a)                     = injectFAnnDef (Ident n :&: a)
+  trans (F.JSAssignExpression lhs op rhs :&: a)        = translateAssign lhs op rhs a
+  trans (F.JSFunctionExpression _ na _ params _ block :&: a) =
+      F.JSFunctionExpression noAnnA (translate na) noAnnA (translate params) noAnnA (translateBlock block) ::&:: a
+  trans (F.JSMemberExpression f _ args _ :&: a)        = injFAnnDef $ translateFunCall f args a
+  trans (F.JSCallExpression   f _ args _ :&: a)        = injFAnnDef $ translateFunCall f args a
+  trans x                                              = transDefault x
 
-transIdent :: F.JSTerm F.JSIdentL -> MJSTerm IdentL
-transIdent (project -> (Just (F.JSIdentName _ n))) = Ident' n
-transIdent (project -> (Just F.JSIdentNone))       = error "JSIdentNone discovered where identifier was required"
+transIdent :: (Default a, AnnotationInfo a) => F.JSTermAnn a F.JSIdentL -> MJSTermAnn a IdentL
+transIdent (F.JSIdentName _ n ::&:: a) = Ident n ::&:: a
+transIdent (project -> (Just F.JSIdentNone)) = error "JSIdentNone discovered where identifier was required"
 
 
 instance Trans F.JSIdent where
-  trans (F.JSIdentName _ n) = injF $ Just' $ Ident' n
-  trans F.JSIdentNone       = injF $ (Nothing' :: MJSTerm (Maybe IdentL))
+  trans (F.JSIdentName _ n :&: a) = injFAnnDef $ JustF (Ident n ::&:: a) ::&:: a
+  trans (F.JSIdentNone     :&: a) = injFAnnDef $ (NothingF ::&:: a :: MJSTermAnn _ (Maybe IdentL))
 
-varInitToDecl :: F.JSTerm F.JSExpressionL -> MJSTerm SingleLocalVarDeclL
-varInitToDecl (project -> (Just (F.JSVarInitExpression lhs init))) =
-          SingleLocalVarDecl' EmptyLocalVarDeclAttrs' (injF $ translate lhs) rhs
+varInitToDecl :: (Default a, AnnotationInfo a) => F.JSTermAnn a F.JSExpressionL -> MJSTermAnn a SingleLocalVarDeclL
+varInitToDecl (F.JSVarInitExpression lhs init ::&:: a) =
+          SingleLocalVarDecl jEmptyLocalVarDeclAttrs (injFAnnDef $ translate lhs) rhs ::&:: a
   where
     rhs = case init of
-      F.JSVarInit' _ e -> JustLocalVarInit' $ injF $ translate e
-      F.JSVarInitNone' -> NoLocalVarInit'
+      (F.JSVarInit _ e ::&:: rA) -> JustLocalVarInit (injFAnnDef $ translate e) ::&:: rA
+      (F.JSVarInitNone ::&:: rA) -> NoLocalVarInit ::&:: rA
+      _ -> error "varInitToDecl: JSVarInitializer subterm is neither JSVarInit nor JSVarInitNone"
 
-extractVarDecls :: F.JSTerm (F.JSCommaList F.JSExpressionL) -> MJSTerm [SingleLocalVarDeclL]
+extractVarDecls
+  :: (Default a, AnnotationInfo a)
+  => F.JSTermAnn a (F.JSCommaList F.JSExpressionL) -> MJSTermAnn a [SingleLocalVarDeclL]
 extractVarDecls commaList = insertF $ map varInitToDecl exps
   where
     exps = jsCommaListToList commaList
 
-transCommaExpList :: F.JSTerm (F.JSCommaList F.JSExpressionL) -> MJSTerm [F.JSExpressionL]
+transCommaExpList
+  :: (Default a, AnnotationInfo a)
+  => F.JSTermAnn a (F.JSCommaList F.JSExpressionL) -> MJSTermAnn a [F.JSExpressionL]
 transCommaExpList = insertF . map translate . jsCommaListToList
 
-transParams :: F.JSTerm (F.JSCommaList F.JSIdentL) -> MJSTerm [FunctionParameterL]
-transParams args = insertF $ map (makeParam.transIdent) (jsCommaListToList args)
+transParams
+  :: (Default a, AnnotationInfo a)
+  => F.JSTermAnn a (F.JSCommaList F.JSIdentL) -> MJSTermAnn a [FunctionParameterL]
+transParams args = insertF $ map (makeParam . transIdent) (jsCommaListToList args)
   where
-    makeParam :: MJSTerm IdentL -> MJSTerm FunctionParameterL
-    makeParam n = PositionalParameter' EmptyParameterAttrs' n
+    makeParam :: (Default a, AnnotationInfo a) => MJSTermAnn a IdentL -> MJSTermAnn a FunctionParameterL
+    makeParam n = PositionalParameter jEmptyParameterAttrs n ::&:: def
 
 instance Trans F.JSStatement where
-  trans (F.JSVariable _ exprs _)      = iMultiLocalVarDecl EmptyMultiLocalVarDeclCommonAttrs'
-                                                         (extractVarDecls exprs)
-  trans (F.JSFor _ _ init _ exp _ upd _ s)      = iJSFor (transCommaExpList init) (transCommaExpList exp) (transCommaExpList upd) (translate s)
-  trans (F.JSForIn _ _ v op exp _ s)            = iJSForIn (translate v) (translate op) (translate exp) (translate s)
-  trans (F.JSForVar _ _ _ init _ exp _ upd _ s) = iJSForVar (extractVarDecls init) (transCommaExpList exp) (transCommaExpList upd) (translate s)
-  trans (F.JSForVarIn _ _ _ v op exp _ s)       = iJSForVarIn (varInitToDecl v) (translate op) (translate exp) (translate s)
-  trans (F.JSConstant _ _ _)                    = error "ES7 Const not supported"
-  trans (F.JSAssignStatement lhs op rhs s)      = F.iJSExpressionStatement (translateAssign lhs op rhs) semi
-  trans (F.JSFunction _ n _ args _ block _)     = iFunctionDef EmptyFunctionDefAttrs' (transIdent n) (transParams args) (injF $ translateBlock block)
-  trans (F.JSMethodCall f _ args _ _)           = F.iJSExpressionStatement (injF $ translateFunCall f args) semi
-  trans x                                       = transDefault x
+  trans (F.JSVariable _ exprs _ :&: a) =
+      injFAnnDef $ MultiLocalVarDecl jEmptyMultiLocalVarDeclCommonAttrs (extractVarDecls exprs) ::&:: a
+  trans (F.JSFor _ _ init _ exp _ upd _ s :&: a) =
+      injFAnnDef $ JSFor (transCommaExpList init) (transCommaExpList exp) (transCommaExpList upd) (translate s) ::&:: a
+  trans (F.JSForIn _ _ v op exp _ s :&: a) =
+      injFAnnDef $ JSForIn (translate v) (translate op) (translate exp) (translate s) ::&:: a
+  trans (F.JSForVar _ _ _ init _ exp _ upd _ s :&: a) =
+      injFAnnDef $ JSForVar (extractVarDecls init) (transCommaExpList exp) (transCommaExpList upd) (translate s) ::&:: a
+  trans (F.JSForVarIn _ _ _ v op exp _ s :&: a) =
+      injFAnnDef $ JSForVarIn (varInitToDecl v) (translate op) (translate exp) (translate s) ::&:: a
+  trans (F.JSConstant _ _ _ :&: _) = error "ES7 Const not supported"
+  -- The inner assign-expression's annotation is the parent's annotation
+  -- /minus/ the trailing semi position; we don't have a generic way to
+  -- subtract that off, so we fall back to 'def' here. The
+  -- 'JSExpressionStatement' wrapper still carries the statement-level
+  -- span, which is what a reparse-at-JSStatementL target needs.
+  trans (F.JSAssignStatement lhs op rhs _ :&: a) =
+      F.JSExpressionStatement (translateAssign lhs op rhs def) semiA ::&:: a
+  trans (F.JSFunction _ n _ args _ block _ :&: a) =
+      injFAnnDef $ FunctionDef jEmptyFunctionDefAttrs (transIdent n) (transParams args) (injFAnnDef $ translateBlock block) ::&:: a
+  -- See note on JSAssignStatement: the inner call-expression's
+  -- annotation comes out as 'def' rather than the parent's, so a
+  -- reparse target at JSExpressionL doesn't include the trailing
+  -- @;@ in its slice.
+  trans (F.JSMethodCall f _ args _ _ :&: a) =
+      F.JSExpressionStatement (injFAnnDef $ translateFunCall f args def) semiA ::&:: a
+  trans x = transDefault x
 
 instance Trans F.JSAST where
-  trans (F.JSAstProgram stmts _) = injF $ translateBlock (F.iJSBlock noAnn stmts noAnn)
-  trans x                        = transDefault x
+  trans (F.JSAstProgram stmts _ :&: a) =
+      injFAnnDef $ translateBlockStmts stmts a
+  trans x = transDefault x
 
 -------------------------------------------------------------------------------
 

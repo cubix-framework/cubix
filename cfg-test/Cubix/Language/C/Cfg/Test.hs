@@ -194,7 +194,7 @@ instance AssertCfgWellFormed MCSig CExpression where
   assertCfgWellFormed t@(remA -> CSizeofExpr e) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> CSizeofType dec) = assertCfgIsGenericAuto (inject' t) [E dec]
   assertCfgWellFormed t@(remA -> CAlignofExpr e) = assertCfgIsGeneric (inject' t) [E e]
-  assertCfgWellFormed t@(remA -> CAlignofType dec) = assertCfgIsGenericAuto (inject' t) [E dec]  
+  assertCfgWellFormed t@(remA -> CAlignofType dec) = assertCfgIsGenericAuto (inject' t) [E dec]
   assertCfgWellFormed t@(remA -> CComplexReal e) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> CComplexImag e) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> CIndex i e) = assertCfgIsGeneric (inject' t) [E i, E e]
@@ -202,9 +202,9 @@ instance AssertCfgWellFormed MCSig CExpression where
   -- Ignoring CCall
   assertCfgWellFormed t@(remA -> CMember e _ _) = assertCfgIsGeneric (inject' t) [E e]
   assertCfgWellFormed t@(remA -> CVar {}) = assertCfgIsGeneric (inject' t) []
-  assertCfgWellFormed t@(remA -> CConst {}) = assertCfgIsGeneric (inject' t) [] 
+  assertCfgWellFormed t@(remA -> CConst {}) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> CCompoundLit dec init) = assertCfgIsGenericAuto (inject' t) [E dec, E init]
-  assertCfgWellFormed t@(remA -> CGenericSelection e es) = assertCfgIsGenericAuto (inject' t) [E e, E es]  
+  assertCfgWellFormed t@(remA -> CGenericSelection e es) = assertCfgIsGenericAuto (inject' t) [E e, E es]
   assertCfgWellFormed t@(remA -> CStatExpr s) = assertCfgIsGeneric (inject' t) (extractBlock s)
   assertCfgWellFormed t@(remA -> CLabAddrExpr {}) = assertCfgIsGeneric (inject' t) []
   assertCfgWellFormed t@(remA -> CBuiltinExpr e) = assertCfgIsGenericAuto (inject' t) [E e]
@@ -231,9 +231,9 @@ instance AssertCfgWellFormed MCSig CStatement where
     assertCfgWhile (inject' t) e (extractBlock b)
   assertCfgWellFormed t@(remA -> CWhile e b True) =
     assertCfgDoWhile (inject' t) (extractBlock b) e
-  assertCfgWellFormed t@(remA -> CGoto n) =    
+  assertCfgWellFormed t@(remA -> CGoto n) =
     assertCfgGoto (inject' t) (nameString n)
-  assertCfgWellFormed t@(remA -> CGotoPtr e) =    
+  assertCfgWellFormed t@(remA -> CGotoPtr e) =
     assertCfgReturn (inject' t) (Just e)
   assertCfgWellFormed t@(remA -> CCont) =
     assertCfgContinue (inject' t)

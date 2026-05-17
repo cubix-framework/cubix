@@ -12,7 +12,7 @@ module Cubix.Language.JavaScript.Parametric.Full.Types where
 import qualified Data.Set as Set
 import Data.Type.Equality ( (:~:)(..), gcastWith )
 
-import Data.Comp.Multi ( (:<:), inject, project, Cxt, Term )
+import Data.Comp.Multi ( (:<:), AnnTerm, inject, project, Cxt, Term )
 import Data.Comp.Multi.Derive ( derive, makeConstrNameHF, makeHFunctor, makeHTraversable, makeHFoldable,
                                     makeEqHF, makeShowHF, makeOrdHF )
 
@@ -99,6 +99,9 @@ do let specialSigNames = [''JSCommaListF, ''JSCommaTrailingListF]
 
 type JSTerm    = Term JSSig
 type JSTermLab l = TermLab JSSig l
+
+type JSTermAnn    a = AnnTerm        a  JSSig
+type JSTermOptAnn a = AnnTerm (Maybe a) JSSig
 
 -- Phase restriction makes eliminating redundancy hard
 jsSigNames :: [TH.Name]

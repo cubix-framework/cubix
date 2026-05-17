@@ -296,9 +296,11 @@ test-suite unit-tests
       Cubix.Language.C.SourcePosSpec
       Cubix.Language.Java.ParseSpec
       Cubix.Language.Java.SourcePosSpec
+      Cubix.Language.JavaScript.SourcePosSpec
       Cubix.Language.Lua.SourcePosSpec
       Cubix.Language.Parametric.SourcePos.Test
       Cubix.Language.Python.SourcePosSpec
+      Cubix.ParsePrettySpec
       Paths_cubix
   hs-source-dirs:
       test
@@ -357,6 +359,7 @@ test-suite unit-tests
     , hspec
     , language-c
     , language-java
+    , language-javascript
     , language-lua
     , language-python
     , mtl

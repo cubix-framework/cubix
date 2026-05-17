@@ -198,6 +198,7 @@ tests:
      - hspec
      - language-c
      - language-java
+     - language-javascript
      - language-lua
      - language-python
      - mtl

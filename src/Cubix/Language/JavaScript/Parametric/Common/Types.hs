@@ -11,7 +11,7 @@ module Cubix.Language.JavaScript.Parametric.Common.Types where
 import Data.List ( (\\) )
 import Language.Haskell.TH ( mkName )
 
-import Data.Comp.Multi ( Term, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
+import Data.Comp.Multi ( Term, AnnTerm, project', project, HFunctor, (:-<:), All, CxtS, AnnCxtS )
 import Data.Comp.Trans ( runCompTrans, makeSumType )
 
 import Cubix.Language.Info
@@ -125,6 +125,9 @@ type instance InjectableSorts MJSSig MultiLocalVarDeclL = [JSStatementL, BlockIt
 
 type MJSTerm = Term MJSSig
 type MJSTermLab = TermLab MJSSig
+
+type MJSTermAnn    a = AnnTerm        a  MJSSig
+type MJSTermOptAnn a = AnnTerm (Maybe a) MJSSig
 
 type MJSCxt h a = CxtS h MJSSig a
 type MJSCxtA h a p = AnnCxtS p h MJSSig a

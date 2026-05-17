@@ -7,6 +7,8 @@ TIMELIMIT = "45s"
 # Jakub 2025.06.12: Updated to match new Lua tests script, but I
 #                   have not run it.
 JS_TESTS = ENV["JS_TESTS"]
+JS_EXCLUDE = ENV["JS_EXCLUDE"]
+JS_PRELUDE = ENV["JS_PRELUDE"]
 RUNPROG = `cabal list-bin multi`.strip
 OUT_DIR = "tmp_js_" + transform
 
@@ -28,7 +30,7 @@ end
 
 Dir.mkdir OUT_DIR
 
-excluded_tests = File.read(JS_EXCLUDE").split(/\s+/)
+excluded_tests = File.read(JS_EXCLUDE).split(/\s+/)
 
 tests = `find #{JS_TESTS}ch{08,09,10,11,12,13,14} -name '*.js'`.split(/\s+/).select {|s| not (excluded_tests.index s) }
 
@@ -49,8 +51,12 @@ tests.each do |testfil|
   test_contents = File.read(testfil)
   positive = (nil == test_contents.index("@negative"))
 
-  # I had mysterious errors on big files using "<(" that "=(" seems to fix
-  system("zsh -c \"node =(cat #{JS_PRELUDE} #{testfil})\"")
+  # Feed via stdin so node runs as a script (this === globalThis), not
+  # as a CommonJS module (this === module.exports). The ES5 test262
+  # corpus uses `this.x` to mean "set on the global", which only
+  # works in script mode — historical Node defaulted there, modern
+  # Node defaults to module mode when invoked with a file argument.
+  system("cat #{JS_PRELUDE} #{testfil} | node")
 
   status = $?
 
@@ -90,8 +96,7 @@ tests.each do |testfil|
     f.puts(addTestCoverageArr(res))
   end
 
-  # I had mysterious errors on big files using "<(" that "=(" seems to fix
-  system("zsh -c \"node =(cat #{JS_PRELUDE} #{outfil})\"")
+  system("cat #{JS_PRELUDE} #{outfil} | node")
   status = $?
 
   if (status == 0) == positive
