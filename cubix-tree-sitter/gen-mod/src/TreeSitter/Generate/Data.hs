@@ -6,13 +6,14 @@
 module TreeSitter.Generate.Data where
 
 import Control.Exception (Exception, throw)
+import Data.Char (isDigit)
 import Data.Map (Map)
 import Data.Map qualified as Map (elems, filter, fromList, keys, lookup)
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set (empty, fromList, singleton)
 import Data.Text (Text)
-import Data.Text qualified as Text (head, isPrefixOf, show, split)
+import Data.Text qualified as Text (all, head, null, show, split, stripPrefix)
 import Data.Vector qualified as Vector (foldl, foldr, head, toList, uncons)
 import GHC.Generics (Generic)
 
@@ -27,9 +28,22 @@ import TreeSitter.Grammar
 isHidden :: RuleName -> Bool
 isHidden n = Text.head n == '_'
 
+-- | True for hoist-synthesised intermediate rules whose names follow
+-- the @<parent>_internalN@ pattern emitted by
+-- 'TreeSitter.Grammar.Transform.HoistDefinitions.hoistDedup'.
+--
+-- The predicate matches the segment shape @internal<digits>@ (e.g.
+-- @internal0@, @internal12@) rather than any segment beginning with
+-- @internal@, so user-defined tokens or rules literally named
+-- @internal@ (Sui Move has one) don't get misclassified as
+-- generator-internal and consequently routed through the EOF-only
+-- @p<Name>Tok@ helper instead of an in-stream @pSort@.
 isInternal :: RuleName -> Bool
-isInternal n = let segments = Text.split (== '_') n
-  in any (Text.isPrefixOf "internal") segments
+isInternal n = any matchInternal (Text.split (== '_') n)
+  where
+    matchInternal s = case Text.stripPrefix "internal" s of
+      Just rest -> not (Text.null rest) && Text.all isDigit rest
+      Nothing   -> False
   
 data Type
   = Ref Name

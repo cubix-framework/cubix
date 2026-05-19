@@ -135,6 +135,7 @@ test-suite unit-tests
     BannedConstructorTH
     BannedConstructorsSpec
     ParseSpec
+    SourcePosSpec
     TransRoundtripSpec
   build-depends:
     , async >= 2.2

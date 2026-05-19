@@ -15,6 +15,8 @@ import System.Timeout (timeout)
 
 import Test.Hspec (Spec, describe, expectationFailure, it, runIO)
 
+import Data.Comp.Multi (stripA)
+
 import TreeSitter.SuiMove (tree_sitter_sui_move)
 
 import Cubix.Language.SuiMove.Pretty qualified as Pretty
@@ -45,7 +47,7 @@ roundtripTest filepath
         case parsed of
           Nothing -> return Nothing
           Just orig -> do
-            let prettyPrinted = Pretty.pretty orig
+            let prettyPrinted = Pretty.pretty (stripA orig)
             withSystemTempFile "roundtrip.move" $ \tmpPath tmpHandle -> do
               hClose tmpHandle
               writeFile tmpPath prettyPrinted
@@ -53,7 +55,9 @@ roundtripTest filepath
               case reparsed of
                 Nothing -> return $ Just filepath
                 Just ast2 -> do
-                  eq <- evaluate (orig == ast2)
+                  -- Compare structurally, ignoring source spans (which
+                  -- differ because the temp file has a different path).
+                  eq <- evaluate (stripA orig == stripA ast2)
                   return $ if eq then Nothing else Just filepath
       case result of
         Nothing        -> return Nothing  -- timed out, skip
@@ -76,13 +80,13 @@ getMoveFiles dir = do
            else return []
 
 -- | Try multiple candidate paths for the test corpus.
--- The working directory varies depending on how the test is invoked:
---   - Running binary directly from cubix/:          ../sui-move-test-corpus
---   - Running via cabal test from cubix/:            ../../sui-move-test-corpus
+-- The working directory varies depending on how the test is invoked.
 findCorpusDir :: IO (Maybe FilePath)
 findCorpusDir = go candidates
   where
-    candidates = [ "../sui-move-test-corpus"
+    candidates = [ "input-files/sui-move"
+                 , "../input-files/sui-move"
+                 , "../sui-move-test-corpus"
                  , "../../sui-move-test-corpus"
                  ]
     go [] = return Nothing

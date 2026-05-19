@@ -22,8 +22,10 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
-import Data.Comp.Multi (E (..), project)
+import Data.Comp.Multi (AnnTerm, E (..))
+import Data.Comp.Multi.Annotation ((:&:) (..))
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.Comp.Multi.Term (Cxt (Term))
 import Data.Foldable (foldrM)
 import Data.Functor ((<&>))
 import Data.IntMap.Strict (IntMap)
@@ -41,7 +43,7 @@ import TreeSitter qualified as TS
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
-import Cubix.Language.Parametric.Syntax (jJustF, riNothingF)
+import Cubix.Language.Info (SourceSpan)
 import Cubix.ParsePretty (type RootSort)
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
@@ -56,12 +58,29 @@ parse' = do
   rootNode <- liftIO . TS.treeRootNode =<< getTree
   syntax filepath source pTable rootNode
 
-parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (MoveTerm (RootSort MoveSig)))
+parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (MoveTermAnn (Maybe SourceSpan) (RootSort MoveSig)))
 parse path getLang = do
   mEnv <- newTreeSitterEnv path getLang
   case mEnv of
     Nothing  -> pure Nothing
     Just env -> runReaderT parse' env <&> caseE @_ @(RootSort MoveSig)
+
+-- | Replace the outer annotation of an 'AnnTerm' with a 'SourceSpan'.
+--
+-- Smart constructors (@CtorName'@, @riNothingF@, @jJustF@, ...) inject
+-- with @def = Nothing@ as the annotation via the @f :<: (Sum fs :&: a)@
+-- instance; we overwrite that 'Nothing' with the tree-sitter node's
+-- actual span at the construction site in 'go'. Inner children keep
+-- their own spans (set by their own recursive 'go'), so the result is
+-- per-layer annotated.
+attachSpan
+  :: Maybe SourceSpan
+  -> MoveTermAnn (Maybe SourceSpan) l
+  -> MoveTermAnn (Maybe SourceSpan) l
+attachSpan sp (Term (n :&: _)) = Term (n :&: sp)
+
+attachSpanE :: Maybe SourceSpan -> SomeTerm -> SomeTerm
+attachSpanE sp (E t) = E (attachSpan sp t)
 
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = fmap fromJust . go
@@ -102,15 +121,21 @@ syntax path source pTable = fmap fromJust . go
                   pPrintDarkBg children
                   error "no parse"
                 Right item ->
-                  pure (Just item)
+                  pure (Just (attachSpanE (Just span) item))
 
 -- --------------------------------------------------------------------------------
--- -- Parser 
+-- -- Parser
 -- --------------------------------------------------------------------------------
-type SomeTerm = E MoveTerm
-type Parser t = Megaparsec.Cubix.Parser MoveSig t
-type TermParser l = Parser (MoveTerm l)
-type SomeTermParser = Parser (E MoveTerm)
+
+-- | Cubix term over the grammar signature carrying an annotation of
+-- type @a@ at every layer. With @a = Maybe SourceSpan@ this is the
+-- parser's output.
+type MoveTermAnn a = AnnTerm a MoveSig
+
+type SomeTerm = E (MoveTermAnn (Maybe SourceSpan))
+type Parser t = Megaparsec.Cubix.ParserA MoveSig (Maybe SourceSpan) t
+type TermParser l = Parser (MoveTermAnn (Maybe SourceSpan) l)
+type SomeTermParser = Parser (E (MoveTermAnn (Maybe SourceSpan)))
 
 -- reify types
 pMaybe :: Typeable l => TermParser l -> TermParser (Maybe l)
@@ -141,12 +166,12 @@ pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l ->
 pBetween = Megaparsec.Cubix.pBetween
 {-# INLINABLE pBetween #-}
 
-pSort :: forall l. DynCase MoveTerm l => NonEmpty Char -> TermParser l
+pSort :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
 pSort = Megaparsec.Cubix.pSort @l
 {-# INLINABLE pSort #-}
 
-pSort' :: forall l. DynCase MoveTerm l => Proxy l -> NonEmpty Char -> TermParser l
-pSort' = Megaparsec.Cubix.pSort' 
+pSort' :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
+pSort' = Megaparsec.Cubix.pSort'
 {-# INLINABLE pSort' #-}
 
 pContent :: Parser Text
@@ -520,21 +545,8 @@ pModuleDefinition =
   ModuleDefinition' <$> pSort @ModuleTokL "module_tok" <*> pSort @ModuleIdentityL "module_identity" <*> pSort @ModuleBodyL "module_body"
 
 pModuleBody :: TermParser ModuleBodyL
-pModuleBody = do
-  opener <- pModuleBodyInternal0
-  items <- pMany (pModuleBodyInternal1)
-  closer <- case project @ModuleBodyInternal0 opener of
-    Just (ModuleBodyInternal0LeftCurlyBracket _) -> do
-      -- When opener is '{', always produce JustF '}'
-      -- (consume it if present, synthesize if absent from malformed source)
-      mbTok <- optional (pSort @RightCurlyBracketTokL "}_tok")
-      case mbTok of
-        Just tok -> pure (jJustF tok)
-        Nothing  -> pure (jJustF RightCurlyBracketTok')
-    _ ->
-      -- When opener is ';', no closer expected
-      pure riNothingF
-  pure $ ModuleBody' opener items closer
+pModuleBody =
+  ModuleBody' <$> pModuleBodyInternal0 <*> pMany (pModuleBodyInternal1) <*> pMaybe (pSort @RightCurlyBracketTokL "}_tok")
 
 pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
 pModuleBodyInternal0 =
@@ -707,45 +719,44 @@ pApplyType =
 
 pModuleAccess :: TermParser ModuleAccessL
 pModuleAccess =
-  -- Order matters: try longer/more specific patterns first
-  choice [ Megaparsec.try pModuleAccess1   -- $identifier
-         , Megaparsec.try pModuleAccess2   -- @identifier
-         , Megaparsec.try pModuleAccessMember  -- reserved identifier
-         , Megaparsec.try pModuleAccess9   -- module::id<types>::id (most specific)
-         , Megaparsec.try pModuleAccess6   -- module::id<types>
-         , Megaparsec.try pModuleAccess8   -- module<types>::id
-         , Megaparsec.try pModuleAccess5   -- hidden_mod<types>::id
-         , Megaparsec.try pModuleAccess7   -- module<types>
-         , Megaparsec.try pModuleAccess4   -- identifier<types> (least specific, try last)
+  choice [ Megaparsec.try pModuleAccess9
+         , Megaparsec.try pModuleAccess6
+         , Megaparsec.try pModuleAccess5
+         , Megaparsec.try pModuleAccess8
+         , Megaparsec.try pModuleAccess1
+         , Megaparsec.try pModuleAccess2
+         , Megaparsec.try pModuleAccess4
+         , Megaparsec.try pModuleAccess7
+         , Megaparsec.try pModuleAccessMember
          ]
   where
+    pModuleAccess9 :: TermParser ModuleAccessL
+    pModuleAccess9 =
+      ModuleAccess9' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
+    pModuleAccess6 :: TermParser ModuleAccessL
+    pModuleAccess6 =
+      ModuleAccess6' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pSort @TypeArgumentsL "type_arguments"
+    pModuleAccess5 :: TermParser ModuleAccessL
+    pModuleAccess5 =
+      ModuleAccess5' <$> pHiddenModuleIdentifier <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
+    pModuleAccess8 :: TermParser ModuleAccessL
+    pModuleAccess8 =
+      ModuleAccess8' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess1 :: TermParser ModuleAccessL
     pModuleAccess1 =
       ModuleAccess1' <$> pSort @DollarSignTokL "$_tok" <*> pSort @IdentifierL "identifier"
     pModuleAccess2 :: TermParser ModuleAccessL
     pModuleAccess2 =
       ModuleAccess2' <$> pSort @CommercialAtTokL "@_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccessMember :: TermParser ModuleAccessL
-    pModuleAccessMember =
-      ModuleAccessMember' <$> pHiddenReservedIdentifier
     pModuleAccess4 :: TermParser ModuleAccessL
     pModuleAccess4 =
       ModuleAccess4' <$> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
-    pModuleAccess5 :: TermParser ModuleAccessL
-    pModuleAccess5 =
-      ModuleAccess5' <$> pHiddenModuleIdentifier <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess6 :: TermParser ModuleAccessL
-    pModuleAccess6 =
-      ModuleAccess6' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pSort @TypeArgumentsL "type_arguments"
     pModuleAccess7 :: TermParser ModuleAccessL
     pModuleAccess7 =
       ModuleAccess7' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
-    pModuleAccess8 :: TermParser ModuleAccessL
-    pModuleAccess8 =
-      ModuleAccess8' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess9 :: TermParser ModuleAccessL
-    pModuleAccess9 =
-      ModuleAccess9' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
+    pModuleAccessMember :: TermParser ModuleAccessL
+    pModuleAccessMember =
+      ModuleAccessMember' <$> pHiddenReservedIdentifier
 
 pHiddenModuleIdentifier :: TermParser HiddenModuleIdentifierL
 pHiddenModuleIdentifier =
@@ -968,16 +979,16 @@ pFunctionParameter =
 
 pFunctionParameterInternal0 :: TermParser FunctionParameterInternal0L
 pFunctionParameterInternal0 =
-  choice [ Megaparsec.try pFunctionParameterInternal0Name
-         , Megaparsec.try pFunctionParameterInternal02
+  choice [ Megaparsec.try pFunctionParameterInternal02
+         , Megaparsec.try pFunctionParameterInternal0Name
          ]
   where
-    pFunctionParameterInternal0Name :: TermParser FunctionParameterInternal0L
-    pFunctionParameterInternal0Name =
-      FunctionParameterInternal0Name' <$> pHiddenVariableIdentifier
     pFunctionParameterInternal02 :: TermParser FunctionParameterInternal0L
     pFunctionParameterInternal02 =
       FunctionParameterInternal02' <$> pSort @DollarSignTokL "$_tok" <*> pHiddenVariableIdentifier
+    pFunctionParameterInternal0Name :: TermParser FunctionParameterInternal0L
+    pFunctionParameterInternal0Name =
+      FunctionParameterInternal0Name' <$> pHiddenVariableIdentifier
 
 pHiddenVariableIdentifier :: TermParser HiddenVariableIdentifierL
 pHiddenVariableIdentifier =
@@ -1599,7 +1610,7 @@ pSpecApplyPatternInternal0 =
       SpecApplyPatternInternal0Public' <$> pSort @PublicTokL "public_tok"
     pSpecApplyPatternInternal0Internal :: TermParser SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Internal =
-      SpecApplyPatternInternal0Internal' <$> pSort @InternalTokL "internal"
+      SpecApplyPatternInternal0Internal' <$> pSort @InternalTokL "internal_tok"
 
 pSpecCondition :: TermParser SpecConditionL
 pSpecCondition =
@@ -1653,16 +1664,16 @@ pHiddenSpecCondition =
 
 pHiddenSpecConditionInternal0 :: TermParser HiddenSpecConditionInternal0L
 pHiddenSpecConditionInternal0 =
-  choice [ Megaparsec.try pHiddenSpecConditionInternal0Kind
-         , Megaparsec.try pHiddenSpecConditionInternal02
+  choice [ Megaparsec.try pHiddenSpecConditionInternal02
+         , Megaparsec.try pHiddenSpecConditionInternal0Kind
          ]
   where
-    pHiddenSpecConditionInternal0Kind :: TermParser HiddenSpecConditionInternal0L
-    pHiddenSpecConditionInternal0Kind =
-      HiddenSpecConditionInternal0Kind' <$> pHiddenSpecConditionKind
     pHiddenSpecConditionInternal02 :: TermParser HiddenSpecConditionInternal0L
     pHiddenSpecConditionInternal02 =
       HiddenSpecConditionInternal02' <$> pSort @RequiresTokL "requires_tok" <*> pMaybe (pSort @ModuleTokL "module_tok")
+    pHiddenSpecConditionInternal0Kind :: TermParser HiddenSpecConditionInternal0L
+    pHiddenSpecConditionInternal0Kind =
+      HiddenSpecConditionInternal0Kind' <$> pHiddenSpecConditionKind
 
 pHiddenSpecConditionKind :: TermParser HiddenSpecConditionKindL
 pHiddenSpecConditionKind =
@@ -1782,17 +1793,17 @@ pUseModuleMember =
 
 pUseMember :: TermParser UseMemberL
 pUseMember =
-  choice [ Megaparsec.try pUseMember1
-         , Megaparsec.try pUseMember2
+  choice [ Megaparsec.try pUseMember2
+         , Megaparsec.try pUseMember1
          , Megaparsec.try pUseMember3
          ]
   where
-    pUseMember1 :: TermParser UseMemberL
-    pUseMember1 =
-      UseMember1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
     pUseMember2 :: TermParser UseMemberL
     pUseMember2 =
       UseMember2' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
+    pUseMember1 :: TermParser UseMemberL
+    pUseMember1 =
+      UseMember1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
     pUseMember3 :: TermParser UseMemberL
     pUseMember3 =
       UseMember3' <$> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
@@ -1820,16 +1831,16 @@ pVectorExpression =
 
 pVectorExpressionInternal0 :: TermParser VectorExpressionInternal0L
 pVectorExpressionInternal0 =
-  choice [ Megaparsec.try pVectorExpressionInternal0VectorLeftSquareBracket
-         , Megaparsec.try pVectorExpressionInternal02
+  choice [ Megaparsec.try pVectorExpressionInternal02
+         , Megaparsec.try pVectorExpressionInternal0VectorLeftSquareBracket
          ]
   where
-    pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser VectorExpressionInternal0L
-    pVectorExpressionInternal0VectorLeftSquareBracket =
-      VectorExpressionInternal0VectorLeftSquareBracket' <$> pSort @VectorLeftSquareBracketTokL "vector[_tok"
     pVectorExpressionInternal02 :: TermParser VectorExpressionInternal0L
     pVectorExpressionInternal02 =
       VectorExpressionInternal02' <$> pBetween (pSort @VectorLessThanSignTokL "vector<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pHiddenType) (pSort @CommaTokL ",_tok")) <*> pSort @LeftSquareBracketTokL "[_tok"
+    pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser VectorExpressionInternal0L
+    pVectorExpressionInternal0VectorLeftSquareBracket =
+      VectorExpressionInternal0VectorLeftSquareBracket' <$> pSort @VectorLeftSquareBracketTokL "vector[_tok"
 
 pBorrowExpression :: TermParser BorrowExpressionL
 pBorrowExpression =
@@ -1979,21 +1990,20 @@ pLambdaBindings =
 
 pLambdaBinding :: TermParser LambdaBindingL
 pLambdaBinding =
-  -- Order matters: pLambdaBinding3 (bind + optional type) before pLambdaBindingBind (bind only)
-  choice [ Megaparsec.try pLambdaBindingCommaBindList
-         , Megaparsec.try pLambdaBinding3
+  choice [ Megaparsec.try pLambdaBinding3
+         , Megaparsec.try pLambdaBindingCommaBindList
          , Megaparsec.try pLambdaBindingBind
          ]
   where
+    pLambdaBinding3 :: TermParser LambdaBindingL
+    pLambdaBinding3 =
+      LambdaBinding3' <$> pHiddenBind <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pHiddenType))
     pLambdaBindingCommaBindList :: TermParser LambdaBindingL
     pLambdaBindingCommaBindList =
       LambdaBindingCommaBindList' <$> pSort @CommaBindListL "comma_bind_list"
     pLambdaBindingBind :: TermParser LambdaBindingL
     pLambdaBindingBind =
       LambdaBindingBind' <$> pHiddenBind
-    pLambdaBinding3 :: TermParser LambdaBindingL
-    pLambdaBinding3 =
-      LambdaBinding3' <$> pHiddenBind <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pHiddenType))
 
 pLoopExpression :: TermParser LoopExpressionL
 pLoopExpression =
