@@ -17,6 +17,8 @@ import System.IO ( hClose )
 import System.IO.Temp ( withSystemTempFile )
 import Text.Pretty.Simple ( pPrintLightBg )
 
+import Data.Comp.Multi ( stripA )
+
 import TreeSitter.SuiMove ( tree_sitter_sui_move )
 
 import Cubix.Analysis.NodePairs ( NodePair(..), countNodePairsInFolder, possibleNodePairs )
@@ -115,7 +117,7 @@ main = do
       mast <- RawParse.parse inputFile tree_sitter_sui_move
       ast <- case mast of
         Nothing -> error "Couldn't parse file"
-        Just a -> pure a
+        Just a -> pure (stripA a)
       putStrLn (Pretty.pretty ast)
 
     _ | act == aRoundTrip -> do
@@ -123,7 +125,7 @@ main = do
       mast <- RawParse.parse inputFile tree_sitter_sui_move
       ast <- case mast of
         Nothing -> error "Couldn't parse file"
-        Just a -> pure a
+        Just a -> pure (stripA a)
       let prettyPrinted = Pretty.pretty ast
       -- Write to temp file and re-parse
       withSystemTempFile "roundtrip.move" $ \tmpPath tmpHandle -> do
@@ -136,7 +138,7 @@ main = do
             putStrLn "Pretty-printed output:"
             putStrLn prettyPrinted
           Just ast2 -> do
-            if ast == ast2
+            if ast == stripA ast2
               then putStrLn "Round-trip SUCCESS"
               else do
                 putStrLn "Round-trip FAILED: ASTs differ"
@@ -145,7 +147,7 @@ main = do
 
     _ | act == aNodePairs -> do
       -- Count node pairs across all .move files in the given folder
-      let parseRaw path = RawParse.parse path tree_sitter_sui_move
+      let parseRaw path = fmap (fmap stripA) (RawParse.parse path tree_sitter_sui_move)
       counts <- countNodePairsInFolder @MoveSig suiMovePossiblePairs ".move" parseRaw inputFile
       putStrLn "Node pair counts:"
       let printPair (NodePair p c, count) =

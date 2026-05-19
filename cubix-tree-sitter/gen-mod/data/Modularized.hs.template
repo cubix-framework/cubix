@@ -23,7 +23,7 @@ module ${moduleName}
 {+-}
   where
 
-import Data.Comp.Multi.Strategy.Classification (DynCase (..))
+import Data.Comp.Multi.Strategy.Classification (KDynCase (..))
 import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..))
 import Language.Haskell.TH qualified as TH
@@ -32,7 +32,7 @@ import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Term, project)
+import Data.Comp.Multi (Term)
 
 --------------------------------------------------------------------------------
 -- Labels
@@ -140,11 +140,19 @@ ${endfor}
 -- Generated instances
 --------------------------------------------------------------------------------
 
+-- | One @KDynCase Token@ instance per token sort, so the generic
+-- @DynCase (Cxt h f a) l@ instance picks up the dispatch for /any/
+-- term shape containing 'Token' — including annotated terms
+-- @AnnTerm a fs l@ produced by the source-position-tracking parser.
+-- (Going via @KDynCase@ rather than emitting one @DynCase Term-shape@
+-- instance per term type avoids the n-grammar-names × m-tokens code
+-- explosion and gets the @:&: a@ wrapper for free via the
+-- @KDynCase (f :&: a) l@ instance in compstrat.)
 {-+}
 ${for(tokens)}
-instance {-# OVERLAPPING #-} DynCase MoveTerm ${it.name.sort} where
-  dyncase (project -> Just ${it.name.camelCase}) = Just Refl
-  dyncase _ = Nothing
+instance KDynCase Token ${it.name.sort} where
+  kdyncase ${it.name.camelCase} = Just Refl
+  kdyncase _                    = Nothing
 
 ${endfor}
 {+-}

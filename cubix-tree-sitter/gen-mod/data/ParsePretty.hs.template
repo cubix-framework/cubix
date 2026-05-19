@@ -26,8 +26,10 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
-import Data.Comp.Multi (E (..))
+import Data.Comp.Multi (AnnTerm, E (..))
+import Data.Comp.Multi.Annotation ((:&:) (..))
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.Comp.Multi.Term (Cxt (Term))
 import Data.Foldable (foldrM)
 import Data.Functor ((<&>))
 import Data.IntMap.Strict (IntMap)
@@ -45,6 +47,7 @@ import TreeSitter qualified as TS
 import Text.Megaparsec qualified as Megaparsec
 import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
+import Cubix.Language.Info (SourceSpan)
 import Cubix.ParsePretty (type RootSort)
 import Cubix.TreeSitter
 import Cubix.Language.SuiMove.Modularized
@@ -60,13 +63,32 @@ parse' = do
   syntax filepath source pTable rootNode
 
 {-+}
-parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (${grammarName}Term (RootSort ${grammarName}Sig)))
+parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (${grammarName}TermAnn (Maybe SourceSpan) (RootSort ${grammarName}Sig)))
 parse path getLang = do
   mEnv <- newTreeSitterEnv path getLang
   case mEnv of
     Nothing  -> pure Nothing
     Just env -> runReaderT parse' env <&> caseE @_ @(RootSort ${grammarName}Sig)
 {+-}
+
+-- | Replace the outer annotation of an 'AnnTerm' with a 'SourceSpan'.
+--
+-- Smart constructors (@CtorName'@, @riNothingF@, @jJustF@, ...) inject
+-- with @def = Nothing@ as the annotation via the @f :<: (Sum fs :&: a)@
+-- instance; we overwrite that 'Nothing' with the tree-sitter node's
+-- actual span at the construction site in 'go'. Inner children keep
+-- their own spans (set by their own recursive 'go'), so the result is
+-- per-layer annotated.
+{-+}
+attachSpan
+  :: Maybe SourceSpan
+  -> ${grammarName}TermAnn (Maybe SourceSpan) l
+  -> ${grammarName}TermAnn (Maybe SourceSpan) l
+attachSpan sp (Term (n :&: _)) = Term (n :&: sp)
+{+-}
+
+attachSpanE :: Maybe SourceSpan -> SomeTerm -> SomeTerm
+attachSpanE sp (E t) = E (attachSpan sp t)
 
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = fmap fromJust . go
@@ -107,16 +129,22 @@ syntax path source pTable = fmap fromJust . go
                   pPrintDarkBg children
                   error "no parse"
                 Right item ->
-                  pure (Just item)
+                  pure (Just (attachSpanE (Just span) item))
 
 -- --------------------------------------------------------------------------------
--- -- Parser 
+-- -- Parser
 -- --------------------------------------------------------------------------------
+
+-- | Cubix term over the grammar signature carrying an annotation of
+-- type @a@ at every layer. With @a = Maybe SourceSpan@ this is the
+-- parser's output.
 {-+}
-type SomeTerm = E ${grammarName}Term
-type Parser t = Megaparsec.Cubix.Parser ${grammarName}Sig t
-type TermParser l = Parser (${grammarName}Term l)
-type SomeTermParser = Parser (E ${grammarName}Term)
+type ${grammarName}TermAnn a = AnnTerm a ${grammarName}Sig
+
+type SomeTerm = E (${grammarName}TermAnn (Maybe SourceSpan))
+type Parser t = Megaparsec.Cubix.ParserA ${grammarName}Sig (Maybe SourceSpan) t
+type TermParser l = Parser (${grammarName}TermAnn (Maybe SourceSpan) l)
+type SomeTermParser = Parser (E (${grammarName}TermAnn (Maybe SourceSpan)))
 {+-}
 
 -- reify types
@@ -148,13 +176,15 @@ pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l ->
 pBetween = Megaparsec.Cubix.pBetween
 {-# INLINABLE pBetween #-}
 
-pSort :: forall l. DynCase MoveTerm l => NonEmpty Char -> TermParser l
+{-+}
+pSort :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
 pSort = Megaparsec.Cubix.pSort @l
 {-# INLINABLE pSort #-}
 
-pSort' :: forall l. DynCase MoveTerm l => Proxy l -> NonEmpty Char -> TermParser l
-pSort' = Megaparsec.Cubix.pSort' 
+pSort' :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
+pSort' = Megaparsec.Cubix.pSort'
 {-# INLINABLE pSort' #-}
+{+-}
 
 pContent :: Parser Text
 pContent = Megaparsec.Cubix.pContent

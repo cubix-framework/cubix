@@ -14,10 +14,11 @@ module TreeSitter.Generate.Render where
 import Data.Char (isAlphaNum, toLower, toUpper)
 import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (..))
-import Data.List (uncons)
+import Data.List (sortOn, uncons)
 import Data.List.NonEmpty qualified as NonEmpty (toList)
 import Data.Map qualified as Map (elems, fromList, mapWithKey, singleton)
 import Data.Maybe (fromMaybe)
+import Data.Ord (Down (..))
 import Data.Set qualified as Set (fromList, toList)
 import Data.String (IsString (..))
 import Data.Text (Text)
@@ -125,12 +126,41 @@ instance ToContext Text Node where
       , ("sort", toVal (sortName $ Name nSort))
       , ("hasSymbol", toVal hasSymbol)
       , ("sum", toVal (length nCtrs /= 1))
-      , ("constructors", ListVal (toVal . (Name nSort,) <$> nCtrs))
+      , ("constructors", ListVal (toVal . (Name nSort,) <$> orderedCtrs))
       ]
     where
       -- if the node exists in ts token stream
       hasSymbol :: Bool
       hasSymbol = not $ isHidden nSort || isInternal nName
+
+      -- | Order constructors so longer (more-field) alternatives come
+      -- first in the generated @choice [try p1, try p2, ...]@ block.
+      --
+      -- The Megaparsec backtracking parser commits to the first @try@
+      -- that returns successfully. Where two alternatives share a
+      -- prefix (e.g. @identifier@ vs @identifier "::" identifier@), the
+      -- shorter one would otherwise succeed prematurely, consuming a
+      -- proper prefix of the longer match and leaving the surrounding
+      -- parser with leftover children. Sorting stably by descending
+      -- field count puts the most-specific alternative first; ties are
+      -- broken by required field count so an explicit suffix (for
+      -- example @type_arguments@) is tried before an optional prefix.
+      -- Remaining ties preserve grammar order. Matches the rationale recorded in
+      -- commit 53804bc1's hand-edits to pModuleAccess / pLambdaBinding
+      -- ("Order matters: try longer/more specific patterns first").
+      orderedCtrs :: [Constructor]
+      orderedCtrs = sortOn specificity nCtrs
+
+      specificity :: Constructor -> (Down Int, Down Int)
+      specificity ctor =
+        ( Down (length ctor.cFields)
+        , Down (length (filter isRequiredField ctor.cFields))
+        )
+
+      isRequiredField :: Field -> Bool
+      isRequiredField field = case field.fType of
+        Maybe _ -> False
+        _       -> True
 
 instance ToContext Text (Name, Constructor) where
   toVal :: (Name, Constructor) -> Val Text

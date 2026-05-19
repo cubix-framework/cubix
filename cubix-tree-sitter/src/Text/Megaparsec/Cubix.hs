@@ -22,7 +22,7 @@ import Control.Applicative.Combinators (between, eitherP, many, optional, sepEnd
 -- import Control.Applicative.Combinators.NonEmpty (some, sepBy1)
 import Text.Megaparsec qualified (ErrorItem (Label), Parsec, PosState (..), Stream (..), Token, Tokens, TraversableStream (..), VisualStream (..), getParserState, sourceLine, stateInput, token, tokensLength)
 
-import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, KShow, NoHole, OrdHF, ShowHF, Sum, (:<:))
+import Data.Comp.Multi (Cxt, E, HFunctor, K, KOrd, KShow, NoHole, OrdHF, ShowHF, Sum, (:<:), (:&:))
 import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
 
 import Cubix.Language.Info (SourceRange (..), rangeLength)
@@ -168,6 +168,13 @@ instance
 
 type Parser' h fs a t = Text.Megaparsec.Parsec Void (Input h fs a) t
 type Parser sig t = Parser' NoHole (Sum sig) (K ()) t
+
+-- | Parser whose tokens are annotated terms: each Cxt layer carries an
+-- annotation of type @ann@. Used by the generated tree-sitter parsers
+-- to thread source spans through the parse, attaching them at every
+-- AST layer (mirrors what the hand-written Java parser does with
+-- 'layer').
+type ParserA sig ann t = Parser' NoHole (Sum sig :&: ann) (K ()) t
 
 -- Use with TypeApplications, eg. `pSort @IdentL`
 -- that is why I've put `l` variable first

@@ -3,6 +3,7 @@ debug-info: 0
 profiling: False
 executable-profiling: False
 library-profiling: False
+executable-dynamic: True
 
 optimization: False
 

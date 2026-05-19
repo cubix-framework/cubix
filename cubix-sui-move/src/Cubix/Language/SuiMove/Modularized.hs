@@ -19,7 +19,7 @@
 module Cubix.Language.SuiMove.Modularized
   where
 
-import Data.Comp.Multi.Strategy.Classification (DynCase (..))
+import Data.Comp.Multi.Strategy.Classification (KDynCase (..))
 import Data.Text (Text)
 import Data.Type.Equality (type (:~:) (..))
 import Language.Haskell.TH qualified as TH
@@ -28,7 +28,7 @@ import Cubix.Language.Info (TermLab)
 import Cubix.Language.Parametric.Derive
 import Cubix.Language.Parametric.Syntax qualified as Syntax
 import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Term, project)
+import Data.Comp.Multi (Term)
 
 --------------------------------------------------------------------------------
 -- Labels
@@ -661,23 +661,10 @@ data ApplyType e l where
     -> ApplyType e ApplyTypeL
 
 data ModuleAccess e l where
-  ModuleAccess1
-    :: e DollarSignTokL
+  ModuleAccess9
+    :: e ModuleIdentityL
+    -> e ColonColonTokL
     -> e IdentifierL
-    -> ModuleAccess e ModuleAccessL
-  ModuleAccess2
-    :: e CommercialAtTokL
-    -> e IdentifierL
-    -> ModuleAccess e ModuleAccessL
-  ModuleAccessMember
-    :: e HiddenReservedIdentifierL
-    -> ModuleAccess e ModuleAccessL
-  ModuleAccess4
-    :: e IdentifierL
-    -> e (Maybe TypeArgumentsL)
-    -> ModuleAccess e ModuleAccessL
-  ModuleAccess5
-    :: e HiddenModuleIdentifierL
     -> e (Maybe TypeArgumentsL)
     -> e ColonColonTokL
     -> e IdentifierL
@@ -688,9 +675,11 @@ data ModuleAccess e l where
     -> e IdentifierL
     -> e TypeArgumentsL
     -> ModuleAccess e ModuleAccessL
-  ModuleAccess7
-    :: e ModuleIdentityL
+  ModuleAccess5
+    :: e HiddenModuleIdentifierL
     -> e (Maybe TypeArgumentsL)
+    -> e ColonColonTokL
+    -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess8
     :: e ModuleIdentityL
@@ -698,13 +687,24 @@ data ModuleAccess e l where
     -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
-  ModuleAccess9
-    :: e ModuleIdentityL
-    -> e ColonColonTokL
+  ModuleAccess1
+    :: e DollarSignTokL
     -> e IdentifierL
+    -> ModuleAccess e ModuleAccessL
+  ModuleAccess2
+    :: e CommercialAtTokL
+    -> e IdentifierL
+    -> ModuleAccess e ModuleAccessL
+  ModuleAccess4
+    :: e IdentifierL
     -> e (Maybe TypeArgumentsL)
-    -> e ColonColonTokL
-    -> e IdentifierL
+    -> ModuleAccess e ModuleAccessL
+  ModuleAccess7
+    :: e ModuleIdentityL
+    -> e (Maybe TypeArgumentsL)
+    -> ModuleAccess e ModuleAccessL
+  ModuleAccessMember
+    :: e HiddenReservedIdentifierL
     -> ModuleAccess e ModuleAccessL
 
 data HiddenModuleIdentifier e l where
@@ -914,12 +914,12 @@ data FunctionParameter e l where
     -> FunctionParameter e FunctionParameterL
 
 data FunctionParameterInternal0 e l where
-  FunctionParameterInternal0Name
-    :: e HiddenVariableIdentifierL
-    -> FunctionParameterInternal0 e FunctionParameterInternal0L
   FunctionParameterInternal02
     :: e DollarSignTokL
     -> e HiddenVariableIdentifierL
+    -> FunctionParameterInternal0 e FunctionParameterInternal0L
+  FunctionParameterInternal0Name
+    :: e HiddenVariableIdentifierL
     -> FunctionParameterInternal0 e FunctionParameterInternal0L
 
 data HiddenVariableIdentifier e l where
@@ -1562,12 +1562,12 @@ data HiddenSpecCondition e l where
     -> HiddenSpecCondition e HiddenSpecConditionL
 
 data HiddenSpecConditionInternal0 e l where
-  HiddenSpecConditionInternal0Kind
-    :: e HiddenSpecConditionKindL
-    -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
   HiddenSpecConditionInternal02
     :: e RequiresTokL
     -> e (Maybe ModuleTokL)
+    -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
+  HiddenSpecConditionInternal0Kind
+    :: e HiddenSpecConditionKindL
     -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
 
 data HiddenSpecConditionKind e l where
@@ -1684,16 +1684,16 @@ data UseModuleMember e l where
     -> UseModuleMember e UseModuleMemberL
 
 data UseMember e l where
-  UseMember1
-    :: e IdentifierL
-    -> e ColonColonTokL
-    -> e [UseMemberL]
-    -> UseMember e UseMemberL
   UseMember2
     :: e IdentifierL
     -> e ColonColonTokL
     -> e IdentifierL
     -> e (Maybe (AsTokL, IdentifierL))
+    -> UseMember e UseMemberL
+  UseMember1
+    :: e IdentifierL
+    -> e ColonColonTokL
+    -> e [UseMemberL]
     -> UseMember e UseMemberL
   UseMember3
     :: e IdentifierL
@@ -1726,12 +1726,12 @@ data VectorExpression e l where
     -> VectorExpression e VectorExpressionL
 
 data VectorExpressionInternal0 e l where
-  VectorExpressionInternal0VectorLeftSquareBracket
-    :: e VectorLeftSquareBracketTokL
-    -> VectorExpressionInternal0 e VectorExpressionInternal0L
   VectorExpressionInternal02
     :: e [HiddenTypeL]
     -> e LeftSquareBracketTokL
+    -> VectorExpressionInternal0 e VectorExpressionInternal0L
+  VectorExpressionInternal0VectorLeftSquareBracket
+    :: e VectorLeftSquareBracketTokL
     -> VectorExpressionInternal0 e VectorExpressionInternal0L
 
 data BorrowExpression e l where
@@ -1911,15 +1911,15 @@ data LambdaBindings e l where
     -> LambdaBindings e LambdaBindingsL
 
 data LambdaBinding e l where
+  LambdaBinding3
+    :: e HiddenBindL
+    -> e (Maybe (ColonTokL, HiddenTypeL))
+    -> LambdaBinding e LambdaBindingL
   LambdaBindingCommaBindList
     :: e CommaBindListL
     -> LambdaBinding e LambdaBindingL
   LambdaBindingBind
     :: e HiddenBindL
-    -> LambdaBinding e LambdaBindingL
-  LambdaBinding3
-    :: e HiddenBindL
-    -> e (Maybe (ColonTokL, HiddenTypeL))
     -> LambdaBinding e LambdaBindingL
 
 data LoopExpression e l where
@@ -2663,462 +2663,470 @@ moveSigNames =
 -- Generated instances
 --------------------------------------------------------------------------------
 
-instance {-# OVERLAPPING #-} DynCase MoveTerm ExclamationMarkTokL where
-  dyncase (project -> Just ExclamationMarkTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ExclamationMarkEqualsSignTokL where
-  dyncase (project -> Just ExclamationMarkEqualsSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm NumberSignLeftSquareBracketTokL where
-  dyncase (project -> Just NumberSignLeftSquareBracketTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm DollarSignTokL where
-  dyncase (project -> Just DollarSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PercentSignTokL where
-  dyncase (project -> Just PercentSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AmpersandTokL where
-  dyncase (project -> Just AmpersandTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AmpersandAmpersandTokL where
-  dyncase (project -> Just AmpersandAmpersandTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ApostropheTokL where
-  dyncase (project -> Just ApostropheTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LeftParenthesisTokL where
-  dyncase (project -> Just LeftParenthesisTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm RightParenthesisTokL where
-  dyncase (project -> Just RightParenthesisTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AsteriskTokL where
-  dyncase (project -> Just AsteriskTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PlusSignTokL where
-  dyncase (project -> Just PlusSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm CommaTokL where
-  dyncase (project -> Just CommaTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm HyphenMinusTokL where
-  dyncase (project -> Just HyphenMinusTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm HyphenMinusGreaterThanSignTokL where
-  dyncase (project -> Just HyphenMinusGreaterThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm FullStopTokL where
-  dyncase (project -> Just FullStopTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm FullStopFullStopTokL where
-  dyncase (project -> Just FullStopFullStopTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SolidusTokL where
-  dyncase (project -> Just SolidusTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SolidusAsteriskTokL where
-  dyncase (project -> Just SolidusAsteriskTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SolidusSolidusTokL where
-  dyncase (project -> Just SolidusSolidusTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ColonTokL where
-  dyncase (project -> Just ColonTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ColonColonTokL where
-  dyncase (project -> Just ColonColonTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SemicolonTokL where
-  dyncase (project -> Just SemicolonTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LessThanSignTokL where
-  dyncase (project -> Just LessThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LessThanSignLessThanSignTokL where
-  dyncase (project -> Just LessThanSignLessThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LessThanSignEqualsSignTokL where
-  dyncase (project -> Just LessThanSignEqualsSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EqualsSignTokL where
-  dyncase (project -> Just EqualsSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EqualsSignEqualsSignTokL where
-  dyncase (project -> Just EqualsSignEqualsSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EqualsSignEqualsSignGreaterThanSignTokL where
-  dyncase (project -> Just EqualsSignEqualsSignGreaterThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EqualsSignGreaterThanSignTokL where
-  dyncase (project -> Just EqualsSignGreaterThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm GreaterThanSignTokL where
-  dyncase (project -> Just GreaterThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm GreaterThanSignEqualsSignTokL where
-  dyncase (project -> Just GreaterThanSignEqualsSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm GreaterThanSignGreaterThanSignTokL where
-  dyncase (project -> Just GreaterThanSignGreaterThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm CommercialAtTokL where
-  dyncase (project -> Just CommercialAtTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LeftSquareBracketTokL where
-  dyncase (project -> Just LeftSquareBracketTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm RightSquareBracketTokL where
-  dyncase (project -> Just RightSquareBracketTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm CircumflexAccentTokL where
-  dyncase (project -> Just CircumflexAccentTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AbortTokL where
-  dyncase (project -> Just AbortTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AbortsIfTokL where
-  dyncase (project -> Just AbortsIfTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AbortsWithTokL where
-  dyncase (project -> Just AbortsWithTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AddressTokL where
-  dyncase (project -> Just AddressTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ApplyTokL where
-  dyncase (project -> Just ApplyTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AsTokL where
-  dyncase (project -> Just AsTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AssertTokL where
-  dyncase (project -> Just AssertTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm AssumeTokL where
-  dyncase (project -> Just AssumeTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm BoolTokL where
-  dyncase (project -> Just BoolTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm BreakTokL where
-  dyncase (project -> Just BreakTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ConstTokL where
-  dyncase (project -> Just ConstTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ContinueTokL where
-  dyncase (project -> Just ContinueTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm CopyTokL where
-  dyncase (project -> Just CopyTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm DecreasesTokL where
-  dyncase (project -> Just DecreasesTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm DropTokL where
-  dyncase (project -> Just DropTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ElseTokL where
-  dyncase (project -> Just ElseTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EnsuresTokL where
-  dyncase (project -> Just EnsuresTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EntryTokL where
-  dyncase (project -> Just EntryTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm EnumTokL where
-  dyncase (project -> Just EnumTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ExceptTokL where
-  dyncase (project -> Just ExceptTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ExistsTokL where
-  dyncase (project -> Just ExistsTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ExtendTokL where
-  dyncase (project -> Just ExtendTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm FalseTokL where
-  dyncase (project -> Just FalseTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ForallTokL where
-  dyncase (project -> Just ForallTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm FriendTokL where
-  dyncase (project -> Just FriendTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm FunTokL where
-  dyncase (project -> Just FunTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm GlobalTokL where
-  dyncase (project -> Just GlobalTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm HasTokL where
-  dyncase (project -> Just HasTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm IfTokL where
-  dyncase (project -> Just IfTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm InTokL where
-  dyncase (project -> Just InTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm IncludeTokL where
-  dyncase (project -> Just IncludeTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm InternalTokL where
-  dyncase (project -> Just InternalTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm InvariantTokL where
-  dyncase (project -> Just InvariantTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm KeyTokL where
-  dyncase (project -> Just KeyTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LetTokL where
-  dyncase (project -> Just LetTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LocalTokL where
-  dyncase (project -> Just LocalTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LoopTokL where
-  dyncase (project -> Just LoopTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm MacroTokL where
-  dyncase (project -> Just MacroTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm MatchTokL where
-  dyncase (project -> Just MatchTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ModifiesTokL where
-  dyncase (project -> Just ModifiesTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ModuleTokL where
-  dyncase (project -> Just ModuleTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm MoveTokL where
-  dyncase (project -> Just MoveTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm MutTokL where
-  dyncase (project -> Just MutTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm NativeTokL where
-  dyncase (project -> Just NativeTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PackTokL where
-  dyncase (project -> Just PackTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PackageTokL where
-  dyncase (project -> Just PackageTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PhantomTokL where
-  dyncase (project -> Just PhantomTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PostTokL where
-  dyncase (project -> Just PostTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PragmaTokL where
-  dyncase (project -> Just PragmaTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm PublicTokL where
-  dyncase (project -> Just PublicTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm RequiresTokL where
-  dyncase (project -> Just RequiresTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ReturnTokL where
-  dyncase (project -> Just ReturnTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SchemaTokL where
-  dyncase (project -> Just SchemaTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SignerTokL where
-  dyncase (project -> Just SignerTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SpecTokL where
-  dyncase (project -> Just SpecTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm StoreTokL where
-  dyncase (project -> Just StoreTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm StructTokL where
-  dyncase (project -> Just StructTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm SucceedsIfTokL where
-  dyncase (project -> Just SucceedsIfTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm ToTokL where
-  dyncase (project -> Just ToTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm TrueTokL where
-  dyncase (project -> Just TrueTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U128TokL where
-  dyncase (project -> Just U128Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U16TokL where
-  dyncase (project -> Just U16Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U256TokL where
-  dyncase (project -> Just U256Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U32TokL where
-  dyncase (project -> Just U32Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U64TokL where
-  dyncase (project -> Just U64Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm U8TokL where
-  dyncase (project -> Just U8Tok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm UnpackTokL where
-  dyncase (project -> Just UnpackTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm UpdateTokL where
-  dyncase (project -> Just UpdateTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm UseTokL where
-  dyncase (project -> Just UseTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm VectorLessThanSignTokL where
-  dyncase (project -> Just VectorLessThanSignTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm VectorLeftSquareBracketTokL where
-  dyncase (project -> Just VectorLeftSquareBracketTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm WhereTokL where
-  dyncase (project -> Just WhereTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm WhileTokL where
-  dyncase (project -> Just WhileTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm WithTokL where
-  dyncase (project -> Just WithTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm LeftCurlyBracketTokL where
-  dyncase (project -> Just LeftCurlyBracketTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm VerticalLineTokL where
-  dyncase (project -> Just VerticalLineTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm VerticalLineVerticalLineTokL where
-  dyncase (project -> Just VerticalLineVerticalLineTok) = Just Refl
-  dyncase _ = Nothing
-
-instance {-# OVERLAPPING #-} DynCase MoveTerm RightCurlyBracketTokL where
-  dyncase (project -> Just RightCurlyBracketTok) = Just Refl
-  dyncase _ = Nothing
+-- | One @KDynCase Token@ instance per token sort, so the generic
+-- @DynCase (Cxt h f a) l@ instance picks up the dispatch for /any/
+-- term shape containing 'Token' — including annotated terms
+-- @AnnTerm a fs l@ produced by the source-position-tracking parser.
+-- (Going via @KDynCase@ rather than emitting one @DynCase Term-shape@
+-- instance per term type avoids the n-grammar-names × m-tokens code
+-- explosion and gets the @:&: a@ wrapper for free via the
+-- @KDynCase (f :&: a) l@ instance in compstrat.)
+instance KDynCase Token ExclamationMarkTokL where
+  kdyncase ExclamationMarkTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ExclamationMarkEqualsSignTokL where
+  kdyncase ExclamationMarkEqualsSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token NumberSignLeftSquareBracketTokL where
+  kdyncase NumberSignLeftSquareBracketTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token DollarSignTokL where
+  kdyncase DollarSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PercentSignTokL where
+  kdyncase PercentSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AmpersandTokL where
+  kdyncase AmpersandTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AmpersandAmpersandTokL where
+  kdyncase AmpersandAmpersandTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ApostropheTokL where
+  kdyncase ApostropheTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LeftParenthesisTokL where
+  kdyncase LeftParenthesisTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token RightParenthesisTokL where
+  kdyncase RightParenthesisTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AsteriskTokL where
+  kdyncase AsteriskTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PlusSignTokL where
+  kdyncase PlusSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token CommaTokL where
+  kdyncase CommaTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token HyphenMinusTokL where
+  kdyncase HyphenMinusTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token HyphenMinusGreaterThanSignTokL where
+  kdyncase HyphenMinusGreaterThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token FullStopTokL where
+  kdyncase FullStopTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token FullStopFullStopTokL where
+  kdyncase FullStopFullStopTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SolidusTokL where
+  kdyncase SolidusTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SolidusAsteriskTokL where
+  kdyncase SolidusAsteriskTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SolidusSolidusTokL where
+  kdyncase SolidusSolidusTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ColonTokL where
+  kdyncase ColonTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ColonColonTokL where
+  kdyncase ColonColonTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SemicolonTokL where
+  kdyncase SemicolonTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LessThanSignTokL where
+  kdyncase LessThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LessThanSignLessThanSignTokL where
+  kdyncase LessThanSignLessThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LessThanSignEqualsSignTokL where
+  kdyncase LessThanSignEqualsSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EqualsSignTokL where
+  kdyncase EqualsSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EqualsSignEqualsSignTokL where
+  kdyncase EqualsSignEqualsSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EqualsSignEqualsSignGreaterThanSignTokL where
+  kdyncase EqualsSignEqualsSignGreaterThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EqualsSignGreaterThanSignTokL where
+  kdyncase EqualsSignGreaterThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token GreaterThanSignTokL where
+  kdyncase GreaterThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token GreaterThanSignEqualsSignTokL where
+  kdyncase GreaterThanSignEqualsSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token GreaterThanSignGreaterThanSignTokL where
+  kdyncase GreaterThanSignGreaterThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token CommercialAtTokL where
+  kdyncase CommercialAtTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LeftSquareBracketTokL where
+  kdyncase LeftSquareBracketTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token RightSquareBracketTokL where
+  kdyncase RightSquareBracketTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token CircumflexAccentTokL where
+  kdyncase CircumflexAccentTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AbortTokL where
+  kdyncase AbortTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AbortsIfTokL where
+  kdyncase AbortsIfTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AbortsWithTokL where
+  kdyncase AbortsWithTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AddressTokL where
+  kdyncase AddressTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ApplyTokL where
+  kdyncase ApplyTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AsTokL where
+  kdyncase AsTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AssertTokL where
+  kdyncase AssertTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token AssumeTokL where
+  kdyncase AssumeTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token BoolTokL where
+  kdyncase BoolTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token BreakTokL where
+  kdyncase BreakTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ConstTokL where
+  kdyncase ConstTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ContinueTokL where
+  kdyncase ContinueTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token CopyTokL where
+  kdyncase CopyTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token DecreasesTokL where
+  kdyncase DecreasesTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token DropTokL where
+  kdyncase DropTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ElseTokL where
+  kdyncase ElseTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EnsuresTokL where
+  kdyncase EnsuresTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EntryTokL where
+  kdyncase EntryTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token EnumTokL where
+  kdyncase EnumTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ExceptTokL where
+  kdyncase ExceptTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ExistsTokL where
+  kdyncase ExistsTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ExtendTokL where
+  kdyncase ExtendTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token FalseTokL where
+  kdyncase FalseTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ForallTokL where
+  kdyncase ForallTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token FriendTokL where
+  kdyncase FriendTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token FunTokL where
+  kdyncase FunTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token GlobalTokL where
+  kdyncase GlobalTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token HasTokL where
+  kdyncase HasTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token IfTokL where
+  kdyncase IfTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token InTokL where
+  kdyncase InTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token IncludeTokL where
+  kdyncase IncludeTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token InternalTokL where
+  kdyncase InternalTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token InvariantTokL where
+  kdyncase InvariantTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token KeyTokL where
+  kdyncase KeyTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LetTokL where
+  kdyncase LetTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LocalTokL where
+  kdyncase LocalTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LoopTokL where
+  kdyncase LoopTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token MacroTokL where
+  kdyncase MacroTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token MatchTokL where
+  kdyncase MatchTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ModifiesTokL where
+  kdyncase ModifiesTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ModuleTokL where
+  kdyncase ModuleTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token MoveTokL where
+  kdyncase MoveTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token MutTokL where
+  kdyncase MutTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token NativeTokL where
+  kdyncase NativeTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PackTokL where
+  kdyncase PackTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PackageTokL where
+  kdyncase PackageTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PhantomTokL where
+  kdyncase PhantomTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PostTokL where
+  kdyncase PostTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PragmaTokL where
+  kdyncase PragmaTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token PublicTokL where
+  kdyncase PublicTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token RequiresTokL where
+  kdyncase RequiresTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ReturnTokL where
+  kdyncase ReturnTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SchemaTokL where
+  kdyncase SchemaTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SignerTokL where
+  kdyncase SignerTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SpecTokL where
+  kdyncase SpecTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token StoreTokL where
+  kdyncase StoreTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token StructTokL where
+  kdyncase StructTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token SucceedsIfTokL where
+  kdyncase SucceedsIfTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token ToTokL where
+  kdyncase ToTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token TrueTokL where
+  kdyncase TrueTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U128TokL where
+  kdyncase U128Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U16TokL where
+  kdyncase U16Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U256TokL where
+  kdyncase U256Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U32TokL where
+  kdyncase U32Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U64TokL where
+  kdyncase U64Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token U8TokL where
+  kdyncase U8Tok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token UnpackTokL where
+  kdyncase UnpackTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token UpdateTokL where
+  kdyncase UpdateTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token UseTokL where
+  kdyncase UseTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token VectorLessThanSignTokL where
+  kdyncase VectorLessThanSignTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token VectorLeftSquareBracketTokL where
+  kdyncase VectorLeftSquareBracketTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token WhereTokL where
+  kdyncase WhereTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token WhileTokL where
+  kdyncase WhileTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token WithTokL where
+  kdyncase WithTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token LeftCurlyBracketTokL where
+  kdyncase LeftCurlyBracketTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token VerticalLineTokL where
+  kdyncase VerticalLineTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token VerticalLineVerticalLineTokL where
+  kdyncase VerticalLineVerticalLineTok = Just Refl
+  kdyncase _                    = Nothing
+
+instance KDynCase Token RightCurlyBracketTokL where
+  kdyncase RightCurlyBracketTok = Just Refl
+  kdyncase _                    = Nothing

@@ -29,17 +29,53 @@ pointToPos path (TS.Point line column) = SourcePos path (fromIntegral line) (fro
 pointToPos' :: TS.Point -> (Int, Int)
 pointToPos' (TS.Point line column) = (fromIntegral line, fromIntegral column)
 
+-- | Convert a tree-sitter node's @(start, end)@ points into a Cubix
+-- 'SourceSpan' that is /inclusive on both ends/ and 1-based on
+-- row\/column.
+--
+-- Tree-sitter reports the end point as the byte position one past the
+-- last byte of the node — exclusive. A whole-file @source_file@'s end
+-- point is @(numLines, 0)@ when the input ends with a newline, which
+-- naively translates to @(numLines+1, 0)@ in 1-based notation: a row
+-- past the last line at column 0. That's a sentinel, not a position;
+-- @sliceSpan@ can't reach the trailing newline through it, and any
+-- byte-substring slice through that span has to special-case it.
+--
+-- Instead, when tree-sitter's end column is 0 (the only case where the
+-- exclusive end falls on a row boundary), we shift the end back to the
+-- /last character/ of the previous row — typically the trailing newline
+-- byte itself — at @(prevRow, displayLen(prevRow) + 1)@. After the
+-- shift, the span end is a real, sliceable, in-file position.
 nodeSpan :: FilePath -> ByteString -> TS.Node -> IO SourceSpan
 nodeSpan path source node = do
   start <- pointToPos' <$> TS.nodeStartPoint node
   end <- pointToPos' <$> TS.nodeEndPoint node
   pure $ mkSourceSpan path
-    (toSourcePos source start True)
-    (toSourcePos source end False)
-  where
-    toSourcePos src (row, byteCol) isStart =
-      let displayCol = byteColumnToDisplayColumn src row byteCol
-      in (row + 1, displayCol + if isStart then 1 else 0)
+    (toSourcePosStart source start)
+    (toSourcePosEnd source end)
+
+toSourcePosStart :: ByteString -> (Int, Int) -> (Int, Int)
+toSourcePosStart src (tsRow, tsCol) =
+  let displayCol = byteColumnToDisplayColumn src tsRow tsCol
+  in (tsRow + 1, displayCol + 1)
+
+-- | Tree-sitter's end is exclusive, so the last byte of the span is at
+-- @byteCol - 1@ on @tsRow@ when @byteCol > 0@. When @byteCol == 0@, the
+-- exclusive end is on a row boundary and the last byte is the trailing
+-- newline of @tsRow - 1@; we report it at @(tsRow, prevLineDisplayLen + 1)@.
+toSourcePosEnd :: ByteString -> (Int, Int) -> (Int, Int)
+toSourcePosEnd src (tsRow, 0)
+  | tsRow > 0 =
+      let prevRow = tsRow - 1
+          prevLine = case drop prevRow (BS.split 0x0a src) of
+            l : _ -> l
+            []    -> BS.empty
+          prevLineDisplayLen =
+            byteColumnToDisplayColumn src prevRow (BS.length prevLine)
+      in (tsRow, prevLineDisplayLen + 1)
+toSourcePosEnd src (tsRow, tsCol) =
+  let displayCol = byteColumnToDisplayColumn src tsRow tsCol
+  in (tsRow + 1, displayCol)
 
 byteColumnToDisplayColumn :: ByteString -> Int -> Int -> Int
 byteColumnToDisplayColumn src row byteCol =
