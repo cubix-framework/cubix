@@ -123,6 +123,30 @@ in {
       popd
     '';
 
+    gen-haskell-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-haskell/cbits/src/grammar.json \
+        --start-rule-name haskell \
+        --module-name Cubix.Language.Haskell.Modularized \
+        --keep-text _varsym \
+        --keep-text _consym \
+        -o cubix-haskell/src/Cubix/Language/Haskell/Modularized.hs
+      popd
+    '';
+
+    gen-haskell-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-haskell/cbits/src/grammar.json \
+        --start-rule-name haskell \
+        --module-name Cubix.Language.Haskell.RawParse \
+        --keep-text _varsym \
+        --keep-text _consym \
+        -o cubix-haskell/src/Cubix/Language/Haskell/RawParse.hs
+      popd
+    '';
+
   };
 
   env = {

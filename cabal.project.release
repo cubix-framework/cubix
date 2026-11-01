@@ -5,11 +5,13 @@ packages:
     compstrat
     cubix-benchmarks
     cubix-examples
+    cubix-haskell
     cubix-python-ts
     cubix-solidity
     cubix-sui-move
     cubix-tree-sitter
     cubix-typescript
+    tree-sitter-haskell
     tree-sitter-python
     tree-sitter-sui-move
     tree-sitter-typescript

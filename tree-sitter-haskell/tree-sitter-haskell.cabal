@@ -1,0 +1,42 @@
+cabal-version: 3.4
+name:          tree-sitter-haskell
+version:       1.0.0
+synopsis:      Tree-sitter grammar/parser for Haskell, preprocessed for Cubix
+description:
+  The tree-sitter-haskell@0.23.1 grammar with aliases and supertypes stripped
+  (see README.md), compiled for use with the hs-tree-sitter package.
+category:      Language
+license:       MIT
+license-file:  LICENSE
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+extra-source-files:
+  README.md
+  vendor/grammar.json
+  cbits/src/grammar.json
+  cbits/src/node-types.json
+  cbits/src/parser.c
+  cbits/src/scanner.c
+  cbits/src/tree_sitter/tree-sitter-haskell.h
+  cbits/src/tree_sitter/alloc.h
+  cbits/src/tree_sitter/array.h
+  cbits/src/tree_sitter/parser.h
+  cbits/src/unicode.h
+
+common language
+  default-language: GHC2021
+
+library
+  import: language
+  exposed-modules:
+    TreeSitter.Haskell
+  build-depends:
+      base >= 4.12 && < 5
+    , base-compat-constptr  >=0.1  && <0.2
+  include-dirs:
+    cbits/src
+  includes:
+    tree_sitter/tree-sitter-haskell.h
+  c-sources:
+    cbits/src/parser.c
+    cbits/src/scanner.c
