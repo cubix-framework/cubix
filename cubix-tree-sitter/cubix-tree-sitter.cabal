@@ -97,7 +97,20 @@ library
   exposed-modules:
     Cubix.TreeSitter
     Text.Megaparsec.Cubix
-  
+
+-- Helpers for the drivers and parse tests of the generated language
+-- packages; not part of the main library. Depend on it as
+-- cubix-tree-sitter:testing.
+library testing
+  import: language
+  import: ghc-options
+  visibility: public
+  hs-source-dirs: testing
+  build-depends:
+    , base
+  exposed-modules:
+    Cubix.TreeSitter.ParseFiles
+
 library gen-internal
   import: language
   import: dependencies
