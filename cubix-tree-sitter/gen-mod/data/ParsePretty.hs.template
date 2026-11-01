@@ -15,20 +15,21 @@
 -}
 {+-}
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-+}
 module ${moduleName} where
 {+-}
 
-import Control.Applicative.Combinators
 import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
 import Data.Comp.Multi (AnnTerm, E (..))
+import Data.Comp.Multi qualified as Comp (Sum, (:<:))
 import Data.Comp.Multi.Annotation ((:&:) (..))
-import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.Comp.Multi.Strategy.Classification (DynCase, KDynCase, caseE)
 import Data.Comp.Multi.Term (Cxt (Term))
 import Data.Foldable (foldrM)
 import Data.Functor ((<&>))
@@ -49,10 +50,17 @@ import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
 import Cubix.Language.Info (SourceSpan)
 import Cubix.ParsePretty (type RootSort)
-import Cubix.TreeSitter
-import Cubix.Language.SuiMove.Modularized
+import Cubix.TreeSitter (TreeSitterEnv, getFilePath, getLanguage, getSource, getTree, newTreeSitterEnv, nodeRange, nodeSpan)
+{-+}
+import ${modularizedModuleName} qualified as M
+{+-}
 
-import Text.Pretty.Simple (pPrintDarkBg, pPrintLightBg)
+import Text.Pretty.Simple qualified as Pretty (pPrintDarkBg, pPrintLightBg)
+
+-- The generated parsers are named p<Rule> and alts<Rule>, where <Rule>
+-- starts with a capital letter, and refer to the Modularized syntax
+-- qualified. Nothing else in scope here may have such a name: the
+-- combinators below are named <combinator>P instead.
 
 parse' :: ReaderT TreeSitterEnv IO SomeTerm
 parse' = do
@@ -63,12 +71,12 @@ parse' = do
   syntax filepath source pTable rootNode
 
 {-+}
-parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (${grammarName}TermAnn (Maybe SourceSpan) (RootSort ${grammarName}Sig)))
+parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (${grammarName}TermAnn (Maybe SourceSpan) (RootSort M.${sigType})))
 parse path getLang = do
   mEnv <- newTreeSitterEnv path getLang
   case mEnv of
     Nothing  -> pure Nothing
-    Just env -> runReaderT parse' env <&> caseE @_ @(RootSort ${grammarName}Sig)
+    Just env -> runReaderT parse' env <&> caseE @_ @(RootSort M.${sigType})
 {+-}
 
 -- | Replace the outer annotation of an 'AnnTerm' with a 'SourceSpan'.
@@ -93,7 +101,7 @@ attachSpanE sp (E t) = E (attachSpan sp t)
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = fmap fromJust . go
   where
-    pContent = Megaparsec.Cubix.getContent source
+    nodeContent = Megaparsec.Cubix.getContent source
     getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
     go :: TS.Node -> ReaderT TreeSitterEnv IO (Maybe SomeTerm)
     go root = do
@@ -106,7 +114,7 @@ syntax path source pTable = fmap fromJust . go
           symbolNo <- liftIO $ TS.nodeSymbol root
           case getParser symbolNo of
             Nothing -> do
-              liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
+              liftIO (TS.nodeTypeAsString root) >>= Pretty.pPrintLightBg
               error $ "Unrecognized symbol: "
                    <> Prelude.show symbolNo
                    <> " at: "
@@ -115,19 +123,23 @@ syntax path source pTable = fmap fromJust . go
             Just p -> do
               childNo <- liftIO $ TS.nodeChildCount root
               let childNums = [0..childNo - 1]
-                  content = pContent range
+                  content = nodeContent range
 
               children <- if childNo == 0
                 then
                   pure []
                 else
                   catMaybes <$> mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path (Megaparsec.Cubix.Input content children) of
+
+              -- A node's parser must account for all of its children;
+              -- otherwise some of them would silently be dropped.
+              case Megaparsec.runParser (p <* Megaparsec.eof) path (Megaparsec.Cubix.mkInput content children) of
                 Left err -> do
                   liftIO . putStrLn $ Megaparsec.errorBundlePretty err
-                  pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
-                  pPrintDarkBg children
+                  Pretty.pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
+                  Pretty.pPrintDarkBg children
                   error "no parse"
+
                 Right item ->
                   pure (Just (attachSpanE (Just span) item))
 
@@ -139,84 +151,92 @@ syntax path source pTable = fmap fromJust . go
 -- type @a@ at every layer. With @a = Maybe SourceSpan@ this is the
 -- parser's output.
 {-+}
-type ${grammarName}TermAnn a = AnnTerm a ${grammarName}Sig
+type ${grammarName}TermAnn a = AnnTerm a M.${sigType}
 
 type SomeTerm = E (${grammarName}TermAnn (Maybe SourceSpan))
-type Parser t = Megaparsec.Cubix.ParserA ${grammarName}Sig (Maybe SourceSpan) t
+type Parser t = Megaparsec.Cubix.ParserA M.${sigType} (Maybe SourceSpan) t
 type TermParser l = Parser (${grammarName}TermAnn (Maybe SourceSpan) l)
 type SomeTermParser = Parser (E (${grammarName}TermAnn (Maybe SourceSpan)))
 {+-}
 
 -- reify types
-pMaybe :: Typeable l => TermParser l -> TermParser (Maybe l)
-pMaybe = Megaparsec.Cubix.pMaybe
-{-# INLINABLE pMaybe #-}
+maybeP :: Typeable l => TermParser l -> TermParser (Maybe l)
+maybeP = Megaparsec.Cubix.pMaybe
+{-# INLINABLE maybeP #-}
 
-pPair :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
-pPair = Megaparsec.Cubix.pPair
-{-# INLINABLE pPair #-}
+pairP :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
+pairP = Megaparsec.Cubix.pPair
+{-# INLINABLE pairP #-}
 
-pSome :: Typeable l => TermParser l -> TermParser [l]
-pSome = Megaparsec.Cubix.pSome
-{-# INLINABLE pSome #-}
+someP :: Typeable l => TermParser l -> TermParser [l]
+someP = Megaparsec.Cubix.pSome
+{-# INLINABLE someP #-}
 
-pMany :: Typeable l => TermParser l -> TermParser [l]
-pMany = Megaparsec.Cubix.pMany
-{-# INLINABLE pMany #-}
+manyP :: Typeable l => TermParser l -> TermParser [l]
+manyP = Megaparsec.Cubix.pMany
+{-# INLINABLE manyP #-}
 
-pSepBy :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
-pSepBy = Megaparsec.Cubix.pSepBy
-{-# INLINABLE pSepBy #-}
+sepByP :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+sepByP = Megaparsec.Cubix.pSepBy
+{-# INLINABLE sepByP #-}
 
-pSepBy1 :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
-pSepBy1 = Megaparsec.Cubix.pSepBy1
-{-# INLINABLE pSepBy1 #-}
+sepBy1P :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+sepBy1P = Megaparsec.Cubix.pSepBy1
+{-# INLINABLE sepBy1P #-}
 
-pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
-pBetween = Megaparsec.Cubix.pBetween
-{-# INLINABLE pBetween #-}
+betweenP :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
+betweenP = Megaparsec.Cubix.pBetween
+{-# INLINABLE betweenP #-}
 
 {-+}
-pSort :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
-pSort = Megaparsec.Cubix.pSort @l
-{-# INLINABLE pSort #-}
+sortP :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
+sortP = Megaparsec.Cubix.pSort @l
+{-# INLINABLE sortP #-}
 
-pSort' :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
-pSort' = Megaparsec.Cubix.pSort'
-{-# INLINABLE pSort' #-}
+fragmentSortP :: forall f l. (f Comp.:<: (Comp.Sum M.${sigType} :&: Maybe SourceSpan), KDynCase f l) => NonEmpty Char -> TermParser l
+fragmentSortP = Megaparsec.Cubix.pFragmentSort @f @l
+{-# INLINABLE fragmentSortP #-}
+
+sortP' :: forall l. DynCase (${grammarName}TermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
+sortP' = Megaparsec.Cubix.pSort'
+{-# INLINABLE sortP' #-}
 {+-}
 
-pContent :: Parser Text
-pContent = Megaparsec.Cubix.pContent
-{-# INLINABLE pContent #-}
+contentP :: Parser Text
+contentP = Megaparsec.Cubix.pContent
+{-# INLINABLE contentP #-}
 
 {-+}
 ${for(tokens)}
-p${it.name.camelCase} :: TermParser ${it.name.sort}
-p${it.name.camelCase} = ${it.name.camelCase}' <$$ Megaparsec.eof
+p${it.name.camelCase} :: TermParser M.${it.name.sort}
+p${it.name.camelCase} = M.${it.name.camelCase}' <$$ Megaparsec.eof
 
 ${endfor}
 {+-}
 
 {-+}
 ${for(data)}
-p${it.name.camelCase} :: TermParser ${it.name.sort}
+p${it.name.camelCase} :: TermParser M.${it.name.sort}
 p${it.name.camelCase} =
 ${if(it.sum)}
-  choice [ Megaparsec.try ${for(it.constructors)}p${it.name.camelCase}${sep}
-         , Megaparsec.try ${endfor}
-         ]
+  Megaparsec.Cubix.pLongest "${it.name.text}" alts${it.name.camelCase}
+
+alts${it.name.camelCase} :: [TermParser M.${it.name.sort}]
+alts${it.name.camelCase} =
+  [ ${for(it.constructors)}p${it.name.camelCase}${sep}
+  , ${endfor}
+  ]
 ${else}
 ${for(it.constructors)}
-  ${if(it.hasChildren)}${else}pure ${endif}${it.name.camelCase}' <$$> ${it.parser}
+  ${if(it.hasChildren)}${else}pure ${endif}M.${it.name.camelCase}' <$$> ${it.parser}
 ${endfor}
 ${endif}
 ${if(it.sum)}
   where
 ${for(it.constructors)}
-    p${it.name.camelCase} :: TermParser ${it.type.sort}
+    p${it.name.camelCase} :: TermParser M.${it.type.sort}
     p${it.name.camelCase} =
-      ${if(it.hasChildren)}${else}pure ${endif}${it.name.camelCase}' <$$> ${it.parser}
+      ${if(it.hasChildren)}${else}pure ${endif}M.${it.name.camelCase}' <$$> ${it.parser}
 ${endfor}
 ${endif}
 
@@ -227,8 +247,17 @@ ${endfor}
 -- Parse Table
 --------------------------------------------------------------------------------
 
+-- | The parser for each tree-sitter symbol, by symbol number. 'syntax'
+-- looks a node's parser up here by 'TS.nodeSymbol'.
+--
+-- The generator knows the grammar's rules and tokens by name, but the
+-- symbol numbers exist only in the compiled grammar, so the names are
+-- listed in 'symbolMap' and 'tokenMap', and 'mkParseTable' resolves
+-- them to numbers when parsing starts.
 newtype ParseTable = SymbolTable {unParseTable :: IntMap SomeTermParser}
 
+-- | Parsers for named nodes (rules of the grammar), by node type, e.g.
+-- @if_statement@.
 symbolMap :: Map String SomeTermParser
 symbolMap = Map.fromList
 {-+}
@@ -238,19 +267,41 @@ ${endfor}
 ${for(data/rest)}
     , ("${it.name.text}", E <$$> p${it.name.camelCase})
 ${endfor}
-${for(tokens)}
-    , ("${it.symbol}", E <$$> p${it.name.camelCase})
-${endfor}
     ]
 {+-}
 
+-- | Parsers for anonymous tokens (string literals in the grammar), by
+-- their text, e.g. @if@ or @(@: tree-sitter names an anonymous token
+-- by its text. Kept apart from 'symbolMap' because a keyword can share
+-- its name with a node type (Python's @type@ keyword and @type@
+-- annotations); in one map, one of the two would get the other's parser.
+tokenMap :: Map String SomeTermParser
+tokenMap = Map.fromList
+{-+}
+    [ ${for(tokens)}(${it.symbol}, E <$$> p${it.name.camelCase})${sep}
+    , ${endfor}
+    ]
+{+-}
+
+-- | Look every symbol of the compiled grammar up by name, in 'symbolMap'
+-- if it is a named node and in 'tokenMap' if it is an anonymous token.
+-- Other symbols (hidden rules, supertypes) never appear in a parse tree
+-- and get no parser, as do symbols the generator saw no use of; reaching
+-- one of those is an "Unrecognized symbol" error in 'syntax'.
 mkParseTable :: TS.Language -> IO ParseTable
 mkParseTable lang = do
   count <- fromIntegral <$> TS.languageSymbolCount lang
   SymbolTable <$> foldrM
     (\id acc -> do
       symName <- TS.languageSymbolName lang id
-      let mSymSing = Map.lookup (Char8.unpack symName) symbolMap
+      symType <- TS.languageSymbolType lang id
+
+      let parsers = case symType of
+            TS.SymbolTypeRegular -> symbolMap
+            TS.SymbolTypeAnonymous -> tokenMap
+            _ -> Map.empty
+          mSymSing = Map.lookup (Char8.unpack symName) parsers
+
       pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
     )
     (IM.empty :: IntMap SomeTermParser)

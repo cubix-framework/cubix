@@ -11,18 +11,21 @@
 
 module TreeSitter.Generate.Render where
 
-import Data.Char (isAlphaNum, toLower, toUpper)
+import Data.Bifunctor (second)
+import Data.Char (isAlphaNum, isDigit, toLower, toUpper)
 import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (..))
-import Data.List (sortOn, uncons)
+import Data.List (find, intercalate, sortOn, uncons)
 import Data.List.NonEmpty qualified as NonEmpty (toList)
-import Data.Map qualified as Map (elems, fromList, mapWithKey, singleton)
+import Data.Map qualified as Map (elems, fromList, fromListWith, mapWithKey, singleton, toList)
 import Data.Maybe (fromMaybe)
 import Data.Ord (Down (..))
-import Data.Set qualified as Set (fromList, toList)
+import Data.Set (Set)
+import Data.Set qualified as Set (fromList, insert, map, notMember, singleton, size, toList)
 import Data.String (IsString (..))
+import Data.Traversable (mapAccumL)
 import Data.Text (Text)
-import Data.Text qualified as Text (head, length, lines, pack, unlines, unpack)
+import Data.Text qualified as Text (breakOnEnd, length, lines, null, pack, replicate, show, span, unlines, unpack)
 import Data.Text.Lazy qualified as Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (Builder)
 import Data.Text.Lazy.Builder qualified as Builder (fromText, toLazyText)
@@ -30,8 +33,7 @@ import Data.Text.Lazy.Builder qualified as Builder (fromText, toLazyText)
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
 import Text.DocTemplates (Context (..), ToContext (..), Val (..), applyTemplate)
-import Unicode.Char.General qualified as Unicode (isWhiteSpace)
-import Unicode.Char.General.Names qualified as Unicode (name)
+import Unicode.Char.General.Names qualified as Unicode (nameOrAlias)
 
 import TreeSitter.Generate.Data
 import TreeSitter.Generate.Parser
@@ -46,27 +48,60 @@ data Metadata = Metadata
 
 data RenderState = InText | InTemplate [Text]
 
+-- | Haskell constructors share one namespace, but names derived from
+-- different rules can coincide once camel-cased (TypeScript's
+-- @literal_type@ has alternatives @_number@ and @number@, and
+-- @for_statement@ has three alternatives that are all the field
+-- @initializer@). Number the later ones. The first argument is the
+-- constructors that are already taken: those of 'Token'.
+uniqueConstructorNames :: Set Text -> [Node] -> [Node]
+uniqueConstructorNames taken = snd . mapAccumL renameNode taken
+  where
+    renameNode used node =
+      second (\ctors -> node { nCtrs = ctors }) (mapAccumL renameCtor used (nCtrs node))
+
+    renameCtor used ctor =
+      let candidates = cName ctor : [ cName ctor <> Text.show i | i <- [2 :: Int ..] ]
+          isFree c = camelName (Name c) `Set.notMember` used
+          name = fromMaybe (cName ctor) (find isFree candidates)
+      in (Set.insert (camelName (Name name)) used, ctor { cName = name })
+
 renderSyntax :: Metadata -> Grammar -> FilePath -> Text -> Either String Text
 renderSyntax Metadata{..} grammar templateFile template =
   {- unsafePerformIO (pPrintLightBg (rules grammar)) `seq` -} errorOrModule
  where
   defaultModuleName = snakeToCase Upper grammar.name <> "Ast"
+
+  -- The parser imports the Modularized syntax from its sibling module,
+  -- following the @Cubix.Language.<Lang>.{Modularized,RawParse}@ layout.
+  modularizedModuleName = case moduleName of
+    Just name | (parent, _) <- Text.breakOnEnd "." name, not (Text.null parent) ->
+      parent <> "Modularized"
+    _ -> defaultModuleName
+
+  grammarName = snakeToCase Upper grammar.name
+
   metadataContext =
     Context . Map.fromList $
       [ ("startRuleName", textToVal startRuleName)
-      , ("grammarName", textToVal $ snakeToCase Upper grammar.name)
+      , ("grammarName", textToVal grammarName)
       , ("moduleName", textToVal $ fromMaybe defaultModuleName moduleName)
+      , ("modularizedModuleName", textToVal modularizedModuleName)
       , ("pretty", BoolVal pretty)
       ]
+      <> (second textToVal <$> templateTypes grammarName)
+
   nodes  = Map.elems $ Map.mapWithKey (topRuleToNode grammar.rules) grammar.rules
-  nodes' = nodes `reachableFrom` Name startRuleName
+  nodes' = uniqueConstructorNames
+    (Set.map (camelName . tokenName) tokens)
+    (nodes `reachableFrom` Name startRuleName)
 
   -- Collect all tokens from grammar rules by traversing them with catamorphism
   tokens = mconcat $ tokensOfRule <$> Map.elems grammar.rules
   tokensCtx = Context . Map.singleton "tokens" . toVal $ Set.toList tokens <&> (\k ->
     MapVal . Context . Map.fromList $
-      [ ("name", toVal (Name (k <> "_tok")))
-      , ("symbol", textToVal k)
+      [ ("name", toVal (tokenName k))
+      , ("symbol", textToVal (Text.show k)) -- as a Haskell string literal
       ])
 
   nodesCtx = Context . Map.fromList $
@@ -79,7 +114,53 @@ renderSyntax Metadata{..} grammar templateFile template =
 
   context :: Context Text
   context = metadataContext <> nodesCtx <> labelsCtx <> tokensCtx
-  errorOrModule = renderTemplate templateFile template context
+  errorOrModule = case clashes of
+    [] -> renderTemplate templateFile template context
+    _ -> Left . unlines $
+      "Grammar names that map to the same Haskell identifier:"
+      : [ "  " <> Text.unpack ident <> ": " <> intercalate ", " (Text.unpack <$> sources)
+        | (ident, sources) <- clashes
+        ]
+
+  -- Generated names can only clash with each other: the templates bring
+  -- nothing else into their namespace (see their imports). Constructors
+  -- are numbered apart ('uniqueConstructorNames'); types and parsers,
+  -- which other code refers to by name, are checked.
+  clashes = nameClashes types <> nameClashes parsers
+  types =
+    [ (camelName (Name n.nName), "rule " <> n.nName) | n <- nodes' ]
+    <> [ (sortName (Name l), "sort of rule " <> l) | l <- labels ]
+    <> [ (sortName (tokenName t), "sort of token " <> Text.show t) | t <- Set.toList tokens ]
+    <> [ (ty, "the Modularized template") | (_, ty) <- templateTypes grammarName ]
+  parsers =
+    [ ("p" <> camelName (Name n.nName), "rule " <> n.nName) | n <- nodes' ]
+    <> [ ("p" <> camelName (tokenName t), "token " <> Text.show t) | t <- Set.toList tokens ]
+
+-- | The types the Modularized template declares besides the generated
+-- ones, by template variable. Their names are chosen here so that
+-- 'renderSyntax' can check them against the generated names.
+templateTypes :: Text -> [(Text, Text)]
+templateTypes grammarName =
+  [ ("tokenType", tokenType)
+  , ("sigType", grammarName <> "Sig")
+  , ("termType", grammarName <> "Term")
+  , ("termLabType", grammarName <> "TermLab")
+  ]
+
+-- | The data type of all tokens.
+tokenType :: Text
+tokenType = "Token"
+
+-- | Identifiers that more than one grammar name maps to, with those
+-- names. Camel-casing is not injective: @foo_bar@ and @fooBar@, @_foo@
+-- and @hidden_foo@, or the rule @foo_l@ and the sort of rule @foo@
+-- give the same identifier.
+nameClashes :: [(Text, Text)] -> [(Text, [Text])]
+nameClashes named =
+  [ (ident, Set.toList sources)
+  | (ident, sources) <- Map.toList (Map.fromListWith (<>) (second Set.singleton <$> named))
+  , Set.size sources > 1
+  ]
 
 renderTemplate :: (ToContext Text b) => FilePath -> Text -> b -> Either String Text
 renderTemplate templateFile templateText context =
@@ -113,7 +194,7 @@ instance ToContext Text Name where
     MapVal . Context . Map.fromList $
       [ ("text", textToVal (getName name))
       , ("sort", textToVal (sortName name))
-      , ("camelCase", textToVal (snakeToCase Upper (hiddenName name)))
+      , ("camelCase", textToVal (camelName name))
       ]
 
 instance ToContext Text Node where
@@ -134,20 +215,13 @@ instance ToContext Text Node where
       hasSymbol = not $ isHidden nSort || isInternal nName
 
       -- | Order constructors so longer (more-field) alternatives come
-      -- first in the generated @choice [try p1, try p2, ...]@ block.
-      --
-      -- The Megaparsec backtracking parser commits to the first @try@
-      -- that returns successfully. Where two alternatives share a
-      -- prefix (e.g. @identifier@ vs @identifier "::" identifier@), the
-      -- shorter one would otherwise succeed prematurely, consuming a
-      -- proper prefix of the longer match and leaving the surrounding
-      -- parser with leftover children. Sorting stably by descending
-      -- field count puts the most-specific alternative first; ties are
-      -- broken by required field count so an explicit suffix (for
-      -- example @type_arguments@) is tried before an optional prefix.
-      -- Remaining ties preserve grammar order. Matches the rationale recorded in
-      -- commit 53804bc1's hand-edits to pModuleAccess / pLambdaBinding
-      -- ("Order matters: try longer/more specific patterns first").
+      -- first. The generated parser picks the alternative that consumes
+      -- the most children ('Megaparsec.Cubix.pLongest'), so this order
+      -- only decides between alternatives that consume equally many;
+      -- it used to be what kept a shorter alternative (e.g.
+      -- @identifier@ vs @identifier "::" identifier@) from succeeding
+      -- prematurely. Sorting is stable, by descending field count, then
+      -- by required field count; remaining ties keep grammar order.
       orderedCtrs :: [Constructor]
       orderedCtrs = sortOn specificity nCtrs
 
@@ -216,11 +290,12 @@ instance ToContext Text Type where
         -- TODO: CUBIX_NON_EMPTY
         -- discuss cubix non empty support first
         -- par p ("NonEmpty" <> " " <> t2t True a)
-      Token t -> Builder.fromText (snakeToCase Upper t) <> "TokL"
+      Token t -> Builder.fromText (sortName (tokenName t))
       Unit -> mempty
       Tuple a b -> par True (t2t False a <> ", " <> t2t False b)
-      Maybe a -> par p ("Maybe" <> " " <> t2t True a)
-      Content -> "Text"
+      -- The Modularized template imports these qualified
+      Maybe a -> par p ("Prelude.Maybe" <> " " <> t2t True a)
+      Content -> "Text.Text"
 
 instance ToContext Text Parser where
   toVal :: Parser -> Val Text
@@ -230,35 +305,41 @@ instance ToContext Text Parser where
     hasSymbol :: Name -> Bool
     hasSymbol (getName -> n) = not $ isHidden n || isInternal n
     p2t p = \case
-      Symbol name -> par p $ name2psort name
-      Inline name -> par p $ name2psort name
-      Tok t -> par p $ name2psort (Name $ t <> "_tok")
-      -- Builder.fromText ("p" <> snakeToCase Upper (t <> "_tok"))
+      Symbol name -> par p $ name2psort (camelName name) name
+      Inline name -> par p $ name2psort (camelName name) name
+      Tok t -> par p $ name2psort tokenType (tokenName t)
       Seq ps -> mconcat $ intersperseBy (p2t False) inspect (NonEmpty.toList ps)
         -- mconcat (p2t False <$> NonEmpty.toList ps)
-      Pair a b -> par p ("pPair "<> p2t True a <> " " <> p2t True b)
-      Optional a -> par p ("pMaybe " <> p2t True a)
-      Many ps -> par p ("pMany " <> p2t True ps)
-      Some ps -> par p ("pSome " <> p2t True ps)
-      Skip -> Builder.fromText "Megaparsec.eof"
-      Extract -> "pContent"
-      SepBy sep content -> par p ("pSepBy " <> p2t True content <> " " <> p2t True sep)
-      SepBy1 sep content -> par p ("pSepBy1 " <> p2t True content <> " " <> p2t True sep)
-      Between open close content -> par p ("pBetween " <> p2t True open <> " " <> p2t True close <> " " <> p2t True content)
+      Pair a b -> par p ("pairP "<> p2t True a <> " " <> p2t True b)
+      Optional a -> par p ("maybeP " <> p2t True a)
+      Many ps -> par p ("manyP " <> p2t True ps)
+      Some ps -> par p ("someP " <> p2t True ps)
+      -- Nothing to parse, e.g. a hidden rule made of invisible tokens
+      -- (Haskell's @_layout_end@, which comes before @in@ in @let_in@).
+      -- Not 'eof': a node's parser is checked for 'eof' anyway, and such a
+      -- rule need not end its node.
+      Skip -> Builder.fromText "pure ()"
+      Extract -> "contentP"
+      SepBy sep content -> par p ("sepByP " <> p2t True content <> " " <> p2t True sep)
+      SepBy1 sep content -> par p ("sepBy1P " <> p2t True content <> " " <> p2t True sep)
+      Between open close content -> par p ("betweenP " <> p2t True open <> " " <> p2t True close <> " " <> p2t True content)
     inspect :: Parser -> Parser -> Builder
     -- future
     -- inspect (Tok _) _ = Builder.fromText " *> "
     -- inspect _ (Tok _) = Builder.fromText " <* "
     inspect _ _ = Builder.fromText " <*> "
 
-    name2psort name
+    -- A child of the node's own data type or, for a token, of 'Token'.
+    -- The parser imports the Modularized syntax qualified as @M@.
+    name2psort fragment name
       | hasSymbol name =
-          "pSort @" <>
+          "fragmentSortP @M." <>
+          Builder.fromText fragment <>
+          " @M." <>
           Builder.fromText (sortName name) <>
-          " \"" <>
-          Builder.fromText (getName name) <>
-          "\""
-      | otherwise = "p" <> Builder.fromText (snakeToCase Upper $ hiddenName name)
+          " " <>
+          Builder.fromText (Text.show (getName name))
+      | otherwise = "p" <> Builder.fromText (camelName name)
 
     intersperseBy :: Monoid b => (a -> b) -> (a -> a -> b) -> [a] -> [b]
     intersperseBy _ _ []     = mempty
@@ -273,6 +354,21 @@ hiddenName (getName -> n)
 sortName :: Name -> Text
 sortName n = snakeToCase Upper (hiddenName n <> "_l")
 
+-- | Haskell identifier for the data type, constructor or parser
+-- (@p<Name>@) of a rule or token. The generated modules import
+-- everything else qualified, or in a shape no such identifier has (see
+-- the templates), so it cannot clash with an imported name.
+camelName :: Name -> Text
+camelName = snakeToCase Upper . hiddenName
+
+-- | The rule-like name a token is declared under. Tokens are named after
+-- their text, not after a rule, so a leading underscore (Python's @_@
+-- wildcard pattern) must not make them look hidden: it is spelled out.
+tokenName :: Text -> Name
+tokenName t = Name (Text.replicate (Text.length underscores) "low_line_" <> rest <> "_tok")
+  where
+    (underscores, rest) = Text.span (== '_') t
+
 --------------------------------------------------------------------------------
 -- Helper functions for case conversion
 --------------------------------------------------------------------------------
@@ -280,18 +376,25 @@ sortName n = snakeToCase Upper (hiddenName n <> "_l")
 data Case = Upper | Lower | Keep
 
 -- | @`snakeToCase` c txt@ converts a string from snake or kebab case to camel case.
+--
+-- Characters that cannot appear in an identifier are spelled out by
+-- their Unicode name (or alias, for control characters), so tokens such
+-- as @"=>"@ or @"\\n"@ get distinct names. So is a leading digit
+-- (@"0x"@), which cannot start a Haskell identifier.
 snakeToCase :: Case -> Text -> Text
-snakeToCase b = Text.pack . go b . Text.unpack
+snakeToCase b = Text.pack . start . Text.unpack
  where
+  start (c : cs) | isDigit c = go b (spell c ++ cs)
+  start cs = go b cs
+
   go _ [] = []
   go a (c : cs) =
     if | c == '_' -> go Upper cs
-       | Unicode.isWhiteSpace c -> go Upper cs
        | isAlphaNum c -> c `to` a : go Keep cs
-       | Just n <- Unicode.name c -> go Upper $
-           -- Some unicode names use '-' as separator
-           (toLower <$> replaceChar '-' '_' n) ++ cs
-       | otherwise -> go Upper cs
+       | otherwise -> go Upper (spell c ++ cs)
+
+  -- Unicode names separate words with spaces, and some with '-'
+  spell c = maybe "" (fmap toLower . replaceChar ' ' '_' . replaceChar '-' '_') (Unicode.nameOrAlias c) ++ "_"
 
   to c Upper = toUpper c
   to c Lower = toLower c

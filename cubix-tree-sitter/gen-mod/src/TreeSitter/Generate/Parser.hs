@@ -68,7 +68,4 @@ alg = \case
   OptionalRuleF {..} -> Optional contentF
   SepByRuleF {..} -> SepBy separatorF contentF
   SepBy1RuleF {..} -> SepBy1 separatorF contentF
-  BetweenRuleF {..} -> Between
-    (Symbol (Name $ openF  <> "_tok"))
-    (Symbol (Name $ closeF <> "_tok"))
-    contentF
+  BetweenRuleF {..} -> Between (Tok openF) (Tok closeF) contentF

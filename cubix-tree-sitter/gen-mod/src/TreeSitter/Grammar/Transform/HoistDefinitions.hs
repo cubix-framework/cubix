@@ -11,7 +11,7 @@ import Control.Monad.Reader (MonadReader, Reader, asks, runReader)
 import Control.Monad.State (MonadState, StateT, gets, modify', runStateT)
 import Data.Bifunctor (second)
 import Data.Map (Map)
-import Data.Map qualified as Map (filter, insert, keys, mapAccumWithKey)
+import Data.Map qualified as Map (filter, insert, keys, mapAccumWithKey, member)
 import Data.Text (Text)
 import Data.Text qualified as Text (show)
 import Data.Vector qualified as Vector (cons, empty, foldr')
@@ -84,11 +84,19 @@ hoistDedup rule = do
   RefRule <$> case mexisting of
     Just name -> pure name
     Nothing -> do
-      fresh <- getFresh
-      parent <- asks parent
-      let name = parent `addFieldName` ("internal" <> Text.show fresh)
+      name <- freshName
       modify' (\s -> s { hoisted = Map.insert name rule (hoisted s) })
       pure name
+
+-- | The counter restarts for every alternative of a top-level choice
+-- (see 'hoistChoiceRules'), so skip names an earlier alternative took.
+freshName :: HoistM RuleName
+freshName = do
+  fresh <- getFresh
+  parent <- asks parent
+  let name = parent `addFieldName` ("internal" <> Text.show fresh)
+  taken <- gets (Map.member name . hoisted)
+  if taken then freshName else pure name
 
 hoist :: RuleName -> Rule -> HoistM Rule
 hoist name rule = do

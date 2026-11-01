@@ -23,16 +23,19 @@ module ${moduleName}
 {+-}
   where
 
-import Data.Comp.Multi.Strategy.Classification (KDynCase (..))
-import Data.Text (Text)
-import Data.Type.Equality (type (:~:) (..))
+-- Everything is imported qualified, so that the generated names, which
+-- come from the grammar, cannot clash with an import.
+import Data.Comp.Multi.Strategy.Classification qualified as Classification (KDynCase (..))
+import Data.Text qualified as Text (Text)
+import Data.Type.Equality qualified as Equality (type (:~:) (..))
 import Language.Haskell.TH qualified as TH
+import Prelude qualified
 
-import Cubix.Language.Info (TermLab)
-import Cubix.Language.Parametric.Derive
+import Cubix.Language.Info qualified as Info (TermLab)
+import Cubix.Language.Parametric.Derive qualified as Derive (deriveAll, deriveAllButDynCase)
 import Cubix.Language.Parametric.Syntax qualified as Syntax
-import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Term)
+import Cubix.ParsePretty qualified as ParsePretty (type RootSort)
+import Data.Comp.Multi qualified as Comp (Term)
 
 --------------------------------------------------------------------------------
 -- Labels
@@ -54,14 +57,14 @@ ${endfor}
 -- Modularized syntax
 --------------------------------------------------------------------------------
 
-data Token e l where
 {-+}
+data ${tokenType} e l where
 ${for(tokens)}
-  ${it.name.camelCase} :: Token e ${it.name.sort}
+  ${it.name.camelCase} :: ${tokenType} e ${it.name.sort}
 ${endfor}
-{+-}
 
-deriveAllButDynCase [''Token]
+Derive.deriveAllButDynCase [''${tokenType}]
+{+-}
 
 {-+}
 ${for(data)}
@@ -76,7 +79,7 @@ ${endfor}
 {+-}
 
 {-+}
-deriveAll
+Derive.deriveAll
 ${for(data/first)}
   [ ''${it.name.camelCase/first}
 ${endfor}
@@ -91,21 +94,21 @@ ${endfor}
 --------------------------------------------------------------------------------
 
 {-+}
-type ${grammarName}Sig =
+type ${sigType} =
 ${for(data/first)}
   '[ ${it.name.camelCase}
 ${endfor}
 ${for(data/rest)}
    , ${it.name.camelCase}
 ${endfor}
-   , Token
+   , ${tokenType}
    , Syntax.PairF
    , Syntax.MaybeF
    , Syntax.ListF
    ]
 
-type ${grammarName}Term      = Term ${grammarName}Sig
-type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
+type ${termType} = Comp.Term ${sigType}
+type ${termLabType} l = Info.TermLab ${sigType} l
 {+-}
 
 --------------------------------------------------------------------------------
@@ -113,7 +116,7 @@ type ${grammarName}TermLab l = TermLab ${grammarName}Sig l
 --------------------------------------------------------------------------------
 
 {-+}
-type instance RootSort ${grammarName}Sig = ${startSort.sort}
+type instance ParsePretty.RootSort ${sigType} = ${startSort.sort}
 {+-}
 
 --------------------------------------------------------------------------------
@@ -129,7 +132,7 @@ ${endfor}
 ${for(data/rest)}
    , ''${it.name.camelCase}
 ${endfor}
-   , ''Token
+   , ''${tokenType}
    , ''Syntax.PairF
    , ''Syntax.MaybeF
    , ''Syntax.ListF
@@ -150,9 +153,9 @@ ${endfor}
 -- @KDynCase (f :&: a) l@ instance in compstrat.)
 {-+}
 ${for(tokens)}
-instance KDynCase Token ${it.name.sort} where
-  kdyncase ${it.name.camelCase} = Just Refl
-  kdyncase _                    = Nothing
+instance Classification.KDynCase ${tokenType} ${it.name.sort} where
+  kdyncase ${it.name.camelCase} = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
 
 ${endfor}
 {+-}

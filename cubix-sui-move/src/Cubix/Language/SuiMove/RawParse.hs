@@ -114,7 +114,7 @@ syntax path source pTable = fmap fromJust . go
                   pure []
                 else
                   catMaybes <$> mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path (Megaparsec.Cubix.Input content children) of
+              case Megaparsec.runParser p path (Megaparsec.Cubix.mkInput content children) of
                 Left err -> do
                   liftIO . putStrLn $ Megaparsec.errorBundlePretty err
                   pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
