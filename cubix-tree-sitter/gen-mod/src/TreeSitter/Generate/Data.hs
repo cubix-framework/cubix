@@ -13,7 +13,7 @@ import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set (empty, fromList, singleton)
 import Data.Text (Text)
-import Data.Text qualified as Text (all, head, null, show, split, stripPrefix)
+import Data.Text qualified as Text (all, null, show, split, stripPrefix)
 import Data.Vector qualified as Vector (foldl, foldr, head, toList, uncons)
 import GHC.Generics (Generic)
 
@@ -24,9 +24,6 @@ import Data.Graph.Inductive qualified as Gr (Node, lab, mkGraph, reachable)
 import TreeSitter.Generate.Parser
 import TreeSitter.Generate.Types
 import TreeSitter.Grammar
-
-isHidden :: RuleName -> Bool
-isHidden n = Text.head n == '_'
 
 -- | True for hoist-synthesised intermediate rules whose names follow
 -- the @<parent>_internalN@ pattern emitted by

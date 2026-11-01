@@ -117,8 +117,10 @@ library gen-internal
     TreeSitter.Grammar
     TreeSitter.Grammar.Transform
     TreeSitter.Grammar.Transform.Between
+    TreeSitter.Grammar.Transform.Externals
     TreeSitter.Grammar.Transform.HoistDefinitions
     TreeSitter.Grammar.Transform.MergePatterns
+    TreeSitter.Grammar.Transform.OpaqueTokens
     TreeSitter.Grammar.Transform.RemoveUnusedStrings
     TreeSitter.Grammar.Transform.SepBy
     TreeSitter.Grammar.Transform.StripBlanks

@@ -29,6 +29,7 @@ import Data.Text qualified as Text (breakOnEnd, length, lines, null, pack, repli
 import Data.Text.Lazy qualified as Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (Builder)
 import Data.Text.Lazy.Builder qualified as Builder (fromText, toLazyText)
+import Data.Vector qualified as Vector (toList)
 
 import Text.DocLayout (Doc, render)
 import Text.DocLayout qualified as Doc (Doc (..))
@@ -114,13 +115,20 @@ renderSyntax Metadata{..} grammar templateFile template =
 
   context :: Context Text
   context = metadataContext <> nodesCtx <> labelsCtx <> tokensCtx
-  errorOrModule = case clashes of
-    [] -> renderTemplate templateFile template context
-    _ -> Left . unlines $
+  errorOrModule = case (visibleSupertypes, clashes) of
+    ([], []) -> renderTemplate templateFile template context
+    (names@(_ : _), _) -> Left $ unlines
+      [ "Grammar declares supertypes that are not hidden: " <> show names
+      , "Tree-sitter never emits nodes for supertypes, but the generated parser"
+      , "would expect them. Remove them from grammar.json first (jq/supertypes.jq)."
+      ]
+    (_, _) -> Left . unlines $
       "Grammar names that map to the same Haskell identifier:"
       : [ "  " <> Text.unpack ident <> ": " <> intercalate ", " (Text.unpack <$> sources)
         | (ident, sources) <- clashes
         ]
+
+  visibleSupertypes = filter (not . isHidden) (foldMap Vector.toList grammar.supertypes)
 
   -- Generated names can only clash with each other: the templates bring
   -- nothing else into their namespace (see their imports). Constructors
