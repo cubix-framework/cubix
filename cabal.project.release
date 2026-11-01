@@ -9,8 +9,10 @@ packages:
     cubix-solidity
     cubix-sui-move
     cubix-tree-sitter
+    cubix-typescript
     tree-sitter-python
     tree-sitter-sui-move
+    tree-sitter-typescript
 
 source-repository-package
     type: git

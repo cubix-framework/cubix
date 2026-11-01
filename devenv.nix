@@ -101,6 +101,28 @@ in {
       popd
     '';
 
+    gen-typescript-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-typescript/cbits/typescript/src/grammar.json \
+        --start-rule-name program \
+        --module-name Cubix.Language.TypeScript.Modularized \
+        --keep-text _template_chars \
+        -o cubix-typescript/src/Cubix/Language/TypeScript/Modularized.hs
+      popd
+    '';
+
+    gen-typescript-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-typescript/cbits/typescript/src/grammar.json \
+        --start-rule-name program \
+        --module-name Cubix.Language.TypeScript.RawParse \
+        --keep-text _template_chars \
+        -o cubix-typescript/src/Cubix/Language/TypeScript/RawParse.hs
+      popd
+    '';
+
   };
 
   env = {
