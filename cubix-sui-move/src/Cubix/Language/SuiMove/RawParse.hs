@@ -13,18 +13,19 @@
    See CLAUDE.md for full instructions on adding language support.
 -}
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Cubix.Language.SuiMove.RawParse where
 
-import Control.Applicative.Combinators
 import Control.Monad ((<=<))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as Char8
 import Data.Comp.Multi (AnnTerm, E (..))
+import Data.Comp.Multi qualified as Comp (Sum, (:<:))
 import Data.Comp.Multi.Annotation ((:&:) (..))
-import Data.Comp.Multi.Strategy.Classification (DynCase, caseE)
+import Data.Comp.Multi.Strategy.Classification (DynCase, KDynCase, caseE)
 import Data.Comp.Multi.Term (Cxt (Term))
 import Data.Foldable (foldrM)
 import Data.Functor ((<&>))
@@ -45,10 +46,15 @@ import Text.Megaparsec.Cubix qualified as Megaparsec.Cubix
 
 import Cubix.Language.Info (SourceSpan)
 import Cubix.ParsePretty (type RootSort)
-import Cubix.TreeSitter
-import Cubix.Language.SuiMove.Modularized
+import Cubix.TreeSitter (TreeSitterEnv, getFilePath, getLanguage, getSource, getTree, newTreeSitterEnv, nodeRange, nodeSpan)
+import Cubix.Language.SuiMove.Modularized qualified as M
 
-import Text.Pretty.Simple (pPrintDarkBg, pPrintLightBg)
+import Text.Pretty.Simple qualified as Pretty (pPrintDarkBg, pPrintLightBg)
+
+-- The generated parsers are named p<Rule> and alts<Rule>, where <Rule>
+-- starts with a capital letter, and refer to the Modularized syntax
+-- qualified. Nothing else in scope here may have such a name: the
+-- combinators below are named <combinator>P instead.
 
 parse' :: ReaderT TreeSitterEnv IO SomeTerm
 parse' = do
@@ -58,12 +64,12 @@ parse' = do
   rootNode <- liftIO . TS.treeRootNode =<< getTree
   syntax filepath source pTable rootNode
 
-parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (MoveTermAnn (Maybe SourceSpan) (RootSort MoveSig)))
+parse :: FilePath -> IO (ConstPtr lang) -> IO (Maybe (MoveTermAnn (Maybe SourceSpan) (RootSort M.MoveSig)))
 parse path getLang = do
   mEnv <- newTreeSitterEnv path getLang
   case mEnv of
     Nothing  -> pure Nothing
-    Just env -> runReaderT parse' env <&> caseE @_ @(RootSort MoveSig)
+    Just env -> runReaderT parse' env <&> caseE @_ @(RootSort M.MoveSig)
 
 -- | Replace the outer annotation of an 'AnnTerm' with a 'SourceSpan'.
 --
@@ -85,7 +91,7 @@ attachSpanE sp (E t) = E (attachSpan sp t)
 syntax :: FilePath -> ByteString -> ParseTable -> TS.Node -> ReaderT TreeSitterEnv IO SomeTerm
 syntax path source pTable = fmap fromJust . go
   where
-    pContent = Megaparsec.Cubix.getContent source
+    nodeContent = Megaparsec.Cubix.getContent source
     getParser sym = IM.lookup (fromIntegral sym) (unParseTable pTable)
     go :: TS.Node -> ReaderT TreeSitterEnv IO (Maybe SomeTerm)
     go root = do
@@ -98,7 +104,7 @@ syntax path source pTable = fmap fromJust . go
           symbolNo <- liftIO $ TS.nodeSymbol root
           case getParser symbolNo of
             Nothing -> do
-              liftIO (TS.nodeTypeAsString root) >>= pPrintLightBg
+              liftIO (TS.nodeTypeAsString root) >>= Pretty.pPrintLightBg
               error $ "Unrecognized symbol: "
                    <> Prelude.show symbolNo
                    <> " at: "
@@ -107,19 +113,23 @@ syntax path source pTable = fmap fromJust . go
             Just p -> do
               childNo <- liftIO $ TS.nodeChildCount root
               let childNums = [0..childNo - 1]
-                  content = pContent range
+                  content = nodeContent range
 
               children <- if childNo == 0
                 then
                   pure []
                 else
                   catMaybes <$> mapM (go <=< (liftIO . TS.nodeChild root)) childNums
-              case Megaparsec.runParser p path (Megaparsec.Cubix.mkInput content children) of
+
+              -- A node's parser must account for all of its children;
+              -- otherwise some of them would silently be dropped.
+              case Megaparsec.runParser (p <* Megaparsec.eof) path (Megaparsec.Cubix.mkInput content children) of
                 Left err -> do
                   liftIO . putStrLn $ Megaparsec.errorBundlePretty err
-                  pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
-                  pPrintDarkBg children
+                  Pretty.pPrintLightBg =<< liftIO (TS.nodeTypeAsString root)
+                  Pretty.pPrintDarkBg children
                   error "no parse"
+
                 Right item ->
                   pure (Just (attachSpanE (Just span) item))
 
@@ -130,2025 +140,2246 @@ syntax path source pTable = fmap fromJust . go
 -- | Cubix term over the grammar signature carrying an annotation of
 -- type @a@ at every layer. With @a = Maybe SourceSpan@ this is the
 -- parser's output.
-type MoveTermAnn a = AnnTerm a MoveSig
+type MoveTermAnn a = AnnTerm a M.MoveSig
 
 type SomeTerm = E (MoveTermAnn (Maybe SourceSpan))
-type Parser t = Megaparsec.Cubix.ParserA MoveSig (Maybe SourceSpan) t
+type Parser t = Megaparsec.Cubix.ParserA M.MoveSig (Maybe SourceSpan) t
 type TermParser l = Parser (MoveTermAnn (Maybe SourceSpan) l)
 type SomeTermParser = Parser (E (MoveTermAnn (Maybe SourceSpan)))
 
 -- reify types
-pMaybe :: Typeable l => TermParser l -> TermParser (Maybe l)
-pMaybe = Megaparsec.Cubix.pMaybe
-{-# INLINABLE pMaybe #-}
+maybeP :: Typeable l => TermParser l -> TermParser (Maybe l)
+maybeP = Megaparsec.Cubix.pMaybe
+{-# INLINABLE maybeP #-}
 
-pPair :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
-pPair = Megaparsec.Cubix.pPair
-{-# INLINABLE pPair #-}
+pairP :: (Typeable l, Typeable l') => TermParser l -> TermParser l' -> TermParser (l, l')
+pairP = Megaparsec.Cubix.pPair
+{-# INLINABLE pairP #-}
 
-pSome :: Typeable l => TermParser l -> TermParser [l]
-pSome = Megaparsec.Cubix.pSome
-{-# INLINABLE pSome #-}
+someP :: Typeable l => TermParser l -> TermParser [l]
+someP = Megaparsec.Cubix.pSome
+{-# INLINABLE someP #-}
 
-pMany :: Typeable l => TermParser l -> TermParser [l]
-pMany = Megaparsec.Cubix.pMany
-{-# INLINABLE pMany #-}
+manyP :: Typeable l => TermParser l -> TermParser [l]
+manyP = Megaparsec.Cubix.pMany
+{-# INLINABLE manyP #-}
 
-pSepBy :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
-pSepBy = Megaparsec.Cubix.pSepBy
-{-# INLINABLE pSepBy #-}
+sepByP :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+sepByP = Megaparsec.Cubix.pSepBy
+{-# INLINABLE sepByP #-}
 
-pSepBy1 :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
-pSepBy1 = Megaparsec.Cubix.pSepBy1
-{-# INLINABLE pSepBy1 #-}
+sepBy1P :: Typeable l => TermParser l -> TermParser sep -> TermParser [l]
+sepBy1P = Megaparsec.Cubix.pSepBy1
+{-# INLINABLE sepBy1P #-}
 
-pBetween :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
-pBetween = Megaparsec.Cubix.pBetween
-{-# INLINABLE pBetween #-}
+betweenP :: Typeable l => TermParser open -> TermParser close -> TermParser l -> TermParser l
+betweenP = Megaparsec.Cubix.pBetween
+{-# INLINABLE betweenP #-}
 
-pSort :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
-pSort = Megaparsec.Cubix.pSort @l
-{-# INLINABLE pSort #-}
+sortP :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => NonEmpty Char -> TermParser l
+sortP = Megaparsec.Cubix.pSort @l
+{-# INLINABLE sortP #-}
 
-pSort' :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
-pSort' = Megaparsec.Cubix.pSort'
-{-# INLINABLE pSort' #-}
+fragmentSortP :: forall f l. (f Comp.:<: (Comp.Sum M.MoveSig :&: Maybe SourceSpan), KDynCase f l) => NonEmpty Char -> TermParser l
+fragmentSortP = Megaparsec.Cubix.pFragmentSort @f @l
+{-# INLINABLE fragmentSortP #-}
 
-pContent :: Parser Text
-pContent = Megaparsec.Cubix.pContent
-{-# INLINABLE pContent #-}
+sortP' :: forall l. DynCase (MoveTermAnn (Maybe SourceSpan)) l => Proxy l -> NonEmpty Char -> TermParser l
+sortP' = Megaparsec.Cubix.pSort'
+{-# INLINABLE sortP' #-}
 
-pExclamationMarkTok :: TermParser ExclamationMarkTokL
-pExclamationMarkTok = ExclamationMarkTok' <$ Megaparsec.eof
+contentP :: Parser Text
+contentP = Megaparsec.Cubix.pContent
+{-# INLINABLE contentP #-}
 
-pExclamationMarkEqualsSignTok :: TermParser ExclamationMarkEqualsSignTokL
-pExclamationMarkEqualsSignTok = ExclamationMarkEqualsSignTok' <$ Megaparsec.eof
+pExclamationMarkTok :: TermParser M.ExclamationMarkTokL
+pExclamationMarkTok = M.ExclamationMarkTok' <$ Megaparsec.eof
 
-pNumberSignLeftSquareBracketTok :: TermParser NumberSignLeftSquareBracketTokL
-pNumberSignLeftSquareBracketTok = NumberSignLeftSquareBracketTok' <$ Megaparsec.eof
+pExclamationMarkEqualsSignTok :: TermParser M.ExclamationMarkEqualsSignTokL
+pExclamationMarkEqualsSignTok = M.ExclamationMarkEqualsSignTok' <$ Megaparsec.eof
 
-pDollarSignTok :: TermParser DollarSignTokL
-pDollarSignTok = DollarSignTok' <$ Megaparsec.eof
+pNumberSignLeftSquareBracketTok :: TermParser M.NumberSignLeftSquareBracketTokL
+pNumberSignLeftSquareBracketTok = M.NumberSignLeftSquareBracketTok' <$ Megaparsec.eof
 
-pPercentSignTok :: TermParser PercentSignTokL
-pPercentSignTok = PercentSignTok' <$ Megaparsec.eof
+pDollarSignTok :: TermParser M.DollarSignTokL
+pDollarSignTok = M.DollarSignTok' <$ Megaparsec.eof
 
-pAmpersandTok :: TermParser AmpersandTokL
-pAmpersandTok = AmpersandTok' <$ Megaparsec.eof
+pPercentSignTok :: TermParser M.PercentSignTokL
+pPercentSignTok = M.PercentSignTok' <$ Megaparsec.eof
 
-pAmpersandAmpersandTok :: TermParser AmpersandAmpersandTokL
-pAmpersandAmpersandTok = AmpersandAmpersandTok' <$ Megaparsec.eof
+pAmpersandTok :: TermParser M.AmpersandTokL
+pAmpersandTok = M.AmpersandTok' <$ Megaparsec.eof
 
-pApostropheTok :: TermParser ApostropheTokL
-pApostropheTok = ApostropheTok' <$ Megaparsec.eof
+pAmpersandAmpersandTok :: TermParser M.AmpersandAmpersandTokL
+pAmpersandAmpersandTok = M.AmpersandAmpersandTok' <$ Megaparsec.eof
 
-pLeftParenthesisTok :: TermParser LeftParenthesisTokL
-pLeftParenthesisTok = LeftParenthesisTok' <$ Megaparsec.eof
+pApostropheTok :: TermParser M.ApostropheTokL
+pApostropheTok = M.ApostropheTok' <$ Megaparsec.eof
 
-pRightParenthesisTok :: TermParser RightParenthesisTokL
-pRightParenthesisTok = RightParenthesisTok' <$ Megaparsec.eof
+pLeftParenthesisTok :: TermParser M.LeftParenthesisTokL
+pLeftParenthesisTok = M.LeftParenthesisTok' <$ Megaparsec.eof
 
-pAsteriskTok :: TermParser AsteriskTokL
-pAsteriskTok = AsteriskTok' <$ Megaparsec.eof
+pRightParenthesisTok :: TermParser M.RightParenthesisTokL
+pRightParenthesisTok = M.RightParenthesisTok' <$ Megaparsec.eof
 
-pPlusSignTok :: TermParser PlusSignTokL
-pPlusSignTok = PlusSignTok' <$ Megaparsec.eof
+pAsteriskTok :: TermParser M.AsteriskTokL
+pAsteriskTok = M.AsteriskTok' <$ Megaparsec.eof
 
-pCommaTok :: TermParser CommaTokL
-pCommaTok = CommaTok' <$ Megaparsec.eof
+pPlusSignTok :: TermParser M.PlusSignTokL
+pPlusSignTok = M.PlusSignTok' <$ Megaparsec.eof
 
-pHyphenMinusTok :: TermParser HyphenMinusTokL
-pHyphenMinusTok = HyphenMinusTok' <$ Megaparsec.eof
+pCommaTok :: TermParser M.CommaTokL
+pCommaTok = M.CommaTok' <$ Megaparsec.eof
 
-pHyphenMinusGreaterThanSignTok :: TermParser HyphenMinusGreaterThanSignTokL
-pHyphenMinusGreaterThanSignTok = HyphenMinusGreaterThanSignTok' <$ Megaparsec.eof
+pHyphenMinusTok :: TermParser M.HyphenMinusTokL
+pHyphenMinusTok = M.HyphenMinusTok' <$ Megaparsec.eof
 
-pFullStopTok :: TermParser FullStopTokL
-pFullStopTok = FullStopTok' <$ Megaparsec.eof
+pHyphenMinusGreaterThanSignTok :: TermParser M.HyphenMinusGreaterThanSignTokL
+pHyphenMinusGreaterThanSignTok = M.HyphenMinusGreaterThanSignTok' <$ Megaparsec.eof
 
-pFullStopFullStopTok :: TermParser FullStopFullStopTokL
-pFullStopFullStopTok = FullStopFullStopTok' <$ Megaparsec.eof
+pFullStopTok :: TermParser M.FullStopTokL
+pFullStopTok = M.FullStopTok' <$ Megaparsec.eof
 
-pSolidusTok :: TermParser SolidusTokL
-pSolidusTok = SolidusTok' <$ Megaparsec.eof
+pFullStopFullStopTok :: TermParser M.FullStopFullStopTokL
+pFullStopFullStopTok = M.FullStopFullStopTok' <$ Megaparsec.eof
 
-pSolidusAsteriskTok :: TermParser SolidusAsteriskTokL
-pSolidusAsteriskTok = SolidusAsteriskTok' <$ Megaparsec.eof
+pSolidusTok :: TermParser M.SolidusTokL
+pSolidusTok = M.SolidusTok' <$ Megaparsec.eof
 
-pSolidusSolidusTok :: TermParser SolidusSolidusTokL
-pSolidusSolidusTok = SolidusSolidusTok' <$ Megaparsec.eof
+pSolidusAsteriskTok :: TermParser M.SolidusAsteriskTokL
+pSolidusAsteriskTok = M.SolidusAsteriskTok' <$ Megaparsec.eof
 
-pColonTok :: TermParser ColonTokL
-pColonTok = ColonTok' <$ Megaparsec.eof
+pSolidusSolidusTok :: TermParser M.SolidusSolidusTokL
+pSolidusSolidusTok = M.SolidusSolidusTok' <$ Megaparsec.eof
 
-pColonColonTok :: TermParser ColonColonTokL
-pColonColonTok = ColonColonTok' <$ Megaparsec.eof
+pColonTok :: TermParser M.ColonTokL
+pColonTok = M.ColonTok' <$ Megaparsec.eof
 
-pSemicolonTok :: TermParser SemicolonTokL
-pSemicolonTok = SemicolonTok' <$ Megaparsec.eof
+pColonColonTok :: TermParser M.ColonColonTokL
+pColonColonTok = M.ColonColonTok' <$ Megaparsec.eof
 
-pLessThanSignTok :: TermParser LessThanSignTokL
-pLessThanSignTok = LessThanSignTok' <$ Megaparsec.eof
+pSemicolonTok :: TermParser M.SemicolonTokL
+pSemicolonTok = M.SemicolonTok' <$ Megaparsec.eof
 
-pLessThanSignLessThanSignTok :: TermParser LessThanSignLessThanSignTokL
-pLessThanSignLessThanSignTok = LessThanSignLessThanSignTok' <$ Megaparsec.eof
+pLessThanSignTok :: TermParser M.LessThanSignTokL
+pLessThanSignTok = M.LessThanSignTok' <$ Megaparsec.eof
 
-pLessThanSignEqualsSignTok :: TermParser LessThanSignEqualsSignTokL
-pLessThanSignEqualsSignTok = LessThanSignEqualsSignTok' <$ Megaparsec.eof
+pLessThanSignLessThanSignTok :: TermParser M.LessThanSignLessThanSignTokL
+pLessThanSignLessThanSignTok = M.LessThanSignLessThanSignTok' <$ Megaparsec.eof
 
-pEqualsSignTok :: TermParser EqualsSignTokL
-pEqualsSignTok = EqualsSignTok' <$ Megaparsec.eof
+pLessThanSignEqualsSignTok :: TermParser M.LessThanSignEqualsSignTokL
+pLessThanSignEqualsSignTok = M.LessThanSignEqualsSignTok' <$ Megaparsec.eof
 
-pEqualsSignEqualsSignTok :: TermParser EqualsSignEqualsSignTokL
-pEqualsSignEqualsSignTok = EqualsSignEqualsSignTok' <$ Megaparsec.eof
+pEqualsSignTok :: TermParser M.EqualsSignTokL
+pEqualsSignTok = M.EqualsSignTok' <$ Megaparsec.eof
 
-pEqualsSignEqualsSignGreaterThanSignTok :: TermParser EqualsSignEqualsSignGreaterThanSignTokL
-pEqualsSignEqualsSignGreaterThanSignTok = EqualsSignEqualsSignGreaterThanSignTok' <$ Megaparsec.eof
+pEqualsSignEqualsSignTok :: TermParser M.EqualsSignEqualsSignTokL
+pEqualsSignEqualsSignTok = M.EqualsSignEqualsSignTok' <$ Megaparsec.eof
 
-pEqualsSignGreaterThanSignTok :: TermParser EqualsSignGreaterThanSignTokL
-pEqualsSignGreaterThanSignTok = EqualsSignGreaterThanSignTok' <$ Megaparsec.eof
+pEqualsSignEqualsSignGreaterThanSignTok :: TermParser M.EqualsSignEqualsSignGreaterThanSignTokL
+pEqualsSignEqualsSignGreaterThanSignTok = M.EqualsSignEqualsSignGreaterThanSignTok' <$ Megaparsec.eof
 
-pGreaterThanSignTok :: TermParser GreaterThanSignTokL
-pGreaterThanSignTok = GreaterThanSignTok' <$ Megaparsec.eof
+pEqualsSignGreaterThanSignTok :: TermParser M.EqualsSignGreaterThanSignTokL
+pEqualsSignGreaterThanSignTok = M.EqualsSignGreaterThanSignTok' <$ Megaparsec.eof
 
-pGreaterThanSignEqualsSignTok :: TermParser GreaterThanSignEqualsSignTokL
-pGreaterThanSignEqualsSignTok = GreaterThanSignEqualsSignTok' <$ Megaparsec.eof
+pGreaterThanSignTok :: TermParser M.GreaterThanSignTokL
+pGreaterThanSignTok = M.GreaterThanSignTok' <$ Megaparsec.eof
 
-pGreaterThanSignGreaterThanSignTok :: TermParser GreaterThanSignGreaterThanSignTokL
-pGreaterThanSignGreaterThanSignTok = GreaterThanSignGreaterThanSignTok' <$ Megaparsec.eof
+pGreaterThanSignEqualsSignTok :: TermParser M.GreaterThanSignEqualsSignTokL
+pGreaterThanSignEqualsSignTok = M.GreaterThanSignEqualsSignTok' <$ Megaparsec.eof
 
-pCommercialAtTok :: TermParser CommercialAtTokL
-pCommercialAtTok = CommercialAtTok' <$ Megaparsec.eof
+pGreaterThanSignGreaterThanSignTok :: TermParser M.GreaterThanSignGreaterThanSignTokL
+pGreaterThanSignGreaterThanSignTok = M.GreaterThanSignGreaterThanSignTok' <$ Megaparsec.eof
 
-pLeftSquareBracketTok :: TermParser LeftSquareBracketTokL
-pLeftSquareBracketTok = LeftSquareBracketTok' <$ Megaparsec.eof
+pCommercialAtTok :: TermParser M.CommercialAtTokL
+pCommercialAtTok = M.CommercialAtTok' <$ Megaparsec.eof
 
-pRightSquareBracketTok :: TermParser RightSquareBracketTokL
-pRightSquareBracketTok = RightSquareBracketTok' <$ Megaparsec.eof
+pLeftSquareBracketTok :: TermParser M.LeftSquareBracketTokL
+pLeftSquareBracketTok = M.LeftSquareBracketTok' <$ Megaparsec.eof
 
-pCircumflexAccentTok :: TermParser CircumflexAccentTokL
-pCircumflexAccentTok = CircumflexAccentTok' <$ Megaparsec.eof
+pRightSquareBracketTok :: TermParser M.RightSquareBracketTokL
+pRightSquareBracketTok = M.RightSquareBracketTok' <$ Megaparsec.eof
 
-pAbortTok :: TermParser AbortTokL
-pAbortTok = AbortTok' <$ Megaparsec.eof
+pCircumflexAccentTok :: TermParser M.CircumflexAccentTokL
+pCircumflexAccentTok = M.CircumflexAccentTok' <$ Megaparsec.eof
 
-pAbortsIfTok :: TermParser AbortsIfTokL
-pAbortsIfTok = AbortsIfTok' <$ Megaparsec.eof
+pAbortTok :: TermParser M.AbortTokL
+pAbortTok = M.AbortTok' <$ Megaparsec.eof
 
-pAbortsWithTok :: TermParser AbortsWithTokL
-pAbortsWithTok = AbortsWithTok' <$ Megaparsec.eof
+pAbortsIfTok :: TermParser M.AbortsIfTokL
+pAbortsIfTok = M.AbortsIfTok' <$ Megaparsec.eof
 
-pAddressTok :: TermParser AddressTokL
-pAddressTok = AddressTok' <$ Megaparsec.eof
+pAbortsWithTok :: TermParser M.AbortsWithTokL
+pAbortsWithTok = M.AbortsWithTok' <$ Megaparsec.eof
 
-pApplyTok :: TermParser ApplyTokL
-pApplyTok = ApplyTok' <$ Megaparsec.eof
+pAddressTok :: TermParser M.AddressTokL
+pAddressTok = M.AddressTok' <$ Megaparsec.eof
 
-pAsTok :: TermParser AsTokL
-pAsTok = AsTok' <$ Megaparsec.eof
+pApplyTok :: TermParser M.ApplyTokL
+pApplyTok = M.ApplyTok' <$ Megaparsec.eof
 
-pAssertTok :: TermParser AssertTokL
-pAssertTok = AssertTok' <$ Megaparsec.eof
+pAsTok :: TermParser M.AsTokL
+pAsTok = M.AsTok' <$ Megaparsec.eof
 
-pAssumeTok :: TermParser AssumeTokL
-pAssumeTok = AssumeTok' <$ Megaparsec.eof
+pAssertTok :: TermParser M.AssertTokL
+pAssertTok = M.AssertTok' <$ Megaparsec.eof
 
-pBoolTok :: TermParser BoolTokL
-pBoolTok = BoolTok' <$ Megaparsec.eof
+pAssumeTok :: TermParser M.AssumeTokL
+pAssumeTok = M.AssumeTok' <$ Megaparsec.eof
 
-pBreakTok :: TermParser BreakTokL
-pBreakTok = BreakTok' <$ Megaparsec.eof
+pBoolTok :: TermParser M.BoolTokL
+pBoolTok = M.BoolTok' <$ Megaparsec.eof
 
-pConstTok :: TermParser ConstTokL
-pConstTok = ConstTok' <$ Megaparsec.eof
+pBreakTok :: TermParser M.BreakTokL
+pBreakTok = M.BreakTok' <$ Megaparsec.eof
 
-pContinueTok :: TermParser ContinueTokL
-pContinueTok = ContinueTok' <$ Megaparsec.eof
+pConstTok :: TermParser M.ConstTokL
+pConstTok = M.ConstTok' <$ Megaparsec.eof
 
-pCopyTok :: TermParser CopyTokL
-pCopyTok = CopyTok' <$ Megaparsec.eof
+pContinueTok :: TermParser M.ContinueTokL
+pContinueTok = M.ContinueTok' <$ Megaparsec.eof
 
-pDecreasesTok :: TermParser DecreasesTokL
-pDecreasesTok = DecreasesTok' <$ Megaparsec.eof
+pCopyTok :: TermParser M.CopyTokL
+pCopyTok = M.CopyTok' <$ Megaparsec.eof
 
-pDropTok :: TermParser DropTokL
-pDropTok = DropTok' <$ Megaparsec.eof
+pDecreasesTok :: TermParser M.DecreasesTokL
+pDecreasesTok = M.DecreasesTok' <$ Megaparsec.eof
 
-pElseTok :: TermParser ElseTokL
-pElseTok = ElseTok' <$ Megaparsec.eof
+pDropTok :: TermParser M.DropTokL
+pDropTok = M.DropTok' <$ Megaparsec.eof
 
-pEnsuresTok :: TermParser EnsuresTokL
-pEnsuresTok = EnsuresTok' <$ Megaparsec.eof
+pElseTok :: TermParser M.ElseTokL
+pElseTok = M.ElseTok' <$ Megaparsec.eof
 
-pEntryTok :: TermParser EntryTokL
-pEntryTok = EntryTok' <$ Megaparsec.eof
+pEnsuresTok :: TermParser M.EnsuresTokL
+pEnsuresTok = M.EnsuresTok' <$ Megaparsec.eof
 
-pEnumTok :: TermParser EnumTokL
-pEnumTok = EnumTok' <$ Megaparsec.eof
+pEntryTok :: TermParser M.EntryTokL
+pEntryTok = M.EntryTok' <$ Megaparsec.eof
 
-pExceptTok :: TermParser ExceptTokL
-pExceptTok = ExceptTok' <$ Megaparsec.eof
+pEnumTok :: TermParser M.EnumTokL
+pEnumTok = M.EnumTok' <$ Megaparsec.eof
 
-pExistsTok :: TermParser ExistsTokL
-pExistsTok = ExistsTok' <$ Megaparsec.eof
+pExceptTok :: TermParser M.ExceptTokL
+pExceptTok = M.ExceptTok' <$ Megaparsec.eof
 
-pExtendTok :: TermParser ExtendTokL
-pExtendTok = ExtendTok' <$ Megaparsec.eof
+pExistsTok :: TermParser M.ExistsTokL
+pExistsTok = M.ExistsTok' <$ Megaparsec.eof
 
-pFalseTok :: TermParser FalseTokL
-pFalseTok = FalseTok' <$ Megaparsec.eof
+pExtendTok :: TermParser M.ExtendTokL
+pExtendTok = M.ExtendTok' <$ Megaparsec.eof
 
-pForallTok :: TermParser ForallTokL
-pForallTok = ForallTok' <$ Megaparsec.eof
+pFalseTok :: TermParser M.FalseTokL
+pFalseTok = M.FalseTok' <$ Megaparsec.eof
 
-pFriendTok :: TermParser FriendTokL
-pFriendTok = FriendTok' <$ Megaparsec.eof
+pForallTok :: TermParser M.ForallTokL
+pForallTok = M.ForallTok' <$ Megaparsec.eof
 
-pFunTok :: TermParser FunTokL
-pFunTok = FunTok' <$ Megaparsec.eof
+pFriendTok :: TermParser M.FriendTokL
+pFriendTok = M.FriendTok' <$ Megaparsec.eof
 
-pGlobalTok :: TermParser GlobalTokL
-pGlobalTok = GlobalTok' <$ Megaparsec.eof
+pFunTok :: TermParser M.FunTokL
+pFunTok = M.FunTok' <$ Megaparsec.eof
 
-pHasTok :: TermParser HasTokL
-pHasTok = HasTok' <$ Megaparsec.eof
+pGlobalTok :: TermParser M.GlobalTokL
+pGlobalTok = M.GlobalTok' <$ Megaparsec.eof
 
-pIfTok :: TermParser IfTokL
-pIfTok = IfTok' <$ Megaparsec.eof
+pHasTok :: TermParser M.HasTokL
+pHasTok = M.HasTok' <$ Megaparsec.eof
 
-pInTok :: TermParser InTokL
-pInTok = InTok' <$ Megaparsec.eof
+pIfTok :: TermParser M.IfTokL
+pIfTok = M.IfTok' <$ Megaparsec.eof
 
-pIncludeTok :: TermParser IncludeTokL
-pIncludeTok = IncludeTok' <$ Megaparsec.eof
+pInTok :: TermParser M.InTokL
+pInTok = M.InTok' <$ Megaparsec.eof
 
-pInternalTok :: TermParser InternalTokL
-pInternalTok = InternalTok' <$ Megaparsec.eof
+pIncludeTok :: TermParser M.IncludeTokL
+pIncludeTok = M.IncludeTok' <$ Megaparsec.eof
 
-pInvariantTok :: TermParser InvariantTokL
-pInvariantTok = InvariantTok' <$ Megaparsec.eof
+pInternalTok :: TermParser M.InternalTokL
+pInternalTok = M.InternalTok' <$ Megaparsec.eof
 
-pKeyTok :: TermParser KeyTokL
-pKeyTok = KeyTok' <$ Megaparsec.eof
+pInvariantTok :: TermParser M.InvariantTokL
+pInvariantTok = M.InvariantTok' <$ Megaparsec.eof
 
-pLetTok :: TermParser LetTokL
-pLetTok = LetTok' <$ Megaparsec.eof
+pKeyTok :: TermParser M.KeyTokL
+pKeyTok = M.KeyTok' <$ Megaparsec.eof
 
-pLocalTok :: TermParser LocalTokL
-pLocalTok = LocalTok' <$ Megaparsec.eof
+pLetTok :: TermParser M.LetTokL
+pLetTok = M.LetTok' <$ Megaparsec.eof
 
-pLoopTok :: TermParser LoopTokL
-pLoopTok = LoopTok' <$ Megaparsec.eof
+pLocalTok :: TermParser M.LocalTokL
+pLocalTok = M.LocalTok' <$ Megaparsec.eof
 
-pMacroTok :: TermParser MacroTokL
-pMacroTok = MacroTok' <$ Megaparsec.eof
+pLoopTok :: TermParser M.LoopTokL
+pLoopTok = M.LoopTok' <$ Megaparsec.eof
 
-pMatchTok :: TermParser MatchTokL
-pMatchTok = MatchTok' <$ Megaparsec.eof
+pMacroTok :: TermParser M.MacroTokL
+pMacroTok = M.MacroTok' <$ Megaparsec.eof
 
-pModifiesTok :: TermParser ModifiesTokL
-pModifiesTok = ModifiesTok' <$ Megaparsec.eof
+pMatchTok :: TermParser M.MatchTokL
+pMatchTok = M.MatchTok' <$ Megaparsec.eof
 
-pModuleTok :: TermParser ModuleTokL
-pModuleTok = ModuleTok' <$ Megaparsec.eof
+pModifiesTok :: TermParser M.ModifiesTokL
+pModifiesTok = M.ModifiesTok' <$ Megaparsec.eof
 
-pMoveTok :: TermParser MoveTokL
-pMoveTok = MoveTok' <$ Megaparsec.eof
+pModuleTok :: TermParser M.ModuleTokL
+pModuleTok = M.ModuleTok' <$ Megaparsec.eof
 
-pMutTok :: TermParser MutTokL
-pMutTok = MutTok' <$ Megaparsec.eof
+pMoveTok :: TermParser M.MoveTokL
+pMoveTok = M.MoveTok' <$ Megaparsec.eof
 
-pNativeTok :: TermParser NativeTokL
-pNativeTok = NativeTok' <$ Megaparsec.eof
+pMutTok :: TermParser M.MutTokL
+pMutTok = M.MutTok' <$ Megaparsec.eof
 
-pPackTok :: TermParser PackTokL
-pPackTok = PackTok' <$ Megaparsec.eof
+pNativeTok :: TermParser M.NativeTokL
+pNativeTok = M.NativeTok' <$ Megaparsec.eof
 
-pPackageTok :: TermParser PackageTokL
-pPackageTok = PackageTok' <$ Megaparsec.eof
+pPackTok :: TermParser M.PackTokL
+pPackTok = M.PackTok' <$ Megaparsec.eof
 
-pPhantomTok :: TermParser PhantomTokL
-pPhantomTok = PhantomTok' <$ Megaparsec.eof
+pPackageTok :: TermParser M.PackageTokL
+pPackageTok = M.PackageTok' <$ Megaparsec.eof
 
-pPostTok :: TermParser PostTokL
-pPostTok = PostTok' <$ Megaparsec.eof
+pPhantomTok :: TermParser M.PhantomTokL
+pPhantomTok = M.PhantomTok' <$ Megaparsec.eof
 
-pPragmaTok :: TermParser PragmaTokL
-pPragmaTok = PragmaTok' <$ Megaparsec.eof
+pPostTok :: TermParser M.PostTokL
+pPostTok = M.PostTok' <$ Megaparsec.eof
 
-pPublicTok :: TermParser PublicTokL
-pPublicTok = PublicTok' <$ Megaparsec.eof
+pPragmaTok :: TermParser M.PragmaTokL
+pPragmaTok = M.PragmaTok' <$ Megaparsec.eof
 
-pRequiresTok :: TermParser RequiresTokL
-pRequiresTok = RequiresTok' <$ Megaparsec.eof
+pPublicTok :: TermParser M.PublicTokL
+pPublicTok = M.PublicTok' <$ Megaparsec.eof
 
-pReturnTok :: TermParser ReturnTokL
-pReturnTok = ReturnTok' <$ Megaparsec.eof
+pRequiresTok :: TermParser M.RequiresTokL
+pRequiresTok = M.RequiresTok' <$ Megaparsec.eof
 
-pSchemaTok :: TermParser SchemaTokL
-pSchemaTok = SchemaTok' <$ Megaparsec.eof
+pReturnTok :: TermParser M.ReturnTokL
+pReturnTok = M.ReturnTok' <$ Megaparsec.eof
 
-pSignerTok :: TermParser SignerTokL
-pSignerTok = SignerTok' <$ Megaparsec.eof
+pSchemaTok :: TermParser M.SchemaTokL
+pSchemaTok = M.SchemaTok' <$ Megaparsec.eof
 
-pSpecTok :: TermParser SpecTokL
-pSpecTok = SpecTok' <$ Megaparsec.eof
+pSignerTok :: TermParser M.SignerTokL
+pSignerTok = M.SignerTok' <$ Megaparsec.eof
 
-pStoreTok :: TermParser StoreTokL
-pStoreTok = StoreTok' <$ Megaparsec.eof
+pSpecTok :: TermParser M.SpecTokL
+pSpecTok = M.SpecTok' <$ Megaparsec.eof
 
-pStructTok :: TermParser StructTokL
-pStructTok = StructTok' <$ Megaparsec.eof
+pStoreTok :: TermParser M.StoreTokL
+pStoreTok = M.StoreTok' <$ Megaparsec.eof
 
-pSucceedsIfTok :: TermParser SucceedsIfTokL
-pSucceedsIfTok = SucceedsIfTok' <$ Megaparsec.eof
+pStructTok :: TermParser M.StructTokL
+pStructTok = M.StructTok' <$ Megaparsec.eof
 
-pToTok :: TermParser ToTokL
-pToTok = ToTok' <$ Megaparsec.eof
+pSucceedsIfTok :: TermParser M.SucceedsIfTokL
+pSucceedsIfTok = M.SucceedsIfTok' <$ Megaparsec.eof
 
-pTrueTok :: TermParser TrueTokL
-pTrueTok = TrueTok' <$ Megaparsec.eof
+pToTok :: TermParser M.ToTokL
+pToTok = M.ToTok' <$ Megaparsec.eof
 
-pU128Tok :: TermParser U128TokL
-pU128Tok = U128Tok' <$ Megaparsec.eof
+pTrueTok :: TermParser M.TrueTokL
+pTrueTok = M.TrueTok' <$ Megaparsec.eof
 
-pU16Tok :: TermParser U16TokL
-pU16Tok = U16Tok' <$ Megaparsec.eof
+pU128Tok :: TermParser M.U128TokL
+pU128Tok = M.U128Tok' <$ Megaparsec.eof
 
-pU256Tok :: TermParser U256TokL
-pU256Tok = U256Tok' <$ Megaparsec.eof
+pU16Tok :: TermParser M.U16TokL
+pU16Tok = M.U16Tok' <$ Megaparsec.eof
 
-pU32Tok :: TermParser U32TokL
-pU32Tok = U32Tok' <$ Megaparsec.eof
+pU256Tok :: TermParser M.U256TokL
+pU256Tok = M.U256Tok' <$ Megaparsec.eof
 
-pU64Tok :: TermParser U64TokL
-pU64Tok = U64Tok' <$ Megaparsec.eof
+pU32Tok :: TermParser M.U32TokL
+pU32Tok = M.U32Tok' <$ Megaparsec.eof
 
-pU8Tok :: TermParser U8TokL
-pU8Tok = U8Tok' <$ Megaparsec.eof
+pU64Tok :: TermParser M.U64TokL
+pU64Tok = M.U64Tok' <$ Megaparsec.eof
 
-pUnpackTok :: TermParser UnpackTokL
-pUnpackTok = UnpackTok' <$ Megaparsec.eof
+pU8Tok :: TermParser M.U8TokL
+pU8Tok = M.U8Tok' <$ Megaparsec.eof
 
-pUpdateTok :: TermParser UpdateTokL
-pUpdateTok = UpdateTok' <$ Megaparsec.eof
+pUnpackTok :: TermParser M.UnpackTokL
+pUnpackTok = M.UnpackTok' <$ Megaparsec.eof
 
-pUseTok :: TermParser UseTokL
-pUseTok = UseTok' <$ Megaparsec.eof
+pUpdateTok :: TermParser M.UpdateTokL
+pUpdateTok = M.UpdateTok' <$ Megaparsec.eof
 
-pVectorLessThanSignTok :: TermParser VectorLessThanSignTokL
-pVectorLessThanSignTok = VectorLessThanSignTok' <$ Megaparsec.eof
+pUseTok :: TermParser M.UseTokL
+pUseTok = M.UseTok' <$ Megaparsec.eof
 
-pVectorLeftSquareBracketTok :: TermParser VectorLeftSquareBracketTokL
-pVectorLeftSquareBracketTok = VectorLeftSquareBracketTok' <$ Megaparsec.eof
+pVectorLessThanSignTok :: TermParser M.VectorLessThanSignTokL
+pVectorLessThanSignTok = M.VectorLessThanSignTok' <$ Megaparsec.eof
 
-pWhereTok :: TermParser WhereTokL
-pWhereTok = WhereTok' <$ Megaparsec.eof
+pVectorLeftSquareBracketTok :: TermParser M.VectorLeftSquareBracketTokL
+pVectorLeftSquareBracketTok = M.VectorLeftSquareBracketTok' <$ Megaparsec.eof
 
-pWhileTok :: TermParser WhileTokL
-pWhileTok = WhileTok' <$ Megaparsec.eof
+pWhereTok :: TermParser M.WhereTokL
+pWhereTok = M.WhereTok' <$ Megaparsec.eof
 
-pWithTok :: TermParser WithTokL
-pWithTok = WithTok' <$ Megaparsec.eof
+pWhileTok :: TermParser M.WhileTokL
+pWhileTok = M.WhileTok' <$ Megaparsec.eof
 
-pLeftCurlyBracketTok :: TermParser LeftCurlyBracketTokL
-pLeftCurlyBracketTok = LeftCurlyBracketTok' <$ Megaparsec.eof
+pWithTok :: TermParser M.WithTokL
+pWithTok = M.WithTok' <$ Megaparsec.eof
 
-pVerticalLineTok :: TermParser VerticalLineTokL
-pVerticalLineTok = VerticalLineTok' <$ Megaparsec.eof
+pLeftCurlyBracketTok :: TermParser M.LeftCurlyBracketTokL
+pLeftCurlyBracketTok = M.LeftCurlyBracketTok' <$ Megaparsec.eof
 
-pVerticalLineVerticalLineTok :: TermParser VerticalLineVerticalLineTokL
-pVerticalLineVerticalLineTok = VerticalLineVerticalLineTok' <$ Megaparsec.eof
+pVerticalLineTok :: TermParser M.VerticalLineTokL
+pVerticalLineTok = M.VerticalLineTok' <$ Megaparsec.eof
 
-pRightCurlyBracketTok :: TermParser RightCurlyBracketTokL
-pRightCurlyBracketTok = RightCurlyBracketTok' <$ Megaparsec.eof
+pVerticalLineVerticalLineTok :: TermParser M.VerticalLineVerticalLineTokL
+pVerticalLineVerticalLineTok = M.VerticalLineVerticalLineTok' <$ Megaparsec.eof
 
-pSourceFile :: TermParser SourceFileL
+pRightCurlyBracketTok :: TermParser M.RightCurlyBracketTokL
+pRightCurlyBracketTok = M.RightCurlyBracketTok' <$ Megaparsec.eof
+
+pSourceFile :: TermParser M.SourceFileL
 pSourceFile =
-  SourceFile' <$> pMany (pSourceFileInternal0)
+  M.SourceFile' <$> manyP (pSourceFileInternal0)
 
-pSourceFileInternal0 :: TermParser SourceFileInternal0L
+pSourceFileInternal0 :: TermParser M.SourceFileInternal0L
 pSourceFileInternal0 =
-  choice [ Megaparsec.try pSourceFileInternal0ModuleExtensionDefinition
-         , Megaparsec.try pSourceFileInternal0ModuleDefinition
-         ]
+  Megaparsec.Cubix.pLongest "source_file_internal0" altsSourceFileInternal0
+
+altsSourceFileInternal0 :: [TermParser M.SourceFileInternal0L]
+altsSourceFileInternal0 =
+  [ pSourceFileInternal0ModuleExtensionDefinition
+  , pSourceFileInternal0ModuleDefinition
+  ]
   where
-    pSourceFileInternal0ModuleExtensionDefinition :: TermParser SourceFileInternal0L
+    pSourceFileInternal0ModuleExtensionDefinition :: TermParser M.SourceFileInternal0L
     pSourceFileInternal0ModuleExtensionDefinition =
-      SourceFileInternal0ModuleExtensionDefinition' <$> pSort @ModuleExtensionDefinitionL "module_extension_definition"
-    pSourceFileInternal0ModuleDefinition :: TermParser SourceFileInternal0L
+      M.SourceFileInternal0ModuleExtensionDefinition' <$> fragmentSortP @M.ModuleExtensionDefinition @M.ModuleExtensionDefinitionL "module_extension_definition"
+    pSourceFileInternal0ModuleDefinition :: TermParser M.SourceFileInternal0L
     pSourceFileInternal0ModuleDefinition =
-      SourceFileInternal0ModuleDefinition' <$> pSort @ModuleDefinitionL "module_definition"
+      M.SourceFileInternal0ModuleDefinition' <$> fragmentSortP @M.ModuleDefinition @M.ModuleDefinitionL "module_definition"
 
-pModuleDefinition :: TermParser ModuleDefinitionL
+pModuleDefinition :: TermParser M.ModuleDefinitionL
 pModuleDefinition =
-  ModuleDefinition' <$> pSort @ModuleTokL "module_tok" <*> pSort @ModuleIdentityL "module_identity" <*> pSort @ModuleBodyL "module_body"
+  M.ModuleDefinition' <$> fragmentSortP @M.Token @M.ModuleTokL "module_tok" <*> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> fragmentSortP @M.ModuleBody @M.ModuleBodyL "module_body"
 
-pModuleBody :: TermParser ModuleBodyL
+pModuleBody :: TermParser M.ModuleBodyL
 pModuleBody =
-  ModuleBody' <$> pModuleBodyInternal0 <*> pMany (pModuleBodyInternal1) <*> pMaybe (pSort @RightCurlyBracketTokL "}_tok")
+  M.ModuleBody' <$> pModuleBodyInternal0 <*> manyP (pModuleBodyInternal1) <*> maybeP (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok")
 
-pModuleBodyInternal0 :: TermParser ModuleBodyInternal0L
+pModuleBodyInternal0 :: TermParser M.ModuleBodyInternal0L
 pModuleBodyInternal0 =
-  choice [ Megaparsec.try pModuleBodyInternal0Semicolon
-         , Megaparsec.try pModuleBodyInternal0LeftCurlyBracket
-         ]
+  Megaparsec.Cubix.pLongest "module_body_internal0" altsModuleBodyInternal0
+
+altsModuleBodyInternal0 :: [TermParser M.ModuleBodyInternal0L]
+altsModuleBodyInternal0 =
+  [ pModuleBodyInternal0Semicolon
+  , pModuleBodyInternal0LeftCurlyBracket
+  ]
   where
-    pModuleBodyInternal0Semicolon :: TermParser ModuleBodyInternal0L
+    pModuleBodyInternal0Semicolon :: TermParser M.ModuleBodyInternal0L
     pModuleBodyInternal0Semicolon =
-      ModuleBodyInternal0Semicolon' <$> pSort @SemicolonTokL ";_tok"
-    pModuleBodyInternal0LeftCurlyBracket :: TermParser ModuleBodyInternal0L
+      M.ModuleBodyInternal0Semicolon' <$> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
+    pModuleBodyInternal0LeftCurlyBracket :: TermParser M.ModuleBodyInternal0L
     pModuleBodyInternal0LeftCurlyBracket =
-      ModuleBodyInternal0LeftCurlyBracket' <$> pSort @LeftCurlyBracketTokL "{_tok"
+      M.ModuleBodyInternal0LeftCurlyBracket' <$> fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok"
 
-pModuleBodyInternal1 :: TermParser ModuleBodyInternal1L
+pModuleBodyInternal1 :: TermParser M.ModuleBodyInternal1L
 pModuleBodyInternal1 =
-  choice [ Megaparsec.try pModuleBodyInternal1UseDeclaration
-         , Megaparsec.try pModuleBodyInternal1FriendDeclaration
-         , Megaparsec.try pModuleBodyInternal1Constant
-         , Megaparsec.try pModuleBodyInternal1FunctionItem
-         , Megaparsec.try pModuleBodyInternal1StructItem
-         , Megaparsec.try pModuleBodyInternal1EnumItem
-         , Megaparsec.try pModuleBodyInternal1SpecBlock
-         ]
+  Megaparsec.Cubix.pLongest "module_body_internal1" altsModuleBodyInternal1
+
+altsModuleBodyInternal1 :: [TermParser M.ModuleBodyInternal1L]
+altsModuleBodyInternal1 =
+  [ pModuleBodyInternal1UseDeclaration
+  , pModuleBodyInternal1FriendDeclaration
+  , pModuleBodyInternal1Constant
+  , pModuleBodyInternal1FunctionItem
+  , pModuleBodyInternal1StructItem
+  , pModuleBodyInternal1EnumItem
+  , pModuleBodyInternal1SpecBlock
+  ]
   where
-    pModuleBodyInternal1UseDeclaration :: TermParser ModuleBodyInternal1L
+    pModuleBodyInternal1UseDeclaration :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1UseDeclaration =
-      ModuleBodyInternal1UseDeclaration' <$> pSort @UseDeclarationL "use_declaration"
-    pModuleBodyInternal1FriendDeclaration :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1UseDeclaration' <$> fragmentSortP @M.UseDeclaration @M.UseDeclarationL "use_declaration"
+    pModuleBodyInternal1FriendDeclaration :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1FriendDeclaration =
-      ModuleBodyInternal1FriendDeclaration' <$> pSort @FriendDeclarationL "friend_declaration"
-    pModuleBodyInternal1Constant :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1FriendDeclaration' <$> fragmentSortP @M.FriendDeclaration @M.FriendDeclarationL "friend_declaration"
+    pModuleBodyInternal1Constant :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1Constant =
-      ModuleBodyInternal1Constant' <$> pSort @ConstantL "constant"
-    pModuleBodyInternal1FunctionItem :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1Constant' <$> fragmentSortP @M.Constant @M.ConstantL "constant"
+    pModuleBodyInternal1FunctionItem :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1FunctionItem =
-      ModuleBodyInternal1FunctionItem' <$> pHiddenFunctionItem
-    pModuleBodyInternal1StructItem :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1FunctionItem' <$> pHiddenFunctionItem
+    pModuleBodyInternal1StructItem :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1StructItem =
-      ModuleBodyInternal1StructItem' <$> pHiddenStructItem
-    pModuleBodyInternal1EnumItem :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1StructItem' <$> pHiddenStructItem
+    pModuleBodyInternal1EnumItem :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1EnumItem =
-      ModuleBodyInternal1EnumItem' <$> pHiddenEnumItem
-    pModuleBodyInternal1SpecBlock :: TermParser ModuleBodyInternal1L
+      M.ModuleBodyInternal1EnumItem' <$> pHiddenEnumItem
+    pModuleBodyInternal1SpecBlock :: TermParser M.ModuleBodyInternal1L
     pModuleBodyInternal1SpecBlock =
-      ModuleBodyInternal1SpecBlock' <$> pSort @SpecBlockL "spec_block"
+      M.ModuleBodyInternal1SpecBlock' <$> fragmentSortP @M.SpecBlock @M.SpecBlockL "spec_block"
 
-pHiddenEnumItem :: TermParser HiddenEnumItemL
+pHiddenEnumItem :: TermParser M.HiddenEnumItemL
 pHiddenEnumItem =
-  HiddenEnumItem' <$> pSort @EnumDefinitionL "enum_definition"
+  M.HiddenEnumItem' <$> fragmentSortP @M.EnumDefinition @M.EnumDefinitionL "enum_definition"
 
-pEnumDefinition :: TermParser EnumDefinitionL
+pEnumDefinition :: TermParser M.EnumDefinitionL
 pEnumDefinition =
-  EnumDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pHiddenEnumSignature <*> pSort @EnumVariantsL "enum_variants" <*> pMaybe (pSort @PostfixAbilityDeclsL "postfix_ability_decls")
+  M.EnumDefinition' <$> maybeP (fragmentSortP @M.Token @M.PublicTokL "public_tok") <*> pHiddenEnumSignature <*> fragmentSortP @M.EnumVariants @M.EnumVariantsL "enum_variants" <*> maybeP (fragmentSortP @M.PostfixAbilityDecls @M.PostfixAbilityDeclsL "postfix_ability_decls")
 
-pHiddenEnumSignature :: TermParser HiddenEnumSignatureL
+pHiddenEnumSignature :: TermParser M.HiddenEnumSignatureL
 pHiddenEnumSignature =
-  HiddenEnumSignature' <$> pSort @EnumTokL "enum_tok" <*> pHiddenEnumIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pMaybe (pSort @AbilityDeclsL "ability_decls")
+  M.HiddenEnumSignature' <$> fragmentSortP @M.Token @M.EnumTokL "enum_tok" <*> pHiddenEnumIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> maybeP (fragmentSortP @M.AbilityDecls @M.AbilityDeclsL "ability_decls")
 
-pHiddenEnumIdentifier :: TermParser HiddenEnumIdentifierL
+pHiddenEnumIdentifier :: TermParser M.HiddenEnumIdentifierL
 pHiddenEnumIdentifier =
-  HiddenEnumIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenEnumIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pIdentifier :: TermParser IdentifierL
+pIdentifier :: TermParser M.IdentifierL
 pIdentifier =
-  Identifier' <$> pContent
+  M.Identifier' <$> contentP
 
-pAbilityDecls :: TermParser AbilityDeclsL
+pAbilityDecls :: TermParser M.AbilityDeclsL
 pAbilityDecls =
-  AbilityDecls' <$> pSort @HasTokL "has_tok" <*> pSepBy (pSort @AbilityL "ability") (pSort @CommaTokL ",_tok")
+  M.AbilityDecls' <$> fragmentSortP @M.Token @M.HasTokL "has_tok" <*> sepByP (fragmentSortP @M.Ability @M.AbilityL "ability") (fragmentSortP @M.Token @M.CommaTokL ",_tok")
 
-pAbility :: TermParser AbilityL
+pAbility :: TermParser M.AbilityL
 pAbility =
-  choice [ Megaparsec.try pAbilityCopy
-         , Megaparsec.try pAbilityDrop
-         , Megaparsec.try pAbilityStore
-         , Megaparsec.try pAbilityKey
-         ]
+  Megaparsec.Cubix.pLongest "ability" altsAbility
+
+altsAbility :: [TermParser M.AbilityL]
+altsAbility =
+  [ pAbilityCopy
+  , pAbilityDrop
+  , pAbilityStore
+  , pAbilityKey
+  ]
   where
-    pAbilityCopy :: TermParser AbilityL
+    pAbilityCopy :: TermParser M.AbilityL
     pAbilityCopy =
-      AbilityCopy' <$> pSort @CopyTokL "copy_tok"
-    pAbilityDrop :: TermParser AbilityL
+      M.AbilityCopy' <$> fragmentSortP @M.Token @M.CopyTokL "copy_tok"
+    pAbilityDrop :: TermParser M.AbilityL
     pAbilityDrop =
-      AbilityDrop' <$> pSort @DropTokL "drop_tok"
-    pAbilityStore :: TermParser AbilityL
+      M.AbilityDrop' <$> fragmentSortP @M.Token @M.DropTokL "drop_tok"
+    pAbilityStore :: TermParser M.AbilityL
     pAbilityStore =
-      AbilityStore' <$> pSort @StoreTokL "store_tok"
-    pAbilityKey :: TermParser AbilityL
+      M.AbilityStore' <$> fragmentSortP @M.Token @M.StoreTokL "store_tok"
+    pAbilityKey :: TermParser M.AbilityL
     pAbilityKey =
-      AbilityKey' <$> pSort @KeyTokL "key_tok"
+      M.AbilityKey' <$> fragmentSortP @M.Token @M.KeyTokL "key_tok"
 
-pTypeParameters :: TermParser TypeParametersL
+pTypeParameters :: TermParser M.TypeParametersL
 pTypeParameters =
-  TypeParameters' <$> pBetween (pSort @LessThanSignTokL "<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pSort @TypeParameterL "type_parameter") (pSort @CommaTokL ",_tok"))
+  M.TypeParameters' <$> betweenP (fragmentSortP @M.Token @M.LessThanSignTokL "<_tok") (fragmentSortP @M.Token @M.GreaterThanSignTokL ">_tok") (sepBy1P (fragmentSortP @M.TypeParameter @M.TypeParameterL "type_parameter") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pTypeParameter :: TermParser TypeParameterL
+pTypeParameter :: TermParser M.TypeParameterL
 pTypeParameter =
-  TypeParameter' <$> pMaybe (pSort @DollarSignTokL "$_tok") <*> pMaybe (pSort @PhantomTokL "phantom_tok") <*> pHiddenTypeParameterIdentifier <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSepBy1 (pSort @AbilityL "ability") (pSort @PlusSignTokL "+_tok")))
+  M.TypeParameter' <$> maybeP (fragmentSortP @M.Token @M.DollarSignTokL "$_tok") <*> maybeP (fragmentSortP @M.Token @M.PhantomTokL "phantom_tok") <*> pHiddenTypeParameterIdentifier <*> maybeP (pairP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (sepBy1P (fragmentSortP @M.Ability @M.AbilityL "ability") (fragmentSortP @M.Token @M.PlusSignTokL "+_tok")))
 
-pHiddenTypeParameterIdentifier :: TermParser HiddenTypeParameterIdentifierL
+pHiddenTypeParameterIdentifier :: TermParser M.HiddenTypeParameterIdentifierL
 pHiddenTypeParameterIdentifier =
-  HiddenTypeParameterIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenTypeParameterIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pEnumVariants :: TermParser EnumVariantsL
+pEnumVariants :: TermParser M.EnumVariantsL
 pEnumVariants =
-  EnumVariants' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @VariantL "variant") (pSort @CommaTokL ",_tok"))
+  M.EnumVariants' <$> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepByP (fragmentSortP @M.Variant @M.VariantL "variant") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pVariant :: TermParser VariantL
+pVariant :: TermParser M.VariantL
 pVariant =
-  Variant' <$> pHiddenVariantIdentifier <*> pMaybe (pSort @DatatypeFieldsL "datatype_fields")
+  M.Variant' <$> pHiddenVariantIdentifier <*> maybeP (fragmentSortP @M.DatatypeFields @M.DatatypeFieldsL "datatype_fields")
 
-pHiddenVariantIdentifier :: TermParser HiddenVariantIdentifierL
+pHiddenVariantIdentifier :: TermParser M.HiddenVariantIdentifierL
 pHiddenVariantIdentifier =
-  HiddenVariantIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenVariantIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pDatatypeFields :: TermParser DatatypeFieldsL
+pDatatypeFields :: TermParser M.DatatypeFieldsL
 pDatatypeFields =
-  choice [ Megaparsec.try pDatatypeFieldsPositionalFields
-         , Megaparsec.try pDatatypeFieldsNamedFields
-         ]
+  Megaparsec.Cubix.pLongest "datatype_fields" altsDatatypeFields
+
+altsDatatypeFields :: [TermParser M.DatatypeFieldsL]
+altsDatatypeFields =
+  [ pDatatypeFieldsPositionalFields
+  , pDatatypeFieldsNamedFields
+  ]
   where
-    pDatatypeFieldsPositionalFields :: TermParser DatatypeFieldsL
+    pDatatypeFieldsPositionalFields :: TermParser M.DatatypeFieldsL
     pDatatypeFieldsPositionalFields =
-      DatatypeFieldsPositionalFields' <$> pSort @PositionalFieldsL "positional_fields"
-    pDatatypeFieldsNamedFields :: TermParser DatatypeFieldsL
+      M.DatatypeFieldsPositionalFields' <$> fragmentSortP @M.PositionalFields @M.PositionalFieldsL "positional_fields"
+    pDatatypeFieldsNamedFields :: TermParser M.DatatypeFieldsL
     pDatatypeFieldsNamedFields =
-      DatatypeFieldsNamedFields' <$> pSort @NamedFieldsL "named_fields"
+      M.DatatypeFieldsNamedFields' <$> fragmentSortP @M.NamedFields @M.NamedFieldsL "named_fields"
 
-pNamedFields :: TermParser NamedFieldsL
+pNamedFields :: TermParser M.NamedFieldsL
 pNamedFields =
-  NamedFields' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @FieldAnnotationL "field_annotation") (pSort @CommaTokL ",_tok"))
+  M.NamedFields' <$> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepByP (fragmentSortP @M.FieldAnnotation @M.FieldAnnotationL "field_annotation") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pFieldAnnotation :: TermParser FieldAnnotationL
+pFieldAnnotation :: TermParser M.FieldAnnotationL
 pFieldAnnotation =
-  FieldAnnotation' <$> pHiddenFieldIdentifier <*> pSort @ColonTokL ":_tok" <*> pHiddenType
+  M.FieldAnnotation' <$> pHiddenFieldIdentifier <*> fragmentSortP @M.Token @M.ColonTokL ":_tok" <*> pHiddenType
 
-pHiddenFieldIdentifier :: TermParser HiddenFieldIdentifierL
+pHiddenFieldIdentifier :: TermParser M.HiddenFieldIdentifierL
 pHiddenFieldIdentifier =
-  HiddenFieldIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenFieldIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pHiddenType :: TermParser HiddenTypeL
+pHiddenType :: TermParser M.HiddenTypeL
 pHiddenType =
-  choice [ Megaparsec.try pHiddenTypeApplyType
-         , Megaparsec.try pHiddenTypeRefType
-         , Megaparsec.try pHiddenTypeTupleType
-         , Megaparsec.try pHiddenTypeFunctionType
-         , Megaparsec.try pHiddenTypePrimitiveType
-         ]
+  Megaparsec.Cubix.pLongest "_type" altsHiddenType
+
+altsHiddenType :: [TermParser M.HiddenTypeL]
+altsHiddenType =
+  [ pHiddenTypeApplyType
+  , pHiddenTypeRefType
+  , pHiddenTypeTupleType
+  , pHiddenTypeFunctionType
+  , pHiddenTypePrimitiveType
+  ]
   where
-    pHiddenTypeApplyType :: TermParser HiddenTypeL
+    pHiddenTypeApplyType :: TermParser M.HiddenTypeL
     pHiddenTypeApplyType =
-      HiddenTypeApplyType' <$> pSort @ApplyTypeL "apply_type"
-    pHiddenTypeRefType :: TermParser HiddenTypeL
+      M.HiddenTypeApplyType' <$> fragmentSortP @M.ApplyType @M.ApplyTypeL "apply_type"
+    pHiddenTypeRefType :: TermParser M.HiddenTypeL
     pHiddenTypeRefType =
-      HiddenTypeRefType' <$> pSort @RefTypeL "ref_type"
-    pHiddenTypeTupleType :: TermParser HiddenTypeL
+      M.HiddenTypeRefType' <$> fragmentSortP @M.RefType @M.RefTypeL "ref_type"
+    pHiddenTypeTupleType :: TermParser M.HiddenTypeL
     pHiddenTypeTupleType =
-      HiddenTypeTupleType' <$> pSort @TupleTypeL "tuple_type"
-    pHiddenTypeFunctionType :: TermParser HiddenTypeL
+      M.HiddenTypeTupleType' <$> fragmentSortP @M.TupleType @M.TupleTypeL "tuple_type"
+    pHiddenTypeFunctionType :: TermParser M.HiddenTypeL
     pHiddenTypeFunctionType =
-      HiddenTypeFunctionType' <$> pSort @FunctionTypeL "function_type"
-    pHiddenTypePrimitiveType :: TermParser HiddenTypeL
+      M.HiddenTypeFunctionType' <$> fragmentSortP @M.FunctionType @M.FunctionTypeL "function_type"
+    pHiddenTypePrimitiveType :: TermParser M.HiddenTypeL
     pHiddenTypePrimitiveType =
-      HiddenTypePrimitiveType' <$> pSort @PrimitiveTypeL "primitive_type"
+      M.HiddenTypePrimitiveType' <$> fragmentSortP @M.PrimitiveType @M.PrimitiveTypeL "primitive_type"
 
-pApplyType :: TermParser ApplyTypeL
+pApplyType :: TermParser M.ApplyTypeL
 pApplyType =
-  ApplyType' <$> pPair (pSort @ModuleAccessL "module_access") (pMaybe (pSort @TypeArgumentsL "type_arguments"))
+  M.ApplyType' <$> pairP (fragmentSortP @M.ModuleAccess @M.ModuleAccessL "module_access") (maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments"))
 
-pModuleAccess :: TermParser ModuleAccessL
+pModuleAccess :: TermParser M.ModuleAccessL
 pModuleAccess =
-  choice [ Megaparsec.try pModuleAccess9
-         , Megaparsec.try pModuleAccess6
-         , Megaparsec.try pModuleAccess5
-         , Megaparsec.try pModuleAccess8
-         , Megaparsec.try pModuleAccess1
-         , Megaparsec.try pModuleAccess2
-         , Megaparsec.try pModuleAccess4
-         , Megaparsec.try pModuleAccess7
-         , Megaparsec.try pModuleAccessMember
-         ]
+  Megaparsec.Cubix.pLongest "module_access" altsModuleAccess
+
+altsModuleAccess :: [TermParser M.ModuleAccessL]
+altsModuleAccess =
+  [ pModuleAccess9
+  , pModuleAccess6
+  , pModuleAccess5
+  , pModuleAccess8
+  , pModuleAccess1
+  , pModuleAccess2
+  , pModuleAccess4
+  , pModuleAccess7
+  , pModuleAccessMember
+  ]
   where
-    pModuleAccess9 :: TermParser ModuleAccessL
+    pModuleAccess9 :: TermParser M.ModuleAccessL
     pModuleAccess9 =
-      ModuleAccess9' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess6 :: TermParser ModuleAccessL
+      M.ModuleAccess9' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments") <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pModuleAccess6 :: TermParser M.ModuleAccessL
     pModuleAccess6 =
-      ModuleAccess6' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pSort @TypeArgumentsL "type_arguments"
-    pModuleAccess5 :: TermParser ModuleAccessL
+      M.ModuleAccess6' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments"
+    pModuleAccess5 :: TermParser M.ModuleAccessL
     pModuleAccess5 =
-      ModuleAccess5' <$> pHiddenModuleIdentifier <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess8 :: TermParser ModuleAccessL
+      M.ModuleAccess5' <$> pHiddenModuleIdentifier <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments") <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pModuleAccess8 :: TermParser M.ModuleAccessL
     pModuleAccess8 =
-      ModuleAccess8' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess1 :: TermParser ModuleAccessL
+      M.ModuleAccess8' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments") <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pModuleAccess1 :: TermParser M.ModuleAccessL
     pModuleAccess1 =
-      ModuleAccess1' <$> pSort @DollarSignTokL "$_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess2 :: TermParser ModuleAccessL
+      M.ModuleAccess1' <$> fragmentSortP @M.Token @M.DollarSignTokL "$_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pModuleAccess2 :: TermParser M.ModuleAccessL
     pModuleAccess2 =
-      ModuleAccess2' <$> pSort @CommercialAtTokL "@_tok" <*> pSort @IdentifierL "identifier"
-    pModuleAccess4 :: TermParser ModuleAccessL
+      M.ModuleAccess2' <$> fragmentSortP @M.Token @M.CommercialAtTokL "@_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pModuleAccess4 :: TermParser M.ModuleAccessL
     pModuleAccess4 =
-      ModuleAccess4' <$> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
-    pModuleAccess7 :: TermParser ModuleAccessL
+      M.ModuleAccess4' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments")
+    pModuleAccess7 :: TermParser M.ModuleAccessL
     pModuleAccess7 =
-      ModuleAccess7' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pSort @TypeArgumentsL "type_arguments")
-    pModuleAccessMember :: TermParser ModuleAccessL
+      M.ModuleAccess7' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments")
+    pModuleAccessMember :: TermParser M.ModuleAccessL
     pModuleAccessMember =
-      ModuleAccessMember' <$> pHiddenReservedIdentifier
+      M.ModuleAccessMember' <$> pHiddenReservedIdentifier
 
-pHiddenModuleIdentifier :: TermParser HiddenModuleIdentifierL
+pHiddenModuleIdentifier :: TermParser M.HiddenModuleIdentifierL
 pHiddenModuleIdentifier =
-  HiddenModuleIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenModuleIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pHiddenReservedIdentifier :: TermParser HiddenReservedIdentifierL
+pHiddenReservedIdentifier :: TermParser M.HiddenReservedIdentifierL
 pHiddenReservedIdentifier =
-  choice [ Megaparsec.try pHiddenReservedIdentifierForall
-         , Megaparsec.try pHiddenReservedIdentifierExists
-         , Megaparsec.try pHiddenReservedIdentifierSpec
-         ]
+  Megaparsec.Cubix.pLongest "_reserved_identifier" altsHiddenReservedIdentifier
+
+altsHiddenReservedIdentifier :: [TermParser M.HiddenReservedIdentifierL]
+altsHiddenReservedIdentifier =
+  [ pHiddenReservedIdentifierForall
+  , pHiddenReservedIdentifierExists
+  , pHiddenReservedIdentifierSpec
+  ]
   where
-    pHiddenReservedIdentifierForall :: TermParser HiddenReservedIdentifierL
+    pHiddenReservedIdentifierForall :: TermParser M.HiddenReservedIdentifierL
     pHiddenReservedIdentifierForall =
-      HiddenReservedIdentifierForall' <$> pHiddenForall
-    pHiddenReservedIdentifierExists :: TermParser HiddenReservedIdentifierL
+      M.HiddenReservedIdentifierForall' <$> pHiddenForall
+    pHiddenReservedIdentifierExists :: TermParser M.HiddenReservedIdentifierL
     pHiddenReservedIdentifierExists =
-      HiddenReservedIdentifierExists' <$> pHiddenExists
-    pHiddenReservedIdentifierSpec :: TermParser HiddenReservedIdentifierL
+      M.HiddenReservedIdentifierExists' <$> pHiddenExists
+    pHiddenReservedIdentifierSpec :: TermParser M.HiddenReservedIdentifierL
     pHiddenReservedIdentifierSpec =
-      HiddenReservedIdentifierSpec' <$> pSort @SpecTokL "spec_tok"
+      M.HiddenReservedIdentifierSpec' <$> fragmentSortP @M.Token @M.SpecTokL "spec_tok"
 
-pHiddenExists :: TermParser HiddenExistsL
+pHiddenExists :: TermParser M.HiddenExistsL
 pHiddenExists =
-  HiddenExists' <$> pSort @ExistsTokL "exists_tok"
+  M.HiddenExists' <$> fragmentSortP @M.Token @M.ExistsTokL "exists_tok"
 
-pHiddenForall :: TermParser HiddenForallL
+pHiddenForall :: TermParser M.HiddenForallL
 pHiddenForall =
-  HiddenForall' <$> pSort @ForallTokL "forall_tok"
+  M.HiddenForall' <$> fragmentSortP @M.Token @M.ForallTokL "forall_tok"
 
-pModuleIdentity :: TermParser ModuleIdentityL
+pModuleIdentity :: TermParser M.ModuleIdentityL
 pModuleIdentity =
-  ModuleIdentity' <$> pModuleIdentityInternal0 <*> pSort @ColonColonTokL "::_tok" <*> pHiddenModuleIdentifier
+  M.ModuleIdentity' <$> pModuleIdentityInternal0 <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> pHiddenModuleIdentifier
 
-pModuleIdentityInternal0 :: TermParser ModuleIdentityInternal0L
+pModuleIdentityInternal0 :: TermParser M.ModuleIdentityInternal0L
 pModuleIdentityInternal0 =
-  choice [ Megaparsec.try pModuleIdentityInternal0NumLiteral
-         , Megaparsec.try pModuleIdentityInternal0ModuleIdentifier
-         ]
+  Megaparsec.Cubix.pLongest "module_identity_internal0" altsModuleIdentityInternal0
+
+altsModuleIdentityInternal0 :: [TermParser M.ModuleIdentityInternal0L]
+altsModuleIdentityInternal0 =
+  [ pModuleIdentityInternal0NumLiteral
+  , pModuleIdentityInternal0ModuleIdentifier
+  ]
   where
-    pModuleIdentityInternal0NumLiteral :: TermParser ModuleIdentityInternal0L
+    pModuleIdentityInternal0NumLiteral :: TermParser M.ModuleIdentityInternal0L
     pModuleIdentityInternal0NumLiteral =
-      ModuleIdentityInternal0NumLiteral' <$> pSort @NumLiteralL "num_literal"
-    pModuleIdentityInternal0ModuleIdentifier :: TermParser ModuleIdentityInternal0L
+      M.ModuleIdentityInternal0NumLiteral' <$> fragmentSortP @M.NumLiteral @M.NumLiteralL "num_literal"
+    pModuleIdentityInternal0ModuleIdentifier :: TermParser M.ModuleIdentityInternal0L
     pModuleIdentityInternal0ModuleIdentifier =
-      ModuleIdentityInternal0ModuleIdentifier' <$> pHiddenModuleIdentifier
+      M.ModuleIdentityInternal0ModuleIdentifier' <$> pHiddenModuleIdentifier
 
-pNumLiteral :: TermParser NumLiteralL
+pNumLiteral :: TermParser M.NumLiteralL
 pNumLiteral =
-  NumLiteral' <$> pContent <*> pMaybe (pNumLiteralInternal0)
+  M.NumLiteral' <$> contentP <*> maybeP (pNumLiteralInternal0)
 
-pNumLiteralInternal0 :: TermParser NumLiteralInternal0L
+pNumLiteralInternal0 :: TermParser M.NumLiteralInternal0L
 pNumLiteralInternal0 =
-  choice [ Megaparsec.try pNumLiteralInternal0U8
-         , Megaparsec.try pNumLiteralInternal0U16
-         , Megaparsec.try pNumLiteralInternal0U32
-         , Megaparsec.try pNumLiteralInternal0U64
-         , Megaparsec.try pNumLiteralInternal0U128
-         , Megaparsec.try pNumLiteralInternal0U256
-         ]
+  Megaparsec.Cubix.pLongest "num_literal_internal0" altsNumLiteralInternal0
+
+altsNumLiteralInternal0 :: [TermParser M.NumLiteralInternal0L]
+altsNumLiteralInternal0 =
+  [ pNumLiteralInternal0U8
+  , pNumLiteralInternal0U16
+  , pNumLiteralInternal0U32
+  , pNumLiteralInternal0U64
+  , pNumLiteralInternal0U128
+  , pNumLiteralInternal0U256
+  ]
   where
-    pNumLiteralInternal0U8 :: TermParser NumLiteralInternal0L
+    pNumLiteralInternal0U8 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U8 =
-      NumLiteralInternal0U8' <$> pSort @U8TokL "u8_tok"
-    pNumLiteralInternal0U16 :: TermParser NumLiteralInternal0L
+      M.NumLiteralInternal0U8' <$> fragmentSortP @M.Token @M.U8TokL "u8_tok"
+    pNumLiteralInternal0U16 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U16 =
-      NumLiteralInternal0U16' <$> pSort @U16TokL "u16_tok"
-    pNumLiteralInternal0U32 :: TermParser NumLiteralInternal0L
+      M.NumLiteralInternal0U16' <$> fragmentSortP @M.Token @M.U16TokL "u16_tok"
+    pNumLiteralInternal0U32 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U32 =
-      NumLiteralInternal0U32' <$> pSort @U32TokL "u32_tok"
-    pNumLiteralInternal0U64 :: TermParser NumLiteralInternal0L
+      M.NumLiteralInternal0U32' <$> fragmentSortP @M.Token @M.U32TokL "u32_tok"
+    pNumLiteralInternal0U64 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U64 =
-      NumLiteralInternal0U64' <$> pSort @U64TokL "u64_tok"
-    pNumLiteralInternal0U128 :: TermParser NumLiteralInternal0L
+      M.NumLiteralInternal0U64' <$> fragmentSortP @M.Token @M.U64TokL "u64_tok"
+    pNumLiteralInternal0U128 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U128 =
-      NumLiteralInternal0U128' <$> pSort @U128TokL "u128_tok"
-    pNumLiteralInternal0U256 :: TermParser NumLiteralInternal0L
+      M.NumLiteralInternal0U128' <$> fragmentSortP @M.Token @M.U128TokL "u128_tok"
+    pNumLiteralInternal0U256 :: TermParser M.NumLiteralInternal0L
     pNumLiteralInternal0U256 =
-      NumLiteralInternal0U256' <$> pSort @U256TokL "u256_tok"
+      M.NumLiteralInternal0U256' <$> fragmentSortP @M.Token @M.U256TokL "u256_tok"
 
-pTypeArguments :: TermParser TypeArgumentsL
+pTypeArguments :: TermParser M.TypeArgumentsL
 pTypeArguments =
-  TypeArguments' <$> pBetween (pSort @LessThanSignTokL "<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pHiddenType) (pSort @CommaTokL ",_tok"))
+  M.TypeArguments' <$> betweenP (fragmentSortP @M.Token @M.LessThanSignTokL "<_tok") (fragmentSortP @M.Token @M.GreaterThanSignTokL ">_tok") (sepBy1P (pHiddenType) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pFunctionType :: TermParser FunctionTypeL
+pFunctionType :: TermParser M.FunctionTypeL
 pFunctionType =
-  FunctionType' <$> pSort @FunctionTypeParametersL "function_type_parameters" <*> pMaybe (pPair (pSort @HyphenMinusGreaterThanSignTokL "->_tok") (pHiddenType))
+  M.FunctionType' <$> fragmentSortP @M.FunctionTypeParameters @M.FunctionTypeParametersL "function_type_parameters" <*> maybeP (pairP (fragmentSortP @M.Token @M.HyphenMinusGreaterThanSignTokL "->_tok") (pHiddenType))
 
-pFunctionTypeParameters :: TermParser FunctionTypeParametersL
+pFunctionTypeParameters :: TermParser M.FunctionTypeParametersL
 pFunctionTypeParameters =
-  FunctionTypeParameters' <$> pBetween (pSort @VerticalLineTokL "|_tok") (pSort @VerticalLineTokL "|_tok") (pSepBy (pHiddenType) (pSort @CommaTokL ",_tok"))
+  M.FunctionTypeParameters' <$> betweenP (fragmentSortP @M.Token @M.VerticalLineTokL "|_tok") (fragmentSortP @M.Token @M.VerticalLineTokL "|_tok") (sepByP (pHiddenType) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pPrimitiveType :: TermParser PrimitiveTypeL
+pPrimitiveType :: TermParser M.PrimitiveTypeL
 pPrimitiveType =
-  choice [ Megaparsec.try pPrimitiveTypeU8
-         , Megaparsec.try pPrimitiveTypeU16
-         , Megaparsec.try pPrimitiveTypeU32
-         , Megaparsec.try pPrimitiveTypeU64
-         , Megaparsec.try pPrimitiveTypeU128
-         , Megaparsec.try pPrimitiveTypeU256
-         , Megaparsec.try pPrimitiveTypeBool
-         , Megaparsec.try pPrimitiveTypeAddress
-         , Megaparsec.try pPrimitiveTypeSigner
-         ]
+  Megaparsec.Cubix.pLongest "primitive_type" altsPrimitiveType
+
+altsPrimitiveType :: [TermParser M.PrimitiveTypeL]
+altsPrimitiveType =
+  [ pPrimitiveTypeU8
+  , pPrimitiveTypeU16
+  , pPrimitiveTypeU32
+  , pPrimitiveTypeU64
+  , pPrimitiveTypeU128
+  , pPrimitiveTypeU256
+  , pPrimitiveTypeBool
+  , pPrimitiveTypeAddress
+  , pPrimitiveTypeSigner
+  ]
   where
-    pPrimitiveTypeU8 :: TermParser PrimitiveTypeL
+    pPrimitiveTypeU8 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU8 =
-      PrimitiveTypeU8' <$> pSort @U8TokL "u8_tok"
-    pPrimitiveTypeU16 :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU8' <$> fragmentSortP @M.Token @M.U8TokL "u8_tok"
+    pPrimitiveTypeU16 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU16 =
-      PrimitiveTypeU16' <$> pSort @U16TokL "u16_tok"
-    pPrimitiveTypeU32 :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU16' <$> fragmentSortP @M.Token @M.U16TokL "u16_tok"
+    pPrimitiveTypeU32 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU32 =
-      PrimitiveTypeU32' <$> pSort @U32TokL "u32_tok"
-    pPrimitiveTypeU64 :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU32' <$> fragmentSortP @M.Token @M.U32TokL "u32_tok"
+    pPrimitiveTypeU64 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU64 =
-      PrimitiveTypeU64' <$> pSort @U64TokL "u64_tok"
-    pPrimitiveTypeU128 :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU64' <$> fragmentSortP @M.Token @M.U64TokL "u64_tok"
+    pPrimitiveTypeU128 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU128 =
-      PrimitiveTypeU128' <$> pSort @U128TokL "u128_tok"
-    pPrimitiveTypeU256 :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU128' <$> fragmentSortP @M.Token @M.U128TokL "u128_tok"
+    pPrimitiveTypeU256 :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeU256 =
-      PrimitiveTypeU256' <$> pSort @U256TokL "u256_tok"
-    pPrimitiveTypeBool :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeU256' <$> fragmentSortP @M.Token @M.U256TokL "u256_tok"
+    pPrimitiveTypeBool :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeBool =
-      PrimitiveTypeBool' <$> pSort @BoolTokL "bool_tok"
-    pPrimitiveTypeAddress :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeBool' <$> fragmentSortP @M.Token @M.BoolTokL "bool_tok"
+    pPrimitiveTypeAddress :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeAddress =
-      PrimitiveTypeAddress' <$> pSort @AddressTokL "address_tok"
-    pPrimitiveTypeSigner :: TermParser PrimitiveTypeL
+      M.PrimitiveTypeAddress' <$> fragmentSortP @M.Token @M.AddressTokL "address_tok"
+    pPrimitiveTypeSigner :: TermParser M.PrimitiveTypeL
     pPrimitiveTypeSigner =
-      PrimitiveTypeSigner' <$> pSort @SignerTokL "signer_tok"
+      M.PrimitiveTypeSigner' <$> fragmentSortP @M.Token @M.SignerTokL "signer_tok"
 
-pRefType :: TermParser RefTypeL
+pRefType :: TermParser M.RefTypeL
 pRefType =
-  RefType' <$> pHiddenReference <*> pHiddenType
+  M.RefType' <$> pHiddenReference <*> pHiddenType
 
-pHiddenReference :: TermParser HiddenReferenceL
+pHiddenReference :: TermParser M.HiddenReferenceL
 pHiddenReference =
-  choice [ Megaparsec.try pHiddenReferenceImmRef
-         , Megaparsec.try pHiddenReferenceMutRef
-         ]
+  Megaparsec.Cubix.pLongest "_reference" altsHiddenReference
+
+altsHiddenReference :: [TermParser M.HiddenReferenceL]
+altsHiddenReference =
+  [ pHiddenReferenceImmRef
+  , pHiddenReferenceMutRef
+  ]
   where
-    pHiddenReferenceImmRef :: TermParser HiddenReferenceL
+    pHiddenReferenceImmRef :: TermParser M.HiddenReferenceL
     pHiddenReferenceImmRef =
-      HiddenReferenceImmRef' <$> pSort @ImmRefL "imm_ref"
-    pHiddenReferenceMutRef :: TermParser HiddenReferenceL
+      M.HiddenReferenceImmRef' <$> fragmentSortP @M.ImmRef @M.ImmRefL "imm_ref"
+    pHiddenReferenceMutRef :: TermParser M.HiddenReferenceL
     pHiddenReferenceMutRef =
-      HiddenReferenceMutRef' <$> pSort @MutRefL "mut_ref"
+      M.HiddenReferenceMutRef' <$> fragmentSortP @M.MutRef @M.MutRefL "mut_ref"
 
-pImmRef :: TermParser ImmRefL
+pImmRef :: TermParser M.ImmRefL
 pImmRef =
-  ImmRef' <$> pSort @AmpersandTokL "&_tok"
+  M.ImmRef' <$> fragmentSortP @M.Token @M.AmpersandTokL "&_tok"
 
-pMutRef :: TermParser MutRefL
+pMutRef :: TermParser M.MutRefL
 pMutRef =
-  MutRef' <$> pSort @AmpersandTokL "&_tok" <*> pSort @MutTokL "mut_tok"
+  M.MutRef' <$> fragmentSortP @M.Token @M.AmpersandTokL "&_tok" <*> fragmentSortP @M.Token @M.MutTokL "mut_tok"
 
-pTupleType :: TermParser TupleTypeL
+pTupleType :: TermParser M.TupleTypeL
 pTupleType =
-  TupleType' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pHiddenType) (pSort @CommaTokL ",_tok"))
+  M.TupleType' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pHiddenType) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pPositionalFields :: TermParser PositionalFieldsL
+pPositionalFields :: TermParser M.PositionalFieldsL
 pPositionalFields =
-  PositionalFields' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pHiddenType) (pSort @CommaTokL ",_tok"))
+  M.PositionalFields' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pHiddenType) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pPostfixAbilityDecls :: TermParser PostfixAbilityDeclsL
+pPostfixAbilityDecls :: TermParser M.PostfixAbilityDeclsL
 pPostfixAbilityDecls =
-  PostfixAbilityDecls' <$> pBetween (pSort @HasTokL "has_tok") (pSort @SemicolonTokL ";_tok") (pSepBy (pSort @AbilityL "ability") (pSort @CommaTokL ",_tok"))
+  M.PostfixAbilityDecls' <$> betweenP (fragmentSortP @M.Token @M.HasTokL "has_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (sepByP (fragmentSortP @M.Ability @M.AbilityL "ability") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pHiddenFunctionItem :: TermParser HiddenFunctionItemL
+pHiddenFunctionItem :: TermParser M.HiddenFunctionItemL
 pHiddenFunctionItem =
-  choice [ Megaparsec.try pHiddenFunctionItemNativeFunctionDefinition
-         , Megaparsec.try pHiddenFunctionItemMacroFunctionDefinition
-         , Megaparsec.try pHiddenFunctionItemFunctionDefinition
-         ]
+  Megaparsec.Cubix.pLongest "_function_item" altsHiddenFunctionItem
+
+altsHiddenFunctionItem :: [TermParser M.HiddenFunctionItemL]
+altsHiddenFunctionItem =
+  [ pHiddenFunctionItemNativeFunctionDefinition
+  , pHiddenFunctionItemMacroFunctionDefinition
+  , pHiddenFunctionItemFunctionDefinition
+  ]
   where
-    pHiddenFunctionItemNativeFunctionDefinition :: TermParser HiddenFunctionItemL
+    pHiddenFunctionItemNativeFunctionDefinition :: TermParser M.HiddenFunctionItemL
     pHiddenFunctionItemNativeFunctionDefinition =
-      HiddenFunctionItemNativeFunctionDefinition' <$> pSort @NativeFunctionDefinitionL "native_function_definition"
-    pHiddenFunctionItemMacroFunctionDefinition :: TermParser HiddenFunctionItemL
+      M.HiddenFunctionItemNativeFunctionDefinition' <$> fragmentSortP @M.NativeFunctionDefinition @M.NativeFunctionDefinitionL "native_function_definition"
+    pHiddenFunctionItemMacroFunctionDefinition :: TermParser M.HiddenFunctionItemL
     pHiddenFunctionItemMacroFunctionDefinition =
-      HiddenFunctionItemMacroFunctionDefinition' <$> pSort @MacroFunctionDefinitionL "macro_function_definition"
-    pHiddenFunctionItemFunctionDefinition :: TermParser HiddenFunctionItemL
+      M.HiddenFunctionItemMacroFunctionDefinition' <$> fragmentSortP @M.MacroFunctionDefinition @M.MacroFunctionDefinitionL "macro_function_definition"
+    pHiddenFunctionItemFunctionDefinition :: TermParser M.HiddenFunctionItemL
     pHiddenFunctionItemFunctionDefinition =
-      HiddenFunctionItemFunctionDefinition' <$> pSort @FunctionDefinitionL "function_definition"
+      M.HiddenFunctionItemFunctionDefinition' <$> fragmentSortP @M.FunctionDefinition @M.FunctionDefinitionL "function_definition"
 
-pFunctionDefinition :: TermParser FunctionDefinitionL
+pFunctionDefinition :: TermParser M.FunctionDefinitionL
 pFunctionDefinition =
-  FunctionDefinition' <$> pHiddenFunctionSignature <*> pSort @BlockL "block"
+  M.FunctionDefinition' <$> pHiddenFunctionSignature <*> fragmentSortP @M.Block @M.BlockL "block"
 
-pHiddenFunctionSignature :: TermParser HiddenFunctionSignatureL
+pHiddenFunctionSignature :: TermParser M.HiddenFunctionSignatureL
 pHiddenFunctionSignature =
-  HiddenFunctionSignature' <$> pMaybe (pSort @ModifierL "modifier") <*> pMaybe (pSort @ModifierL "modifier") <*> pMaybe (pSort @ModifierL "modifier") <*> pSort @FunTokL "fun_tok" <*> pHiddenFunctionIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pMaybe (pSort @RetTypeL "ret_type")
+  M.HiddenFunctionSignature' <$> maybeP (fragmentSortP @M.Modifier @M.ModifierL "modifier") <*> maybeP (fragmentSortP @M.Modifier @M.ModifierL "modifier") <*> maybeP (fragmentSortP @M.Modifier @M.ModifierL "modifier") <*> fragmentSortP @M.Token @M.FunTokL "fun_tok" <*> pHiddenFunctionIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> fragmentSortP @M.FunctionParameters @M.FunctionParametersL "function_parameters" <*> maybeP (fragmentSortP @M.RetType @M.RetTypeL "ret_type")
 
-pHiddenFunctionIdentifier :: TermParser HiddenFunctionIdentifierL
+pHiddenFunctionIdentifier :: TermParser M.HiddenFunctionIdentifierL
 pHiddenFunctionIdentifier =
-  HiddenFunctionIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenFunctionIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pFunctionParameters :: TermParser FunctionParametersL
+pFunctionParameters :: TermParser M.FunctionParametersL
 pFunctionParameters =
-  FunctionParameters' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pFunctionParametersInternal0) (pSort @CommaTokL ",_tok"))
+  M.FunctionParameters' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pFunctionParametersInternal0) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pFunctionParametersInternal0 :: TermParser FunctionParametersInternal0L
+pFunctionParametersInternal0 :: TermParser M.FunctionParametersInternal0L
 pFunctionParametersInternal0 =
-  choice [ Megaparsec.try pFunctionParametersInternal0MutFunctionParameter
-         , Megaparsec.try pFunctionParametersInternal0FunctionParameter
-         ]
+  Megaparsec.Cubix.pLongest "function_parameters_internal0" altsFunctionParametersInternal0
+
+altsFunctionParametersInternal0 :: [TermParser M.FunctionParametersInternal0L]
+altsFunctionParametersInternal0 =
+  [ pFunctionParametersInternal0MutFunctionParameter
+  , pFunctionParametersInternal0FunctionParameter
+  ]
   where
-    pFunctionParametersInternal0MutFunctionParameter :: TermParser FunctionParametersInternal0L
+    pFunctionParametersInternal0MutFunctionParameter :: TermParser M.FunctionParametersInternal0L
     pFunctionParametersInternal0MutFunctionParameter =
-      FunctionParametersInternal0MutFunctionParameter' <$> pSort @MutFunctionParameterL "mut_function_parameter"
-    pFunctionParametersInternal0FunctionParameter :: TermParser FunctionParametersInternal0L
+      M.FunctionParametersInternal0MutFunctionParameter' <$> fragmentSortP @M.MutFunctionParameter @M.MutFunctionParameterL "mut_function_parameter"
+    pFunctionParametersInternal0FunctionParameter :: TermParser M.FunctionParametersInternal0L
     pFunctionParametersInternal0FunctionParameter =
-      FunctionParametersInternal0FunctionParameter' <$> pSort @FunctionParameterL "function_parameter"
+      M.FunctionParametersInternal0FunctionParameter' <$> fragmentSortP @M.FunctionParameter @M.FunctionParameterL "function_parameter"
 
-pFunctionParameter :: TermParser FunctionParameterL
+pFunctionParameter :: TermParser M.FunctionParameterL
 pFunctionParameter =
-  FunctionParameter' <$> pFunctionParameterInternal0 <*> pSort @ColonTokL ":_tok" <*> pHiddenType
+  M.FunctionParameter' <$> pFunctionParameterInternal0 <*> fragmentSortP @M.Token @M.ColonTokL ":_tok" <*> pHiddenType
 
-pFunctionParameterInternal0 :: TermParser FunctionParameterInternal0L
+pFunctionParameterInternal0 :: TermParser M.FunctionParameterInternal0L
 pFunctionParameterInternal0 =
-  choice [ Megaparsec.try pFunctionParameterInternal02
-         , Megaparsec.try pFunctionParameterInternal0Name
-         ]
+  Megaparsec.Cubix.pLongest "function_parameter_internal0" altsFunctionParameterInternal0
+
+altsFunctionParameterInternal0 :: [TermParser M.FunctionParameterInternal0L]
+altsFunctionParameterInternal0 =
+  [ pFunctionParameterInternal02
+  , pFunctionParameterInternal0Name
+  ]
   where
-    pFunctionParameterInternal02 :: TermParser FunctionParameterInternal0L
+    pFunctionParameterInternal02 :: TermParser M.FunctionParameterInternal0L
     pFunctionParameterInternal02 =
-      FunctionParameterInternal02' <$> pSort @DollarSignTokL "$_tok" <*> pHiddenVariableIdentifier
-    pFunctionParameterInternal0Name :: TermParser FunctionParameterInternal0L
+      M.FunctionParameterInternal02' <$> fragmentSortP @M.Token @M.DollarSignTokL "$_tok" <*> pHiddenVariableIdentifier
+    pFunctionParameterInternal0Name :: TermParser M.FunctionParameterInternal0L
     pFunctionParameterInternal0Name =
-      FunctionParameterInternal0Name' <$> pHiddenVariableIdentifier
+      M.FunctionParameterInternal0Name' <$> pHiddenVariableIdentifier
 
-pHiddenVariableIdentifier :: TermParser HiddenVariableIdentifierL
+pHiddenVariableIdentifier :: TermParser M.HiddenVariableIdentifierL
 pHiddenVariableIdentifier =
-  HiddenVariableIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenVariableIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pMutFunctionParameter :: TermParser MutFunctionParameterL
+pMutFunctionParameter :: TermParser M.MutFunctionParameterL
 pMutFunctionParameter =
-  MutFunctionParameter' <$> pSort @MutTokL "mut_tok" <*> pSort @FunctionParameterL "function_parameter"
+  M.MutFunctionParameter' <$> fragmentSortP @M.Token @M.MutTokL "mut_tok" <*> fragmentSortP @M.FunctionParameter @M.FunctionParameterL "function_parameter"
 
-pModifier :: TermParser ModifierL
+pModifier :: TermParser M.ModifierL
 pModifier =
-  choice [ Megaparsec.try pModifier1
-         , Megaparsec.try pModifierEntry
-         , Megaparsec.try pModifierNative
-         ]
+  Megaparsec.Cubix.pLongest "modifier" altsModifier
+
+altsModifier :: [TermParser M.ModifierL]
+altsModifier =
+  [ pModifier1
+  , pModifierEntry
+  , pModifierNative
+  ]
   where
-    pModifier1 :: TermParser ModifierL
+    pModifier1 :: TermParser M.ModifierL
     pModifier1 =
-      Modifier1' <$> pSort @PublicTokL "public_tok" <*> pMaybe (pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pModifierInternal0))
-    pModifierEntry :: TermParser ModifierL
+      M.Modifier1' <$> fragmentSortP @M.Token @M.PublicTokL "public_tok" <*> maybeP (betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (pModifierInternal0))
+    pModifierEntry :: TermParser M.ModifierL
     pModifierEntry =
-      ModifierEntry' <$> pSort @EntryTokL "entry_tok"
-    pModifierNative :: TermParser ModifierL
+      M.ModifierEntry' <$> fragmentSortP @M.Token @M.EntryTokL "entry_tok"
+    pModifierNative :: TermParser M.ModifierL
     pModifierNative =
-      ModifierNative' <$> pSort @NativeTokL "native_tok"
+      M.ModifierNative' <$> fragmentSortP @M.Token @M.NativeTokL "native_tok"
 
-pModifierInternal0 :: TermParser ModifierInternal0L
+pModifierInternal0 :: TermParser M.ModifierInternal0L
 pModifierInternal0 =
-  choice [ Megaparsec.try pModifierInternal0Package
-         , Megaparsec.try pModifierInternal0Friend
-         ]
+  Megaparsec.Cubix.pLongest "modifier_internal0" altsModifierInternal0
+
+altsModifierInternal0 :: [TermParser M.ModifierInternal0L]
+altsModifierInternal0 =
+  [ pModifierInternal0Package
+  , pModifierInternal0Friend
+  ]
   where
-    pModifierInternal0Package :: TermParser ModifierInternal0L
+    pModifierInternal0Package :: TermParser M.ModifierInternal0L
     pModifierInternal0Package =
-      ModifierInternal0Package' <$> pSort @PackageTokL "package_tok"
-    pModifierInternal0Friend :: TermParser ModifierInternal0L
+      M.ModifierInternal0Package' <$> fragmentSortP @M.Token @M.PackageTokL "package_tok"
+    pModifierInternal0Friend :: TermParser M.ModifierInternal0L
     pModifierInternal0Friend =
-      ModifierInternal0Friend' <$> pSort @FriendTokL "friend_tok"
+      M.ModifierInternal0Friend' <$> fragmentSortP @M.Token @M.FriendTokL "friend_tok"
 
-pRetType :: TermParser RetTypeL
+pRetType :: TermParser M.RetTypeL
 pRetType =
-  RetType' <$> pSort @ColonTokL ":_tok" <*> pHiddenType
+  M.RetType' <$> fragmentSortP @M.Token @M.ColonTokL ":_tok" <*> pHiddenType
 
-pBlock :: TermParser BlockL
+pBlock :: TermParser M.BlockL
 pBlock =
-  Block' <$> pSort @LeftCurlyBracketTokL "{_tok" <*> pMany (pSort @UseDeclarationL "use_declaration") <*> pMany (pSort @BlockItemL "block_item") <*> pMaybe (pHiddenExpression) <*> pSort @RightCurlyBracketTokL "}_tok"
+  M.Block' <$> fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok" <*> manyP (fragmentSortP @M.UseDeclaration @M.UseDeclarationL "use_declaration") <*> manyP (fragmentSortP @M.BlockItem @M.BlockItemL "block_item") <*> maybeP (pHiddenExpression) <*> fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok"
 
-pHiddenExpression :: TermParser HiddenExpressionL
+pHiddenExpression :: TermParser M.HiddenExpressionL
 pHiddenExpression =
-  choice [ Megaparsec.try pHiddenExpressionCallExpression
-         , Megaparsec.try pHiddenExpressionMacroCallExpression
-         , Megaparsec.try pHiddenExpressionLambdaExpression
-         , Megaparsec.try pHiddenExpressionIfExpression
-         , Megaparsec.try pHiddenExpressionWhileExpression
-         , Megaparsec.try pHiddenExpressionReturnExpression
-         , Megaparsec.try pHiddenExpressionAbortExpression
-         , Megaparsec.try pHiddenExpressionAssignExpression
-         , Megaparsec.try pHiddenExpressionUnaryExpression
-         , Megaparsec.try pHiddenExpressionBinaryExpression
-         , Megaparsec.try pHiddenExpressionCastExpression
-         , Megaparsec.try pHiddenExpressionQuantifierExpression
-         , Megaparsec.try pHiddenExpressionMatchExpression
-         , Megaparsec.try pHiddenExpressionVectorExpression
-         , Megaparsec.try pHiddenExpressionLoopExpression
-         , Megaparsec.try pHiddenExpressionIdentifiedExpression
-         ]
+  Megaparsec.Cubix.pLongest "_expression" altsHiddenExpression
+
+altsHiddenExpression :: [TermParser M.HiddenExpressionL]
+altsHiddenExpression =
+  [ pHiddenExpressionCallExpression
+  , pHiddenExpressionMacroCallExpression
+  , pHiddenExpressionLambdaExpression
+  , pHiddenExpressionIfExpression
+  , pHiddenExpressionWhileExpression
+  , pHiddenExpressionReturnExpression
+  , pHiddenExpressionAbortExpression
+  , pHiddenExpressionAssignExpression
+  , pHiddenExpressionUnaryExpression
+  , pHiddenExpressionBinaryExpression
+  , pHiddenExpressionCastExpression
+  , pHiddenExpressionQuantifierExpression
+  , pHiddenExpressionMatchExpression
+  , pHiddenExpressionVectorExpression
+  , pHiddenExpressionLoopExpression
+  , pHiddenExpressionIdentifiedExpression
+  ]
   where
-    pHiddenExpressionCallExpression :: TermParser HiddenExpressionL
+    pHiddenExpressionCallExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionCallExpression =
-      HiddenExpressionCallExpression' <$> pSort @CallExpressionL "call_expression"
-    pHiddenExpressionMacroCallExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionCallExpression' <$> fragmentSortP @M.CallExpression @M.CallExpressionL "call_expression"
+    pHiddenExpressionMacroCallExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionMacroCallExpression =
-      HiddenExpressionMacroCallExpression' <$> pSort @MacroCallExpressionL "macro_call_expression"
-    pHiddenExpressionLambdaExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionMacroCallExpression' <$> fragmentSortP @M.MacroCallExpression @M.MacroCallExpressionL "macro_call_expression"
+    pHiddenExpressionLambdaExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionLambdaExpression =
-      HiddenExpressionLambdaExpression' <$> pSort @LambdaExpressionL "lambda_expression"
-    pHiddenExpressionIfExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionLambdaExpression' <$> fragmentSortP @M.LambdaExpression @M.LambdaExpressionL "lambda_expression"
+    pHiddenExpressionIfExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionIfExpression =
-      HiddenExpressionIfExpression' <$> pSort @IfExpressionL "if_expression"
-    pHiddenExpressionWhileExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionIfExpression' <$> fragmentSortP @M.IfExpression @M.IfExpressionL "if_expression"
+    pHiddenExpressionWhileExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionWhileExpression =
-      HiddenExpressionWhileExpression' <$> pSort @WhileExpressionL "while_expression"
-    pHiddenExpressionReturnExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionWhileExpression' <$> fragmentSortP @M.WhileExpression @M.WhileExpressionL "while_expression"
+    pHiddenExpressionReturnExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionReturnExpression =
-      HiddenExpressionReturnExpression' <$> pSort @ReturnExpressionL "return_expression"
-    pHiddenExpressionAbortExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionReturnExpression' <$> fragmentSortP @M.ReturnExpression @M.ReturnExpressionL "return_expression"
+    pHiddenExpressionAbortExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionAbortExpression =
-      HiddenExpressionAbortExpression' <$> pSort @AbortExpressionL "abort_expression"
-    pHiddenExpressionAssignExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionAbortExpression' <$> fragmentSortP @M.AbortExpression @M.AbortExpressionL "abort_expression"
+    pHiddenExpressionAssignExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionAssignExpression =
-      HiddenExpressionAssignExpression' <$> pSort @AssignExpressionL "assign_expression"
-    pHiddenExpressionUnaryExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionAssignExpression' <$> fragmentSortP @M.AssignExpression @M.AssignExpressionL "assign_expression"
+    pHiddenExpressionUnaryExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionUnaryExpression =
-      HiddenExpressionUnaryExpression' <$> pHiddenUnaryExpression
-    pHiddenExpressionBinaryExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionUnaryExpression' <$> pHiddenUnaryExpression
+    pHiddenExpressionBinaryExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionBinaryExpression =
-      HiddenExpressionBinaryExpression' <$> pSort @BinaryExpressionL "binary_expression"
-    pHiddenExpressionCastExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionBinaryExpression' <$> fragmentSortP @M.BinaryExpression @M.BinaryExpressionL "binary_expression"
+    pHiddenExpressionCastExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionCastExpression =
-      HiddenExpressionCastExpression' <$> pSort @CastExpressionL "cast_expression"
-    pHiddenExpressionQuantifierExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionCastExpression' <$> fragmentSortP @M.CastExpression @M.CastExpressionL "cast_expression"
+    pHiddenExpressionQuantifierExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionQuantifierExpression =
-      HiddenExpressionQuantifierExpression' <$> pSort @QuantifierExpressionL "quantifier_expression"
-    pHiddenExpressionMatchExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionQuantifierExpression' <$> fragmentSortP @M.QuantifierExpression @M.QuantifierExpressionL "quantifier_expression"
+    pHiddenExpressionMatchExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionMatchExpression =
-      HiddenExpressionMatchExpression' <$> pSort @MatchExpressionL "match_expression"
-    pHiddenExpressionVectorExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionMatchExpression' <$> fragmentSortP @M.MatchExpression @M.MatchExpressionL "match_expression"
+    pHiddenExpressionVectorExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionVectorExpression =
-      HiddenExpressionVectorExpression' <$> pSort @VectorExpressionL "vector_expression"
-    pHiddenExpressionLoopExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionVectorExpression' <$> fragmentSortP @M.VectorExpression @M.VectorExpressionL "vector_expression"
+    pHiddenExpressionLoopExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionLoopExpression =
-      HiddenExpressionLoopExpression' <$> pSort @LoopExpressionL "loop_expression"
-    pHiddenExpressionIdentifiedExpression :: TermParser HiddenExpressionL
+      M.HiddenExpressionLoopExpression' <$> fragmentSortP @M.LoopExpression @M.LoopExpressionL "loop_expression"
+    pHiddenExpressionIdentifiedExpression :: TermParser M.HiddenExpressionL
     pHiddenExpressionIdentifiedExpression =
-      HiddenExpressionIdentifiedExpression' <$> pSort @IdentifiedExpressionL "identified_expression"
+      M.HiddenExpressionIdentifiedExpression' <$> fragmentSortP @M.IdentifiedExpression @M.IdentifiedExpressionL "identified_expression"
 
-pHiddenUnaryExpression :: TermParser HiddenUnaryExpressionL
+pHiddenUnaryExpression :: TermParser M.HiddenUnaryExpressionL
 pHiddenUnaryExpression =
-  HiddenUnaryExpression' <$> pHiddenUnaryExpressionInternal0
+  M.HiddenUnaryExpression' <$> pHiddenUnaryExpressionInternal0
 
-pHiddenUnaryExpressionInternal0 :: TermParser HiddenUnaryExpressionInternal0L
+pHiddenUnaryExpressionInternal0 :: TermParser M.HiddenUnaryExpressionInternal0L
 pHiddenUnaryExpressionInternal0 =
-  choice [ Megaparsec.try pHiddenUnaryExpressionInternal0UnaryExpression
-         , Megaparsec.try pHiddenUnaryExpressionInternal0BorrowExpression
-         , Megaparsec.try pHiddenUnaryExpressionInternal0DereferenceExpression
-         , Megaparsec.try pHiddenUnaryExpressionInternal0MoveOrCopyExpression
-         , Megaparsec.try pHiddenUnaryExpressionInternal0ExpressionTerm
-         ]
+  Megaparsec.Cubix.pLongest "_unary_expression_internal0" altsHiddenUnaryExpressionInternal0
+
+altsHiddenUnaryExpressionInternal0 :: [TermParser M.HiddenUnaryExpressionInternal0L]
+altsHiddenUnaryExpressionInternal0 =
+  [ pHiddenUnaryExpressionInternal0UnaryExpression
+  , pHiddenUnaryExpressionInternal0BorrowExpression
+  , pHiddenUnaryExpressionInternal0DereferenceExpression
+  , pHiddenUnaryExpressionInternal0MoveOrCopyExpression
+  , pHiddenUnaryExpressionInternal0ExpressionTerm
+  ]
   where
-    pHiddenUnaryExpressionInternal0UnaryExpression :: TermParser HiddenUnaryExpressionInternal0L
+    pHiddenUnaryExpressionInternal0UnaryExpression :: TermParser M.HiddenUnaryExpressionInternal0L
     pHiddenUnaryExpressionInternal0UnaryExpression =
-      HiddenUnaryExpressionInternal0UnaryExpression' <$> pSort @UnaryExpressionL "unary_expression"
-    pHiddenUnaryExpressionInternal0BorrowExpression :: TermParser HiddenUnaryExpressionInternal0L
+      M.HiddenUnaryExpressionInternal0UnaryExpression' <$> fragmentSortP @M.UnaryExpression @M.UnaryExpressionL "unary_expression"
+    pHiddenUnaryExpressionInternal0BorrowExpression :: TermParser M.HiddenUnaryExpressionInternal0L
     pHiddenUnaryExpressionInternal0BorrowExpression =
-      HiddenUnaryExpressionInternal0BorrowExpression' <$> pSort @BorrowExpressionL "borrow_expression"
-    pHiddenUnaryExpressionInternal0DereferenceExpression :: TermParser HiddenUnaryExpressionInternal0L
+      M.HiddenUnaryExpressionInternal0BorrowExpression' <$> fragmentSortP @M.BorrowExpression @M.BorrowExpressionL "borrow_expression"
+    pHiddenUnaryExpressionInternal0DereferenceExpression :: TermParser M.HiddenUnaryExpressionInternal0L
     pHiddenUnaryExpressionInternal0DereferenceExpression =
-      HiddenUnaryExpressionInternal0DereferenceExpression' <$> pSort @DereferenceExpressionL "dereference_expression"
-    pHiddenUnaryExpressionInternal0MoveOrCopyExpression :: TermParser HiddenUnaryExpressionInternal0L
+      M.HiddenUnaryExpressionInternal0DereferenceExpression' <$> fragmentSortP @M.DereferenceExpression @M.DereferenceExpressionL "dereference_expression"
+    pHiddenUnaryExpressionInternal0MoveOrCopyExpression :: TermParser M.HiddenUnaryExpressionInternal0L
     pHiddenUnaryExpressionInternal0MoveOrCopyExpression =
-      HiddenUnaryExpressionInternal0MoveOrCopyExpression' <$> pSort @MoveOrCopyExpressionL "move_or_copy_expression"
-    pHiddenUnaryExpressionInternal0ExpressionTerm :: TermParser HiddenUnaryExpressionInternal0L
+      M.HiddenUnaryExpressionInternal0MoveOrCopyExpression' <$> fragmentSortP @M.MoveOrCopyExpression @M.MoveOrCopyExpressionL "move_or_copy_expression"
+    pHiddenUnaryExpressionInternal0ExpressionTerm :: TermParser M.HiddenUnaryExpressionInternal0L
     pHiddenUnaryExpressionInternal0ExpressionTerm =
-      HiddenUnaryExpressionInternal0ExpressionTerm' <$> pHiddenExpressionTerm
+      M.HiddenUnaryExpressionInternal0ExpressionTerm' <$> pHiddenExpressionTerm
 
-pHiddenExpressionTerm :: TermParser HiddenExpressionTermL
+pHiddenExpressionTerm :: TermParser M.HiddenExpressionTermL
 pHiddenExpressionTerm =
-  choice [ Megaparsec.try pHiddenExpressionTermCallExpression
-         , Megaparsec.try pHiddenExpressionTermBreakExpression
-         , Megaparsec.try pHiddenExpressionTermContinueExpression
-         , Megaparsec.try pHiddenExpressionTermNameExpression
-         , Megaparsec.try pHiddenExpressionTermMacroCallExpression
-         , Megaparsec.try pHiddenExpressionTermPackExpression
-         , Megaparsec.try pHiddenExpressionTermLiteralValue
-         , Megaparsec.try pHiddenExpressionTermUnitExpression
-         , Megaparsec.try pHiddenExpressionTermExpressionList
-         , Megaparsec.try pHiddenExpressionTermAnnotationExpression
-         , Megaparsec.try pHiddenExpressionTermBlock
-         , Megaparsec.try pHiddenExpressionTermSpecBlock
-         , Megaparsec.try pHiddenExpressionTermIfExpression
-         , Megaparsec.try pHiddenExpressionTermDotExpression
-         , Megaparsec.try pHiddenExpressionTermIndexExpression
-         , Megaparsec.try pHiddenExpressionTermVectorExpression
-         , Megaparsec.try pHiddenExpressionTermMatchExpression
-         ]
+  Megaparsec.Cubix.pLongest "_expression_term" altsHiddenExpressionTerm
+
+altsHiddenExpressionTerm :: [TermParser M.HiddenExpressionTermL]
+altsHiddenExpressionTerm =
+  [ pHiddenExpressionTermCallExpression
+  , pHiddenExpressionTermBreakExpression
+  , pHiddenExpressionTermContinueExpression
+  , pHiddenExpressionTermNameExpression
+  , pHiddenExpressionTermMacroCallExpression
+  , pHiddenExpressionTermPackExpression
+  , pHiddenExpressionTermLiteralValue
+  , pHiddenExpressionTermUnitExpression
+  , pHiddenExpressionTermExpressionList
+  , pHiddenExpressionTermAnnotationExpression
+  , pHiddenExpressionTermBlock
+  , pHiddenExpressionTermSpecBlock
+  , pHiddenExpressionTermIfExpression
+  , pHiddenExpressionTermDotExpression
+  , pHiddenExpressionTermIndexExpression
+  , pHiddenExpressionTermVectorExpression
+  , pHiddenExpressionTermMatchExpression
+  ]
   where
-    pHiddenExpressionTermCallExpression :: TermParser HiddenExpressionTermL
+    pHiddenExpressionTermCallExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermCallExpression =
-      HiddenExpressionTermCallExpression' <$> pSort @CallExpressionL "call_expression"
-    pHiddenExpressionTermBreakExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermCallExpression' <$> fragmentSortP @M.CallExpression @M.CallExpressionL "call_expression"
+    pHiddenExpressionTermBreakExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermBreakExpression =
-      HiddenExpressionTermBreakExpression' <$> pSort @BreakExpressionL "break_expression"
-    pHiddenExpressionTermContinueExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermBreakExpression' <$> fragmentSortP @M.BreakExpression @M.BreakExpressionL "break_expression"
+    pHiddenExpressionTermContinueExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermContinueExpression =
-      HiddenExpressionTermContinueExpression' <$> pSort @ContinueExpressionL "continue_expression"
-    pHiddenExpressionTermNameExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermContinueExpression' <$> fragmentSortP @M.ContinueExpression @M.ContinueExpressionL "continue_expression"
+    pHiddenExpressionTermNameExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermNameExpression =
-      HiddenExpressionTermNameExpression' <$> pSort @NameExpressionL "name_expression"
-    pHiddenExpressionTermMacroCallExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermNameExpression' <$> fragmentSortP @M.NameExpression @M.NameExpressionL "name_expression"
+    pHiddenExpressionTermMacroCallExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermMacroCallExpression =
-      HiddenExpressionTermMacroCallExpression' <$> pSort @MacroCallExpressionL "macro_call_expression"
-    pHiddenExpressionTermPackExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermMacroCallExpression' <$> fragmentSortP @M.MacroCallExpression @M.MacroCallExpressionL "macro_call_expression"
+    pHiddenExpressionTermPackExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermPackExpression =
-      HiddenExpressionTermPackExpression' <$> pSort @PackExpressionL "pack_expression"
-    pHiddenExpressionTermLiteralValue :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermPackExpression' <$> fragmentSortP @M.PackExpression @M.PackExpressionL "pack_expression"
+    pHiddenExpressionTermLiteralValue :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermLiteralValue =
-      HiddenExpressionTermLiteralValue' <$> pHiddenLiteralValue
-    pHiddenExpressionTermUnitExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermLiteralValue' <$> pHiddenLiteralValue
+    pHiddenExpressionTermUnitExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermUnitExpression =
-      HiddenExpressionTermUnitExpression' <$> pSort @UnitExpressionL "unit_expression"
-    pHiddenExpressionTermExpressionList :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermUnitExpression' <$> fragmentSortP @M.UnitExpression @M.UnitExpressionL "unit_expression"
+    pHiddenExpressionTermExpressionList :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermExpressionList =
-      HiddenExpressionTermExpressionList' <$> pSort @ExpressionListL "expression_list"
-    pHiddenExpressionTermAnnotationExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermExpressionList' <$> fragmentSortP @M.ExpressionList @M.ExpressionListL "expression_list"
+    pHiddenExpressionTermAnnotationExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermAnnotationExpression =
-      HiddenExpressionTermAnnotationExpression' <$> pSort @AnnotationExpressionL "annotation_expression"
-    pHiddenExpressionTermBlock :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermAnnotationExpression' <$> fragmentSortP @M.AnnotationExpression @M.AnnotationExpressionL "annotation_expression"
+    pHiddenExpressionTermBlock :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermBlock =
-      HiddenExpressionTermBlock' <$> pSort @BlockL "block"
-    pHiddenExpressionTermSpecBlock :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermBlock' <$> fragmentSortP @M.Block @M.BlockL "block"
+    pHiddenExpressionTermSpecBlock :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermSpecBlock =
-      HiddenExpressionTermSpecBlock' <$> pSort @SpecBlockL "spec_block"
-    pHiddenExpressionTermIfExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermSpecBlock' <$> fragmentSortP @M.SpecBlock @M.SpecBlockL "spec_block"
+    pHiddenExpressionTermIfExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermIfExpression =
-      HiddenExpressionTermIfExpression' <$> pSort @IfExpressionL "if_expression"
-    pHiddenExpressionTermDotExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermIfExpression' <$> fragmentSortP @M.IfExpression @M.IfExpressionL "if_expression"
+    pHiddenExpressionTermDotExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermDotExpression =
-      HiddenExpressionTermDotExpression' <$> pSort @DotExpressionL "dot_expression"
-    pHiddenExpressionTermIndexExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermDotExpression' <$> fragmentSortP @M.DotExpression @M.DotExpressionL "dot_expression"
+    pHiddenExpressionTermIndexExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermIndexExpression =
-      HiddenExpressionTermIndexExpression' <$> pSort @IndexExpressionL "index_expression"
-    pHiddenExpressionTermVectorExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermIndexExpression' <$> fragmentSortP @M.IndexExpression @M.IndexExpressionL "index_expression"
+    pHiddenExpressionTermVectorExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermVectorExpression =
-      HiddenExpressionTermVectorExpression' <$> pSort @VectorExpressionL "vector_expression"
-    pHiddenExpressionTermMatchExpression :: TermParser HiddenExpressionTermL
+      M.HiddenExpressionTermVectorExpression' <$> fragmentSortP @M.VectorExpression @M.VectorExpressionL "vector_expression"
+    pHiddenExpressionTermMatchExpression :: TermParser M.HiddenExpressionTermL
     pHiddenExpressionTermMatchExpression =
-      HiddenExpressionTermMatchExpression' <$> pSort @MatchExpressionL "match_expression"
+      M.HiddenExpressionTermMatchExpression' <$> fragmentSortP @M.MatchExpression @M.MatchExpressionL "match_expression"
 
-pHiddenLiteralValue :: TermParser HiddenLiteralValueL
+pHiddenLiteralValue :: TermParser M.HiddenLiteralValueL
 pHiddenLiteralValue =
-  choice [ Megaparsec.try pHiddenLiteralValueAddressLiteral
-         , Megaparsec.try pHiddenLiteralValueBoolLiteral
-         , Megaparsec.try pHiddenLiteralValueNumLiteral
-         , Megaparsec.try pHiddenLiteralValueHexStringLiteral
-         , Megaparsec.try pHiddenLiteralValueByteStringLiteral
-         , Megaparsec.try pHiddenLiteralValueStringLiteral
-         ]
+  Megaparsec.Cubix.pLongest "_literal_value" altsHiddenLiteralValue
+
+altsHiddenLiteralValue :: [TermParser M.HiddenLiteralValueL]
+altsHiddenLiteralValue =
+  [ pHiddenLiteralValueAddressLiteral
+  , pHiddenLiteralValueBoolLiteral
+  , pHiddenLiteralValueNumLiteral
+  , pHiddenLiteralValueHexStringLiteral
+  , pHiddenLiteralValueByteStringLiteral
+  , pHiddenLiteralValueStringLiteral
+  ]
   where
-    pHiddenLiteralValueAddressLiteral :: TermParser HiddenLiteralValueL
+    pHiddenLiteralValueAddressLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueAddressLiteral =
-      HiddenLiteralValueAddressLiteral' <$> pSort @AddressLiteralL "address_literal"
-    pHiddenLiteralValueBoolLiteral :: TermParser HiddenLiteralValueL
+      M.HiddenLiteralValueAddressLiteral' <$> fragmentSortP @M.AddressLiteral @M.AddressLiteralL "address_literal"
+    pHiddenLiteralValueBoolLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueBoolLiteral =
-      HiddenLiteralValueBoolLiteral' <$> pSort @BoolLiteralL "bool_literal"
-    pHiddenLiteralValueNumLiteral :: TermParser HiddenLiteralValueL
+      M.HiddenLiteralValueBoolLiteral' <$> fragmentSortP @M.BoolLiteral @M.BoolLiteralL "bool_literal"
+    pHiddenLiteralValueNumLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueNumLiteral =
-      HiddenLiteralValueNumLiteral' <$> pSort @NumLiteralL "num_literal"
-    pHiddenLiteralValueHexStringLiteral :: TermParser HiddenLiteralValueL
+      M.HiddenLiteralValueNumLiteral' <$> fragmentSortP @M.NumLiteral @M.NumLiteralL "num_literal"
+    pHiddenLiteralValueHexStringLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueHexStringLiteral =
-      HiddenLiteralValueHexStringLiteral' <$> pSort @HexStringLiteralL "hex_string_literal"
-    pHiddenLiteralValueByteStringLiteral :: TermParser HiddenLiteralValueL
+      M.HiddenLiteralValueHexStringLiteral' <$> fragmentSortP @M.HexStringLiteral @M.HexStringLiteralL "hex_string_literal"
+    pHiddenLiteralValueByteStringLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueByteStringLiteral =
-      HiddenLiteralValueByteStringLiteral' <$> pSort @ByteStringLiteralL "byte_string_literal"
-    pHiddenLiteralValueStringLiteral :: TermParser HiddenLiteralValueL
+      M.HiddenLiteralValueByteStringLiteral' <$> fragmentSortP @M.ByteStringLiteral @M.ByteStringLiteralL "byte_string_literal"
+    pHiddenLiteralValueStringLiteral :: TermParser M.HiddenLiteralValueL
     pHiddenLiteralValueStringLiteral =
-      HiddenLiteralValueStringLiteral' <$> pSort @StringLiteralL "string_literal"
+      M.HiddenLiteralValueStringLiteral' <$> fragmentSortP @M.StringLiteral @M.StringLiteralL "string_literal"
 
-pAddressLiteral :: TermParser AddressLiteralL
+pAddressLiteral :: TermParser M.AddressLiteralL
 pAddressLiteral =
-  AddressLiteral' <$> pContent
+  M.AddressLiteral' <$> contentP
 
-pBoolLiteral :: TermParser BoolLiteralL
+pBoolLiteral :: TermParser M.BoolLiteralL
 pBoolLiteral =
-  choice [ Megaparsec.try pBoolLiteralTrue
-         , Megaparsec.try pBoolLiteralFalse
-         ]
+  Megaparsec.Cubix.pLongest "bool_literal" altsBoolLiteral
+
+altsBoolLiteral :: [TermParser M.BoolLiteralL]
+altsBoolLiteral =
+  [ pBoolLiteralTrue
+  , pBoolLiteralFalse
+  ]
   where
-    pBoolLiteralTrue :: TermParser BoolLiteralL
+    pBoolLiteralTrue :: TermParser M.BoolLiteralL
     pBoolLiteralTrue =
-      BoolLiteralTrue' <$> pSort @TrueTokL "true_tok"
-    pBoolLiteralFalse :: TermParser BoolLiteralL
+      M.BoolLiteralTrue' <$> fragmentSortP @M.Token @M.TrueTokL "true_tok"
+    pBoolLiteralFalse :: TermParser M.BoolLiteralL
     pBoolLiteralFalse =
-      BoolLiteralFalse' <$> pSort @FalseTokL "false_tok"
+      M.BoolLiteralFalse' <$> fragmentSortP @M.Token @M.FalseTokL "false_tok"
 
-pByteStringLiteral :: TermParser ByteStringLiteralL
+pByteStringLiteral :: TermParser M.ByteStringLiteralL
 pByteStringLiteral =
-  ByteStringLiteral' <$> pContent
+  M.ByteStringLiteral' <$> contentP
 
-pHexStringLiteral :: TermParser HexStringLiteralL
+pHexStringLiteral :: TermParser M.HexStringLiteralL
 pHexStringLiteral =
-  HexStringLiteral' <$> pContent
+  M.HexStringLiteral' <$> contentP
 
-pStringLiteral :: TermParser StringLiteralL
+pStringLiteral :: TermParser M.StringLiteralL
 pStringLiteral =
-  StringLiteral' <$> pContent
+  M.StringLiteral' <$> contentP
 
-pAnnotationExpression :: TermParser AnnotationExpressionL
+pAnnotationExpression :: TermParser M.AnnotationExpressionL
 pAnnotationExpression =
-  AnnotationExpression' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @ColonTokL ":_tok") (pHiddenExpression) <*> pHiddenType <*> pSort @RightParenthesisTokL ")_tok"
+  M.AnnotationExpression' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.ColonTokL ":_tok") (pHiddenExpression) <*> pHiddenType <*> fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok"
 
-pBreakExpression :: TermParser BreakExpressionL
+pBreakExpression :: TermParser M.BreakExpressionL
 pBreakExpression =
-  BreakExpression' <$> pSort @BreakTokL "break_tok" <*> pMaybe (pSort @LabelL "label") <*> pMaybe (pHiddenExpression)
+  M.BreakExpression' <$> fragmentSortP @M.Token @M.BreakTokL "break_tok" <*> maybeP (fragmentSortP @M.Label @M.LabelL "label") <*> maybeP (pHiddenExpression)
 
-pLabel :: TermParser LabelL
+pLabel :: TermParser M.LabelL
 pLabel =
-  Label' <$> pSort @ApostropheTokL "'_tok" <*> pSort @IdentifierL "identifier"
+  M.Label' <$> fragmentSortP @M.Token @M.ApostropheTokL "'_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pCallExpression :: TermParser CallExpressionL
+pCallExpression :: TermParser M.CallExpressionL
 pCallExpression =
-  CallExpression' <$> pPair (pSort @NameExpressionL "name_expression") (pSort @ArgListL "arg_list")
+  M.CallExpression' <$> pairP (fragmentSortP @M.NameExpression @M.NameExpressionL "name_expression") (fragmentSortP @M.ArgList @M.ArgListL "arg_list")
 
-pArgList :: TermParser ArgListL
+pArgList :: TermParser M.ArgListL
 pArgList =
-  ArgList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pHiddenExpression) (pSort @CommaTokL ",_tok"))
+  M.ArgList' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pHiddenExpression) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pNameExpression :: TermParser NameExpressionL
+pNameExpression :: TermParser M.NameExpressionL
 pNameExpression =
-  NameExpression' <$> pMaybe (pSort @ColonColonTokL "::_tok") <*> pSort @ModuleAccessL "module_access"
+  M.NameExpression' <$> maybeP (fragmentSortP @M.Token @M.ColonColonTokL "::_tok") <*> fragmentSortP @M.ModuleAccess @M.ModuleAccessL "module_access"
 
-pContinueExpression :: TermParser ContinueExpressionL
+pContinueExpression :: TermParser M.ContinueExpressionL
 pContinueExpression =
-  ContinueExpression' <$> pSort @ContinueTokL "continue_tok" <*> pMaybe (pSort @LabelL "label")
+  M.ContinueExpression' <$> fragmentSortP @M.Token @M.ContinueTokL "continue_tok" <*> maybeP (fragmentSortP @M.Label @M.LabelL "label")
 
-pDotExpression :: TermParser DotExpressionL
+pDotExpression :: TermParser M.DotExpressionL
 pDotExpression =
-  DotExpression' <$> pPair (pPair (pHiddenExpressionTerm) (pSort @FullStopTokL "._tok")) (pHiddenExpressionTerm)
+  M.DotExpression' <$> pairP (pairP (pHiddenExpressionTerm) (fragmentSortP @M.Token @M.FullStopTokL "._tok")) (pHiddenExpressionTerm)
 
-pExpressionList :: TermParser ExpressionListL
+pExpressionList :: TermParser M.ExpressionListL
 pExpressionList =
-  ExpressionList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy1 (pHiddenExpression) (pSort @CommaTokL ",_tok"))
+  M.ExpressionList' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepBy1P (pHiddenExpression) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pIfExpression :: TermParser IfExpressionL
+pIfExpression :: TermParser M.IfExpressionL
 pIfExpression =
-  IfExpression' <$> pPair (pPair (pPair (pSort @IfTokL "if_tok") (pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pHiddenExpression))) (pHiddenExpression)) (pMaybe (pPair (pSort @ElseTokL "else_tok") (pHiddenExpression)))
+  M.IfExpression' <$> pairP (pairP (pairP (fragmentSortP @M.Token @M.IfTokL "if_tok") (betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (pHiddenExpression))) (pHiddenExpression)) (maybeP (pairP (fragmentSortP @M.Token @M.ElseTokL "else_tok") (pHiddenExpression)))
 
-pIndexExpression :: TermParser IndexExpressionL
+pIndexExpression :: TermParser M.IndexExpressionL
 pIndexExpression =
-  IndexExpression' <$> pPair (pHiddenExpressionTerm) (pBetween (pSort @LeftSquareBracketTokL "[_tok") (pSort @RightSquareBracketTokL "]_tok") (pSepBy (pHiddenExpression) (pSort @CommaTokL ",_tok")))
+  M.IndexExpression' <$> pairP (pHiddenExpressionTerm) (betweenP (fragmentSortP @M.Token @M.LeftSquareBracketTokL "[_tok") (fragmentSortP @M.Token @M.RightSquareBracketTokL "]_tok") (sepByP (pHiddenExpression) (fragmentSortP @M.Token @M.CommaTokL ",_tok")))
 
-pMacroCallExpression :: TermParser MacroCallExpressionL
+pMacroCallExpression :: TermParser M.MacroCallExpressionL
 pMacroCallExpression =
-  MacroCallExpression' <$> pSort @MacroModuleAccessL "macro_module_access" <*> pMaybe (pSort @TypeArgumentsL "type_arguments") <*> pSort @ArgListL "arg_list"
+  M.MacroCallExpression' <$> fragmentSortP @M.MacroModuleAccess @M.MacroModuleAccessL "macro_module_access" <*> maybeP (fragmentSortP @M.TypeArguments @M.TypeArgumentsL "type_arguments") <*> fragmentSortP @M.ArgList @M.ArgListL "arg_list"
 
-pMacroModuleAccess :: TermParser MacroModuleAccessL
+pMacroModuleAccess :: TermParser M.MacroModuleAccessL
 pMacroModuleAccess =
-  MacroModuleAccess' <$> pSort @ModuleAccessL "module_access" <*> pSort @ExclamationMarkTokL "!_tok"
+  M.MacroModuleAccess' <$> fragmentSortP @M.ModuleAccess @M.ModuleAccessL "module_access" <*> fragmentSortP @M.Token @M.ExclamationMarkTokL "!_tok"
 
-pMatchExpression :: TermParser MatchExpressionL
+pMatchExpression :: TermParser M.MatchExpressionL
 pMatchExpression =
-  MatchExpression' <$> pSort @MatchTokL "match_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pHiddenExpression) <*> pHiddenMatchBody
+  M.MatchExpression' <$> fragmentSortP @M.Token @M.MatchTokL "match_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (pHiddenExpression) <*> pHiddenMatchBody
 
-pHiddenMatchBody :: TermParser HiddenMatchBodyL
+pHiddenMatchBody :: TermParser M.HiddenMatchBodyL
 pHiddenMatchBody =
-  HiddenMatchBody' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @MatchArmL "match_arm") (pSort @CommaTokL ",_tok"))
+  M.HiddenMatchBody' <$> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepByP (fragmentSortP @M.MatchArm @M.MatchArmL "match_arm") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pMatchArm :: TermParser MatchArmL
+pMatchArm :: TermParser M.MatchArmL
 pMatchArm =
-  MatchArm' <$> pSort @BindListL "bind_list" <*> pMaybe (pSort @MatchConditionL "match_condition") <*> pSort @EqualsSignGreaterThanSignTokL "=>_tok" <*> pHiddenExpression
+  M.MatchArm' <$> fragmentSortP @M.BindList @M.BindListL "bind_list" <*> maybeP (fragmentSortP @M.MatchCondition @M.MatchConditionL "match_condition") <*> fragmentSortP @M.Token @M.EqualsSignGreaterThanSignTokL "=>_tok" <*> pHiddenExpression
 
-pBindList :: TermParser BindListL
+pBindList :: TermParser M.BindListL
 pBindList =
-  choice [ Megaparsec.try pBindListBind
-         , Megaparsec.try pBindListCommaBindList
-         , Megaparsec.try pBindListOrBindList
-         ]
+  Megaparsec.Cubix.pLongest "bind_list" altsBindList
+
+altsBindList :: [TermParser M.BindListL]
+altsBindList =
+  [ pBindListBind
+  , pBindListCommaBindList
+  , pBindListOrBindList
+  ]
   where
-    pBindListBind :: TermParser BindListL
+    pBindListBind :: TermParser M.BindListL
     pBindListBind =
-      BindListBind' <$> pHiddenBind
-    pBindListCommaBindList :: TermParser BindListL
+      M.BindListBind' <$> pHiddenBind
+    pBindListCommaBindList :: TermParser M.BindListL
     pBindListCommaBindList =
-      BindListCommaBindList' <$> pSort @CommaBindListL "comma_bind_list"
-    pBindListOrBindList :: TermParser BindListL
+      M.BindListCommaBindList' <$> fragmentSortP @M.CommaBindList @M.CommaBindListL "comma_bind_list"
+    pBindListOrBindList :: TermParser M.BindListL
     pBindListOrBindList =
-      BindListOrBindList' <$> pSort @OrBindListL "or_bind_list"
+      M.BindListOrBindList' <$> fragmentSortP @M.OrBindList @M.OrBindListL "or_bind_list"
 
-pHiddenBind :: TermParser HiddenBindL
+pHiddenBind :: TermParser M.HiddenBindL
 pHiddenBind =
-  choice [ Megaparsec.try pHiddenBindBindInternal0
-         , Megaparsec.try pHiddenBindBindUnpack
-         , Megaparsec.try pHiddenBindAtBind
-         , Megaparsec.try pHiddenBindLiteralValue
-         ]
+  Megaparsec.Cubix.pLongest "_bind" altsHiddenBind
+
+altsHiddenBind :: [TermParser M.HiddenBindL]
+altsHiddenBind =
+  [ pHiddenBindBindInternal0
+  , pHiddenBindBindUnpack
+  , pHiddenBindAtBind
+  , pHiddenBindLiteralValue
+  ]
   where
-    pHiddenBindBindInternal0 :: TermParser HiddenBindL
+    pHiddenBindBindInternal0 :: TermParser M.HiddenBindL
     pHiddenBindBindInternal0 =
-      HiddenBindBindInternal0' <$> pHiddenBindInternal0
-    pHiddenBindBindUnpack :: TermParser HiddenBindL
+      M.HiddenBindBindInternal0' <$> pHiddenBindInternal0
+    pHiddenBindBindUnpack :: TermParser M.HiddenBindL
     pHiddenBindBindUnpack =
-      HiddenBindBindUnpack' <$> pSort @BindUnpackL "bind_unpack"
-    pHiddenBindAtBind :: TermParser HiddenBindL
+      M.HiddenBindBindUnpack' <$> fragmentSortP @M.BindUnpack @M.BindUnpackL "bind_unpack"
+    pHiddenBindAtBind :: TermParser M.HiddenBindL
     pHiddenBindAtBind =
-      HiddenBindAtBind' <$> pSort @AtBindL "at_bind"
-    pHiddenBindLiteralValue :: TermParser HiddenBindL
+      M.HiddenBindAtBind' <$> fragmentSortP @M.AtBind @M.AtBindL "at_bind"
+    pHiddenBindLiteralValue :: TermParser M.HiddenBindL
     pHiddenBindLiteralValue =
-      HiddenBindLiteralValue' <$> pHiddenLiteralValue
+      M.HiddenBindLiteralValue' <$> pHiddenLiteralValue
 
-pHiddenBindInternal0 :: TermParser HiddenBindInternal0L
+pHiddenBindInternal0 :: TermParser M.HiddenBindInternal0L
 pHiddenBindInternal0 =
-  choice [ Megaparsec.try pHiddenBindInternal0MutBindVar
-         , Megaparsec.try pHiddenBindInternal0VariableIdentifier
-         ]
+  Megaparsec.Cubix.pLongest "_bind_internal0" altsHiddenBindInternal0
+
+altsHiddenBindInternal0 :: [TermParser M.HiddenBindInternal0L]
+altsHiddenBindInternal0 =
+  [ pHiddenBindInternal0MutBindVar
+  , pHiddenBindInternal0VariableIdentifier
+  ]
   where
-    pHiddenBindInternal0MutBindVar :: TermParser HiddenBindInternal0L
+    pHiddenBindInternal0MutBindVar :: TermParser M.HiddenBindInternal0L
     pHiddenBindInternal0MutBindVar =
-      HiddenBindInternal0MutBindVar' <$> pSort @MutBindVarL "mut_bind_var"
-    pHiddenBindInternal0VariableIdentifier :: TermParser HiddenBindInternal0L
+      M.HiddenBindInternal0MutBindVar' <$> fragmentSortP @M.MutBindVar @M.MutBindVarL "mut_bind_var"
+    pHiddenBindInternal0VariableIdentifier :: TermParser M.HiddenBindInternal0L
     pHiddenBindInternal0VariableIdentifier =
-      HiddenBindInternal0VariableIdentifier' <$> pHiddenVariableIdentifier
+      M.HiddenBindInternal0VariableIdentifier' <$> pHiddenVariableIdentifier
 
-pMutBindVar :: TermParser MutBindVarL
+pMutBindVar :: TermParser M.MutBindVarL
 pMutBindVar =
-  MutBindVar' <$> pSort @MutTokL "mut_tok" <*> pHiddenVariableIdentifier
+  M.MutBindVar' <$> fragmentSortP @M.Token @M.MutTokL "mut_tok" <*> pHiddenVariableIdentifier
 
-pAtBind :: TermParser AtBindL
+pAtBind :: TermParser M.AtBindL
 pAtBind =
-  AtBind' <$> pHiddenVariableIdentifier <*> pSort @CommercialAtTokL "@_tok" <*> pSort @BindListL "bind_list"
+  M.AtBind' <$> pHiddenVariableIdentifier <*> fragmentSortP @M.Token @M.CommercialAtTokL "@_tok" <*> fragmentSortP @M.BindList @M.BindListL "bind_list"
 
-pBindUnpack :: TermParser BindUnpackL
+pBindUnpack :: TermParser M.BindUnpackL
 pBindUnpack =
-  BindUnpack' <$> pSort @NameExpressionL "name_expression" <*> pMaybe (pSort @BindFieldsL "bind_fields")
+  M.BindUnpack' <$> fragmentSortP @M.NameExpression @M.NameExpressionL "name_expression" <*> maybeP (fragmentSortP @M.BindFields @M.BindFieldsL "bind_fields")
 
-pBindFields :: TermParser BindFieldsL
+pBindFields :: TermParser M.BindFieldsL
 pBindFields =
-  choice [ Megaparsec.try pBindFieldsBindPositionalFields
-         , Megaparsec.try pBindFieldsBindNamedFields
-         ]
+  Megaparsec.Cubix.pLongest "bind_fields" altsBindFields
+
+altsBindFields :: [TermParser M.BindFieldsL]
+altsBindFields =
+  [ pBindFieldsBindPositionalFields
+  , pBindFieldsBindNamedFields
+  ]
   where
-    pBindFieldsBindPositionalFields :: TermParser BindFieldsL
+    pBindFieldsBindPositionalFields :: TermParser M.BindFieldsL
     pBindFieldsBindPositionalFields =
-      BindFieldsBindPositionalFields' <$> pSort @BindPositionalFieldsL "bind_positional_fields"
-    pBindFieldsBindNamedFields :: TermParser BindFieldsL
+      M.BindFieldsBindPositionalFields' <$> fragmentSortP @M.BindPositionalFields @M.BindPositionalFieldsL "bind_positional_fields"
+    pBindFieldsBindNamedFields :: TermParser M.BindFieldsL
     pBindFieldsBindNamedFields =
-      BindFieldsBindNamedFields' <$> pSort @BindNamedFieldsL "bind_named_fields"
+      M.BindFieldsBindNamedFields' <$> fragmentSortP @M.BindNamedFields @M.BindNamedFieldsL "bind_named_fields"
 
-pBindNamedFields :: TermParser BindNamedFieldsL
+pBindNamedFields :: TermParser M.BindNamedFieldsL
 pBindNamedFields =
-  BindNamedFields' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pBindNamedFieldsInternal0) (pSort @CommaTokL ",_tok"))
+  M.BindNamedFields' <$> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepByP (pBindNamedFieldsInternal0) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pBindNamedFieldsInternal0 :: TermParser BindNamedFieldsInternal0L
+pBindNamedFieldsInternal0 :: TermParser M.BindNamedFieldsInternal0L
 pBindNamedFieldsInternal0 =
-  choice [ Megaparsec.try pBindNamedFieldsInternal0BindField
-         , Megaparsec.try pBindNamedFieldsInternal0MutBindField
-         ]
+  Megaparsec.Cubix.pLongest "bind_named_fields_internal0" altsBindNamedFieldsInternal0
+
+altsBindNamedFieldsInternal0 :: [TermParser M.BindNamedFieldsInternal0L]
+altsBindNamedFieldsInternal0 =
+  [ pBindNamedFieldsInternal0BindField
+  , pBindNamedFieldsInternal0MutBindField
+  ]
   where
-    pBindNamedFieldsInternal0BindField :: TermParser BindNamedFieldsInternal0L
+    pBindNamedFieldsInternal0BindField :: TermParser M.BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0BindField =
-      BindNamedFieldsInternal0BindField' <$> pSort @BindFieldL "bind_field"
-    pBindNamedFieldsInternal0MutBindField :: TermParser BindNamedFieldsInternal0L
+      M.BindNamedFieldsInternal0BindField' <$> fragmentSortP @M.BindField @M.BindFieldL "bind_field"
+    pBindNamedFieldsInternal0MutBindField :: TermParser M.BindNamedFieldsInternal0L
     pBindNamedFieldsInternal0MutBindField =
-      BindNamedFieldsInternal0MutBindField' <$> pSort @MutBindFieldL "mut_bind_field"
+      M.BindNamedFieldsInternal0MutBindField' <$> fragmentSortP @M.MutBindField @M.MutBindFieldL "mut_bind_field"
 
-pBindField :: TermParser BindFieldL
+pBindField :: TermParser M.BindFieldL
 pBindField =
-  choice [ Megaparsec.try pBindField1
-         , Megaparsec.try pBindFieldSpreadOperator
-         ]
+  Megaparsec.Cubix.pLongest "bind_field" altsBindField
+
+altsBindField :: [TermParser M.BindFieldL]
+altsBindField =
+  [ pBindField1
+  , pBindFieldSpreadOperator
+  ]
   where
-    pBindField1 :: TermParser BindFieldL
+    pBindField1 :: TermParser M.BindFieldL
     pBindField1 =
-      BindField1' <$> pSort @BindListL "bind_list" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pSort @BindListL "bind_list"))
-    pBindFieldSpreadOperator :: TermParser BindFieldL
+      M.BindField1' <$> fragmentSortP @M.BindList @M.BindListL "bind_list" <*> maybeP (pairP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (fragmentSortP @M.BindList @M.BindListL "bind_list"))
+    pBindFieldSpreadOperator :: TermParser M.BindFieldL
     pBindFieldSpreadOperator =
-      BindFieldSpreadOperator' <$> pHiddenSpreadOperator
+      M.BindFieldSpreadOperator' <$> pHiddenSpreadOperator
 
-pHiddenSpreadOperator :: TermParser HiddenSpreadOperatorL
+pHiddenSpreadOperator :: TermParser M.HiddenSpreadOperatorL
 pHiddenSpreadOperator =
-  HiddenSpreadOperator' <$> pSort @FullStopFullStopTokL ".._tok"
+  M.HiddenSpreadOperator' <$> fragmentSortP @M.Token @M.FullStopFullStopTokL ".._tok"
 
-pMutBindField :: TermParser MutBindFieldL
+pMutBindField :: TermParser M.MutBindFieldL
 pMutBindField =
-  MutBindField' <$> pSort @MutTokL "mut_tok" <*> pSort @BindFieldL "bind_field"
+  M.MutBindField' <$> fragmentSortP @M.Token @M.MutTokL "mut_tok" <*> fragmentSortP @M.BindField @M.BindFieldL "bind_field"
 
-pBindPositionalFields :: TermParser BindPositionalFieldsL
+pBindPositionalFields :: TermParser M.BindPositionalFieldsL
 pBindPositionalFields =
-  BindPositionalFields' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pBindNamedFieldsInternal0) (pSort @CommaTokL ",_tok"))
+  M.BindPositionalFields' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pBindNamedFieldsInternal0) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pCommaBindList :: TermParser CommaBindListL
+pCommaBindList :: TermParser M.CommaBindListL
 pCommaBindList =
-  CommaBindList' <$> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pSepBy (pHiddenBind) (pSort @CommaTokL ",_tok"))
+  M.CommaBindList' <$> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (sepByP (pHiddenBind) (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pOrBindList :: TermParser OrBindListL
+pOrBindList :: TermParser M.OrBindListL
 pOrBindList =
-  OrBindList' <$> pMaybe (pSort @LeftParenthesisTokL "(_tok") <*> pSepBy1 (pPair (pPair (pMaybe (pSort @LeftParenthesisTokL "(_tok")) (pHiddenBind)) (pMaybe (pSort @RightParenthesisTokL ")_tok"))) (pSort @VerticalLineTokL "|_tok") <*> pMaybe (pSort @RightParenthesisTokL ")_tok")
+  M.OrBindList' <$> maybeP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") <*> sepBy1P (pairP (pairP (maybeP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok")) (pHiddenBind)) (maybeP (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok"))) (fragmentSortP @M.Token @M.VerticalLineTokL "|_tok") <*> maybeP (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok")
 
-pMatchCondition :: TermParser MatchConditionL
+pMatchCondition :: TermParser M.MatchConditionL
 pMatchCondition =
-  MatchCondition' <$> pSort @IfTokL "if_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pHiddenExpression)
+  M.MatchCondition' <$> fragmentSortP @M.Token @M.IfTokL "if_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (pHiddenExpression)
 
-pPackExpression :: TermParser PackExpressionL
+pPackExpression :: TermParser M.PackExpressionL
 pPackExpression =
-  PackExpression' <$> pSort @NameExpressionL "name_expression" <*> pSort @FieldInitializeListL "field_initialize_list"
+  M.PackExpression' <$> fragmentSortP @M.NameExpression @M.NameExpressionL "name_expression" <*> fragmentSortP @M.FieldInitializeList @M.FieldInitializeListL "field_initialize_list"
 
-pFieldInitializeList :: TermParser FieldInitializeListL
+pFieldInitializeList :: TermParser M.FieldInitializeListL
 pFieldInitializeList =
-  FieldInitializeList' <$> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy (pSort @ExpFieldL "exp_field") (pSort @CommaTokL ",_tok"))
+  M.FieldInitializeList' <$> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepByP (fragmentSortP @M.ExpField @M.ExpFieldL "exp_field") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pExpField :: TermParser ExpFieldL
+pExpField :: TermParser M.ExpFieldL
 pExpField =
-  ExpField' <$> pHiddenFieldIdentifier <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pHiddenExpression))
+  M.ExpField' <$> pHiddenFieldIdentifier <*> maybeP (pairP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (pHiddenExpression))
 
-pSpecBlock :: TermParser SpecBlockL
+pSpecBlock :: TermParser M.SpecBlockL
 pSpecBlock =
-  SpecBlock' <$> pSort @SpecTokL "spec_tok" <*> pSpecBlockInternal0
+  M.SpecBlock' <$> fragmentSortP @M.Token @M.SpecTokL "spec_tok" <*> pSpecBlockInternal0
 
-pSpecBlockInternal0 :: TermParser SpecBlockInternal0L
+pSpecBlockInternal0 :: TermParser M.SpecBlockInternal0L
 pSpecBlockInternal0 =
-  choice [ Megaparsec.try pSpecBlockInternal01
-         , Megaparsec.try pSpecBlockInternal0SpecFunction
-         ]
+  Megaparsec.Cubix.pLongest "spec_block_internal0" altsSpecBlockInternal0
+
+altsSpecBlockInternal0 :: [TermParser M.SpecBlockInternal0L]
+altsSpecBlockInternal0 =
+  [ pSpecBlockInternal01
+  , pSpecBlockInternal0SpecFunction
+  ]
   where
-    pSpecBlockInternal01 :: TermParser SpecBlockInternal0L
+    pSpecBlockInternal01 :: TermParser M.SpecBlockInternal0L
     pSpecBlockInternal01 =
-      SpecBlockInternal01' <$> pMaybe (pHiddenSpecBlockTarget) <*> pSort @SpecBodyL "spec_body"
-    pSpecBlockInternal0SpecFunction :: TermParser SpecBlockInternal0L
+      M.SpecBlockInternal01' <$> maybeP (pHiddenSpecBlockTarget) <*> fragmentSortP @M.SpecBody @M.SpecBodyL "spec_body"
+    pSpecBlockInternal0SpecFunction :: TermParser M.SpecBlockInternal0L
     pSpecBlockInternal0SpecFunction =
-      SpecBlockInternal0SpecFunction' <$> pHiddenSpecFunction
+      M.SpecBlockInternal0SpecFunction' <$> pHiddenSpecFunction
 
-pHiddenSpecBlockTarget :: TermParser HiddenSpecBlockTargetL
+pHiddenSpecBlockTarget :: TermParser M.HiddenSpecBlockTargetL
 pHiddenSpecBlockTarget =
-  choice [ Megaparsec.try pHiddenSpecBlockTargetIdentifier
-         , Megaparsec.try pHiddenSpecBlockTargetModule
-         , Megaparsec.try pHiddenSpecBlockTargetSpecBlockTargetSchema
-         ]
+  Megaparsec.Cubix.pLongest "_spec_block_target" altsHiddenSpecBlockTarget
+
+altsHiddenSpecBlockTarget :: [TermParser M.HiddenSpecBlockTargetL]
+altsHiddenSpecBlockTarget =
+  [ pHiddenSpecBlockTargetIdentifier
+  , pHiddenSpecBlockTargetModule
+  , pHiddenSpecBlockTargetSpecBlockTargetSchema
+  ]
   where
-    pHiddenSpecBlockTargetIdentifier :: TermParser HiddenSpecBlockTargetL
+    pHiddenSpecBlockTargetIdentifier :: TermParser M.HiddenSpecBlockTargetL
     pHiddenSpecBlockTargetIdentifier =
-      HiddenSpecBlockTargetIdentifier' <$> pSort @IdentifierL "identifier"
-    pHiddenSpecBlockTargetModule :: TermParser HiddenSpecBlockTargetL
+      M.HiddenSpecBlockTargetIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pHiddenSpecBlockTargetModule :: TermParser M.HiddenSpecBlockTargetL
     pHiddenSpecBlockTargetModule =
-      HiddenSpecBlockTargetModule' <$> pSort @ModuleTokL "module_tok"
-    pHiddenSpecBlockTargetSpecBlockTargetSchema :: TermParser HiddenSpecBlockTargetL
+      M.HiddenSpecBlockTargetModule' <$> fragmentSortP @M.Token @M.ModuleTokL "module_tok"
+    pHiddenSpecBlockTargetSpecBlockTargetSchema :: TermParser M.HiddenSpecBlockTargetL
     pHiddenSpecBlockTargetSpecBlockTargetSchema =
-      HiddenSpecBlockTargetSpecBlockTargetSchema' <$> pSort @SpecBlockTargetSchemaL "spec_block_target_schema"
+      M.HiddenSpecBlockTargetSpecBlockTargetSchema' <$> fragmentSortP @M.SpecBlockTargetSchema @M.SpecBlockTargetSchemaL "spec_block_target_schema"
 
-pSpecBlockTargetSchema :: TermParser SpecBlockTargetSchemaL
+pSpecBlockTargetSchema :: TermParser M.SpecBlockTargetSchemaL
 pSpecBlockTargetSchema =
-  SpecBlockTargetSchema' <$> pSort @SchemaTokL "schema_tok" <*> pHiddenStructIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters")
+  M.SpecBlockTargetSchema' <$> fragmentSortP @M.Token @M.SchemaTokL "schema_tok" <*> pHiddenStructIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters")
 
-pHiddenStructIdentifier :: TermParser HiddenStructIdentifierL
+pHiddenStructIdentifier :: TermParser M.HiddenStructIdentifierL
 pHiddenStructIdentifier =
-  HiddenStructIdentifier' <$> pSort @IdentifierL "identifier"
+  M.HiddenStructIdentifier' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
 
-pHiddenSpecFunction :: TermParser HiddenSpecFunctionL
+pHiddenSpecFunction :: TermParser M.HiddenSpecFunctionL
 pHiddenSpecFunction =
-  choice [ Megaparsec.try pHiddenSpecFunctionNativeSpecFunction
-         , Megaparsec.try pHiddenSpecFunctionUsualSpecFunction
-         , Megaparsec.try pHiddenSpecFunctionUninterpretedSpecFunction
-         ]
+  Megaparsec.Cubix.pLongest "_spec_function" altsHiddenSpecFunction
+
+altsHiddenSpecFunction :: [TermParser M.HiddenSpecFunctionL]
+altsHiddenSpecFunction =
+  [ pHiddenSpecFunctionNativeSpecFunction
+  , pHiddenSpecFunctionUsualSpecFunction
+  , pHiddenSpecFunctionUninterpretedSpecFunction
+  ]
   where
-    pHiddenSpecFunctionNativeSpecFunction :: TermParser HiddenSpecFunctionL
+    pHiddenSpecFunctionNativeSpecFunction :: TermParser M.HiddenSpecFunctionL
     pHiddenSpecFunctionNativeSpecFunction =
-      HiddenSpecFunctionNativeSpecFunction' <$> pSort @NativeSpecFunctionL "native_spec_function"
-    pHiddenSpecFunctionUsualSpecFunction :: TermParser HiddenSpecFunctionL
+      M.HiddenSpecFunctionNativeSpecFunction' <$> fragmentSortP @M.NativeSpecFunction @M.NativeSpecFunctionL "native_spec_function"
+    pHiddenSpecFunctionUsualSpecFunction :: TermParser M.HiddenSpecFunctionL
     pHiddenSpecFunctionUsualSpecFunction =
-      HiddenSpecFunctionUsualSpecFunction' <$> pSort @UsualSpecFunctionL "usual_spec_function"
-    pHiddenSpecFunctionUninterpretedSpecFunction :: TermParser HiddenSpecFunctionL
+      M.HiddenSpecFunctionUsualSpecFunction' <$> fragmentSortP @M.UsualSpecFunction @M.UsualSpecFunctionL "usual_spec_function"
+    pHiddenSpecFunctionUninterpretedSpecFunction :: TermParser M.HiddenSpecFunctionL
     pHiddenSpecFunctionUninterpretedSpecFunction =
-      HiddenSpecFunctionUninterpretedSpecFunction' <$> pSort @UninterpretedSpecFunctionL "uninterpreted_spec_function"
+      M.HiddenSpecFunctionUninterpretedSpecFunction' <$> fragmentSortP @M.UninterpretedSpecFunction @M.UninterpretedSpecFunctionL "uninterpreted_spec_function"
 
-pNativeSpecFunction :: TermParser NativeSpecFunctionL
+pNativeSpecFunction :: TermParser M.NativeSpecFunctionL
 pNativeSpecFunction =
-  NativeSpecFunction' <$> pSort @NativeTokL "native_tok" <*> pBetween (pSort @FunTokL "fun_tok") (pSort @SemicolonTokL ";_tok") (pHiddenSpecFunctionSignature)
+  M.NativeSpecFunction' <$> fragmentSortP @M.Token @M.NativeTokL "native_tok" <*> betweenP (fragmentSortP @M.Token @M.FunTokL "fun_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenSpecFunctionSignature)
 
-pHiddenSpecFunctionSignature :: TermParser HiddenSpecFunctionSignatureL
+pHiddenSpecFunctionSignature :: TermParser M.HiddenSpecFunctionSignatureL
 pHiddenSpecFunctionSignature =
-  HiddenSpecFunctionSignature' <$> pHiddenFunctionIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pSort @RetTypeL "ret_type"
+  M.HiddenSpecFunctionSignature' <$> pHiddenFunctionIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> fragmentSortP @M.FunctionParameters @M.FunctionParametersL "function_parameters" <*> fragmentSortP @M.RetType @M.RetTypeL "ret_type"
 
-pUninterpretedSpecFunction :: TermParser UninterpretedSpecFunctionL
+pUninterpretedSpecFunction :: TermParser M.UninterpretedSpecFunctionL
 pUninterpretedSpecFunction =
-  UninterpretedSpecFunction' <$> pBetween (pSort @FunTokL "fun_tok") (pSort @SemicolonTokL ";_tok") (pHiddenSpecFunctionSignature)
+  M.UninterpretedSpecFunction' <$> betweenP (fragmentSortP @M.Token @M.FunTokL "fun_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenSpecFunctionSignature)
 
-pUsualSpecFunction :: TermParser UsualSpecFunctionL
+pUsualSpecFunction :: TermParser M.UsualSpecFunctionL
 pUsualSpecFunction =
-  UsualSpecFunction' <$> pSort @FunTokL "fun_tok" <*> pHiddenSpecFunctionSignature <*> pSort @BlockL "block"
+  M.UsualSpecFunction' <$> fragmentSortP @M.Token @M.FunTokL "fun_tok" <*> pHiddenSpecFunctionSignature <*> fragmentSortP @M.Block @M.BlockL "block"
 
-pSpecBody :: TermParser SpecBodyL
+pSpecBody :: TermParser M.SpecBodyL
 pSpecBody =
-  SpecBody' <$> pSort @LeftCurlyBracketTokL "{_tok" <*> pMany (pSort @UseDeclarationL "use_declaration") <*> pMany (pHiddenSpecBlockMemeber) <*> pSort @RightCurlyBracketTokL "}_tok"
+  M.SpecBody' <$> fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok" <*> manyP (fragmentSortP @M.UseDeclaration @M.UseDeclarationL "use_declaration") <*> manyP (pHiddenSpecBlockMemeber) <*> fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok"
 
-pHiddenSpecBlockMemeber :: TermParser HiddenSpecBlockMemeberL
+pHiddenSpecBlockMemeber :: TermParser M.HiddenSpecBlockMemeberL
 pHiddenSpecBlockMemeber =
-  choice [ Megaparsec.try pHiddenSpecBlockMemeberSpecInvariant
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecFunction
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecCondition
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecInclude
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecApply
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecPragma
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecVariable
-         , Megaparsec.try pHiddenSpecBlockMemeberSpecLet
-         ]
+  Megaparsec.Cubix.pLongest "_spec_block_memeber" altsHiddenSpecBlockMemeber
+
+altsHiddenSpecBlockMemeber :: [TermParser M.HiddenSpecBlockMemeberL]
+altsHiddenSpecBlockMemeber =
+  [ pHiddenSpecBlockMemeberSpecInvariant
+  , pHiddenSpecBlockMemeberSpecFunction
+  , pHiddenSpecBlockMemeberSpecCondition
+  , pHiddenSpecBlockMemeberSpecInclude
+  , pHiddenSpecBlockMemeberSpecApply
+  , pHiddenSpecBlockMemeberSpecPragma
+  , pHiddenSpecBlockMemeberSpecVariable
+  , pHiddenSpecBlockMemeberSpecLet
+  ]
   where
-    pHiddenSpecBlockMemeberSpecInvariant :: TermParser HiddenSpecBlockMemeberL
+    pHiddenSpecBlockMemeberSpecInvariant :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecInvariant =
-      HiddenSpecBlockMemeberSpecInvariant' <$> pSort @SpecInvariantL "spec_invariant"
-    pHiddenSpecBlockMemeberSpecFunction :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecInvariant' <$> fragmentSortP @M.SpecInvariant @M.SpecInvariantL "spec_invariant"
+    pHiddenSpecBlockMemeberSpecFunction :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecFunction =
-      HiddenSpecBlockMemeberSpecFunction' <$> pHiddenSpecFunction
-    pHiddenSpecBlockMemeberSpecCondition :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecFunction' <$> pHiddenSpecFunction
+    pHiddenSpecBlockMemeberSpecCondition :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecCondition =
-      HiddenSpecBlockMemeberSpecCondition' <$> pSort @SpecConditionL "spec_condition"
-    pHiddenSpecBlockMemeberSpecInclude :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecCondition' <$> fragmentSortP @M.SpecCondition @M.SpecConditionL "spec_condition"
+    pHiddenSpecBlockMemeberSpecInclude :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecInclude =
-      HiddenSpecBlockMemeberSpecInclude' <$> pSort @SpecIncludeL "spec_include"
-    pHiddenSpecBlockMemeberSpecApply :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecInclude' <$> fragmentSortP @M.SpecInclude @M.SpecIncludeL "spec_include"
+    pHiddenSpecBlockMemeberSpecApply :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecApply =
-      HiddenSpecBlockMemeberSpecApply' <$> pSort @SpecApplyL "spec_apply"
-    pHiddenSpecBlockMemeberSpecPragma :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecApply' <$> fragmentSortP @M.SpecApply @M.SpecApplyL "spec_apply"
+    pHiddenSpecBlockMemeberSpecPragma :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecPragma =
-      HiddenSpecBlockMemeberSpecPragma' <$> pSort @SpecPragmaL "spec_pragma"
-    pHiddenSpecBlockMemeberSpecVariable :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecPragma' <$> fragmentSortP @M.SpecPragma @M.SpecPragmaL "spec_pragma"
+    pHiddenSpecBlockMemeberSpecVariable :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecVariable =
-      HiddenSpecBlockMemeberSpecVariable' <$> pSort @SpecVariableL "spec_variable"
-    pHiddenSpecBlockMemeberSpecLet :: TermParser HiddenSpecBlockMemeberL
+      M.HiddenSpecBlockMemeberSpecVariable' <$> fragmentSortP @M.SpecVariable @M.SpecVariableL "spec_variable"
+    pHiddenSpecBlockMemeberSpecLet :: TermParser M.HiddenSpecBlockMemeberL
     pHiddenSpecBlockMemeberSpecLet =
-      HiddenSpecBlockMemeberSpecLet' <$> pSort @SpecLetL "spec_let"
+      M.HiddenSpecBlockMemeberSpecLet' <$> fragmentSortP @M.SpecLet @M.SpecLetL "spec_let"
 
-pSpecApply :: TermParser SpecApplyL
+pSpecApply :: TermParser M.SpecApplyL
 pSpecApply =
-  SpecApply' <$> pBetween (pSort @ApplyTokL "apply_tok") (pSort @ToTokL "to_tok") (pHiddenExpression) <*> pSepBy1 (pSort @SpecApplyPatternL "spec_apply_pattern") (pSort @CommaTokL ",_tok") <*> pMaybe (pPair (pSort @ExceptTokL "except_tok") (pSepBy1 (pSort @SpecApplyPatternL "spec_apply_pattern") (pSort @CommaTokL ",_tok"))) <*> pSort @SemicolonTokL ";_tok"
+  M.SpecApply' <$> betweenP (fragmentSortP @M.Token @M.ApplyTokL "apply_tok") (fragmentSortP @M.Token @M.ToTokL "to_tok") (pHiddenExpression) <*> sepBy1P (fragmentSortP @M.SpecApplyPattern @M.SpecApplyPatternL "spec_apply_pattern") (fragmentSortP @M.Token @M.CommaTokL ",_tok") <*> maybeP (pairP (fragmentSortP @M.Token @M.ExceptTokL "except_tok") (sepBy1P (fragmentSortP @M.SpecApplyPattern @M.SpecApplyPatternL "spec_apply_pattern") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))) <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pSpecApplyPattern :: TermParser SpecApplyPatternL
+pSpecApplyPattern :: TermParser M.SpecApplyPatternL
 pSpecApplyPattern =
-  SpecApplyPattern' <$> pMaybe (pSpecApplyPatternInternal0) <*> pSort @SpecApplyNamePatternL "spec_apply_name_pattern" <*> pMaybe (pSort @TypeParametersL "type_parameters")
+  M.SpecApplyPattern' <$> maybeP (pSpecApplyPatternInternal0) <*> fragmentSortP @M.SpecApplyNamePattern @M.SpecApplyNamePatternL "spec_apply_name_pattern" <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters")
 
-pSpecApplyNamePattern :: TermParser SpecApplyNamePatternL
+pSpecApplyNamePattern :: TermParser M.SpecApplyNamePatternL
 pSpecApplyNamePattern =
-  SpecApplyNamePattern' <$> pContent
+  M.SpecApplyNamePattern' <$> contentP
 
-pSpecApplyPatternInternal0 :: TermParser SpecApplyPatternInternal0L
+pSpecApplyPatternInternal0 :: TermParser M.SpecApplyPatternInternal0L
 pSpecApplyPatternInternal0 =
-  choice [ Megaparsec.try pSpecApplyPatternInternal0Public
-         , Megaparsec.try pSpecApplyPatternInternal0Internal
-         ]
+  Megaparsec.Cubix.pLongest "spec_apply_pattern_internal0" altsSpecApplyPatternInternal0
+
+altsSpecApplyPatternInternal0 :: [TermParser M.SpecApplyPatternInternal0L]
+altsSpecApplyPatternInternal0 =
+  [ pSpecApplyPatternInternal0Public
+  , pSpecApplyPatternInternal0Internal
+  ]
   where
-    pSpecApplyPatternInternal0Public :: TermParser SpecApplyPatternInternal0L
+    pSpecApplyPatternInternal0Public :: TermParser M.SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Public =
-      SpecApplyPatternInternal0Public' <$> pSort @PublicTokL "public_tok"
-    pSpecApplyPatternInternal0Internal :: TermParser SpecApplyPatternInternal0L
+      M.SpecApplyPatternInternal0Public' <$> fragmentSortP @M.Token @M.PublicTokL "public_tok"
+    pSpecApplyPatternInternal0Internal :: TermParser M.SpecApplyPatternInternal0L
     pSpecApplyPatternInternal0Internal =
-      SpecApplyPatternInternal0Internal' <$> pSort @InternalTokL "internal_tok"
+      M.SpecApplyPatternInternal0Internal' <$> fragmentSortP @M.Token @M.InternalTokL "internal_tok"
 
-pSpecCondition :: TermParser SpecConditionL
+pSpecCondition :: TermParser M.SpecConditionL
 pSpecCondition =
-  choice [ Megaparsec.try pSpecConditionSpecCondition
-         , Megaparsec.try pSpecConditionSpecAbortIf
-         , Megaparsec.try pSpecConditionSpecAbortWithOrModifies
-         ]
+  Megaparsec.Cubix.pLongest "spec_condition" altsSpecCondition
+
+altsSpecCondition :: [TermParser M.SpecConditionL]
+altsSpecCondition =
+  [ pSpecConditionSpecCondition
+  , pSpecConditionSpecAbortIf
+  , pSpecConditionSpecAbortWithOrModifies
+  ]
   where
-    pSpecConditionSpecCondition :: TermParser SpecConditionL
+    pSpecConditionSpecCondition :: TermParser M.SpecConditionL
     pSpecConditionSpecCondition =
-      SpecConditionSpecCondition' <$> pHiddenSpecCondition
-    pSpecConditionSpecAbortIf :: TermParser SpecConditionL
+      M.SpecConditionSpecCondition' <$> pHiddenSpecCondition
+    pSpecConditionSpecAbortIf :: TermParser M.SpecConditionL
     pSpecConditionSpecAbortIf =
-      SpecConditionSpecAbortIf' <$> pHiddenSpecAbortIf
-    pSpecConditionSpecAbortWithOrModifies :: TermParser SpecConditionL
+      M.SpecConditionSpecAbortIf' <$> pHiddenSpecAbortIf
+    pSpecConditionSpecAbortWithOrModifies :: TermParser M.SpecConditionL
     pSpecConditionSpecAbortWithOrModifies =
-      SpecConditionSpecAbortWithOrModifies' <$> pHiddenSpecAbortWithOrModifies
+      M.SpecConditionSpecAbortWithOrModifies' <$> pHiddenSpecAbortWithOrModifies
 
-pHiddenSpecAbortIf :: TermParser HiddenSpecAbortIfL
+pHiddenSpecAbortIf :: TermParser M.HiddenSpecAbortIfL
 pHiddenSpecAbortIf =
-  HiddenSpecAbortIf' <$> pSort @AbortsIfTokL "aborts_if_tok" <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> pMaybe (pPair (pSort @WithTokL "with_tok") (pHiddenExpression)) <*> pSort @SemicolonTokL ";_tok"
+  M.HiddenSpecAbortIf' <$> fragmentSortP @M.Token @M.AbortsIfTokL "aborts_if_tok" <*> maybeP (fragmentSortP @M.ConditionProperties @M.ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> maybeP (pairP (fragmentSortP @M.Token @M.WithTokL "with_tok") (pHiddenExpression)) <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pConditionProperties :: TermParser ConditionPropertiesL
+pConditionProperties :: TermParser M.ConditionPropertiesL
 pConditionProperties =
-  ConditionProperties' <$> pBetween (pSort @LeftSquareBracketTokL "[_tok") (pSort @RightSquareBracketTokL "]_tok") (pSepBy (pSort @SpecPropertyL "spec_property") (pSort @CommaTokL ",_tok"))
+  M.ConditionProperties' <$> betweenP (fragmentSortP @M.Token @M.LeftSquareBracketTokL "[_tok") (fragmentSortP @M.Token @M.RightSquareBracketTokL "]_tok") (sepByP (fragmentSortP @M.SpecProperty @M.SpecPropertyL "spec_property") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pSpecProperty :: TermParser SpecPropertyL
+pSpecProperty :: TermParser M.SpecPropertyL
 pSpecProperty =
-  SpecProperty' <$> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @EqualsSignTokL "=_tok") (pHiddenLiteralValue))
+  M.SpecProperty' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (pairP (fragmentSortP @M.Token @M.EqualsSignTokL "=_tok") (pHiddenLiteralValue))
 
-pHiddenSpecAbortWithOrModifies :: TermParser HiddenSpecAbortWithOrModifiesL
+pHiddenSpecAbortWithOrModifies :: TermParser M.HiddenSpecAbortWithOrModifiesL
 pHiddenSpecAbortWithOrModifies =
-  HiddenSpecAbortWithOrModifies' <$> pHiddenSpecAbortWithOrModifiesInternal0 <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pSepBy1 (pHiddenExpression) (pSort @CommaTokL ",_tok") <*> pSort @SemicolonTokL ";_tok"
+  M.HiddenSpecAbortWithOrModifies' <$> pHiddenSpecAbortWithOrModifiesInternal0 <*> maybeP (fragmentSortP @M.ConditionProperties @M.ConditionPropertiesL "condition_properties") <*> sepBy1P (pHiddenExpression) (fragmentSortP @M.Token @M.CommaTokL ",_tok") <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pHiddenSpecAbortWithOrModifiesInternal0 :: TermParser HiddenSpecAbortWithOrModifiesInternal0L
+pHiddenSpecAbortWithOrModifiesInternal0 :: TermParser M.HiddenSpecAbortWithOrModifiesInternal0L
 pHiddenSpecAbortWithOrModifiesInternal0 =
-  choice [ Megaparsec.try pHiddenSpecAbortWithOrModifiesInternal0AbortsWith
-         , Megaparsec.try pHiddenSpecAbortWithOrModifiesInternal0Modifies
-         ]
+  Megaparsec.Cubix.pLongest "_spec_abort_with_or_modifies_internal0" altsHiddenSpecAbortWithOrModifiesInternal0
+
+altsHiddenSpecAbortWithOrModifiesInternal0 :: [TermParser M.HiddenSpecAbortWithOrModifiesInternal0L]
+altsHiddenSpecAbortWithOrModifiesInternal0 =
+  [ pHiddenSpecAbortWithOrModifiesInternal0AbortsWith
+  , pHiddenSpecAbortWithOrModifiesInternal0Modifies
+  ]
   where
-    pHiddenSpecAbortWithOrModifiesInternal0AbortsWith :: TermParser HiddenSpecAbortWithOrModifiesInternal0L
+    pHiddenSpecAbortWithOrModifiesInternal0AbortsWith :: TermParser M.HiddenSpecAbortWithOrModifiesInternal0L
     pHiddenSpecAbortWithOrModifiesInternal0AbortsWith =
-      HiddenSpecAbortWithOrModifiesInternal0AbortsWith' <$> pSort @AbortsWithTokL "aborts_with_tok"
-    pHiddenSpecAbortWithOrModifiesInternal0Modifies :: TermParser HiddenSpecAbortWithOrModifiesInternal0L
+      M.HiddenSpecAbortWithOrModifiesInternal0AbortsWith' <$> fragmentSortP @M.Token @M.AbortsWithTokL "aborts_with_tok"
+    pHiddenSpecAbortWithOrModifiesInternal0Modifies :: TermParser M.HiddenSpecAbortWithOrModifiesInternal0L
     pHiddenSpecAbortWithOrModifiesInternal0Modifies =
-      HiddenSpecAbortWithOrModifiesInternal0Modifies' <$> pSort @ModifiesTokL "modifies_tok"
+      M.HiddenSpecAbortWithOrModifiesInternal0Modifies' <$> fragmentSortP @M.Token @M.ModifiesTokL "modifies_tok"
 
-pHiddenSpecCondition :: TermParser HiddenSpecConditionL
+pHiddenSpecCondition :: TermParser M.HiddenSpecConditionL
 pHiddenSpecCondition =
-  HiddenSpecCondition' <$> pHiddenSpecConditionInternal0 <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> pSort @SemicolonTokL ";_tok"
+  M.HiddenSpecCondition' <$> pHiddenSpecConditionInternal0 <*> maybeP (fragmentSortP @M.ConditionProperties @M.ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pHiddenSpecConditionInternal0 :: TermParser HiddenSpecConditionInternal0L
+pHiddenSpecConditionInternal0 :: TermParser M.HiddenSpecConditionInternal0L
 pHiddenSpecConditionInternal0 =
-  choice [ Megaparsec.try pHiddenSpecConditionInternal02
-         , Megaparsec.try pHiddenSpecConditionInternal0Kind
-         ]
+  Megaparsec.Cubix.pLongest "_spec_condition_internal0" altsHiddenSpecConditionInternal0
+
+altsHiddenSpecConditionInternal0 :: [TermParser M.HiddenSpecConditionInternal0L]
+altsHiddenSpecConditionInternal0 =
+  [ pHiddenSpecConditionInternal02
+  , pHiddenSpecConditionInternal0Kind
+  ]
   where
-    pHiddenSpecConditionInternal02 :: TermParser HiddenSpecConditionInternal0L
+    pHiddenSpecConditionInternal02 :: TermParser M.HiddenSpecConditionInternal0L
     pHiddenSpecConditionInternal02 =
-      HiddenSpecConditionInternal02' <$> pSort @RequiresTokL "requires_tok" <*> pMaybe (pSort @ModuleTokL "module_tok")
-    pHiddenSpecConditionInternal0Kind :: TermParser HiddenSpecConditionInternal0L
+      M.HiddenSpecConditionInternal02' <$> fragmentSortP @M.Token @M.RequiresTokL "requires_tok" <*> maybeP (fragmentSortP @M.Token @M.ModuleTokL "module_tok")
+    pHiddenSpecConditionInternal0Kind :: TermParser M.HiddenSpecConditionInternal0L
     pHiddenSpecConditionInternal0Kind =
-      HiddenSpecConditionInternal0Kind' <$> pHiddenSpecConditionKind
+      M.HiddenSpecConditionInternal0Kind' <$> pHiddenSpecConditionKind
 
-pHiddenSpecConditionKind :: TermParser HiddenSpecConditionKindL
+pHiddenSpecConditionKind :: TermParser M.HiddenSpecConditionKindL
 pHiddenSpecConditionKind =
-  choice [ Megaparsec.try pHiddenSpecConditionKindAssert
-         , Megaparsec.try pHiddenSpecConditionKindAssume
-         , Megaparsec.try pHiddenSpecConditionKindDecreases
-         , Megaparsec.try pHiddenSpecConditionKindEnsures
-         , Megaparsec.try pHiddenSpecConditionKindSucceedsIf
-         ]
+  Megaparsec.Cubix.pLongest "_spec_condition_kind" altsHiddenSpecConditionKind
+
+altsHiddenSpecConditionKind :: [TermParser M.HiddenSpecConditionKindL]
+altsHiddenSpecConditionKind =
+  [ pHiddenSpecConditionKindAssert
+  , pHiddenSpecConditionKindAssume
+  , pHiddenSpecConditionKindDecreases
+  , pHiddenSpecConditionKindEnsures
+  , pHiddenSpecConditionKindSucceedsIf
+  ]
   where
-    pHiddenSpecConditionKindAssert :: TermParser HiddenSpecConditionKindL
+    pHiddenSpecConditionKindAssert :: TermParser M.HiddenSpecConditionKindL
     pHiddenSpecConditionKindAssert =
-      HiddenSpecConditionKindAssert' <$> pSort @AssertTokL "assert_tok"
-    pHiddenSpecConditionKindAssume :: TermParser HiddenSpecConditionKindL
+      M.HiddenSpecConditionKindAssert' <$> fragmentSortP @M.Token @M.AssertTokL "assert_tok"
+    pHiddenSpecConditionKindAssume :: TermParser M.HiddenSpecConditionKindL
     pHiddenSpecConditionKindAssume =
-      HiddenSpecConditionKindAssume' <$> pSort @AssumeTokL "assume_tok"
-    pHiddenSpecConditionKindDecreases :: TermParser HiddenSpecConditionKindL
+      M.HiddenSpecConditionKindAssume' <$> fragmentSortP @M.Token @M.AssumeTokL "assume_tok"
+    pHiddenSpecConditionKindDecreases :: TermParser M.HiddenSpecConditionKindL
     pHiddenSpecConditionKindDecreases =
-      HiddenSpecConditionKindDecreases' <$> pSort @DecreasesTokL "decreases_tok"
-    pHiddenSpecConditionKindEnsures :: TermParser HiddenSpecConditionKindL
+      M.HiddenSpecConditionKindDecreases' <$> fragmentSortP @M.Token @M.DecreasesTokL "decreases_tok"
+    pHiddenSpecConditionKindEnsures :: TermParser M.HiddenSpecConditionKindL
     pHiddenSpecConditionKindEnsures =
-      HiddenSpecConditionKindEnsures' <$> pSort @EnsuresTokL "ensures_tok"
-    pHiddenSpecConditionKindSucceedsIf :: TermParser HiddenSpecConditionKindL
+      M.HiddenSpecConditionKindEnsures' <$> fragmentSortP @M.Token @M.EnsuresTokL "ensures_tok"
+    pHiddenSpecConditionKindSucceedsIf :: TermParser M.HiddenSpecConditionKindL
     pHiddenSpecConditionKindSucceedsIf =
-      HiddenSpecConditionKindSucceedsIf' <$> pSort @SucceedsIfTokL "succeeds_if_tok"
+      M.HiddenSpecConditionKindSucceedsIf' <$> fragmentSortP @M.Token @M.SucceedsIfTokL "succeeds_if_tok"
 
-pSpecInclude :: TermParser SpecIncludeL
+pSpecInclude :: TermParser M.SpecIncludeL
 pSpecInclude =
-  SpecInclude' <$> pBetween (pSort @IncludeTokL "include_tok") (pSort @SemicolonTokL ";_tok") (pHiddenExpression)
+  M.SpecInclude' <$> betweenP (fragmentSortP @M.Token @M.IncludeTokL "include_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenExpression)
 
-pSpecInvariant :: TermParser SpecInvariantL
+pSpecInvariant :: TermParser M.SpecInvariantL
 pSpecInvariant =
-  SpecInvariant' <$> pSort @InvariantTokL "invariant_tok" <*> pMaybe (pSpecInvariantInternal0) <*> pMaybe (pSort @ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> pSort @SemicolonTokL ";_tok"
+  M.SpecInvariant' <$> fragmentSortP @M.Token @M.InvariantTokL "invariant_tok" <*> maybeP (pSpecInvariantInternal0) <*> maybeP (fragmentSortP @M.ConditionProperties @M.ConditionPropertiesL "condition_properties") <*> pHiddenExpression <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pSpecInvariantInternal0 :: TermParser SpecInvariantInternal0L
+pSpecInvariantInternal0 :: TermParser M.SpecInvariantInternal0L
 pSpecInvariantInternal0 =
-  choice [ Megaparsec.try pSpecInvariantInternal0Update
-         , Megaparsec.try pSpecInvariantInternal0Pack
-         , Megaparsec.try pSpecInvariantInternal0Unpack
-         , Megaparsec.try pSpecInvariantInternal0Module
-         ]
+  Megaparsec.Cubix.pLongest "spec_invariant_internal0" altsSpecInvariantInternal0
+
+altsSpecInvariantInternal0 :: [TermParser M.SpecInvariantInternal0L]
+altsSpecInvariantInternal0 =
+  [ pSpecInvariantInternal0Update
+  , pSpecInvariantInternal0Pack
+  , pSpecInvariantInternal0Unpack
+  , pSpecInvariantInternal0Module
+  ]
   where
-    pSpecInvariantInternal0Update :: TermParser SpecInvariantInternal0L
+    pSpecInvariantInternal0Update :: TermParser M.SpecInvariantInternal0L
     pSpecInvariantInternal0Update =
-      SpecInvariantInternal0Update' <$> pSort @UpdateTokL "update_tok"
-    pSpecInvariantInternal0Pack :: TermParser SpecInvariantInternal0L
+      M.SpecInvariantInternal0Update' <$> fragmentSortP @M.Token @M.UpdateTokL "update_tok"
+    pSpecInvariantInternal0Pack :: TermParser M.SpecInvariantInternal0L
     pSpecInvariantInternal0Pack =
-      SpecInvariantInternal0Pack' <$> pSort @PackTokL "pack_tok"
-    pSpecInvariantInternal0Unpack :: TermParser SpecInvariantInternal0L
+      M.SpecInvariantInternal0Pack' <$> fragmentSortP @M.Token @M.PackTokL "pack_tok"
+    pSpecInvariantInternal0Unpack :: TermParser M.SpecInvariantInternal0L
     pSpecInvariantInternal0Unpack =
-      SpecInvariantInternal0Unpack' <$> pSort @UnpackTokL "unpack_tok"
-    pSpecInvariantInternal0Module :: TermParser SpecInvariantInternal0L
+      M.SpecInvariantInternal0Unpack' <$> fragmentSortP @M.Token @M.UnpackTokL "unpack_tok"
+    pSpecInvariantInternal0Module :: TermParser M.SpecInvariantInternal0L
     pSpecInvariantInternal0Module =
-      SpecInvariantInternal0Module' <$> pSort @ModuleTokL "module_tok"
+      M.SpecInvariantInternal0Module' <$> fragmentSortP @M.Token @M.ModuleTokL "module_tok"
 
-pSpecLet :: TermParser SpecLetL
+pSpecLet :: TermParser M.SpecLetL
 pSpecLet =
-  SpecLet' <$> pSort @LetTokL "let_tok" <*> pMaybe (pSort @PostTokL "post_tok") <*> pSort @IdentifierL "identifier" <*> pBetween (pSort @EqualsSignTokL "=_tok") (pSort @SemicolonTokL ";_tok") (pHiddenExpression)
+  M.SpecLet' <$> fragmentSortP @M.Token @M.LetTokL "let_tok" <*> maybeP (fragmentSortP @M.Token @M.PostTokL "post_tok") <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> betweenP (fragmentSortP @M.Token @M.EqualsSignTokL "=_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenExpression)
 
-pSpecPragma :: TermParser SpecPragmaL
+pSpecPragma :: TermParser M.SpecPragmaL
 pSpecPragma =
-  SpecPragma' <$> pBetween (pSort @PragmaTokL "pragma_tok") (pSort @SemicolonTokL ";_tok") (pSepBy (pSort @SpecPropertyL "spec_property") (pSort @CommaTokL ",_tok"))
+  M.SpecPragma' <$> betweenP (fragmentSortP @M.Token @M.PragmaTokL "pragma_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (sepByP (fragmentSortP @M.SpecProperty @M.SpecPropertyL "spec_property") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pSpecVariable :: TermParser SpecVariableL
+pSpecVariable :: TermParser M.SpecVariableL
 pSpecVariable =
-  SpecVariable' <$> pMaybe (pSpecVariableInternal0) <*> pSort @IdentifierL "identifier" <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pBetween (pSort @ColonTokL ":_tok") (pSort @SemicolonTokL ";_tok") (pHiddenType)
+  M.SpecVariable' <$> maybeP (pSpecVariableInternal0) <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> betweenP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenType)
 
-pSpecVariableInternal0 :: TermParser SpecVariableInternal0L
+pSpecVariableInternal0 :: TermParser M.SpecVariableInternal0L
 pSpecVariableInternal0 =
-  choice [ Megaparsec.try pSpecVariableInternal0Global
-         , Megaparsec.try pSpecVariableInternal0Local
-         ]
+  Megaparsec.Cubix.pLongest "spec_variable_internal0" altsSpecVariableInternal0
+
+altsSpecVariableInternal0 :: [TermParser M.SpecVariableInternal0L]
+altsSpecVariableInternal0 =
+  [ pSpecVariableInternal0Global
+  , pSpecVariableInternal0Local
+  ]
   where
-    pSpecVariableInternal0Global :: TermParser SpecVariableInternal0L
+    pSpecVariableInternal0Global :: TermParser M.SpecVariableInternal0L
     pSpecVariableInternal0Global =
-      SpecVariableInternal0Global' <$> pSort @GlobalTokL "global_tok"
-    pSpecVariableInternal0Local :: TermParser SpecVariableInternal0L
+      M.SpecVariableInternal0Global' <$> fragmentSortP @M.Token @M.GlobalTokL "global_tok"
+    pSpecVariableInternal0Local :: TermParser M.SpecVariableInternal0L
     pSpecVariableInternal0Local =
-      SpecVariableInternal0Local' <$> pSort @LocalTokL "local_tok"
+      M.SpecVariableInternal0Local' <$> fragmentSortP @M.Token @M.LocalTokL "local_tok"
 
-pUseDeclaration :: TermParser UseDeclarationL
+pUseDeclaration :: TermParser M.UseDeclarationL
 pUseDeclaration =
-  UseDeclaration' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pBetween (pSort @UseTokL "use_tok") (pSort @SemicolonTokL ";_tok") (pUseDeclarationInternal0)
+  M.UseDeclaration' <$> maybeP (fragmentSortP @M.Token @M.PublicTokL "public_tok") <*> betweenP (fragmentSortP @M.Token @M.UseTokL "use_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pUseDeclarationInternal0)
 
-pUseDeclarationInternal0 :: TermParser UseDeclarationInternal0L
+pUseDeclarationInternal0 :: TermParser M.UseDeclarationInternal0L
 pUseDeclarationInternal0 =
-  choice [ Megaparsec.try pUseDeclarationInternal0UseFun
-         , Megaparsec.try pUseDeclarationInternal0UseModule
-         , Megaparsec.try pUseDeclarationInternal0UseModuleMember
-         , Megaparsec.try pUseDeclarationInternal0UseModuleMembers
-         ]
+  Megaparsec.Cubix.pLongest "use_declaration_internal0" altsUseDeclarationInternal0
+
+altsUseDeclarationInternal0 :: [TermParser M.UseDeclarationInternal0L]
+altsUseDeclarationInternal0 =
+  [ pUseDeclarationInternal0UseFun
+  , pUseDeclarationInternal0UseModule
+  , pUseDeclarationInternal0UseModuleMember
+  , pUseDeclarationInternal0UseModuleMembers
+  ]
   where
-    pUseDeclarationInternal0UseFun :: TermParser UseDeclarationInternal0L
+    pUseDeclarationInternal0UseFun :: TermParser M.UseDeclarationInternal0L
     pUseDeclarationInternal0UseFun =
-      UseDeclarationInternal0UseFun' <$> pSort @UseFunL "use_fun"
-    pUseDeclarationInternal0UseModule :: TermParser UseDeclarationInternal0L
+      M.UseDeclarationInternal0UseFun' <$> fragmentSortP @M.UseFun @M.UseFunL "use_fun"
+    pUseDeclarationInternal0UseModule :: TermParser M.UseDeclarationInternal0L
     pUseDeclarationInternal0UseModule =
-      UseDeclarationInternal0UseModule' <$> pSort @UseModuleL "use_module"
-    pUseDeclarationInternal0UseModuleMember :: TermParser UseDeclarationInternal0L
+      M.UseDeclarationInternal0UseModule' <$> fragmentSortP @M.UseModule @M.UseModuleL "use_module"
+    pUseDeclarationInternal0UseModuleMember :: TermParser M.UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMember =
-      UseDeclarationInternal0UseModuleMember' <$> pSort @UseModuleMemberL "use_module_member"
-    pUseDeclarationInternal0UseModuleMembers :: TermParser UseDeclarationInternal0L
+      M.UseDeclarationInternal0UseModuleMember' <$> fragmentSortP @M.UseModuleMember @M.UseModuleMemberL "use_module_member"
+    pUseDeclarationInternal0UseModuleMembers :: TermParser M.UseDeclarationInternal0L
     pUseDeclarationInternal0UseModuleMembers =
-      UseDeclarationInternal0UseModuleMembers' <$> pSort @UseModuleMembersL "use_module_members"
+      M.UseDeclarationInternal0UseModuleMembers' <$> fragmentSortP @M.UseModuleMembers @M.UseModuleMembersL "use_module_members"
 
-pUseFun :: TermParser UseFunL
+pUseFun :: TermParser M.UseFunL
 pUseFun =
-  UseFun' <$> pBetween (pSort @FunTokL "fun_tok") (pSort @AsTokL "as_tok") (pSort @ModuleAccessL "module_access") <*> pPair (pPair (pSort @ModuleAccessL "module_access") (pSort @FullStopTokL "._tok")) (pHiddenFunctionIdentifier)
+  M.UseFun' <$> betweenP (fragmentSortP @M.Token @M.FunTokL "fun_tok") (fragmentSortP @M.Token @M.AsTokL "as_tok") (fragmentSortP @M.ModuleAccess @M.ModuleAccessL "module_access") <*> pairP (pairP (fragmentSortP @M.ModuleAccess @M.ModuleAccessL "module_access") (fragmentSortP @M.Token @M.FullStopTokL "._tok")) (pHiddenFunctionIdentifier)
 
-pUseModule :: TermParser UseModuleL
+pUseModule :: TermParser M.UseModuleL
 pUseModule =
-  UseModule' <$> pSort @ModuleIdentityL "module_identity" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pHiddenModuleIdentifier))
+  M.UseModule' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> maybeP (pairP (fragmentSortP @M.Token @M.AsTokL "as_tok") (pHiddenModuleIdentifier))
 
-pUseModuleMember :: TermParser UseModuleMemberL
+pUseModuleMember :: TermParser M.UseModuleMemberL
 pUseModuleMember =
-  UseModuleMember' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pSort @UseMemberL "use_member"
+  M.UseModuleMember' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.UseMember @M.UseMemberL "use_member"
 
-pUseMember :: TermParser UseMemberL
+pUseMember :: TermParser M.UseMemberL
 pUseMember =
-  choice [ Megaparsec.try pUseMember2
-         , Megaparsec.try pUseMember1
-         , Megaparsec.try pUseMember3
-         ]
+  Megaparsec.Cubix.pLongest "use_member" altsUseMember
+
+altsUseMember :: [TermParser M.UseMemberL]
+altsUseMember =
+  [ pUseMember2
+  , pUseMember1
+  , pUseMember3
+  ]
   where
-    pUseMember2 :: TermParser UseMemberL
+    pUseMember2 :: TermParser M.UseMemberL
     pUseMember2 =
-      UseMember2' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
-    pUseMember1 :: TermParser UseMemberL
+      M.UseMember2' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (pairP (fragmentSortP @M.Token @M.AsTokL "as_tok") (fragmentSortP @M.Identifier @M.IdentifierL "identifier"))
+    pUseMember1 :: TermParser M.UseMemberL
     pUseMember1 =
-      UseMember1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
-    pUseMember3 :: TermParser UseMemberL
+      M.UseMember1' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepBy1P (fragmentSortP @M.UseMember @M.UseMemberL "use_member") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
+    pUseMember3 :: TermParser M.UseMemberL
     pUseMember3 =
-      UseMember3' <$> pSort @IdentifierL "identifier" <*> pMaybe (pPair (pSort @AsTokL "as_tok") (pSort @IdentifierL "identifier"))
+      M.UseMember3' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> maybeP (pairP (fragmentSortP @M.Token @M.AsTokL "as_tok") (fragmentSortP @M.Identifier @M.IdentifierL "identifier"))
 
-pUseModuleMembers :: TermParser UseModuleMembersL
+pUseModuleMembers :: TermParser M.UseModuleMembersL
 pUseModuleMembers =
-  choice [ Megaparsec.try pUseModuleMembers1
-         , Megaparsec.try pUseModuleMembers2
-         ]
+  Megaparsec.Cubix.pLongest "use_module_members" altsUseModuleMembers
+
+altsUseModuleMembers :: [TermParser M.UseModuleMembersL]
+altsUseModuleMembers =
+  [ pUseModuleMembers1
+  , pUseModuleMembers2
+  ]
   where
-    pUseModuleMembers1 :: TermParser UseModuleMembersL
+    pUseModuleMembers1 :: TermParser M.UseModuleMembersL
     pUseModuleMembers1 =
-      UseModuleMembers1' <$> pModuleIdentityInternal0 <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
-    pUseModuleMembers2 :: TermParser UseModuleMembersL
+      M.UseModuleMembers1' <$> pModuleIdentityInternal0 <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepBy1P (fragmentSortP @M.UseMember @M.UseMemberL "use_member") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
+    pUseModuleMembers2 :: TermParser M.UseModuleMembersL
     pUseModuleMembers2 =
-      UseModuleMembers2' <$> pSort @ModuleIdentityL "module_identity" <*> pSort @ColonColonTokL "::_tok" <*> pBetween (pSort @LeftCurlyBracketTokL "{_tok") (pSort @RightCurlyBracketTokL "}_tok") (pSepBy1 (pSort @UseMemberL "use_member") (pSort @CommaTokL ",_tok"))
+      M.UseModuleMembers2' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity" <*> fragmentSortP @M.Token @M.ColonColonTokL "::_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftCurlyBracketTokL "{_tok") (fragmentSortP @M.Token @M.RightCurlyBracketTokL "}_tok") (sepBy1P (fragmentSortP @M.UseMember @M.UseMemberL "use_member") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pUnitExpression :: TermParser UnitExpressionL
+pUnitExpression :: TermParser M.UnitExpressionL
 pUnitExpression =
-  UnitExpression' <$> pSort @LeftParenthesisTokL "(_tok" <*> pSort @RightParenthesisTokL ")_tok"
+  M.UnitExpression' <$> fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok" <*> fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok"
 
-pVectorExpression :: TermParser VectorExpressionL
+pVectorExpression :: TermParser M.VectorExpressionL
 pVectorExpression =
-  VectorExpression' <$> pVectorExpressionInternal0 <*> pSepBy (pHiddenExpression) (pSort @CommaTokL ",_tok") <*> pSort @RightSquareBracketTokL "]_tok"
+  M.VectorExpression' <$> pVectorExpressionInternal0 <*> sepByP (pHiddenExpression) (fragmentSortP @M.Token @M.CommaTokL ",_tok") <*> fragmentSortP @M.Token @M.RightSquareBracketTokL "]_tok"
 
-pVectorExpressionInternal0 :: TermParser VectorExpressionInternal0L
+pVectorExpressionInternal0 :: TermParser M.VectorExpressionInternal0L
 pVectorExpressionInternal0 =
-  choice [ Megaparsec.try pVectorExpressionInternal02
-         , Megaparsec.try pVectorExpressionInternal0VectorLeftSquareBracket
-         ]
+  Megaparsec.Cubix.pLongest "vector_expression_internal0" altsVectorExpressionInternal0
+
+altsVectorExpressionInternal0 :: [TermParser M.VectorExpressionInternal0L]
+altsVectorExpressionInternal0 =
+  [ pVectorExpressionInternal02
+  , pVectorExpressionInternal0VectorLeftSquareBracket
+  ]
   where
-    pVectorExpressionInternal02 :: TermParser VectorExpressionInternal0L
+    pVectorExpressionInternal02 :: TermParser M.VectorExpressionInternal0L
     pVectorExpressionInternal02 =
-      VectorExpressionInternal02' <$> pBetween (pSort @VectorLessThanSignTokL "vector<_tok") (pSort @GreaterThanSignTokL ">_tok") (pSepBy1 (pHiddenType) (pSort @CommaTokL ",_tok")) <*> pSort @LeftSquareBracketTokL "[_tok"
-    pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser VectorExpressionInternal0L
+      M.VectorExpressionInternal02' <$> betweenP (fragmentSortP @M.Token @M.VectorLessThanSignTokL "vector<_tok") (fragmentSortP @M.Token @M.GreaterThanSignTokL ">_tok") (sepBy1P (pHiddenType) (fragmentSortP @M.Token @M.CommaTokL ",_tok")) <*> fragmentSortP @M.Token @M.LeftSquareBracketTokL "[_tok"
+    pVectorExpressionInternal0VectorLeftSquareBracket :: TermParser M.VectorExpressionInternal0L
     pVectorExpressionInternal0VectorLeftSquareBracket =
-      VectorExpressionInternal0VectorLeftSquareBracket' <$> pSort @VectorLeftSquareBracketTokL "vector[_tok"
+      M.VectorExpressionInternal0VectorLeftSquareBracket' <$> fragmentSortP @M.Token @M.VectorLeftSquareBracketTokL "vector[_tok"
 
-pBorrowExpression :: TermParser BorrowExpressionL
+pBorrowExpression :: TermParser M.BorrowExpressionL
 pBorrowExpression =
-  BorrowExpression' <$> pPair (pHiddenReference) (pHiddenExpression)
+  M.BorrowExpression' <$> pairP (pHiddenReference) (pHiddenExpression)
 
-pDereferenceExpression :: TermParser DereferenceExpressionL
+pDereferenceExpression :: TermParser M.DereferenceExpressionL
 pDereferenceExpression =
-  DereferenceExpression' <$> pPair (pSort @AsteriskTokL "*_tok") (pHiddenExpression)
+  M.DereferenceExpression' <$> pairP (fragmentSortP @M.Token @M.AsteriskTokL "*_tok") (pHiddenExpression)
 
-pMoveOrCopyExpression :: TermParser MoveOrCopyExpressionL
+pMoveOrCopyExpression :: TermParser M.MoveOrCopyExpressionL
 pMoveOrCopyExpression =
-  MoveOrCopyExpression' <$> pPair (pMoveOrCopyExpressionInternal0) (pHiddenExpression)
+  M.MoveOrCopyExpression' <$> pairP (pMoveOrCopyExpressionInternal0) (pHiddenExpression)
 
-pMoveOrCopyExpressionInternal0 :: TermParser MoveOrCopyExpressionInternal0L
+pMoveOrCopyExpressionInternal0 :: TermParser M.MoveOrCopyExpressionInternal0L
 pMoveOrCopyExpressionInternal0 =
-  choice [ Megaparsec.try pMoveOrCopyExpressionInternal0Move
-         , Megaparsec.try pMoveOrCopyExpressionInternal0Copy
-         ]
+  Megaparsec.Cubix.pLongest "move_or_copy_expression_internal0" altsMoveOrCopyExpressionInternal0
+
+altsMoveOrCopyExpressionInternal0 :: [TermParser M.MoveOrCopyExpressionInternal0L]
+altsMoveOrCopyExpressionInternal0 =
+  [ pMoveOrCopyExpressionInternal0Move
+  , pMoveOrCopyExpressionInternal0Copy
+  ]
   where
-    pMoveOrCopyExpressionInternal0Move :: TermParser MoveOrCopyExpressionInternal0L
+    pMoveOrCopyExpressionInternal0Move :: TermParser M.MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Move =
-      MoveOrCopyExpressionInternal0Move' <$> pSort @MoveTokL "move_tok"
-    pMoveOrCopyExpressionInternal0Copy :: TermParser MoveOrCopyExpressionInternal0L
+      M.MoveOrCopyExpressionInternal0Move' <$> fragmentSortP @M.Token @M.MoveTokL "move_tok"
+    pMoveOrCopyExpressionInternal0Copy :: TermParser M.MoveOrCopyExpressionInternal0L
     pMoveOrCopyExpressionInternal0Copy =
-      MoveOrCopyExpressionInternal0Copy' <$> pSort @CopyTokL "copy_tok"
+      M.MoveOrCopyExpressionInternal0Copy' <$> fragmentSortP @M.Token @M.CopyTokL "copy_tok"
 
-pUnaryExpression :: TermParser UnaryExpressionL
+pUnaryExpression :: TermParser M.UnaryExpressionL
 pUnaryExpression =
-  UnaryExpression' <$> pSort @UnaryOpL "unary_op" <*> pHiddenExpression
+  M.UnaryExpression' <$> fragmentSortP @M.UnaryOp @M.UnaryOpL "unary_op" <*> pHiddenExpression
 
-pUnaryOp :: TermParser UnaryOpL
+pUnaryOp :: TermParser M.UnaryOpL
 pUnaryOp =
-  UnaryOp' <$> pSort @ExclamationMarkTokL "!_tok"
+  M.UnaryOp' <$> fragmentSortP @M.Token @M.ExclamationMarkTokL "!_tok"
 
-pAbortExpression :: TermParser AbortExpressionL
+pAbortExpression :: TermParser M.AbortExpressionL
 pAbortExpression =
-  AbortExpression' <$> pSort @AbortTokL "abort_tok" <*> pMaybe (pHiddenExpression)
+  M.AbortExpression' <$> fragmentSortP @M.Token @M.AbortTokL "abort_tok" <*> maybeP (pHiddenExpression)
 
-pAssignExpression :: TermParser AssignExpressionL
+pAssignExpression :: TermParser M.AssignExpressionL
 pAssignExpression =
-  AssignExpression' <$> pPair (pPair (pHiddenUnaryExpression) (pSort @EqualsSignTokL "=_tok")) (pHiddenExpression)
+  M.AssignExpression' <$> pairP (pairP (pHiddenUnaryExpression) (fragmentSortP @M.Token @M.EqualsSignTokL "=_tok")) (pHiddenExpression)
 
-pBinaryExpression :: TermParser BinaryExpressionL
+pBinaryExpression :: TermParser M.BinaryExpressionL
 pBinaryExpression =
-  choice [ Megaparsec.try pBinaryExpression1
-         , Megaparsec.try pBinaryExpression2
-         , Megaparsec.try pBinaryExpression3
-         , Megaparsec.try pBinaryExpression4
-         , Megaparsec.try pBinaryExpression5
-         , Megaparsec.try pBinaryExpression6
-         , Megaparsec.try pBinaryExpression7
-         , Megaparsec.try pBinaryExpression8
-         , Megaparsec.try pBinaryExpression9
-         , Megaparsec.try pBinaryExpression10
-         , Megaparsec.try pBinaryExpression11
-         , Megaparsec.try pBinaryExpression12
-         , Megaparsec.try pBinaryExpression13
-         , Megaparsec.try pBinaryExpression14
-         , Megaparsec.try pBinaryExpression15
-         , Megaparsec.try pBinaryExpression16
-         , Megaparsec.try pBinaryExpression17
-         , Megaparsec.try pBinaryExpression18
-         , Megaparsec.try pBinaryExpression19
-         , Megaparsec.try pBinaryExpression20
-         ]
+  Megaparsec.Cubix.pLongest "binary_expression" altsBinaryExpression
+
+altsBinaryExpression :: [TermParser M.BinaryExpressionL]
+altsBinaryExpression =
+  [ pBinaryExpression1
+  , pBinaryExpression2
+  , pBinaryExpression3
+  , pBinaryExpression4
+  , pBinaryExpression5
+  , pBinaryExpression6
+  , pBinaryExpression7
+  , pBinaryExpression8
+  , pBinaryExpression9
+  , pBinaryExpression10
+  , pBinaryExpression11
+  , pBinaryExpression12
+  , pBinaryExpression13
+  , pBinaryExpression14
+  , pBinaryExpression15
+  , pBinaryExpression16
+  , pBinaryExpression17
+  , pBinaryExpression18
+  , pBinaryExpression19
+  , pBinaryExpression20
+  ]
   where
-    pBinaryExpression1 :: TermParser BinaryExpressionL
+    pBinaryExpression1 :: TermParser M.BinaryExpressionL
     pBinaryExpression1 =
-      BinaryExpression1' <$> pHiddenExpression <*> pSort @EqualsSignEqualsSignGreaterThanSignTokL "==>_tok" <*> pHiddenExpression
-    pBinaryExpression2 :: TermParser BinaryExpressionL
+      M.BinaryExpression1' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.EqualsSignEqualsSignGreaterThanSignTokL "==>_tok" <*> pHiddenExpression
+    pBinaryExpression2 :: TermParser M.BinaryExpressionL
     pBinaryExpression2 =
-      BinaryExpression2' <$> pHiddenExpression <*> pSort @VerticalLineVerticalLineTokL "||_tok" <*> pHiddenExpression
-    pBinaryExpression3 :: TermParser BinaryExpressionL
+      M.BinaryExpression2' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.VerticalLineVerticalLineTokL "||_tok" <*> pHiddenExpression
+    pBinaryExpression3 :: TermParser M.BinaryExpressionL
     pBinaryExpression3 =
-      BinaryExpression3' <$> pHiddenExpression <*> pSort @AmpersandAmpersandTokL "&&_tok" <*> pHiddenExpression
-    pBinaryExpression4 :: TermParser BinaryExpressionL
+      M.BinaryExpression3' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.AmpersandAmpersandTokL "&&_tok" <*> pHiddenExpression
+    pBinaryExpression4 :: TermParser M.BinaryExpressionL
     pBinaryExpression4 =
-      BinaryExpression4' <$> pHiddenExpression <*> pSort @EqualsSignEqualsSignTokL "==_tok" <*> pHiddenExpression
-    pBinaryExpression5 :: TermParser BinaryExpressionL
+      M.BinaryExpression4' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.EqualsSignEqualsSignTokL "==_tok" <*> pHiddenExpression
+    pBinaryExpression5 :: TermParser M.BinaryExpressionL
     pBinaryExpression5 =
-      BinaryExpression5' <$> pHiddenExpression <*> pSort @ExclamationMarkEqualsSignTokL "!=_tok" <*> pHiddenExpression
-    pBinaryExpression6 :: TermParser BinaryExpressionL
+      M.BinaryExpression5' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.ExclamationMarkEqualsSignTokL "!=_tok" <*> pHiddenExpression
+    pBinaryExpression6 :: TermParser M.BinaryExpressionL
     pBinaryExpression6 =
-      BinaryExpression6' <$> pHiddenExpression <*> pSort @LessThanSignTokL "<_tok" <*> pHiddenExpression
-    pBinaryExpression7 :: TermParser BinaryExpressionL
+      M.BinaryExpression6' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.LessThanSignTokL "<_tok" <*> pHiddenExpression
+    pBinaryExpression7 :: TermParser M.BinaryExpressionL
     pBinaryExpression7 =
-      BinaryExpression7' <$> pHiddenExpression <*> pSort @GreaterThanSignTokL ">_tok" <*> pHiddenExpression
-    pBinaryExpression8 :: TermParser BinaryExpressionL
+      M.BinaryExpression7' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.GreaterThanSignTokL ">_tok" <*> pHiddenExpression
+    pBinaryExpression8 :: TermParser M.BinaryExpressionL
     pBinaryExpression8 =
-      BinaryExpression8' <$> pHiddenExpression <*> pSort @LessThanSignEqualsSignTokL "<=_tok" <*> pHiddenExpression
-    pBinaryExpression9 :: TermParser BinaryExpressionL
+      M.BinaryExpression8' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.LessThanSignEqualsSignTokL "<=_tok" <*> pHiddenExpression
+    pBinaryExpression9 :: TermParser M.BinaryExpressionL
     pBinaryExpression9 =
-      BinaryExpression9' <$> pHiddenExpression <*> pSort @GreaterThanSignEqualsSignTokL ">=_tok" <*> pHiddenExpression
-    pBinaryExpression10 :: TermParser BinaryExpressionL
+      M.BinaryExpression9' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.GreaterThanSignEqualsSignTokL ">=_tok" <*> pHiddenExpression
+    pBinaryExpression10 :: TermParser M.BinaryExpressionL
     pBinaryExpression10 =
-      BinaryExpression10' <$> pHiddenExpression <*> pSort @FullStopFullStopTokL ".._tok" <*> pHiddenExpression
-    pBinaryExpression11 :: TermParser BinaryExpressionL
+      M.BinaryExpression10' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.FullStopFullStopTokL ".._tok" <*> pHiddenExpression
+    pBinaryExpression11 :: TermParser M.BinaryExpressionL
     pBinaryExpression11 =
-      BinaryExpression11' <$> pHiddenExpression <*> pSort @VerticalLineTokL "|_tok" <*> pHiddenExpression
-    pBinaryExpression12 :: TermParser BinaryExpressionL
+      M.BinaryExpression11' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.VerticalLineTokL "|_tok" <*> pHiddenExpression
+    pBinaryExpression12 :: TermParser M.BinaryExpressionL
     pBinaryExpression12 =
-      BinaryExpression12' <$> pHiddenExpression <*> pSort @CircumflexAccentTokL "^_tok" <*> pHiddenExpression
-    pBinaryExpression13 :: TermParser BinaryExpressionL
+      M.BinaryExpression12' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.CircumflexAccentTokL "^_tok" <*> pHiddenExpression
+    pBinaryExpression13 :: TermParser M.BinaryExpressionL
     pBinaryExpression13 =
-      BinaryExpression13' <$> pHiddenExpression <*> pSort @AmpersandTokL "&_tok" <*> pHiddenExpression
-    pBinaryExpression14 :: TermParser BinaryExpressionL
+      M.BinaryExpression13' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.AmpersandTokL "&_tok" <*> pHiddenExpression
+    pBinaryExpression14 :: TermParser M.BinaryExpressionL
     pBinaryExpression14 =
-      BinaryExpression14' <$> pHiddenExpression <*> pSort @LessThanSignLessThanSignTokL "<<_tok" <*> pHiddenExpression
-    pBinaryExpression15 :: TermParser BinaryExpressionL
+      M.BinaryExpression14' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.LessThanSignLessThanSignTokL "<<_tok" <*> pHiddenExpression
+    pBinaryExpression15 :: TermParser M.BinaryExpressionL
     pBinaryExpression15 =
-      BinaryExpression15' <$> pHiddenExpression <*> pSort @GreaterThanSignGreaterThanSignTokL ">>_tok" <*> pHiddenExpression
-    pBinaryExpression16 :: TermParser BinaryExpressionL
+      M.BinaryExpression15' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.GreaterThanSignGreaterThanSignTokL ">>_tok" <*> pHiddenExpression
+    pBinaryExpression16 :: TermParser M.BinaryExpressionL
     pBinaryExpression16 =
-      BinaryExpression16' <$> pHiddenExpression <*> pSort @PlusSignTokL "+_tok" <*> pHiddenExpression
-    pBinaryExpression17 :: TermParser BinaryExpressionL
+      M.BinaryExpression16' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.PlusSignTokL "+_tok" <*> pHiddenExpression
+    pBinaryExpression17 :: TermParser M.BinaryExpressionL
     pBinaryExpression17 =
-      BinaryExpression17' <$> pHiddenExpression <*> pSort @HyphenMinusTokL "-_tok" <*> pHiddenExpression
-    pBinaryExpression18 :: TermParser BinaryExpressionL
+      M.BinaryExpression17' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.HyphenMinusTokL "-_tok" <*> pHiddenExpression
+    pBinaryExpression18 :: TermParser M.BinaryExpressionL
     pBinaryExpression18 =
-      BinaryExpression18' <$> pHiddenExpression <*> pSort @AsteriskTokL "*_tok" <*> pHiddenExpression
-    pBinaryExpression19 :: TermParser BinaryExpressionL
+      M.BinaryExpression18' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.AsteriskTokL "*_tok" <*> pHiddenExpression
+    pBinaryExpression19 :: TermParser M.BinaryExpressionL
     pBinaryExpression19 =
-      BinaryExpression19' <$> pHiddenExpression <*> pSort @SolidusTokL "/_tok" <*> pHiddenExpression
-    pBinaryExpression20 :: TermParser BinaryExpressionL
+      M.BinaryExpression19' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.SolidusTokL "/_tok" <*> pHiddenExpression
+    pBinaryExpression20 :: TermParser M.BinaryExpressionL
     pBinaryExpression20 =
-      BinaryExpression20' <$> pHiddenExpression <*> pSort @PercentSignTokL "%_tok" <*> pHiddenExpression
+      M.BinaryExpression20' <$> pHiddenExpression <*> fragmentSortP @M.Token @M.PercentSignTokL "%_tok" <*> pHiddenExpression
 
-pCastExpression :: TermParser CastExpressionL
+pCastExpression :: TermParser M.CastExpressionL
 pCastExpression =
-  CastExpression' <$> pPair (pPair (pHiddenExpression) (pSort @AsTokL "as_tok")) (pHiddenType)
+  M.CastExpression' <$> pairP (pairP (pHiddenExpression) (fragmentSortP @M.Token @M.AsTokL "as_tok")) (pHiddenType)
 
-pIdentifiedExpression :: TermParser IdentifiedExpressionL
+pIdentifiedExpression :: TermParser M.IdentifiedExpressionL
 pIdentifiedExpression =
-  IdentifiedExpression' <$> pSort @BlockIdentifierL "block_identifier" <*> pHiddenExpression
+  M.IdentifiedExpression' <$> fragmentSortP @M.BlockIdentifier @M.BlockIdentifierL "block_identifier" <*> pHiddenExpression
 
-pBlockIdentifier :: TermParser BlockIdentifierL
+pBlockIdentifier :: TermParser M.BlockIdentifierL
 pBlockIdentifier =
-  BlockIdentifier' <$> pSort @LabelL "label" <*> pSort @ColonTokL ":_tok"
+  M.BlockIdentifier' <$> fragmentSortP @M.Label @M.LabelL "label" <*> fragmentSortP @M.Token @M.ColonTokL ":_tok"
 
-pLambdaExpression :: TermParser LambdaExpressionL
+pLambdaExpression :: TermParser M.LambdaExpressionL
 pLambdaExpression =
-  LambdaExpression' <$> pSort @LambdaBindingsL "lambda_bindings" <*> pMaybe (pPair (pSort @HyphenMinusGreaterThanSignTokL "->_tok") (pHiddenType)) <*> pHiddenExpression
+  M.LambdaExpression' <$> fragmentSortP @M.LambdaBindings @M.LambdaBindingsL "lambda_bindings" <*> maybeP (pairP (fragmentSortP @M.Token @M.HyphenMinusGreaterThanSignTokL "->_tok") (pHiddenType)) <*> pHiddenExpression
 
-pLambdaBindings :: TermParser LambdaBindingsL
+pLambdaBindings :: TermParser M.LambdaBindingsL
 pLambdaBindings =
-  LambdaBindings' <$> pBetween (pSort @VerticalLineTokL "|_tok") (pSort @VerticalLineTokL "|_tok") (pSepBy (pSort @LambdaBindingL "lambda_binding") (pSort @CommaTokL ",_tok"))
+  M.LambdaBindings' <$> betweenP (fragmentSortP @M.Token @M.VerticalLineTokL "|_tok") (fragmentSortP @M.Token @M.VerticalLineTokL "|_tok") (sepByP (fragmentSortP @M.LambdaBinding @M.LambdaBindingL "lambda_binding") (fragmentSortP @M.Token @M.CommaTokL ",_tok"))
 
-pLambdaBinding :: TermParser LambdaBindingL
+pLambdaBinding :: TermParser M.LambdaBindingL
 pLambdaBinding =
-  choice [ Megaparsec.try pLambdaBinding3
-         , Megaparsec.try pLambdaBindingCommaBindList
-         , Megaparsec.try pLambdaBindingBind
-         ]
+  Megaparsec.Cubix.pLongest "lambda_binding" altsLambdaBinding
+
+altsLambdaBinding :: [TermParser M.LambdaBindingL]
+altsLambdaBinding =
+  [ pLambdaBinding3
+  , pLambdaBindingCommaBindList
+  , pLambdaBindingBind
+  ]
   where
-    pLambdaBinding3 :: TermParser LambdaBindingL
+    pLambdaBinding3 :: TermParser M.LambdaBindingL
     pLambdaBinding3 =
-      LambdaBinding3' <$> pHiddenBind <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pHiddenType))
-    pLambdaBindingCommaBindList :: TermParser LambdaBindingL
+      M.LambdaBinding3' <$> pHiddenBind <*> maybeP (pairP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (pHiddenType))
+    pLambdaBindingCommaBindList :: TermParser M.LambdaBindingL
     pLambdaBindingCommaBindList =
-      LambdaBindingCommaBindList' <$> pSort @CommaBindListL "comma_bind_list"
-    pLambdaBindingBind :: TermParser LambdaBindingL
+      M.LambdaBindingCommaBindList' <$> fragmentSortP @M.CommaBindList @M.CommaBindListL "comma_bind_list"
+    pLambdaBindingBind :: TermParser M.LambdaBindingL
     pLambdaBindingBind =
-      LambdaBindingBind' <$> pHiddenBind
+      M.LambdaBindingBind' <$> pHiddenBind
 
-pLoopExpression :: TermParser LoopExpressionL
+pLoopExpression :: TermParser M.LoopExpressionL
 pLoopExpression =
-  LoopExpression' <$> pSort @LoopTokL "loop_tok" <*> pHiddenExpression
+  M.LoopExpression' <$> fragmentSortP @M.Token @M.LoopTokL "loop_tok" <*> pHiddenExpression
 
-pQuantifierExpression :: TermParser QuantifierExpressionL
+pQuantifierExpression :: TermParser M.QuantifierExpressionL
 pQuantifierExpression =
-  QuantifierExpression' <$> pPair (pPair (pPair (pPair (pQuantifierExpressionInternal0) (pSort @QuantifierBindingsL "quantifier_bindings")) (pMaybe (pPair (pSort @WhereTokL "where_tok") (pHiddenExpression)))) (pSort @ColonTokL ":_tok")) (pHiddenExpression)
+  M.QuantifierExpression' <$> pairP (pairP (pairP (pairP (pQuantifierExpressionInternal0) (fragmentSortP @M.QuantifierBindings @M.QuantifierBindingsL "quantifier_bindings")) (maybeP (pairP (fragmentSortP @M.Token @M.WhereTokL "where_tok") (pHiddenExpression)))) (fragmentSortP @M.Token @M.ColonTokL ":_tok")) (pHiddenExpression)
 
-pQuantifierBindings :: TermParser QuantifierBindingsL
+pQuantifierBindings :: TermParser M.QuantifierBindingsL
 pQuantifierBindings =
-  QuantifierBindings' <$> pSepBy1 (pSort @QuantifierBindingL "quantifier_binding") (pSort @CommaTokL ",_tok")
+  M.QuantifierBindings' <$> sepBy1P (fragmentSortP @M.QuantifierBinding @M.QuantifierBindingL "quantifier_binding") (fragmentSortP @M.Token @M.CommaTokL ",_tok")
 
-pQuantifierBinding :: TermParser QuantifierBindingL
+pQuantifierBinding :: TermParser M.QuantifierBindingL
 pQuantifierBinding =
-  choice [ Megaparsec.try pQuantifierBinding1
-         , Megaparsec.try pQuantifierBinding2
-         ]
+  Megaparsec.Cubix.pLongest "quantifier_binding" altsQuantifierBinding
+
+altsQuantifierBinding :: [TermParser M.QuantifierBindingL]
+altsQuantifierBinding =
+  [ pQuantifierBinding1
+  , pQuantifierBinding2
+  ]
   where
-    pQuantifierBinding1 :: TermParser QuantifierBindingL
+    pQuantifierBinding1 :: TermParser M.QuantifierBindingL
     pQuantifierBinding1 =
-      QuantifierBinding1' <$> pSort @IdentifierL "identifier" <*> pSort @ColonTokL ":_tok" <*> pHiddenType
-    pQuantifierBinding2 :: TermParser QuantifierBindingL
+      M.QuantifierBinding1' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> fragmentSortP @M.Token @M.ColonTokL ":_tok" <*> pHiddenType
+    pQuantifierBinding2 :: TermParser M.QuantifierBindingL
     pQuantifierBinding2 =
-      QuantifierBinding2' <$> pSort @IdentifierL "identifier" <*> pSort @InTokL "in_tok" <*> pHiddenExpression
+      M.QuantifierBinding2' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier" <*> fragmentSortP @M.Token @M.InTokL "in_tok" <*> pHiddenExpression
 
-pQuantifierExpressionInternal0 :: TermParser QuantifierExpressionInternal0L
+pQuantifierExpressionInternal0 :: TermParser M.QuantifierExpressionInternal0L
 pQuantifierExpressionInternal0 =
-  choice [ Megaparsec.try pQuantifierExpressionInternal0Forall
-         , Megaparsec.try pQuantifierExpressionInternal0Exists
-         ]
+  Megaparsec.Cubix.pLongest "quantifier_expression_internal0" altsQuantifierExpressionInternal0
+
+altsQuantifierExpressionInternal0 :: [TermParser M.QuantifierExpressionInternal0L]
+altsQuantifierExpressionInternal0 =
+  [ pQuantifierExpressionInternal0Forall
+  , pQuantifierExpressionInternal0Exists
+  ]
   where
-    pQuantifierExpressionInternal0Forall :: TermParser QuantifierExpressionInternal0L
+    pQuantifierExpressionInternal0Forall :: TermParser M.QuantifierExpressionInternal0L
     pQuantifierExpressionInternal0Forall =
-      QuantifierExpressionInternal0Forall' <$> pHiddenForall
-    pQuantifierExpressionInternal0Exists :: TermParser QuantifierExpressionInternal0L
+      M.QuantifierExpressionInternal0Forall' <$> pHiddenForall
+    pQuantifierExpressionInternal0Exists :: TermParser M.QuantifierExpressionInternal0L
     pQuantifierExpressionInternal0Exists =
-      QuantifierExpressionInternal0Exists' <$> pHiddenExists
+      M.QuantifierExpressionInternal0Exists' <$> pHiddenExists
 
-pReturnExpression :: TermParser ReturnExpressionL
+pReturnExpression :: TermParser M.ReturnExpressionL
 pReturnExpression =
-  choice [ Megaparsec.try pReturnExpression1
-         , Megaparsec.try pReturnExpression2
-         ]
+  Megaparsec.Cubix.pLongest "return_expression" altsReturnExpression
+
+altsReturnExpression :: [TermParser M.ReturnExpressionL]
+altsReturnExpression =
+  [ pReturnExpression1
+  , pReturnExpression2
+  ]
   where
-    pReturnExpression1 :: TermParser ReturnExpressionL
+    pReturnExpression1 :: TermParser M.ReturnExpressionL
     pReturnExpression1 =
-      ReturnExpression1' <$> pSort @ReturnTokL "return_tok" <*> pMaybe (pSort @LabelL "label") <*> pHiddenExpression
-    pReturnExpression2 :: TermParser ReturnExpressionL
+      M.ReturnExpression1' <$> fragmentSortP @M.Token @M.ReturnTokL "return_tok" <*> maybeP (fragmentSortP @M.Label @M.LabelL "label") <*> pHiddenExpression
+    pReturnExpression2 :: TermParser M.ReturnExpressionL
     pReturnExpression2 =
-      ReturnExpression2' <$> pSort @ReturnTokL "return_tok" <*> pMaybe (pSort @LabelL "label")
+      M.ReturnExpression2' <$> fragmentSortP @M.Token @M.ReturnTokL "return_tok" <*> maybeP (fragmentSortP @M.Label @M.LabelL "label")
 
-pWhileExpression :: TermParser WhileExpressionL
+pWhileExpression :: TermParser M.WhileExpressionL
 pWhileExpression =
-  WhileExpression' <$> pSort @WhileTokL "while_tok" <*> pBetween (pSort @LeftParenthesisTokL "(_tok") (pSort @RightParenthesisTokL ")_tok") (pHiddenExpression) <*> pHiddenExpression
+  M.WhileExpression' <$> fragmentSortP @M.Token @M.WhileTokL "while_tok" <*> betweenP (fragmentSortP @M.Token @M.LeftParenthesisTokL "(_tok") (fragmentSortP @M.Token @M.RightParenthesisTokL ")_tok") (pHiddenExpression) <*> pHiddenExpression
 
-pBlockItem :: TermParser BlockItemL
+pBlockItem :: TermParser M.BlockItemL
 pBlockItem =
-  BlockItem' <$> pBlockItemInternal0 <*> pSort @SemicolonTokL ";_tok"
+  M.BlockItem' <$> pBlockItemInternal0 <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pBlockItemInternal0 :: TermParser BlockItemInternal0L
+pBlockItemInternal0 :: TermParser M.BlockItemInternal0L
 pBlockItemInternal0 =
-  choice [ Megaparsec.try pBlockItemInternal0Expression
-         , Megaparsec.try pBlockItemInternal0LetStatement
-         ]
+  Megaparsec.Cubix.pLongest "block_item_internal0" altsBlockItemInternal0
+
+altsBlockItemInternal0 :: [TermParser M.BlockItemInternal0L]
+altsBlockItemInternal0 =
+  [ pBlockItemInternal0Expression
+  , pBlockItemInternal0LetStatement
+  ]
   where
-    pBlockItemInternal0Expression :: TermParser BlockItemInternal0L
+    pBlockItemInternal0Expression :: TermParser M.BlockItemInternal0L
     pBlockItemInternal0Expression =
-      BlockItemInternal0Expression' <$> pHiddenExpression
-    pBlockItemInternal0LetStatement :: TermParser BlockItemInternal0L
+      M.BlockItemInternal0Expression' <$> pHiddenExpression
+    pBlockItemInternal0LetStatement :: TermParser M.BlockItemInternal0L
     pBlockItemInternal0LetStatement =
-      BlockItemInternal0LetStatement' <$> pSort @LetStatementL "let_statement"
+      M.BlockItemInternal0LetStatement' <$> fragmentSortP @M.LetStatement @M.LetStatementL "let_statement"
 
-pLetStatement :: TermParser LetStatementL
+pLetStatement :: TermParser M.LetStatementL
 pLetStatement =
-  LetStatement' <$> pSort @LetTokL "let_tok" <*> pSort @BindListL "bind_list" <*> pMaybe (pPair (pSort @ColonTokL ":_tok") (pHiddenType)) <*> pMaybe (pPair (pSort @EqualsSignTokL "=_tok") (pHiddenExpression))
+  M.LetStatement' <$> fragmentSortP @M.Token @M.LetTokL "let_tok" <*> fragmentSortP @M.BindList @M.BindListL "bind_list" <*> maybeP (pairP (fragmentSortP @M.Token @M.ColonTokL ":_tok") (pHiddenType)) <*> maybeP (pairP (fragmentSortP @M.Token @M.EqualsSignTokL "=_tok") (pHiddenExpression))
 
-pMacroFunctionDefinition :: TermParser MacroFunctionDefinitionL
+pMacroFunctionDefinition :: TermParser M.MacroFunctionDefinitionL
 pMacroFunctionDefinition =
-  MacroFunctionDefinition' <$> pMaybe (pSort @ModifierL "modifier") <*> pSort @MacroTokL "macro_tok" <*> pHiddenMacroSignature <*> pSort @BlockL "block"
+  M.MacroFunctionDefinition' <$> maybeP (fragmentSortP @M.Modifier @M.ModifierL "modifier") <*> fragmentSortP @M.Token @M.MacroTokL "macro_tok" <*> pHiddenMacroSignature <*> fragmentSortP @M.Block @M.BlockL "block"
 
-pHiddenMacroSignature :: TermParser HiddenMacroSignatureL
+pHiddenMacroSignature :: TermParser M.HiddenMacroSignatureL
 pHiddenMacroSignature =
-  HiddenMacroSignature' <$> pMaybe (pSort @ModifierL "modifier") <*> pSort @FunTokL "fun_tok" <*> pHiddenFunctionIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pSort @FunctionParametersL "function_parameters" <*> pMaybe (pSort @RetTypeL "ret_type")
+  M.HiddenMacroSignature' <$> maybeP (fragmentSortP @M.Modifier @M.ModifierL "modifier") <*> fragmentSortP @M.Token @M.FunTokL "fun_tok" <*> pHiddenFunctionIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> fragmentSortP @M.FunctionParameters @M.FunctionParametersL "function_parameters" <*> maybeP (fragmentSortP @M.RetType @M.RetTypeL "ret_type")
 
-pNativeFunctionDefinition :: TermParser NativeFunctionDefinitionL
+pNativeFunctionDefinition :: TermParser M.NativeFunctionDefinitionL
 pNativeFunctionDefinition =
-  NativeFunctionDefinition' <$> pHiddenFunctionSignature <*> pSort @SemicolonTokL ";_tok"
+  M.NativeFunctionDefinition' <$> pHiddenFunctionSignature <*> fragmentSortP @M.Token @M.SemicolonTokL ";_tok"
 
-pHiddenStructItem :: TermParser HiddenStructItemL
+pHiddenStructItem :: TermParser M.HiddenStructItemL
 pHiddenStructItem =
-  choice [ Megaparsec.try pHiddenStructItemNativeStructDefinition
-         , Megaparsec.try pHiddenStructItemStructDefinition
-         ]
+  Megaparsec.Cubix.pLongest "_struct_item" altsHiddenStructItem
+
+altsHiddenStructItem :: [TermParser M.HiddenStructItemL]
+altsHiddenStructItem =
+  [ pHiddenStructItemNativeStructDefinition
+  , pHiddenStructItemStructDefinition
+  ]
   where
-    pHiddenStructItemNativeStructDefinition :: TermParser HiddenStructItemL
+    pHiddenStructItemNativeStructDefinition :: TermParser M.HiddenStructItemL
     pHiddenStructItemNativeStructDefinition =
-      HiddenStructItemNativeStructDefinition' <$> pSort @NativeStructDefinitionL "native_struct_definition"
-    pHiddenStructItemStructDefinition :: TermParser HiddenStructItemL
+      M.HiddenStructItemNativeStructDefinition' <$> fragmentSortP @M.NativeStructDefinition @M.NativeStructDefinitionL "native_struct_definition"
+    pHiddenStructItemStructDefinition :: TermParser M.HiddenStructItemL
     pHiddenStructItemStructDefinition =
-      HiddenStructItemStructDefinition' <$> pSort @StructDefinitionL "struct_definition"
+      M.HiddenStructItemStructDefinition' <$> fragmentSortP @M.StructDefinition @M.StructDefinitionL "struct_definition"
 
-pNativeStructDefinition :: TermParser NativeStructDefinitionL
+pNativeStructDefinition :: TermParser M.NativeStructDefinitionL
 pNativeStructDefinition =
-  NativeStructDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pBetween (pSort @NativeTokL "native_tok") (pSort @SemicolonTokL ";_tok") (pHiddenStructSignature)
+  M.NativeStructDefinition' <$> maybeP (fragmentSortP @M.Token @M.PublicTokL "public_tok") <*> betweenP (fragmentSortP @M.Token @M.NativeTokL "native_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenStructSignature)
 
-pHiddenStructSignature :: TermParser HiddenStructSignatureL
+pHiddenStructSignature :: TermParser M.HiddenStructSignatureL
 pHiddenStructSignature =
-  HiddenStructSignature' <$> pSort @StructTokL "struct_tok" <*> pHiddenStructIdentifier <*> pMaybe (pSort @TypeParametersL "type_parameters") <*> pMaybe (pSort @AbilityDeclsL "ability_decls")
+  M.HiddenStructSignature' <$> fragmentSortP @M.Token @M.StructTokL "struct_tok" <*> pHiddenStructIdentifier <*> maybeP (fragmentSortP @M.TypeParameters @M.TypeParametersL "type_parameters") <*> maybeP (fragmentSortP @M.AbilityDecls @M.AbilityDeclsL "ability_decls")
 
-pStructDefinition :: TermParser StructDefinitionL
+pStructDefinition :: TermParser M.StructDefinitionL
 pStructDefinition =
-  StructDefinition' <$> pMaybe (pSort @PublicTokL "public_tok") <*> pHiddenStructSignature <*> pSort @DatatypeFieldsL "datatype_fields" <*> pMaybe (pSort @PostfixAbilityDeclsL "postfix_ability_decls")
+  M.StructDefinition' <$> maybeP (fragmentSortP @M.Token @M.PublicTokL "public_tok") <*> pHiddenStructSignature <*> fragmentSortP @M.DatatypeFields @M.DatatypeFieldsL "datatype_fields" <*> maybeP (fragmentSortP @M.PostfixAbilityDecls @M.PostfixAbilityDeclsL "postfix_ability_decls")
 
-pConstant :: TermParser ConstantL
+pConstant :: TermParser M.ConstantL
 pConstant =
-  Constant' <$> pBetween (pSort @ConstTokL "const_tok") (pSort @ColonTokL ":_tok") (pSort @IdentifierL "identifier") <*> pHiddenType <*> pBetween (pSort @EqualsSignTokL "=_tok") (pSort @SemicolonTokL ";_tok") (pHiddenExpression)
+  M.Constant' <$> betweenP (fragmentSortP @M.Token @M.ConstTokL "const_tok") (fragmentSortP @M.Token @M.ColonTokL ":_tok") (fragmentSortP @M.Identifier @M.IdentifierL "identifier") <*> pHiddenType <*> betweenP (fragmentSortP @M.Token @M.EqualsSignTokL "=_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (pHiddenExpression)
 
-pFriendDeclaration :: TermParser FriendDeclarationL
+pFriendDeclaration :: TermParser M.FriendDeclarationL
 pFriendDeclaration =
-  FriendDeclaration' <$> pBetween (pSort @FriendTokL "friend_tok") (pSort @SemicolonTokL ";_tok") (pSort @FriendAccessL "friend_access")
+  M.FriendDeclaration' <$> betweenP (fragmentSortP @M.Token @M.FriendTokL "friend_tok") (fragmentSortP @M.Token @M.SemicolonTokL ";_tok") (fragmentSortP @M.FriendAccess @M.FriendAccessL "friend_access")
 
-pFriendAccess :: TermParser FriendAccessL
+pFriendAccess :: TermParser M.FriendAccessL
 pFriendAccess =
-  choice [ Megaparsec.try pFriendAccessLocalModule
-         , Megaparsec.try pFriendAccessFullyQualifiedModule
-         ]
-  where
-    pFriendAccessLocalModule :: TermParser FriendAccessL
-    pFriendAccessLocalModule =
-      FriendAccessLocalModule' <$> pSort @IdentifierL "identifier"
-    pFriendAccessFullyQualifiedModule :: TermParser FriendAccessL
-    pFriendAccessFullyQualifiedModule =
-      FriendAccessFullyQualifiedModule' <$> pSort @ModuleIdentityL "module_identity"
+  Megaparsec.Cubix.pLongest "friend_access" altsFriendAccess
 
-pModuleExtensionDefinition :: TermParser ModuleExtensionDefinitionL
+altsFriendAccess :: [TermParser M.FriendAccessL]
+altsFriendAccess =
+  [ pFriendAccessLocalModule
+  , pFriendAccessFullyQualifiedModule
+  ]
+  where
+    pFriendAccessLocalModule :: TermParser M.FriendAccessL
+    pFriendAccessLocalModule =
+      M.FriendAccessLocalModule' <$> fragmentSortP @M.Identifier @M.IdentifierL "identifier"
+    pFriendAccessFullyQualifiedModule :: TermParser M.FriendAccessL
+    pFriendAccessFullyQualifiedModule =
+      M.FriendAccessFullyQualifiedModule' <$> fragmentSortP @M.ModuleIdentity @M.ModuleIdentityL "module_identity"
+
+pModuleExtensionDefinition :: TermParser M.ModuleExtensionDefinitionL
 pModuleExtensionDefinition =
-  ModuleExtensionDefinition' <$> pSort @ExtendTokL "extend_tok" <*> pSort @ModuleDefinitionL "module_definition"
+  M.ModuleExtensionDefinition' <$> fragmentSortP @M.Token @M.ExtendTokL "extend_tok" <*> fragmentSortP @M.ModuleDefinition @M.ModuleDefinitionL "module_definition"
 
 --------------------------------------------------------------------------------
 -- Parse Table
 --------------------------------------------------------------------------------
 
+-- | The parser for each tree-sitter symbol, by symbol number. 'syntax'
+-- looks a node's parser up here by 'TS.nodeSymbol'.
+--
+-- The generator knows the grammar's rules and tokens by name, but the
+-- symbol numbers exist only in the compiled grammar, so the names are
+-- listed in 'symbolMap' and 'tokenMap', and 'mkParseTable' resolves
+-- them to numbers when parsing starts.
 newtype ParseTable = SymbolTable {unParseTable :: IntMap SomeTermParser}
 
+-- | Parsers for named nodes (rules of the grammar), by node type, e.g.
+-- @if_statement@.
 symbolMap :: Map String SomeTermParser
 symbolMap = Map.fromList
     [ ("source_file", E <$> pSourceFile)
@@ -2333,7 +2564,16 @@ symbolMap = Map.fromList
     , ("friend_declaration", E <$> pFriendDeclaration)
     , ("friend_access", E <$> pFriendAccess)
     , ("module_extension_definition", E <$> pModuleExtensionDefinition)
-    , ("!", E <$> pExclamationMarkTok)
+    ]
+
+-- | Parsers for anonymous tokens (string literals in the grammar), by
+-- their text, e.g. @if@ or @(@: tree-sitter names an anonymous token
+-- by its text. Kept apart from 'symbolMap' because a keyword can share
+-- its name with a node type (Python's @type@ keyword and @type@
+-- annotations); in one map, one of the two would get the other's parser.
+tokenMap :: Map String SomeTermParser
+tokenMap = Map.fromList
+    [ ("!", E <$> pExclamationMarkTok)
     , ("!=", E <$> pExclamationMarkEqualsSignTok)
     , ("#[", E <$> pNumberSignLeftSquareBracketTok)
     , ("$", E <$> pDollarSignTok)
@@ -2450,13 +2690,25 @@ symbolMap = Map.fromList
     , ("}", E <$> pRightCurlyBracketTok)
     ]
 
+-- | Look every symbol of the compiled grammar up by name, in 'symbolMap'
+-- if it is a named node and in 'tokenMap' if it is an anonymous token.
+-- Other symbols (hidden rules, supertypes) never appear in a parse tree
+-- and get no parser, as do symbols the generator saw no use of; reaching
+-- one of those is an "Unrecognized symbol" error in 'syntax'.
 mkParseTable :: TS.Language -> IO ParseTable
 mkParseTable lang = do
   count <- fromIntegral <$> TS.languageSymbolCount lang
   SymbolTable <$> foldrM
     (\id acc -> do
       symName <- TS.languageSymbolName lang id
-      let mSymSing = Map.lookup (Char8.unpack symName) symbolMap
+      symType <- TS.languageSymbolType lang id
+
+      let parsers = case symType of
+            TS.SymbolTypeRegular -> symbolMap
+            TS.SymbolTypeAnonymous -> tokenMap
+            _ -> Map.empty
+          mSymSing = Map.lookup (Char8.unpack symName) parsers
+
       pure (maybe acc (flip (IM.insert (fromIntegral id)) acc) mSymSing)
     )
     (IM.empty :: IntMap SomeTermParser)

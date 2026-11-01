@@ -19,16 +19,19 @@
 module Cubix.Language.SuiMove.Modularized
   where
 
-import Data.Comp.Multi.Strategy.Classification (KDynCase (..))
-import Data.Text (Text)
-import Data.Type.Equality (type (:~:) (..))
+-- Everything is imported qualified, so that the generated names, which
+-- come from the grammar, cannot clash with an import.
+import Data.Comp.Multi.Strategy.Classification qualified as Classification (KDynCase (..))
+import Data.Text qualified as Text (Text)
+import Data.Type.Equality qualified as Equality (type (:~:) (..))
 import Language.Haskell.TH qualified as TH
+import Prelude qualified
 
-import Cubix.Language.Info (TermLab)
-import Cubix.Language.Parametric.Derive
+import Cubix.Language.Info qualified as Info (TermLab)
+import Cubix.Language.Parametric.Derive qualified as Derive (deriveAll, deriveAllButDynCase)
 import Cubix.Language.Parametric.Syntax qualified as Syntax
-import Cubix.ParsePretty (type RootSort)
-import Data.Comp.Multi (Term)
+import Cubix.ParsePretty qualified as ParsePretty (type RootSort)
+import Data.Comp.Multi qualified as Comp (Term)
 
 --------------------------------------------------------------------------------
 -- Labels
@@ -468,7 +471,7 @@ data Token e l where
   VerticalLineVerticalLineTok :: Token e VerticalLineVerticalLineTokL
   RightCurlyBracketTok :: Token e RightCurlyBracketTokL
 
-deriveAllButDynCase [''Token]
+Derive.deriveAllButDynCase [''Token]
 
 data SourceFile e l where
   SourceFile
@@ -494,7 +497,7 @@ data ModuleBody e l where
   ModuleBody
     :: e ModuleBodyInternal0L
     -> e [ModuleBodyInternal1L]
-    -> e (Maybe RightCurlyBracketTokL)
+    -> e (Prelude.Maybe RightCurlyBracketTokL)
     -> ModuleBody e ModuleBodyL
 
 data ModuleBodyInternal0 e l where
@@ -535,18 +538,18 @@ data HiddenEnumItem e l where
 
 data EnumDefinition e l where
   EnumDefinition
-    :: e (Maybe PublicTokL)
+    :: e (Prelude.Maybe PublicTokL)
     -> e HiddenEnumSignatureL
     -> e EnumVariantsL
-    -> e (Maybe PostfixAbilityDeclsL)
+    -> e (Prelude.Maybe PostfixAbilityDeclsL)
     -> EnumDefinition e EnumDefinitionL
 
 data HiddenEnumSignature e l where
   HiddenEnumSignature
     :: e EnumTokL
     -> e HiddenEnumIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e (Maybe AbilityDeclsL)
+    -> e (Prelude.Maybe TypeParametersL)
+    -> e (Prelude.Maybe AbilityDeclsL)
     -> HiddenEnumSignature e HiddenEnumSignatureL
 
 data HiddenEnumIdentifier e l where
@@ -556,7 +559,7 @@ data HiddenEnumIdentifier e l where
 
 data Identifier e l where
   Identifier
-    :: Text
+    :: Text.Text
     -> Identifier e IdentifierL
 
 data AbilityDecls e l where
@@ -586,10 +589,10 @@ data TypeParameters e l where
 
 data TypeParameter e l where
   TypeParameter
-    :: e (Maybe DollarSignTokL)
-    -> e (Maybe PhantomTokL)
+    :: e (Prelude.Maybe DollarSignTokL)
+    -> e (Prelude.Maybe PhantomTokL)
     -> e HiddenTypeParameterIdentifierL
-    -> e (Maybe (ColonTokL, [AbilityL]))
+    -> e (Prelude.Maybe (ColonTokL, [AbilityL]))
     -> TypeParameter e TypeParameterL
 
 data HiddenTypeParameterIdentifier e l where
@@ -605,7 +608,7 @@ data EnumVariants e l where
 data Variant e l where
   Variant
     :: e HiddenVariantIdentifierL
-    -> e (Maybe DatatypeFieldsL)
+    -> e (Prelude.Maybe DatatypeFieldsL)
     -> Variant e VariantL
 
 data HiddenVariantIdentifier e l where
@@ -657,7 +660,7 @@ data HiddenType e l where
 
 data ApplyType e l where
   ApplyType
-    :: e (ModuleAccessL, Maybe TypeArgumentsL)
+    :: e (ModuleAccessL, Prelude.Maybe TypeArgumentsL)
     -> ApplyType e ApplyTypeL
 
 data ModuleAccess e l where
@@ -665,7 +668,7 @@ data ModuleAccess e l where
     :: e ModuleIdentityL
     -> e ColonColonTokL
     -> e IdentifierL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
@@ -677,13 +680,13 @@ data ModuleAccess e l where
     -> ModuleAccess e ModuleAccessL
   ModuleAccess5
     :: e HiddenModuleIdentifierL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
   ModuleAccess8
     :: e ModuleIdentityL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> e ColonColonTokL
     -> e IdentifierL
     -> ModuleAccess e ModuleAccessL
@@ -697,11 +700,11 @@ data ModuleAccess e l where
     -> ModuleAccess e ModuleAccessL
   ModuleAccess4
     :: e IdentifierL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> ModuleAccess e ModuleAccessL
   ModuleAccess7
     :: e ModuleIdentityL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> ModuleAccess e ModuleAccessL
   ModuleAccessMember
     :: e HiddenReservedIdentifierL
@@ -750,8 +753,8 @@ data ModuleIdentityInternal0 e l where
 
 data NumLiteral e l where
   NumLiteral
-    :: Text
-    -> e (Maybe NumLiteralInternal0L)
+    :: Text.Text
+    -> e (Prelude.Maybe NumLiteralInternal0L)
     -> NumLiteral e NumLiteralL
 
 data NumLiteralInternal0 e l where
@@ -782,7 +785,7 @@ data TypeArguments e l where
 data FunctionType e l where
   FunctionType
     :: e FunctionTypeParametersL
-    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
+    -> e (Prelude.Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
     -> FunctionType e FunctionTypeL
 
 data FunctionTypeParameters e l where
@@ -878,14 +881,14 @@ data FunctionDefinition e l where
 
 data HiddenFunctionSignature e l where
   HiddenFunctionSignature
-    :: e (Maybe ModifierL)
-    -> e (Maybe ModifierL)
-    -> e (Maybe ModifierL)
+    :: e (Prelude.Maybe ModifierL)
+    -> e (Prelude.Maybe ModifierL)
+    -> e (Prelude.Maybe ModifierL)
     -> e FunTokL
     -> e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> e FunctionParametersL
-    -> e (Maybe RetTypeL)
+    -> e (Prelude.Maybe RetTypeL)
     -> HiddenFunctionSignature e HiddenFunctionSignatureL
 
 data HiddenFunctionIdentifier e l where
@@ -936,7 +939,7 @@ data MutFunctionParameter e l where
 data Modifier e l where
   Modifier1
     :: e PublicTokL
-    -> e (Maybe ModifierInternal0L)
+    -> e (Prelude.Maybe ModifierInternal0L)
     -> Modifier e ModifierL
   ModifierEntry
     :: e EntryTokL
@@ -964,7 +967,7 @@ data Block e l where
     :: e LeftCurlyBracketTokL
     -> e [UseDeclarationL]
     -> e [BlockItemL]
-    -> e (Maybe HiddenExpressionL)
+    -> e (Prelude.Maybe HiddenExpressionL)
     -> e RightCurlyBracketTokL
     -> Block e BlockL
 
@@ -1115,7 +1118,7 @@ data HiddenLiteralValue e l where
 
 data AddressLiteral e l where
   AddressLiteral
-    :: Text
+    :: Text.Text
     -> AddressLiteral e AddressLiteralL
 
 data BoolLiteral e l where
@@ -1128,17 +1131,17 @@ data BoolLiteral e l where
 
 data ByteStringLiteral e l where
   ByteStringLiteral
-    :: Text
+    :: Text.Text
     -> ByteStringLiteral e ByteStringLiteralL
 
 data HexStringLiteral e l where
   HexStringLiteral
-    :: Text
+    :: Text.Text
     -> HexStringLiteral e HexStringLiteralL
 
 data StringLiteral e l where
   StringLiteral
-    :: Text
+    :: Text.Text
     -> StringLiteral e StringLiteralL
 
 data AnnotationExpression e l where
@@ -1151,8 +1154,8 @@ data AnnotationExpression e l where
 data BreakExpression e l where
   BreakExpression
     :: e BreakTokL
-    -> e (Maybe LabelL)
-    -> e (Maybe HiddenExpressionL)
+    -> e (Prelude.Maybe LabelL)
+    -> e (Prelude.Maybe HiddenExpressionL)
     -> BreakExpression e BreakExpressionL
 
 data Label e l where
@@ -1173,14 +1176,14 @@ data ArgList e l where
 
 data NameExpression e l where
   NameExpression
-    :: e (Maybe ColonColonTokL)
+    :: e (Prelude.Maybe ColonColonTokL)
     -> e ModuleAccessL
     -> NameExpression e NameExpressionL
 
 data ContinueExpression e l where
   ContinueExpression
     :: e ContinueTokL
-    -> e (Maybe LabelL)
+    -> e (Prelude.Maybe LabelL)
     -> ContinueExpression e ContinueExpressionL
 
 data DotExpression e l where
@@ -1195,7 +1198,7 @@ data ExpressionList e l where
 
 data IfExpression e l where
   IfExpression
-    :: e (((IfTokL, HiddenExpressionL), HiddenExpressionL), Maybe (ElseTokL, HiddenExpressionL))
+    :: e (((IfTokL, HiddenExpressionL), HiddenExpressionL), Prelude.Maybe (ElseTokL, HiddenExpressionL))
     -> IfExpression e IfExpressionL
 
 data IndexExpression e l where
@@ -1206,7 +1209,7 @@ data IndexExpression e l where
 data MacroCallExpression e l where
   MacroCallExpression
     :: e MacroModuleAccessL
-    -> e (Maybe TypeArgumentsL)
+    -> e (Prelude.Maybe TypeArgumentsL)
     -> e ArgListL
     -> MacroCallExpression e MacroCallExpressionL
 
@@ -1231,7 +1234,7 @@ data HiddenMatchBody e l where
 data MatchArm e l where
   MatchArm
     :: e BindListL
-    -> e (Maybe MatchConditionL)
+    -> e (Prelude.Maybe MatchConditionL)
     -> e EqualsSignGreaterThanSignTokL
     -> e HiddenExpressionL
     -> MatchArm e MatchArmL
@@ -1285,7 +1288,7 @@ data AtBind e l where
 data BindUnpack e l where
   BindUnpack
     :: e NameExpressionL
-    -> e (Maybe BindFieldsL)
+    -> e (Prelude.Maybe BindFieldsL)
     -> BindUnpack e BindUnpackL
 
 data BindFields e l where
@@ -1312,7 +1315,7 @@ data BindNamedFieldsInternal0 e l where
 data BindField e l where
   BindField1
     :: e BindListL
-    -> e (Maybe (ColonTokL, BindListL))
+    -> e (Prelude.Maybe (ColonTokL, BindListL))
     -> BindField e BindFieldL
   BindFieldSpreadOperator
     :: e HiddenSpreadOperatorL
@@ -1341,9 +1344,9 @@ data CommaBindList e l where
 
 data OrBindList e l where
   OrBindList
-    :: e (Maybe LeftParenthesisTokL)
-    -> e [((Maybe LeftParenthesisTokL, HiddenBindL), Maybe RightParenthesisTokL)]
-    -> e (Maybe RightParenthesisTokL)
+    :: e (Prelude.Maybe LeftParenthesisTokL)
+    -> e [((Prelude.Maybe LeftParenthesisTokL, HiddenBindL), Prelude.Maybe RightParenthesisTokL)]
+    -> e (Prelude.Maybe RightParenthesisTokL)
     -> OrBindList e OrBindListL
 
 data MatchCondition e l where
@@ -1366,7 +1369,7 @@ data FieldInitializeList e l where
 data ExpField e l where
   ExpField
     :: e HiddenFieldIdentifierL
-    -> e (Maybe (ColonTokL, HiddenExpressionL))
+    -> e (Prelude.Maybe (ColonTokL, HiddenExpressionL))
     -> ExpField e ExpFieldL
 
 data SpecBlock e l where
@@ -1377,7 +1380,7 @@ data SpecBlock e l where
 
 data SpecBlockInternal0 e l where
   SpecBlockInternal01
-    :: e (Maybe HiddenSpecBlockTargetL)
+    :: e (Prelude.Maybe HiddenSpecBlockTargetL)
     -> e SpecBodyL
     -> SpecBlockInternal0 e SpecBlockInternal0L
   SpecBlockInternal0SpecFunction
@@ -1399,7 +1402,7 @@ data SpecBlockTargetSchema e l where
   SpecBlockTargetSchema
     :: e SchemaTokL
     -> e HiddenStructIdentifierL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> SpecBlockTargetSchema e SpecBlockTargetSchemaL
 
 data HiddenStructIdentifier e l where
@@ -1427,7 +1430,7 @@ data NativeSpecFunction e l where
 data HiddenSpecFunctionSignature e l where
   HiddenSpecFunctionSignature
     :: e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> e FunctionParametersL
     -> e RetTypeL
     -> HiddenSpecFunctionSignature e HiddenSpecFunctionSignatureL
@@ -1482,20 +1485,20 @@ data SpecApply e l where
   SpecApply
     :: e HiddenExpressionL
     -> e [SpecApplyPatternL]
-    -> e (Maybe (ExceptTokL, [SpecApplyPatternL]))
+    -> e (Prelude.Maybe (ExceptTokL, [SpecApplyPatternL]))
     -> e SemicolonTokL
     -> SpecApply e SpecApplyL
 
 data SpecApplyPattern e l where
   SpecApplyPattern
-    :: e (Maybe SpecApplyPatternInternal0L)
+    :: e (Prelude.Maybe SpecApplyPatternInternal0L)
     -> e SpecApplyNamePatternL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> SpecApplyPattern e SpecApplyPatternL
 
 data SpecApplyNamePattern e l where
   SpecApplyNamePattern
-    :: Text
+    :: Text.Text
     -> SpecApplyNamePattern e SpecApplyNamePatternL
 
 data SpecApplyPatternInternal0 e l where
@@ -1520,9 +1523,9 @@ data SpecCondition e l where
 data HiddenSpecAbortIf e l where
   HiddenSpecAbortIf
     :: e AbortsIfTokL
-    -> e (Maybe ConditionPropertiesL)
+    -> e (Prelude.Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
-    -> e (Maybe (WithTokL, HiddenExpressionL))
+    -> e (Prelude.Maybe (WithTokL, HiddenExpressionL))
     -> e SemicolonTokL
     -> HiddenSpecAbortIf e HiddenSpecAbortIfL
 
@@ -1534,13 +1537,13 @@ data ConditionProperties e l where
 data SpecProperty e l where
   SpecProperty
     :: e IdentifierL
-    -> e (Maybe (EqualsSignTokL, HiddenLiteralValueL))
+    -> e (Prelude.Maybe (EqualsSignTokL, HiddenLiteralValueL))
     -> SpecProperty e SpecPropertyL
 
 data HiddenSpecAbortWithOrModifies e l where
   HiddenSpecAbortWithOrModifies
     :: e HiddenSpecAbortWithOrModifiesInternal0L
-    -> e (Maybe ConditionPropertiesL)
+    -> e (Prelude.Maybe ConditionPropertiesL)
     -> e [HiddenExpressionL]
     -> e SemicolonTokL
     -> HiddenSpecAbortWithOrModifies e HiddenSpecAbortWithOrModifiesL
@@ -1556,7 +1559,7 @@ data HiddenSpecAbortWithOrModifiesInternal0 e l where
 data HiddenSpecCondition e l where
   HiddenSpecCondition
     :: e HiddenSpecConditionInternal0L
-    -> e (Maybe ConditionPropertiesL)
+    -> e (Prelude.Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
     -> e SemicolonTokL
     -> HiddenSpecCondition e HiddenSpecConditionL
@@ -1564,7 +1567,7 @@ data HiddenSpecCondition e l where
 data HiddenSpecConditionInternal0 e l where
   HiddenSpecConditionInternal02
     :: e RequiresTokL
-    -> e (Maybe ModuleTokL)
+    -> e (Prelude.Maybe ModuleTokL)
     -> HiddenSpecConditionInternal0 e HiddenSpecConditionInternal0L
   HiddenSpecConditionInternal0Kind
     :: e HiddenSpecConditionKindL
@@ -1595,8 +1598,8 @@ data SpecInclude e l where
 data SpecInvariant e l where
   SpecInvariant
     :: e InvariantTokL
-    -> e (Maybe SpecInvariantInternal0L)
-    -> e (Maybe ConditionPropertiesL)
+    -> e (Prelude.Maybe SpecInvariantInternal0L)
+    -> e (Prelude.Maybe ConditionPropertiesL)
     -> e HiddenExpressionL
     -> e SemicolonTokL
     -> SpecInvariant e SpecInvariantL
@@ -1618,7 +1621,7 @@ data SpecInvariantInternal0 e l where
 data SpecLet e l where
   SpecLet
     :: e LetTokL
-    -> e (Maybe PostTokL)
+    -> e (Prelude.Maybe PostTokL)
     -> e IdentifierL
     -> e HiddenExpressionL
     -> SpecLet e SpecLetL
@@ -1630,9 +1633,9 @@ data SpecPragma e l where
 
 data SpecVariable e l where
   SpecVariable
-    :: e (Maybe SpecVariableInternal0L)
+    :: e (Prelude.Maybe SpecVariableInternal0L)
     -> e IdentifierL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> e HiddenTypeL
     -> SpecVariable e SpecVariableL
 
@@ -1646,7 +1649,7 @@ data SpecVariableInternal0 e l where
 
 data UseDeclaration e l where
   UseDeclaration
-    :: e (Maybe PublicTokL)
+    :: e (Prelude.Maybe PublicTokL)
     -> e UseDeclarationInternal0L
     -> UseDeclaration e UseDeclarationL
 
@@ -1673,7 +1676,7 @@ data UseFun e l where
 data UseModule e l where
   UseModule
     :: e ModuleIdentityL
-    -> e (Maybe (AsTokL, HiddenModuleIdentifierL))
+    -> e (Prelude.Maybe (AsTokL, HiddenModuleIdentifierL))
     -> UseModule e UseModuleL
 
 data UseModuleMember e l where
@@ -1688,7 +1691,7 @@ data UseMember e l where
     :: e IdentifierL
     -> e ColonColonTokL
     -> e IdentifierL
-    -> e (Maybe (AsTokL, IdentifierL))
+    -> e (Prelude.Maybe (AsTokL, IdentifierL))
     -> UseMember e UseMemberL
   UseMember1
     :: e IdentifierL
@@ -1697,7 +1700,7 @@ data UseMember e l where
     -> UseMember e UseMemberL
   UseMember3
     :: e IdentifierL
-    -> e (Maybe (AsTokL, IdentifierL))
+    -> e (Prelude.Maybe (AsTokL, IdentifierL))
     -> UseMember e UseMemberL
 
 data UseModuleMembers e l where
@@ -1771,7 +1774,7 @@ data UnaryOp e l where
 data AbortExpression e l where
   AbortExpression
     :: e AbortTokL
-    -> e (Maybe HiddenExpressionL)
+    -> e (Prelude.Maybe HiddenExpressionL)
     -> AbortExpression e AbortExpressionL
 
 data AssignExpression e l where
@@ -1901,7 +1904,7 @@ data BlockIdentifier e l where
 data LambdaExpression e l where
   LambdaExpression
     :: e LambdaBindingsL
-    -> e (Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
+    -> e (Prelude.Maybe (HyphenMinusGreaterThanSignTokL, HiddenTypeL))
     -> e HiddenExpressionL
     -> LambdaExpression e LambdaExpressionL
 
@@ -1913,7 +1916,7 @@ data LambdaBindings e l where
 data LambdaBinding e l where
   LambdaBinding3
     :: e HiddenBindL
-    -> e (Maybe (ColonTokL, HiddenTypeL))
+    -> e (Prelude.Maybe (ColonTokL, HiddenTypeL))
     -> LambdaBinding e LambdaBindingL
   LambdaBindingCommaBindList
     :: e CommaBindListL
@@ -1930,7 +1933,7 @@ data LoopExpression e l where
 
 data QuantifierExpression e l where
   QuantifierExpression
-    :: e ((((QuantifierExpressionInternal0L, QuantifierBindingsL), Maybe (WhereTokL, HiddenExpressionL)), ColonTokL), HiddenExpressionL)
+    :: e ((((QuantifierExpressionInternal0L, QuantifierBindingsL), Prelude.Maybe (WhereTokL, HiddenExpressionL)), ColonTokL), HiddenExpressionL)
     -> QuantifierExpression e QuantifierExpressionL
 
 data QuantifierBindings e l where
@@ -1961,12 +1964,12 @@ data QuantifierExpressionInternal0 e l where
 data ReturnExpression e l where
   ReturnExpression1
     :: e ReturnTokL
-    -> e (Maybe LabelL)
+    -> e (Prelude.Maybe LabelL)
     -> e HiddenExpressionL
     -> ReturnExpression e ReturnExpressionL
   ReturnExpression2
     :: e ReturnTokL
-    -> e (Maybe LabelL)
+    -> e (Prelude.Maybe LabelL)
     -> ReturnExpression e ReturnExpressionL
 
 data WhileExpression e l where
@@ -1994,13 +1997,13 @@ data LetStatement e l where
   LetStatement
     :: e LetTokL
     -> e BindListL
-    -> e (Maybe (ColonTokL, HiddenTypeL))
-    -> e (Maybe (EqualsSignTokL, HiddenExpressionL))
+    -> e (Prelude.Maybe (ColonTokL, HiddenTypeL))
+    -> e (Prelude.Maybe (EqualsSignTokL, HiddenExpressionL))
     -> LetStatement e LetStatementL
 
 data MacroFunctionDefinition e l where
   MacroFunctionDefinition
-    :: e (Maybe ModifierL)
+    :: e (Prelude.Maybe ModifierL)
     -> e MacroTokL
     -> e HiddenMacroSignatureL
     -> e BlockL
@@ -2008,12 +2011,12 @@ data MacroFunctionDefinition e l where
 
 data HiddenMacroSignature e l where
   HiddenMacroSignature
-    :: e (Maybe ModifierL)
+    :: e (Prelude.Maybe ModifierL)
     -> e FunTokL
     -> e HiddenFunctionIdentifierL
-    -> e (Maybe TypeParametersL)
+    -> e (Prelude.Maybe TypeParametersL)
     -> e FunctionParametersL
-    -> e (Maybe RetTypeL)
+    -> e (Prelude.Maybe RetTypeL)
     -> HiddenMacroSignature e HiddenMacroSignatureL
 
 data NativeFunctionDefinition e l where
@@ -2032,7 +2035,7 @@ data HiddenStructItem e l where
 
 data NativeStructDefinition e l where
   NativeStructDefinition
-    :: e (Maybe PublicTokL)
+    :: e (Prelude.Maybe PublicTokL)
     -> e HiddenStructSignatureL
     -> NativeStructDefinition e NativeStructDefinitionL
 
@@ -2040,16 +2043,16 @@ data HiddenStructSignature e l where
   HiddenStructSignature
     :: e StructTokL
     -> e HiddenStructIdentifierL
-    -> e (Maybe TypeParametersL)
-    -> e (Maybe AbilityDeclsL)
+    -> e (Prelude.Maybe TypeParametersL)
+    -> e (Prelude.Maybe AbilityDeclsL)
     -> HiddenStructSignature e HiddenStructSignatureL
 
 data StructDefinition e l where
   StructDefinition
-    :: e (Maybe PublicTokL)
+    :: e (Prelude.Maybe PublicTokL)
     -> e HiddenStructSignatureL
     -> e DatatypeFieldsL
-    -> e (Maybe PostfixAbilityDeclsL)
+    -> e (Prelude.Maybe PostfixAbilityDeclsL)
     -> StructDefinition e StructDefinitionL
 
 data Constant e l where
@@ -2078,7 +2081,7 @@ data ModuleExtensionDefinition e l where
     -> e ModuleDefinitionL
     -> ModuleExtensionDefinition e ModuleExtensionDefinitionL
 
-deriveAll
+Derive.deriveAll
   [ ''SourceFile
   , ''SourceFileInternal0
   , ''ModuleDefinition
@@ -2456,14 +2459,14 @@ type MoveSig =
    , Syntax.ListF
    ]
 
-type MoveTerm      = Term MoveSig
-type MoveTermLab l = TermLab MoveSig l
+type MoveTerm = Comp.Term MoveSig
+type MoveTermLab l = Info.TermLab MoveSig l
 
 --------------------------------------------------------------------------------
 -- Entry point
 --------------------------------------------------------------------------------
 
-type instance RootSort MoveSig = SourceFileL
+type instance ParsePretty.RootSort MoveSig = SourceFileL
 
 --------------------------------------------------------------------------------
 -- Signature TH Names
@@ -2671,462 +2674,462 @@ moveSigNames =
 -- instance per term type avoids the n-grammar-names × m-tokens code
 -- explosion and gets the @:&: a@ wrapper for free via the
 -- @KDynCase (f :&: a) l@ instance in compstrat.)
-instance KDynCase Token ExclamationMarkTokL where
-  kdyncase ExclamationMarkTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ExclamationMarkEqualsSignTokL where
-  kdyncase ExclamationMarkEqualsSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token NumberSignLeftSquareBracketTokL where
-  kdyncase NumberSignLeftSquareBracketTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token DollarSignTokL where
-  kdyncase DollarSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PercentSignTokL where
-  kdyncase PercentSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AmpersandTokL where
-  kdyncase AmpersandTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AmpersandAmpersandTokL where
-  kdyncase AmpersandAmpersandTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ApostropheTokL where
-  kdyncase ApostropheTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LeftParenthesisTokL where
-  kdyncase LeftParenthesisTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token RightParenthesisTokL where
-  kdyncase RightParenthesisTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AsteriskTokL where
-  kdyncase AsteriskTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PlusSignTokL where
-  kdyncase PlusSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token CommaTokL where
-  kdyncase CommaTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token HyphenMinusTokL where
-  kdyncase HyphenMinusTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token HyphenMinusGreaterThanSignTokL where
-  kdyncase HyphenMinusGreaterThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token FullStopTokL where
-  kdyncase FullStopTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token FullStopFullStopTokL where
-  kdyncase FullStopFullStopTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SolidusTokL where
-  kdyncase SolidusTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SolidusAsteriskTokL where
-  kdyncase SolidusAsteriskTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SolidusSolidusTokL where
-  kdyncase SolidusSolidusTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ColonTokL where
-  kdyncase ColonTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ColonColonTokL where
-  kdyncase ColonColonTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SemicolonTokL where
-  kdyncase SemicolonTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LessThanSignTokL where
-  kdyncase LessThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LessThanSignLessThanSignTokL where
-  kdyncase LessThanSignLessThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LessThanSignEqualsSignTokL where
-  kdyncase LessThanSignEqualsSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EqualsSignTokL where
-  kdyncase EqualsSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EqualsSignEqualsSignTokL where
-  kdyncase EqualsSignEqualsSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EqualsSignEqualsSignGreaterThanSignTokL where
-  kdyncase EqualsSignEqualsSignGreaterThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EqualsSignGreaterThanSignTokL where
-  kdyncase EqualsSignGreaterThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token GreaterThanSignTokL where
-  kdyncase GreaterThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token GreaterThanSignEqualsSignTokL where
-  kdyncase GreaterThanSignEqualsSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token GreaterThanSignGreaterThanSignTokL where
-  kdyncase GreaterThanSignGreaterThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token CommercialAtTokL where
-  kdyncase CommercialAtTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LeftSquareBracketTokL where
-  kdyncase LeftSquareBracketTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token RightSquareBracketTokL where
-  kdyncase RightSquareBracketTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token CircumflexAccentTokL where
-  kdyncase CircumflexAccentTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AbortTokL where
-  kdyncase AbortTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AbortsIfTokL where
-  kdyncase AbortsIfTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AbortsWithTokL where
-  kdyncase AbortsWithTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AddressTokL where
-  kdyncase AddressTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ApplyTokL where
-  kdyncase ApplyTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AsTokL where
-  kdyncase AsTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AssertTokL where
-  kdyncase AssertTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token AssumeTokL where
-  kdyncase AssumeTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token BoolTokL where
-  kdyncase BoolTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token BreakTokL where
-  kdyncase BreakTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ConstTokL where
-  kdyncase ConstTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ContinueTokL where
-  kdyncase ContinueTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token CopyTokL where
-  kdyncase CopyTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token DecreasesTokL where
-  kdyncase DecreasesTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token DropTokL where
-  kdyncase DropTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ElseTokL where
-  kdyncase ElseTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EnsuresTokL where
-  kdyncase EnsuresTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EntryTokL where
-  kdyncase EntryTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token EnumTokL where
-  kdyncase EnumTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ExceptTokL where
-  kdyncase ExceptTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ExistsTokL where
-  kdyncase ExistsTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ExtendTokL where
-  kdyncase ExtendTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token FalseTokL where
-  kdyncase FalseTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ForallTokL where
-  kdyncase ForallTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token FriendTokL where
-  kdyncase FriendTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token FunTokL where
-  kdyncase FunTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token GlobalTokL where
-  kdyncase GlobalTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token HasTokL where
-  kdyncase HasTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token IfTokL where
-  kdyncase IfTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token InTokL where
-  kdyncase InTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token IncludeTokL where
-  kdyncase IncludeTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token InternalTokL where
-  kdyncase InternalTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token InvariantTokL where
-  kdyncase InvariantTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token KeyTokL where
-  kdyncase KeyTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LetTokL where
-  kdyncase LetTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LocalTokL where
-  kdyncase LocalTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LoopTokL where
-  kdyncase LoopTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token MacroTokL where
-  kdyncase MacroTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token MatchTokL where
-  kdyncase MatchTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ModifiesTokL where
-  kdyncase ModifiesTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ModuleTokL where
-  kdyncase ModuleTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token MoveTokL where
-  kdyncase MoveTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token MutTokL where
-  kdyncase MutTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token NativeTokL where
-  kdyncase NativeTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PackTokL where
-  kdyncase PackTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PackageTokL where
-  kdyncase PackageTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PhantomTokL where
-  kdyncase PhantomTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PostTokL where
-  kdyncase PostTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PragmaTokL where
-  kdyncase PragmaTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token PublicTokL where
-  kdyncase PublicTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token RequiresTokL where
-  kdyncase RequiresTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ReturnTokL where
-  kdyncase ReturnTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SchemaTokL where
-  kdyncase SchemaTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SignerTokL where
-  kdyncase SignerTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SpecTokL where
-  kdyncase SpecTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token StoreTokL where
-  kdyncase StoreTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token StructTokL where
-  kdyncase StructTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token SucceedsIfTokL where
-  kdyncase SucceedsIfTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token ToTokL where
-  kdyncase ToTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token TrueTokL where
-  kdyncase TrueTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U128TokL where
-  kdyncase U128Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U16TokL where
-  kdyncase U16Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U256TokL where
-  kdyncase U256Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U32TokL where
-  kdyncase U32Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U64TokL where
-  kdyncase U64Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token U8TokL where
-  kdyncase U8Tok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token UnpackTokL where
-  kdyncase UnpackTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token UpdateTokL where
-  kdyncase UpdateTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token UseTokL where
-  kdyncase UseTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token VectorLessThanSignTokL where
-  kdyncase VectorLessThanSignTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token VectorLeftSquareBracketTokL where
-  kdyncase VectorLeftSquareBracketTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token WhereTokL where
-  kdyncase WhereTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token WhileTokL where
-  kdyncase WhileTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token WithTokL where
-  kdyncase WithTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token LeftCurlyBracketTokL where
-  kdyncase LeftCurlyBracketTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token VerticalLineTokL where
-  kdyncase VerticalLineTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token VerticalLineVerticalLineTokL where
-  kdyncase VerticalLineVerticalLineTok = Just Refl
-  kdyncase _                    = Nothing
-
-instance KDynCase Token RightCurlyBracketTokL where
-  kdyncase RightCurlyBracketTok = Just Refl
-  kdyncase _                    = Nothing
+instance Classification.KDynCase Token ExclamationMarkTokL where
+  kdyncase ExclamationMarkTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ExclamationMarkEqualsSignTokL where
+  kdyncase ExclamationMarkEqualsSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token NumberSignLeftSquareBracketTokL where
+  kdyncase NumberSignLeftSquareBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token DollarSignTokL where
+  kdyncase DollarSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PercentSignTokL where
+  kdyncase PercentSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AmpersandTokL where
+  kdyncase AmpersandTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AmpersandAmpersandTokL where
+  kdyncase AmpersandAmpersandTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ApostropheTokL where
+  kdyncase ApostropheTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LeftParenthesisTokL where
+  kdyncase LeftParenthesisTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token RightParenthesisTokL where
+  kdyncase RightParenthesisTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AsteriskTokL where
+  kdyncase AsteriskTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PlusSignTokL where
+  kdyncase PlusSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token CommaTokL where
+  kdyncase CommaTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token HyphenMinusTokL where
+  kdyncase HyphenMinusTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token HyphenMinusGreaterThanSignTokL where
+  kdyncase HyphenMinusGreaterThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token FullStopTokL where
+  kdyncase FullStopTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token FullStopFullStopTokL where
+  kdyncase FullStopFullStopTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SolidusTokL where
+  kdyncase SolidusTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SolidusAsteriskTokL where
+  kdyncase SolidusAsteriskTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SolidusSolidusTokL where
+  kdyncase SolidusSolidusTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ColonTokL where
+  kdyncase ColonTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ColonColonTokL where
+  kdyncase ColonColonTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SemicolonTokL where
+  kdyncase SemicolonTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LessThanSignTokL where
+  kdyncase LessThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LessThanSignLessThanSignTokL where
+  kdyncase LessThanSignLessThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LessThanSignEqualsSignTokL where
+  kdyncase LessThanSignEqualsSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EqualsSignTokL where
+  kdyncase EqualsSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EqualsSignEqualsSignTokL where
+  kdyncase EqualsSignEqualsSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EqualsSignEqualsSignGreaterThanSignTokL where
+  kdyncase EqualsSignEqualsSignGreaterThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EqualsSignGreaterThanSignTokL where
+  kdyncase EqualsSignGreaterThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token GreaterThanSignTokL where
+  kdyncase GreaterThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token GreaterThanSignEqualsSignTokL where
+  kdyncase GreaterThanSignEqualsSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token GreaterThanSignGreaterThanSignTokL where
+  kdyncase GreaterThanSignGreaterThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token CommercialAtTokL where
+  kdyncase CommercialAtTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LeftSquareBracketTokL where
+  kdyncase LeftSquareBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token RightSquareBracketTokL where
+  kdyncase RightSquareBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token CircumflexAccentTokL where
+  kdyncase CircumflexAccentTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AbortTokL where
+  kdyncase AbortTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AbortsIfTokL where
+  kdyncase AbortsIfTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AbortsWithTokL where
+  kdyncase AbortsWithTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AddressTokL where
+  kdyncase AddressTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ApplyTokL where
+  kdyncase ApplyTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AsTokL where
+  kdyncase AsTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AssertTokL where
+  kdyncase AssertTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token AssumeTokL where
+  kdyncase AssumeTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token BoolTokL where
+  kdyncase BoolTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token BreakTokL where
+  kdyncase BreakTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ConstTokL where
+  kdyncase ConstTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ContinueTokL where
+  kdyncase ContinueTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token CopyTokL where
+  kdyncase CopyTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token DecreasesTokL where
+  kdyncase DecreasesTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token DropTokL where
+  kdyncase DropTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ElseTokL where
+  kdyncase ElseTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EnsuresTokL where
+  kdyncase EnsuresTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EntryTokL where
+  kdyncase EntryTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token EnumTokL where
+  kdyncase EnumTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ExceptTokL where
+  kdyncase ExceptTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ExistsTokL where
+  kdyncase ExistsTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ExtendTokL where
+  kdyncase ExtendTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token FalseTokL where
+  kdyncase FalseTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ForallTokL where
+  kdyncase ForallTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token FriendTokL where
+  kdyncase FriendTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token FunTokL where
+  kdyncase FunTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token GlobalTokL where
+  kdyncase GlobalTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token HasTokL where
+  kdyncase HasTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token IfTokL where
+  kdyncase IfTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token InTokL where
+  kdyncase InTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token IncludeTokL where
+  kdyncase IncludeTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token InternalTokL where
+  kdyncase InternalTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token InvariantTokL where
+  kdyncase InvariantTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token KeyTokL where
+  kdyncase KeyTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LetTokL where
+  kdyncase LetTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LocalTokL where
+  kdyncase LocalTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LoopTokL where
+  kdyncase LoopTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token MacroTokL where
+  kdyncase MacroTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token MatchTokL where
+  kdyncase MatchTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ModifiesTokL where
+  kdyncase ModifiesTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ModuleTokL where
+  kdyncase ModuleTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token MoveTokL where
+  kdyncase MoveTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token MutTokL where
+  kdyncase MutTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token NativeTokL where
+  kdyncase NativeTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PackTokL where
+  kdyncase PackTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PackageTokL where
+  kdyncase PackageTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PhantomTokL where
+  kdyncase PhantomTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PostTokL where
+  kdyncase PostTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PragmaTokL where
+  kdyncase PragmaTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token PublicTokL where
+  kdyncase PublicTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token RequiresTokL where
+  kdyncase RequiresTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ReturnTokL where
+  kdyncase ReturnTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SchemaTokL where
+  kdyncase SchemaTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SignerTokL where
+  kdyncase SignerTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SpecTokL where
+  kdyncase SpecTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token StoreTokL where
+  kdyncase StoreTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token StructTokL where
+  kdyncase StructTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token SucceedsIfTokL where
+  kdyncase SucceedsIfTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token ToTokL where
+  kdyncase ToTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token TrueTokL where
+  kdyncase TrueTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U128TokL where
+  kdyncase U128Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U16TokL where
+  kdyncase U16Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U256TokL where
+  kdyncase U256Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U32TokL where
+  kdyncase U32Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U64TokL where
+  kdyncase U64Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token U8TokL where
+  kdyncase U8Tok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token UnpackTokL where
+  kdyncase UnpackTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token UpdateTokL where
+  kdyncase UpdateTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token UseTokL where
+  kdyncase UseTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token VectorLessThanSignTokL where
+  kdyncase VectorLessThanSignTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token VectorLeftSquareBracketTokL where
+  kdyncase VectorLeftSquareBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token WhereTokL where
+  kdyncase WhereTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token WhileTokL where
+  kdyncase WhileTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token WithTokL where
+  kdyncase WithTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token LeftCurlyBracketTokL where
+  kdyncase LeftCurlyBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token VerticalLineTokL where
+  kdyncase VerticalLineTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token VerticalLineVerticalLineTokL where
+  kdyncase VerticalLineVerticalLineTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
+
+instance Classification.KDynCase Token RightCurlyBracketTokL where
+  kdyncase RightCurlyBracketTok = Prelude.Just Equality.Refl
+  kdyncase _ = Prelude.Nothing
