@@ -79,6 +79,74 @@ in {
       popd
     '';
 
+    gen-python-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-python/cbits/src/grammar.json \
+        --start-rule-name module \
+        --module-name Cubix.Language.PythonTS.Modularized \
+        --keep-text _string_content \
+        -o cubix-python-ts/src/Cubix/Language/PythonTS/Modularized.hs
+      popd
+    '';
+
+    gen-python-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-python/cbits/src/grammar.json \
+        --start-rule-name module \
+        --module-name Cubix.Language.PythonTS.RawParse \
+        --keep-text _string_content \
+        -o cubix-python-ts/src/Cubix/Language/PythonTS/RawParse.hs
+      popd
+    '';
+
+    gen-typescript-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-typescript/cbits/typescript/src/grammar.json \
+        --start-rule-name program \
+        --module-name Cubix.Language.TypeScript.Modularized \
+        --keep-text _template_chars \
+        -o cubix-typescript/src/Cubix/Language/TypeScript/Modularized.hs
+      popd
+    '';
+
+    gen-typescript-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-typescript/cbits/typescript/src/grammar.json \
+        --start-rule-name program \
+        --module-name Cubix.Language.TypeScript.RawParse \
+        --keep-text _template_chars \
+        -o cubix-typescript/src/Cubix/Language/TypeScript/RawParse.hs
+      popd
+    '';
+
+    gen-haskell-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-haskell/cbits/src/grammar.json \
+        --start-rule-name haskell \
+        --module-name Cubix.Language.Haskell.Modularized \
+        --keep-text _varsym \
+        --keep-text _consym \
+        -o cubix-haskell/src/Cubix/Language/Haskell/Modularized.hs
+      popd
+    '';
+
+    gen-haskell-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-haskell/cbits/src/grammar.json \
+        --start-rule-name haskell \
+        --module-name Cubix.Language.Haskell.RawParse \
+        --keep-text _varsym \
+        --keep-text _consym \
+        -o cubix-haskell/src/Cubix/Language/Haskell/RawParse.hs
+      popd
+    '';
+
   };
 
   env = {

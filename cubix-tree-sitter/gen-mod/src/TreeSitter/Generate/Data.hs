@@ -13,7 +13,7 @@ import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set (empty, fromList, singleton)
 import Data.Text (Text)
-import Data.Text qualified as Text (all, head, null, show, split, stripPrefix)
+import Data.Text qualified as Text (all, null, show, split, stripPrefix)
 import Data.Vector qualified as Vector (foldl, foldr, head, toList, uncons)
 import GHC.Generics (Generic)
 
@@ -25,9 +25,6 @@ import TreeSitter.Generate.Parser
 import TreeSitter.Generate.Types
 import TreeSitter.Grammar
 
-isHidden :: RuleName -> Bool
-isHidden n = Text.head n == '_'
-
 -- | True for hoist-synthesised intermediate rules whose names follow
 -- the @<parent>_internalN@ pattern emitted by
 -- 'TreeSitter.Grammar.Transform.HoistDefinitions.hoistDedup'.
@@ -37,7 +34,7 @@ isHidden n = Text.head n == '_'
 -- @internal@, so user-defined tokens or rules literally named
 -- @internal@ (Sui Move has one) don't get misclassified as
 -- generator-internal and consequently routed through the EOF-only
--- @p<Name>Tok@ helper instead of an in-stream @pSort@.
+-- @p<Name>Tok@ helper instead of an in-stream @fragmentSortP@.
 isInternal :: RuleName -> Bool
 isInternal n = any matchInternal (Text.split (== '_') n)
   where
@@ -123,10 +120,12 @@ ruleToConstructor rules parent = go
       ChoiceRule _ -> error $ "Choice is not a valid constructor: " <> show parent
       BlankRule    -> error $ "Blank is not a valid constructor: " <> show parent
       AliasRule {} -> error $ "Alias is not a valid constructor: " <> show parent
-      RepeatRule {} -> error $ "Repeat is not a valid constructor: " <> show parent
-      Repeat1Rule {} -> error $ "Repeat1 is not a valid constructor: " <> show parent
-      SepByRule {} ->  error $ "SepBy is not a valid constructor: " <> show parent
-      SepBy1Rule {} ->  error $ "SepBy1 is not a valid constructor: " <> show parent
+      -- An alternative that is a repetition (Haskell's @_bind_matches@ is
+      -- @choice(_simple_bind_match, repeat1(_bind_match))@) has one list field
+      r@(RepeatRule {}) -> Constructor parent [toField r] (mkParser r)
+      r@(Repeat1Rule {}) -> Constructor parent [toField r] (mkParser r)
+      r@(SepByRule {}) -> Constructor parent [toField r] (mkParser r)
+      r@(SepBy1Rule {}) -> Constructor parent [toField r] (mkParser r)
       r@(BetweenRule {..}) -> Constructor parent [toField content] (mkParser r)
       r@(StringRule s) -> Constructor (suffix s) [toField r] (mkParser r)
       TokenRule r -> go r

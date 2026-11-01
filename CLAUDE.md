@@ -106,6 +106,7 @@ You can find example config for Sui Move grammar in the `tree-sitter-sui-move/ve
 ```bash
 cat <<< $(jq 'walk(if type != "object" then . else if .type == "ALIAS" then .content else . end end)' src/grammar.json) > src/grammar.json
 ```
+If the grammar declares `supertypes` whose names don't start with `_` (most do, e.g. Python's `expression`), also strip them with `cubix-tree-sitter/jq/supertypes.jq`: tree-sitter hides supertype nodes, which the generated parser doesn't expect, and stripping aliases can make them invalid anyway. `gen-mod` refuses grammars that still have them.
 
 3. Once processed you need to regenerate tree-sitter artefacts from processed grammar file:
 ```bash
@@ -133,6 +134,8 @@ cabal run gen-parser -- \
     --token-map {path to preserved_tokens.json} \
     -o {output file}
 ```
+
+   Grammars with a hand-written scanner (`externals` in `grammar.json`) need nothing special, except: a hidden external token that carries text found nowhere else in the tree (Python's `_string_content`, Haskell's `_varsym`) must be passed to both generators as `--keep-text <name>`, so the rules using it keep their source text. Hidden externals are otherwise dropped, since most are zero-width (layout, automatic semicolons). See `TreeSitter.Grammar.Transform.Externals`.
 
 7. Define `IPS.Types` submodule with appropriate nodes replaced by it's generic counterparts
 

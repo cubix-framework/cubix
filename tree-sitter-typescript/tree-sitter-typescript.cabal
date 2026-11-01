@@ -1,0 +1,42 @@
+cabal-version: 3.4
+name:          tree-sitter-typescript
+version:       1.0.0
+synopsis:      Tree-sitter grammar/parser for TypeScript, preprocessed for Cubix
+description:
+  The tree-sitter-typescript@0.23.2 grammar with aliases and supertypes stripped
+  (see README.md), compiled for use with the hs-tree-sitter package.
+category:      Language
+license:       MIT
+license-file:  LICENSE
+build-type:    Simple
+bug-reports:   https://github.com/cubix-framework/cubix/issues
+extra-source-files:
+  README.md
+  vendor/grammar.json
+  cbits/typescript/src/grammar.json
+  cbits/typescript/src/node-types.json
+  cbits/typescript/src/parser.c
+  cbits/typescript/src/scanner.c
+  cbits/typescript/src/tree_sitter/tree-sitter-typescript.h
+  cbits/typescript/src/tree_sitter/alloc.h
+  cbits/typescript/src/tree_sitter/array.h
+  cbits/typescript/src/tree_sitter/parser.h
+  cbits/common/scanner.h
+
+common language
+  default-language: GHC2021
+
+library
+  import: language
+  exposed-modules:
+    TreeSitter.TypeScript
+  build-depends:
+      base >= 4.12 && < 5
+    , base-compat-constptr  >=0.1  && <0.2
+  include-dirs:
+    cbits/typescript/src
+  includes:
+    tree_sitter/tree-sitter-typescript.h
+  c-sources:
+    cbits/typescript/src/parser.c
+    cbits/typescript/src/scanner.c

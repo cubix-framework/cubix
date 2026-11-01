@@ -9,6 +9,7 @@ import Data.Vector qualified as Vector (elem, filter, length, null, unsafeHead)
 
 import Data.Functor.Foldable (Corecursive (..), Recursive (..), fold)
 
+import Data.Vector.Extra qualified as Vector (nub)
 import TreeSitter.Grammar
 
 stripBlanks :: Grammar -> Grammar
@@ -25,7 +26,9 @@ stripBlanksAlg (SeqRuleF (Vector.filter (/= BlankRule) -> members))
   | Vector.length members == 1 = Vector.unsafeHead members
   | otherwise = SeqRule members
 
-stripBlanksAlg (ChoiceRuleF members)
+-- Duplicate alternatives (which stripping aliases can create) are
+-- dropped too: they would become identically named constructors.
+stripBlanksAlg (ChoiceRuleF (Vector.nub -> members))
   | Vector.null members =
       BlankRule
   | Vector.elem BlankRule members =
@@ -39,6 +42,11 @@ stripBlanksAlg (ChoiceRuleF members)
 stripBlanksAlg (AliasRuleF _ _ BlankRule) = BlankRule
 stripBlanksAlg (RepeatRuleF BlankRule) = BlankRule
 stripBlanksAlg (Repeat1RuleF BlankRule) = BlankRule
+-- A repetition of something optional (e.g. a choice with an alternative
+-- that became blank, such as a hidden external token) is just a
+-- repetition
+stripBlanksAlg (RepeatRuleF (OptionalRule r)) = RepeatRule r
+stripBlanksAlg (Repeat1RuleF (OptionalRule r)) = RepeatRule r
 stripBlanksAlg (TokenRuleF BlankRule) = BlankRule
 stripBlanksAlg (ImmediateTokenRuleF BlankRule) = BlankRule
 stripBlanksAlg (FieldRuleF _ BlankRule) = BlankRule

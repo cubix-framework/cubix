@@ -1,9 +1,9 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Main (main) where
 
 import Control.Applicative (Alternative (..))
+import Data.Set qualified as Set (fromList)
 import Data.Text (Text)
 import Data.Text.Encoding qualified as T (decodeUtf8)
 import Data.Text.IO qualified as T (putStrLn, writeFile)
@@ -22,6 +22,7 @@ data Options = Options
   { inputFile :: FilePath
   , outputFile :: Maybe FilePath
   , tokenMapFile :: Maybe FilePath
+  , keepText :: [Text]
   , metadata :: Metadata
   }
 
@@ -81,6 +82,13 @@ parserOptions =
               <> help "Hint which token to preserve in the syntax."
           )
       )
+    <*> many
+      ( strOption
+          ( long "keep-text"
+              <> metavar "EXTERNAL"
+              <> help "A hidden external token that carries text (e.g. Python's _string_content). Rules using it keep their source text. Repeatable."
+          )
+      )
     <*> parserMetadata
 
 optionsInfo :: ParserInfo Options
@@ -91,9 +99,9 @@ optionsInfo =
 
 main :: IO ()
 main = do
-  Options{..} <- execParser optionsInfo
+  Options { inputFile, outputFile, keepText, metadata } <- execParser optionsInfo
   grammar <- either fail pure =<< eitherDecodeFileStrict inputFile
-  let grammar' = transform grammar
+  let grammar' = transform TransformOptions { keepTextExternals = Set.fromList keepText } grammar
 
   result <- either fail pure (renderSyntax metadata grammar' "ParsePretty.hs.template" template)
   maybe T.putStrLn T.writeFile outputFile result

@@ -3,6 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -13,8 +14,12 @@ module TreeSitter.Grammar where
 
 import Control.Applicative (Alternative (..))
 import Data.Map (Map)
+import Data.Set (Set)
+import Data.Set qualified as Set (fromList)
 import Data.Text (Text)
+import Data.Text qualified as Text (isPrefixOf)
 import Data.Vector (Vector)
+import Data.Vector qualified as Vector (toList)
 import GHC.Generics (Generic)
 
 import Data.Aeson.Types (FromJSON (..), Parser, Value (..), defaultOptions, genericParseJSON, typeMismatch, withObject, (.:), (.:?))
@@ -34,6 +39,11 @@ type RuleName = Text
 
 type FieldName = Text
 
+-- | Rules whose names start with an underscore are hidden: tree-sitter
+-- never emits a node for them.
+isHidden :: RuleName -> Bool
+isHidden = Text.isPrefixOf "_"
+
 data Grammar = Grammar
   { name :: !GrammarName
   , inherits :: !(Maybe GrammarName)
@@ -48,6 +58,12 @@ data Grammar = Grammar
   , supertypes :: !(Maybe (Vector RuleName))
   }
   deriving (Show, Generic)
+
+-- | Names of the rules listed in @extras@ (comments and the like),
+-- which may occur anywhere and are skipped by the generated parser.
+extraRuleNames :: Grammar -> Set RuleName
+extraRuleNames grammar =
+  Set.fromList [ ruleName | SymbolRule ruleName <- Vector.toList grammar.extras ]
 
 instance FromJSON Grammar where
   parseJSON :: Value -> Parser Grammar
