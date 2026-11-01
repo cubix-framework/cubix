@@ -79,6 +79,28 @@ in {
       popd
     '';
 
+    gen-python-mod.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-mod -- \
+        tree-sitter-python/cbits/src/grammar.json \
+        --start-rule-name module \
+        --module-name Cubix.Language.PythonTS.Modularized \
+        --keep-text _string_content \
+        -o cubix-python-ts/src/Cubix/Language/PythonTS/Modularized.hs
+      popd
+    '';
+
+    gen-python-parser.exec = ''
+      pushd $DEVENV_ROOT
+      cabal run gen-parser -- \
+        tree-sitter-python/cbits/src/grammar.json \
+        --start-rule-name module \
+        --module-name Cubix.Language.PythonTS.RawParse \
+        --keep-text _string_content \
+        -o cubix-python-ts/src/Cubix/Language/PythonTS/RawParse.hs
+      popd
+    '';
+
   };
 
   env = {

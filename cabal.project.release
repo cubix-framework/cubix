@@ -5,9 +5,11 @@ packages:
     compstrat
     cubix-benchmarks
     cubix-examples
+    cubix-python-ts
     cubix-solidity
     cubix-sui-move
     cubix-tree-sitter
+    tree-sitter-python
     tree-sitter-sui-move
 
 source-repository-package
