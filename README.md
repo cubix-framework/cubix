@@ -242,3 +242,25 @@ In some directory:
     git reset --hard 7bd4afec86849a57b48f375a9c4e0c32f0539dad # Only if you want the same revision as in the paper
     ./configure
     make
+
+# Pinning GitHub Actions
+
+Every third-party action or reusable workflow in `.github/` must be
+pinned to a full 40-character commit SHA, with the version it
+corresponds to in a trailing comment:
+
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+Tags like `@v4` and branches like `@main` can be repointed by whoever
+controls the action's repository, and that code then runs in our CI with
+our secrets; a commit SHA can't be. Local actions (`./...`) are exempt, and
+`docker://` images must be pinned by `@sha256:` digest. CI enforces this
+with `scripts/check-pinned-actions.py`, which you can also run locally.
+
+To bump a pinned action, pick the new release tag, resolve it to the commit
+it points to, and update both the SHA and the comment:
+
+    gh api repos/actions/checkout/commits/v4.5.0 --jq .sha
+
+(`commits/REF` gives the commit even for annotated tags, whose tag object
+has a different SHA.)
