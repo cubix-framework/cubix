@@ -2,16 +2,26 @@
 on: [push]
 name: build
 jobs:
+  pinned_actions:
+    name: Check GitHub Actions are pinned to commit SHAs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Check pinned actions
+        run: python3 scripts/check-pinned-actions.py
+
   cubix_test:
     name: Cubix test suites
     runs-on: ubuntu-24.04 # or macOS-latest, or windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
       - name: Rewrite SSH git URLs to HTTPS for CI
         run: git config --global url."https://github.com/".insteadOf "git@github.com:"
-      - uses: haskell-actions/setup@v2
+      - uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d # v2.12.1
         with:
           ghc-version: '9.8.4' # Exact version of ghc to use
           cabal-version: 'latest'
